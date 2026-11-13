@@ -1,14 +1,17 @@
-import type { MapCreate, MapDoc, MapSummary } from '../../../../api/types'
+import type { MapBiome, MapCreate, MapDoc, MapLevel, MapSummary } from '../../../../api/types'
+import { usedBiomeIds } from './mapBiomes'
 import { descendantIds } from './mapModel'
 
 // A map as a file: a map and the maps inside it, with their versions over the story and their journeys, to move to another project or keep. The file is JSON; its maps
 // are the maps as the project holds them, except that the links that point outside the file are cut (a place that opened a map that is not in the file opens nothing).
 // Importing makes new maps (new ids, so nothing already there is touched) or, for a map the project already has under the same id, replaces it when asked. A version
-// comes with its map; a journey is of a character, so one whose character the project does not have is left out.
+// comes with its map; a journey is of a character, so one whose character the project does not have is left out. The project's own biomes that the maps use
+// come too (version 3), and are added to the project's own on import; a map of an older file (painted cells) is traced into biome shapes by the server.
 
 export const MAP_FILE_FORMAT = 'scriblr-maps'
-// Version 2 holds the versions of the maps (a map with `versionOf`); a version 1 file has none.
-export const MAP_FILE_VERSION = 2
+// Version 2 holds the versions of the maps (a map with `versionOf`); a version 1 file has none. Version 3 holds maps of levels and biome shapes, and the
+// project's own biomes they use.
+export const MAP_FILE_VERSION = 3
 
 export interface MapFile {
   format: typeof MAP_FILE_FORMAT
@@ -17,10 +20,13 @@ export interface MapFile {
   // The map that was exported; the rest are inside it.
   rootId: string
   maps: MapDoc[]
+  // The project's own biomes the maps use (version 3; absent before).
+  biomes?: MapBiome[]
 }
 
-// The file for a map and everything inside it. `all` are the project's maps (whole); the ones inside the map are found by their parents.
-export function buildMapFile(rootId: string, all: MapDoc[], now = new Date()): MapFile | null {
+// The file for a map and everything inside it. `all` are the project's maps (whole); the ones inside the map are found by their parents. `own` are the
+// project's own biomes (the ones the kept maps use go in the file).
+export function buildMapFile(rootId: string, all: MapDoc[], own: MapBiome[] = [], now = new Date()): MapFile | null {
   const root = all.find(m => m.id === rootId)
   if (!root) return null
   const inside = descendantIds(all, rootId)
@@ -30,15 +36,19 @@ export function buildMapFile(rootId: string, all: MapDoc[], now = new Date()): M
     ...m,
     parentId: m.id === rootId || m.versionOf ? null : m.parentId,
     symbols: m.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(id => keep.has(id)) })),
+    shapes: m.shapes.map(s => (s.mapIds ? { ...s, mapIds: s.mapIds.filter(id => keep.has(id)) } : s)),
   }))
-  return { format: MAP_FILE_FORMAT, version: MAP_FILE_VERSION, exportedAt: now.toISOString(), rootId, maps }
+  const used = new Set(maps.flatMap(m => (m.base ? usedBiomeIds(m) : [])))
+  const biomes = own.filter(b => used.has(b.id))
+  return { format: MAP_FILE_FORMAT, version: MAP_FILE_VERSION, exportedAt: now.toISOString(), rootId, maps, biomes }
 }
 
 export type ParsedFile = { ok: true; file: MapFile } | { ok: false; error: string }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-// Read a file's text: it must be a Scriblr map file of a version this app knows, with at least one map that has an id, a size and its cells.
+// Read a file's text: it must be a Scriblr map file of a version this app knows, with at least one map that has an id, a size and its land (painted cells in
+// an older file, a base and shapes in a newer one).
 export function parseMapFile(text: string): ParsedFile {
   let raw: unknown
   try { raw = JSON.parse(text) } catch { return { ok: false, error: 'This is not a map file: it is not readable JSON.' } }
@@ -48,13 +58,16 @@ export function parseMapFile(text: string): ParsedFile {
   const maps: MapDoc[] = []
   const seen = new Set<string>()
   for (const item of raw.maps) {
-    if (!isRecord(item) || typeof item.id !== 'string' || item.id === '' || seen.has(item.id) || typeof item.width !== 'number' || typeof item.height !== 'number' || !Array.isArray(item.cells)) continue
+    if (!isRecord(item) || typeof item.id !== 'string' || item.id === '' || seen.has(item.id) || typeof item.width !== 'number' || typeof item.height !== 'number') continue
+    const land = item.mapFormat === 2 ? isRecord(item.base) && Array.isArray(item.shapes) : Array.isArray(item.cells)
+    if (!land) continue
     seen.add(item.id)
     maps.push(item as unknown as MapDoc)
   }
   if (maps.length === 0) return { ok: false, error: 'None of the maps in this file can be read.' }
   const rootId = typeof raw.rootId === 'string' && seen.has(raw.rootId) ? raw.rootId : maps[0].id
-  return { ok: true, file: { format: MAP_FILE_FORMAT, version: raw.version, exportedAt: typeof raw.exportedAt === 'string' ? raw.exportedAt : '', rootId, maps } }
+  const biomes = Array.isArray(raw.biomes) ? raw.biomes.filter((b): b is MapBiome => isRecord(b) && typeof b.id === 'string' && b.id.startsWith('own_') && typeof b.name === 'string' && typeof b.color === 'string') : []
+  return { ok: true, file: { format: MAP_FILE_FORMAT, version: raw.version, exportedAt: typeof raw.exportedAt === 'string' ? raw.exportedAt : '', rootId, maps, biomes } }
 }
 
 // ---- importing ----
@@ -89,7 +102,13 @@ export interface ImportApi {
   createVersion?: (mapId: string, body: { title?: string; appliesFrom?: string | null }) => Promise<MapDoc>
   // The ids of the characters the project has: a journey of any other character is left out (without it, all journeys stay).
   characterIds?: Set<string>
+  // Add the file's own biomes to the project's (without it, they are left out and the maps draw them as unknown biomes).
+  addBiomes?: (biomes: MapBiome[]) => Promise<void>
 }
+
+// The level of a map of an older file (it had a kind: world, town or interior).
+const LEVEL_OF_KIND: Record<string, MapLevel> = { world: 'planetary', town: 'local', interior: 'interior' }
+export const levelOfFileMap = (m: MapDoc): MapLevel => m.level ?? LEVEL_OF_KIND[m.kind ?? 'world'] ?? 'planetary'
 
 export interface ImportResult { made: string[]; replaced: string[]; skipped: string[]; rootId: string | null; versions?: number; error?: string }
 
@@ -103,9 +122,10 @@ export async function importMaps(file: MapFile, choices: Map<string, Choice>, ex
   // The id each imported map has in the project.
   const newId = new Map<string, string>()
   try {
+    if (api.addBiomes && file.biomes && file.biomes.length > 0) await api.addBiomes(file.biomes)
     for (const row of taking) {
       if (choiceOf(row) === 'replace') { newId.set(row.map.id, row.map.id); continue }
-      const made = await api.create({ title: row.map.title, kind: row.map.kind, width: row.map.width, height: row.map.height })
+      const made = await api.create({ title: row.map.title, level: levelOfFileMap(row.map), width: row.map.width, height: row.map.height })
       newId.set(row.map.id, made.id)
     }
     const root = file.maps.find(m => m.id === file.rootId) ?? file.maps[0]
@@ -114,8 +134,9 @@ export async function importMaps(file: MapFile, choices: Map<string, Choice>, ex
       const own = row.map
       const parent = own.id === root.id ? parentId : own.parentId !== null && newId.has(own.parentId) ? newId.get(own.parentId)! : parentId
       const doc: MapDoc = {
-        ...own, id, parentId: own.id === root.id && choiceOf(row) === 'replace' ? row.clash!.parentId : parent,
+        ...own, id, level: levelOfFileMap(own), parentId: own.id === root.id && choiceOf(row) === 'replace' ? row.clash!.parentId : parent,
         symbols: own.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) })),
+        shapes: relinkShapes(own.shapes, newId),
         journeys: keepJourneys(own.journeys, api.characterIds),
       }
       await api.put(doc)
@@ -131,8 +152,9 @@ export async function importMaps(file: MapFile, choices: Map<string, Choice>, ex
         const overwrite = choiceOf(rows.find(r => r.map.id === version.versionOf)!) === 'replace' && takenIds.get(version.id)?.versionOf === base
         const id = overwrite ? version.id : (await api.createVersion(base, { title: version.title, appliesFrom: version.appliesFrom ?? null })).id
         await api.put({
-          ...version, id, parentId: null, versionOf: base,
+          ...version, id, level: levelOfFileMap(version), parentId: null, versionOf: base,
           symbols: version.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) })),
+          shapes: relinkShapes(version.shapes, newId),
           journeys: keepJourneys(version.journeys, api.characterIds),
         })
         count += 1
@@ -144,6 +166,11 @@ export async function importMaps(file: MapFile, choices: Map<string, Choice>, ex
     result.error = err instanceof Error ? err.message : 'The maps could not be imported.'
   }
   return result
+}
+
+// The shapes of a map with the maps their places open renamed to the ids the maps have here (links to maps that did not come are dropped).
+function relinkShapes(shapes: MapDoc['shapes'], newId: Map<string, string>): MapDoc['shapes'] {
+  return (shapes ?? []).map(s => (s.mapIds ? { ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) } : s))
 }
 
 // The journeys of a map for a project that has these characters (all of them when the set is not given).

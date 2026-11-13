@@ -14,7 +14,7 @@ const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, or
   id, kind, parentId, order, title, synopsis: '', draftRef: null, flag: null, color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
 })
 const OUTLINE = [node('b1', 'book', null, 0, 'Book'), node('c1', 'chapter', 'b1', 0, 'Arrival'), node('c2', 'chapter', 'b1', 1, 'The flood'), node('c3', 'chapter', 'b1', 2, 'After')]
-const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', kind: 'world', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
+const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
 const ada: CharacterDoc = newCharacter('chr_a', { name: 'Ada' }, 0)
 
 async function open(maps: MapDoc[] = [world()]) {
@@ -51,7 +51,7 @@ describe('versions of a map', () => {
     await screen.findByRole('img', { name: /After the flood/ })
     expect(backend.of('POST')).toContain('POST /projects/p1/maps/map_a/versions')
     const list = within(screen.getByRole('navigation', { name: 'Maps' }))
-    expect(list.getAllByRole('button', { name: /^Open / }).map(b => b.textContent)).toEqual(['Known World8×6', 'After the floodfrom The flood'])
+    expect(list.getAllByRole('button', { name: /^Open / }).map(b => b.textContent)).toEqual(['Known WorldPlanetary', 'After the floodfrom The flood'])
     expect(screen.queryByRole('form', { name: 'New version' })).not.toBeInTheDocument()
     // A version has no "Inside" field: it says where in the story it is true from.
     expect(screen.queryByRole('combobox', { name: 'Inside which map' })).not.toBeInTheDocument()

@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from 'react'
-import { MAP_MAX_SIDE, type MapKind, type MapSummary, type MapThemeName } from '../../../../api/types'
+import { MAP_MAX_SIDE, type MapLevel, type MapSummary, type MapUnits } from '../../../../api/types'
 import { CheckIcon, ChevronRightIcon, CloseIcon, CopyIcon, ExportIcon, HistoryIcon, MapIcon, PlusIcon, TrashIcon, ImportIcon } from '../../../icons'
 import type { StoryPoint } from '../characters/story'
 import { appliesLabel, versionsOf } from './mapVersions'
@@ -7,14 +7,10 @@ import { CommitNumber, CommitText, Field } from './MapFields'
 import { importRows, mapFileName, parseMapFile, type Choice, type MapFile } from './mapFile'
 import { saveBlob } from './mapExport'
 import { MAP_TITLE_MAX, mapRows } from './mapModel'
-import { MAP_THEMES } from './mapThemes'
+import { LEVELS, defaultsFor, levelDef } from './mapLevels'
+import { unitsOf } from './mapUnits'
 import type { Maps } from './useMaps'
 
-const KINDS: Array<{ kind: MapKind; name: string; cell: number; unit: string }> = [
-  { kind: 'world', name: 'World or region', cell: 10, unit: 'miles' },
-  { kind: 'town', name: 'Town or city', cell: 10, unit: 'paces' },
-  { kind: 'interior', name: 'Interior', cell: 5, unit: 'feet' },
-]
 export const MAP_SIZES = [
   { name: 'Small', width: 32, height: 24 }, { name: 'Medium', width: 64, height: 48 }, { name: 'Large', width: 128, height: 96 },
   { name: 'Huge', width: 256, height: 192 }, { name: 'Largest', width: MAP_MAX_SIDE, height: MAP_MAX_SIDE },
@@ -65,7 +61,7 @@ export function MapList({ m, points = [] }: { m: Maps; points?: StoryPoint[] }) 
             <button type="button" className="mapRowMain" aria-label={`Open ${map.title}`} aria-current={map.id === open ? 'true' : undefined} title={`Open ${map.title}`} onClick={() => { void m.open(map.id) }}>
               {depth > 0 ? <ChevronRightIcon size={14} /> : <MapIcon size={14} />}
               <span className="mapRowTitle">{map.title}</span>
-              <span className="mapRowMeta">{map.width}×{map.height}</span>
+              <span className="mapRowMeta" title={`${map.width} × ${map.height} cells`}>{levelDef(map.level).name}</span>
             </button>
             <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Make a version of ${map.title}`} title={`Make a version of ${map.title}, to change for a later point of the story`} aria-expanded={versioning === map.id} onClick={() => setVersioning(v => (v === map.id ? null : map.id))}><CopyIcon size={16} /></button>
             <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Export ${map.title} to a file`} title={hasChildren ? `Export ${map.title} and the maps inside it to a file` : `Export ${map.title} to a file`} onClick={() => { void exportOne(map.id, map.title) }}><ExportIcon size={16} /></button>
@@ -132,34 +128,52 @@ function VersionForm({ m, sourceId, points, onDone }: { m: Maps; sourceId: strin
   )
 }
 
+// The form that makes a new map: its level (which fills the size of a cell, the unit, the biome under everything and the size from the level's defaults), the unit
+// system, the size, and the map it is inside.
 function NewMapForm({ m, maps, onDone }: { m: Maps; maps: MapSummary[]; onDone: () => void }) {
   const [title, setTitle] = useState('')
-  const [kind, setKind] = useState<MapKind>('world')
-  const [width, setWidth] = useState(64)
-  const [height, setHeight] = useState(48)
-  const [cell, setCell] = useState(10)
-  const [unit, setUnit] = useState('miles')
-  const [theme, setTheme] = useState<MapThemeName>('parchment')
+  const [level, setLevel] = useState<MapLevel>('planetary')
+  const [units, setUnits] = useState<MapUnits>('metric')
+  const first = defaultsFor('planetary', 'metric')
+  const [width, setWidth] = useState(first.width)
+  const [height, setHeight] = useState(first.height)
+  const [cell, setCell] = useState(first.cellSize)
+  const [unit, setUnit] = useState(first.unit)
   const [parent, setParent] = useState('')
   const [busy, setBusy] = useState(false)
 
-  function pickKind(next: MapKind) {
-    const k = KINDS.find(x => x.kind === next)!
-    setKind(next); setCell(k.cell); setUnit(k.unit)
+  // A new level or unit system fills the scale (and, for a new level, the size) from the level's defaults.
+  function refill(nextLevel: MapLevel, nextUnits: MapUnits, size: boolean) {
+    const d = defaultsFor(nextLevel, nextUnits === 'custom' ? 'metric' : nextUnits)
+    setCell(d.cellSize)
+    setUnit(nextUnits === 'custom' ? 'paces' : d.unit)
+    if (size) { setWidth(d.width); setHeight(d.height) }
   }
+  function pickLevel(next: MapLevel) { setLevel(next); refill(next, units, true) }
+  function pickUnits(next: MapUnits) { setUnits(next); refill(level, next, false) }
   async function make() {
     setBusy(true)
-    const id = await m.create({ title: title.trim() || undefined, kind, width, height, cellSize: cell, unit, theme, parentId: parent || null })
+    const base = defaultsFor(level, units === 'imperial' ? 'imperial' : 'metric').base
+    const id = await m.create({ title: title.trim() || undefined, level, units, width, height, cellSize: cell, unit, base, parentId: parent || null })
     setBusy(false)
     if (id) onDone()
   }
+  const offeredUnits = unitsOf(units)
 
   return (
     <form className="mapNew" aria-label="New map" noValidate onSubmit={e => { e.preventDefault(); void make() }}>
       <Field label="Title"><CommitText label="Title of the new map" value={title} max={MAP_TITLE_MAX} onCommit={setTitle} live /></Field>
-      <Field label="Kind">
-        <select className="mapSelect" aria-label="Kind of map" value={kind} onChange={e => pickKind(e.target.value as MapKind)}>
-          {KINDS.map(k => <option key={k.kind} value={k.kind}>{k.name}</option>)}
+      <Field label="Level">
+        <select className="mapSelect" aria-label="Level of the new map" value={level} onChange={e => pickLevel(e.target.value as MapLevel)}>
+          {LEVELS.map(lv => <option key={lv.id} value={lv.id}>{lv.name}</option>)}
+        </select>
+      </Field>
+      <p className="mapHint">{levelDef(level).holds}.</p>
+      <Field label="Units">
+        <select className="mapSelect" aria-label="Unit system of the new map" value={units} onChange={e => pickUnits(e.target.value as MapUnits)}>
+          <option value="metric">Metric</option>
+          <option value="imperial">Imperial</option>
+          <option value="custom">Custom (paces, leagues ...)</option>
         </select>
       </Field>
       <Field label="Size">
@@ -178,13 +192,16 @@ function NewMapForm({ m, maps, onDone }: { m: Maps; maps: MapSummary[]; onDone: 
       </div>
       <div className="mapRow">
         <Field label="One cell is" short><CommitNumber label="Size of one cell" value={cell} min={0.001} max={1_000_000} step="any" onCommit={setCell} live /></Field>
-        <Field label="Unit" short><CommitText label="Unit of a cell" value={unit} max={20} className="mapInput mapInput--unit" onCommit={setUnit} live /></Field>
+        <Field label="Unit" short>
+          {units === 'custom' ? (
+            <CommitText label="Unit of a cell" value={unit} max={20} className="mapInput mapInput--unit" onCommit={setUnit} live />
+          ) : (
+            <select className="mapSelect" aria-label="Unit of a cell" value={unit} onChange={e => setUnit(e.target.value)}>
+              {offeredUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          )}
+        </Field>
       </div>
-      <Field label="Look">
-        <select className="mapSelect" aria-label="Look of the new map" value={theme} onChange={e => setTheme(e.target.value as MapThemeName)}>
-          {MAP_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-      </Field>
       {maps.length > 0 && (
         <Field label="Inside">
           <select className="mapSelect" aria-label="Inside which map" value={parent} onChange={e => setParent(e.target.value)}>

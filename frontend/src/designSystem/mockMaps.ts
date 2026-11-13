@@ -1,58 +1,45 @@
-import type { MapCreate, MapDoc, MapKind, MapPlace, MapShape, MapSummary } from '../api/types'
+import type { MapBase, MapCreate, MapDoc, MapKind, MapLevel, MapPlace, MapShape, MapSummary, MapUnits } from '../api/types'
 import { MAP_MAX_SIDE } from '../api/types'
+import { defaultsFor } from '../assets/Interfaces/writer/maps/mapLevels'
 import type { MockAnswer } from './mockPresets'
 
 // A pretend Maps API (`/api/projects/{id}/maps`), shared by the design system's previews (mockBackend.ts) and the tests (test/mapsBackend.ts): the
-// maps live in memory and answer the way the server does (the terrain set of the kind, the five layers, the cells coded as runs that cover the grid,
-// the maps inside a deleted map moved up). A route returns its status and JSON body.
+// maps live in memory and answer the way the server does (a new map is a map of levels and biome shapes: the level's base and the five layers; a save keeps
+// the old painted cells of a traced map as they were stored; the maps inside a deleted map move up). A route returns its status and JSON body.
 
 const ok = (body: unknown, status = 200): MockAnswer => ({ status, body })
 const fail = (status: number, detail: string): MockAnswer => ({ status, body: { detail } })
 const AT = '2026-11-02T12:00:00.000Z'
 
-const SETS: Record<MapKind, Array<[string, string, string]>> = {
-  world: [
-    ['ocean', 'Ocean', '#3b6ea5'], ['plains', 'Plains', '#a8c66c'], ['forest', 'Forest', '#4f8a4a'], ['hills', 'Hills', '#c9a36a'],
-    ['mountains', 'Mountains', '#8a8f98'], ['desert', 'Desert', '#e3c77a'], ['snow', 'Snow', '#eef3f7'], ['swamp', 'Swamp', '#5f7d62'],
-  ],
-  town: [['ground', 'Ground', '#d8cfb4'], ['road', 'Road', '#8a8076'], ['building', 'Building', '#b5654a'], ['park', 'Park', '#7fb069'], ['water', 'Water', '#4a86b8']],
-  interior: [['void', 'Outside', '#2a2330'], ['floor', 'Floor', '#d9c8a8'], ['wall', 'Wall', '#5a4a42'], ['door', 'Door', '#9a6a3a'], ['water', 'Water', '#4a86b8']],
+const LAYERS: Array<[string, string]> = [['terrain', 'Biomes'], ['shapes', 'Regions and lines'], ['symbols', 'Symbols'], ['labels', 'Labels'], ['notes', 'Notes']]
+// The level of a map from before levels (the server's LEVEL_OF_KIND).
+const LEVEL_OF_KIND: Record<string, MapLevel> = { world: 'planetary', town: 'local', interior: 'interior' }
+// The kind a level's map is stored with (for a client from before levels), as the server's MAP_LEVEL_DEFAULTS.
+const KIND_OF: Record<MapLevel, MapKind> = {
+  intergalactic: 'world', galactic: 'world', planetary: 'world', continental: 'world', national: 'world', regional: 'world', local: 'town', architectural: 'interior', interior: 'interior',
 }
-const LAYERS: Array<[string, string]> = [['terrain', 'Terrain'], ['shapes', 'Regions and lines'], ['symbols', 'Symbols'], ['labels', 'Labels'], ['notes', 'Notes']]
 
 const side = (n: number | undefined, fallback: number) => Math.min(MAP_MAX_SIDE, Math.max(1, Math.round(n ?? fallback)))
 
 export function summaryOf(m: MapDoc): MapSummary {
-  return { id: m.id, title: m.title, kind: m.kind, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt, versionOf: m.versionOf ?? null, appliesFrom: m.appliesFrom ?? null }
+  return { id: m.id, title: m.title, kind: m.kind, level: m.level, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt, versionOf: m.versionOf ?? null, appliesFrom: m.appliesFrom ?? null }
 }
 
 export function newMap(id: string, body: MapCreate, order: number): MapDoc {
-  const kind = body.kind ?? 'world'
+  const level: MapLevel = body.level ?? 'planetary'
+  const units: MapUnits = body.units ?? 'metric'
   const width = side(body.width, 32), height = side(body.height, 24)
+  const base: MapBase = body.base ?? defaultsFor(level, units === 'imperial' ? 'imperial' : 'metric').base
   return {
-    schemaVersion: 2, id, title: body.title?.trim() || 'Untitled map', kind, parentId: body.parentId ?? null, order, width, height,
+    schemaVersion: 2, id, title: body.title?.trim() || 'Untitled map', level, mapFormat: 2, base, units, kind: KIND_OF[level], parentId: body.parentId ?? null, order, width, height,
     cellSize: body.cellSize ?? 1, unit: body.unit?.trim() || 'cells', pace: null,
-    terrains: SETS[kind].map(([tid, name, color]) => ({ id: tid, name, color, builtIn: true })),
     layers: LAYERS.map(([lid, name]) => ({ id: lid, name, kind: lid as MapDoc['layers'][number]['kind'], visible: true, locked: false })),
-    cells: [0, width * height], symbols: [], labels: [], shapes: [], theme: body.theme ?? 'modern', scaleBar: true, compass: true, legend: false, updatedAt: AT,
+    symbols: [], labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: AT,
   }
 }
 
-// Runs that cover exactly `total` cells (a surplus cut, a shortfall the first terrain), neighbours of one terrain joined.
-function repairRuns(runs: number[], total: number, terrains: number): number[] {
-  const out: number[] = []
-  let left = total
-  const push = (v: number, n: number) => { if (out.length > 0 && out[out.length - 2] === v) out[out.length - 1] += n; else out.push(v, n) }
-  for (let i = 0; i + 1 < runs.length && left > 0; i += 2) {
-    const v = runs[i], n = runs[i + 1]
-    if (!Number.isInteger(v) || !Number.isInteger(n) || v < 0 || n < 1) continue
-    const take = Math.min(n, left)
-    push(v < terrains ? v : 0, take)
-    left -= take
-  }
-  if (left > 0) push(0, left)
-  return out
-}
+// The places of a map: its named symbols, then its named regions and biome areas (as the server's named_places).
+const namedShapes = (m: MapDoc) => m.shapes.filter(s => s.type !== 'line' && s.name)
 
 export function createMockMaps(initial: MapDoc[] = []) {
   const maps = new Map<string, MapDoc>(initial.map(m => [m.id, m]))
@@ -66,9 +53,10 @@ export function createMockMaps(initial: MapDoc[] = []) {
       return out
     }
     return [...maps.values()].filter(m => !m.versionOf)
-      .flatMap(m => m.symbols.filter(sy => sy.name).map(sy => ({
-        key: `${m.id}/${sy.id}`, mapId: m.id, placeId: sy.id, name: sy.name, path: [...titles(m.id), sy.name].join(' > '), kind: sy.kind, mapTitle: m.title, mapIds: [...sy.mapIds],
-      })))
+      .flatMap(m => [
+        ...m.symbols.filter(sy => sy.name).map(sy => ({ id: sy.id, name: sy.name, kind: sy.kind, mapIds: sy.mapIds })),
+        ...namedShapes(m).map(sh => ({ id: sh.id, name: sh.name ?? '', kind: 'area', mapIds: sh.mapIds ?? [] })),
+      ].map(p => ({ key: `${m.id}/${p.id}`, mapId: m.id, placeId: p.id, name: p.name, path: [...titles(m.id), p.name].join(' > '), kind: p.kind, mapTitle: m.title, mapIds: [...p.mapIds] })))
       .sort((a, b) => a.path.toLowerCase().localeCompare(b.path.toLowerCase()) || a.key.localeCompare(b.key))
   }
 
@@ -105,9 +93,17 @@ export function createMockMaps(initial: MapDoc[] = []) {
       if (!found) return fail(404, 'Map not found')
       const b = body as MapDoc
       if (b.id !== id) return fail(422, 'The id does not match.')
-      const terrains = b.terrains.length > 0 ? b.terrains : found.terrains
-      const symbols = (b.symbols ?? []).map(sy => ({ ...sy, name: sy.name ?? '', mapIds: (sy.mapIds ?? []).filter(x => maps.has(x) && x !== id) }))
-      const saved: MapDoc = { ...b, symbols, terrains, title: b.title.trim() || 'Untitled map', cells: repairRuns(b.cells, b.width * b.height, terrains.length), updatedAt: AT }
+      const keepLink = (x: string) => maps.has(x) && x !== id
+      const symbols = (b.symbols ?? []).map(sy => ({ ...sy, name: sy.name ?? '', mapIds: (sy.mapIds ?? []).filter(keepLink) }))
+      const shapes = (b.shapes ?? []).map(sh => (sh.type === 'line' ? sh : { ...sh, mapIds: (sh.mapIds ?? []).filter(keepLink) }))
+      // A map of painted cells (an old map file) becomes a map of levels (the server traces its cells into biome shapes; this pretend one keeps them aside).
+      // Otherwise the old painted cells, palette, kind and look of a traced map stay as they were stored.
+      const level: MapLevel = b.level ?? LEVEL_OF_KIND[b.kind ?? 'world'] ?? found.level
+      const old = b.mapFormat !== 2
+      const legacy = old
+        ? { kind: b.kind, theme: b.theme, terrains: b.terrains, cells: b.cells, legacyGrid: [b.width, b.height], base: b.base ?? defaultsFor(level, b.units === 'imperial' ? 'imperial' : 'metric').base, units: b.units ?? 'custom' as MapUnits }
+        : { kind: found.kind, theme: found.theme, terrains: found.terrains, cells: found.cells, legacyGrid: found.legacyGrid }
+      const saved: MapDoc = { ...b, ...legacy, level, mapFormat: 2, symbols, shapes, title: b.title.trim() || 'Untitled map', updatedAt: AT }
       maps.set(id, saved)
       return ok(saved)
     }
@@ -118,6 +114,7 @@ export function createMockMaps(initial: MapDoc[] = []) {
       for (const m of maps.values()) {
         if (m.parentId === id) m.parentId = found.parentId
         for (const sym of m.symbols) sym.mapIds = (sym.mapIds ?? []).filter(x => x !== id)
+        for (const sh of m.shapes) if (sh.mapIds) sh.mapIds = sh.mapIds.filter(x => x !== id)
       }
       return { status: 204, body: undefined }
     }
@@ -127,47 +124,58 @@ export function createMockMaps(initial: MapDoc[] = []) {
   return { route, get maps() { return maps } }
 }
 
-// The maps a preview opens with: a painted world and, inside it, a town. (A coast and two hills of land in an ocean, a forest, a range of mountains.)
-export function seedMaps(): MapDoc[] {
-  const world = newMap('map_world', { title: 'The Known World', kind: 'world', width: 28, height: 18, cellSize: 20, unit: 'miles' }, 0)
-  const rows: number[][] = []
-  for (let y = 0; y < 18; y += 1) {
-    const row = new Array<number>(28).fill(0)
-    for (let x = 0; x < 28; x += 1) {
-      const dx = (x - 11) / 9, dy = (y - 9) / 6.5
-      const d = dx * dx + dy * dy
-      if (d < 1) row[x] = d < 0.35 ? 3 : d < 0.6 ? 2 : 1
-      const ex = (x - 22) / 3.5, ey = (y - 5) / 3
-      if (ex * ex + ey * ey < 1) row[x] = ex * ex + ey * ey < 0.4 ? 4 : 1
-    }
-    rows.push(row)
+// The points of an ellipse (a smooth outline), for the seed's biome areas; `wobble` pushes every other point in or out a little so it reads as land.
+function ellipse(cx: number, cy: number, rx: number, ry: number, n = 12, wobble = 0.08): Array<[number, number]> {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2
+    const k = 1 + (i % 2 === 0 ? wobble : -wobble)
+    return [Math.round((cx + Math.cos(a) * rx * k) * 100) / 100, Math.round((cy + Math.sin(a) * ry * k) * 100) / 100]
+  })
+}
+
+function biomeArea(id: string, points: Array<[number, number]>, biome: string | null, over: Partial<MapShape> = {}): MapShape {
+  return {
+    id, layerId: 'terrain', type: 'biome', style: 'solid', color: null, width: 0.25, fill: null, opacity: 1, pattern: 'solid', biome, heightMode: 'none', height: 0, name: '', mapIds: [],
+    points: points.map(([x, y]) => ({ x, y, smooth: true, hx: null, hy: null })), ...over,
   }
-  const flat = rows.flat()
-  const cells: number[] = []
-  for (const v of flat) { if (cells.length > 0 && cells[cells.length - 2] === v) cells[cells.length - 1] += 1; else cells.push(v, 1) }
-  world.cells = cells
-  world.theme = 'parchment'
+}
+
+// The maps a preview opens with: a continent in a sea (plains, a forest on hills, a lake, a rocky range raised high) and, inside it, a town.
+export function seedMaps(): MapDoc[] {
+  const world = newMap('map_world', { title: 'The Known World', level: 'continental', units: 'imperial', width: 28, height: 18, cellSize: 20, unit: 'mi', base: { biome: 'saltwater', height: -650 } }, 0)
   world.legend = true
   world.pace = 25
   const stamp = (id: string, kind: string, x: number, y: number, size = 2, name = '', mapIds: string[] = []) => ({ id, layerId: 'symbols', kind, x, y, size, color: null, name, mapIds })
   world.symbols = [
-    stamp('sym_a', 'city', 11.5, 8.5, 2.5, 'Port Veyra', ['map_town']), stamp('sym_b', 'castle', 7.5, 6.5), stamp('sym_c', 'mountain', 22.5, 4.5, 3), stamp('sym_d', 'mountain', 20.5, 6.5, 2),
-    stamp('sym_e', 'tree', 9.5, 11.5, 1.5), stamp('sym_f', 'pine', 13.5, 11.5, 1.5), stamp('sym_g', 'harbour', 4.5, 9.5), stamp('sym_h', 'ship', 3.5, 13.5, 1.5),
+    stamp('sym_a', 'city', 11.5, 8.5, 2.5, 'Port Veyra', ['map_town']), stamp('sym_b', 'castle', 7.5, 6.5), stamp('sym_g', 'harbour', 4.5, 9.5), stamp('sym_h', 'ship', 3.5, 13.5, 1.5),
   ]
   world.labels = [
-    { id: 'lbl_a', layerId: 'labels', text: 'Port Veyra', x: 11.5, y: 6.7, size: 1.2 },
-    { id: 'lbl_b', layerId: 'labels', text: 'The Spine', x: 21.5, y: 8.8, size: 1.1 },
     { id: 'lbl_c', layerId: 'labels', text: 'Sea of Glass', x: 4.5, y: 3.2, size: 1.3 },
   ]
   const pt = (x: number, y: number, smooth = true) => ({ x, y, smooth, hx: null, hy: null })
   const shape = (id: string, type: 'line' | 'region', points: ReturnType<typeof pt>[], over: Partial<MapShape> = {}): MapShape =>
     ({ id, layerId: 'shapes', type, points, style: 'solid', color: null, width: 0.25, fill: null, opacity: 0.35, pattern: 'solid', ...over })
   world.shapes = [
+    // The land, back to front: later areas lie over earlier ones.
+    biomeArea('bio_land', ellipse(11, 9, 9.2, 6.6, 14), 'plain'),
+    biomeArea('bio_beach', ellipse(4.6, 10.4, 1.6, 2.4, 10), 'beach'),
+    biomeArea('bio_forest', ellipse(13, 11.6, 5.2, 3.2, 12), 'forest', { name: 'Greenwood' }),
+    // Hills under the forest: no biome of their own (the forest stays green), only higher, so lighter.
+    biomeArea('bio_hills', ellipse(14.5, 12.4, 2.4, 1.5, 10), null, { heightMode: 'raise', height: 4000 }),
+    biomeArea('bio_lake', ellipse(8, 9.5, 1.3, 0.9, 10, 0.04), 'freshwater', { name: 'Mirror Lake' }),
+    biomeArea('bio_spine', ellipse(22, 5, 3.6, 3, 12), 'rocky', { name: 'The Spine', heightMode: 'raise', height: 6500 }),
+    biomeArea('bio_peak', ellipse(22.3, 4.6, 1.4, 1.1, 10), 'tundra', { heightMode: 'raise', height: 4000 }),
+    // Regions and lines.
     shape('shp_a', 'region', [pt(14, 11.5, false), pt(17.5, 10.5, false), pt(19, 13.5, false), pt(15.5, 15, false)], { fill: '#4f8a4a', opacity: 0.4, pattern: 'dots', color: '#2f5f2c', width: 0.15 }),
     shape('shp_b', 'line', [pt(22, 5), pt(19.5, 7.5), pt(17, 8), pt(14, 7.5), pt(11.5, 9.5), pt(9, 9)], { color: '#3b6ea5', width: 0.35 }),
     shape('shp_c', 'line', [pt(11.5, 8.5), pt(13, 10), pt(15, 10.5), pt(17.5, 9)], { style: 'road', color: '#6b4a2b', width: 0.3 }),
     shape('shp_d', 'line', [pt(3, 2, false), pt(8, 4.5, false), pt(6.5, 8, false)], { style: 'dashed', width: 0.16 }),
   ]
-  const town = newMap('map_town', { title: 'Port Veyra', kind: 'town', width: 24, height: 16, cellSize: 10, unit: 'paces', parentId: 'map_world' }, 0)
+  const town = newMap('map_town', { title: 'Port Veyra', level: 'local', units: 'imperial', width: 24, height: 16, cellSize: 30, unit: 'ft', parentId: 'map_world' }, 0)
+  town.shapes = [
+    biomeArea('bio_harbour', [[0, 9], [8, 10], [12, 16], [0, 16]], 'saltwater'),
+    biomeArea('bio_square', [[10, 4], [16, 4], [16, 9], [10, 9]], 'paving', { name: 'Market Square' }),
+    biomeArea('bio_park', ellipse(19.5, 11.5, 3, 2.4, 10), 'forest', { name: 'Lantern Park' }),
+  ].map(s => ({ ...s, points: s.points.map(p => ({ ...p, smooth: s.id === 'bio_park' })) }))
   return [world, town]
 }

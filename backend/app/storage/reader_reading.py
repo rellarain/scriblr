@@ -135,7 +135,7 @@ def book_extras(rf: ReaderFile, root: Path, book: CatalogBook) -> BookExtras:
     edition = _local_edition(root, book)
     if edition is None:
         return empty
-    return extras_view(book.id, edition.maps, edition.characters, reach_of(rf, book.id, len(edition.chapters)), edition.figureModels)
+    return extras_view(book.id, edition.maps, edition.characters, reach_of(rf, book.id, len(edition.chapters)), edition.figureModels, edition.biomes)
 
 
 def reaction_totals(rf: ReaderFile, root: Path, book: CatalogBook, n: int) -> ReactionTotals:

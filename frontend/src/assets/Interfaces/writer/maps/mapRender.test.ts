@@ -1,41 +1,48 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MapDoc, MapShape } from '../../../../api/types'
 import { addLabel, addSymbol } from './mapItems'
-import { drawMap, terrainPixels } from './mapRender'
-import { LINE_PRESETS } from './mapShapes'
+import { MAX_TINT, drawMap, heightTint } from './mapRender'
+import { LINE_PRESETS, makeBiomeShape } from './mapShapes'
+import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
 import { draftOf, setOverlay, toggleLayer, type MapDraft } from './mapModel'
 
-// A recording stand-in for a canvas context: every call is kept with its arguments, every property can be set, and text is 6 pixels a letter.
+// A recording stand-in for a canvas context: every call is kept with its arguments, every property can be set, and text is 6 pixels a letter. Each fill
+// keeps the fill colour it was made with (`fills`).
 function recorder() {
   const calls: Array<[string, unknown[]]> = []
+  const fills: string[] = []
   const props: Record<string, unknown> = {}
   const ctx = new Proxy({}, {
     get(_t, name: string) {
       if (name === 'measureText') return (text: string) => ({ width: text.length * 6 })
       if (name in props) return props[name]
-      return (...args: unknown[]) => { calls.push([name, args]) }
+      return (...args: unknown[]) => {
+        calls.push([name, args])
+        if (name === 'fill' || name === 'fillRect') fills.push(String(props.fillStyle))
+      }
     },
     set(_t, name: string, value) { props[name] = value; return true },
   }) as unknown as CanvasRenderingContext2D
-  return { ctx, calls, texts: () => calls.filter(([n]) => n === 'fillText').map(([, a]) => String(a[0])), count: (n: string) => calls.filter(([c]) => c === n).length }
+  return { ctx, calls, fills, texts: () => calls.filter(([n]) => n === 'fillText').map(([, a]) => String(a[0])), count: (n: string) => calls.filter(([c]) => c === n).length }
 }
 
 class FakePath { constructor(public d: string) {} }
 afterEach(() => { vi.unstubAllGlobals() })
 
 const doc = (): MapDoc => ({
-  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
-  terrains: [{ id: 'sea', name: 'Sea', color: '#3b6ea5', builtIn: true }, { id: 'land', name: 'Land', color: '#a8c66c', builtIn: true }],
+  schemaVersion: 2, id: 'map_1', title: 'World', level: 'national', mapFormat: 2, base: { biome: 'plain', height: 0 }, units: 'metric',
+  parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
   layers: [
-    { id: 'terrain', name: 'Terrain', kind: 'terrain', visible: true, locked: false },
+    { id: 'terrain', name: 'Biomes', kind: 'terrain', visible: true, locked: false },
     { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
     { id: 'labels', name: 'Labels', kind: 'labels', visible: true, locked: false },
   ],
-  cells: [0, 100, 1, 100], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: false, compass: false, legend: false, updatedAt: 'x',
+  symbols: [], labels: [], shapes: [], scaleBar: false, compass: false, legend: false, updatedAt: 'x',
 })
 const base = (draft: MapDraft, over: Partial<Parameters<typeof drawMap>[1]> = {}): Parameters<typeof drawMap>[1] => ({
-  width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, bitmap: null, showGrid: false, ink: '#000', brush: [], selected: null, selectedNode: null, pending: null, measure: null, legend: null, ...over,
+  width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, biomes: INDEX, showGrid: false, ink: '#000', selected: null, selectedNode: null, pending: null, measure: null, legend: null, ...over,
 })
+const INDEX = biomeIndex(STARTER_BIOMES)
 const withItems = (): MapDraft => {
   let d = draftOf(doc())
   d = addSymbol(d, 'castle', 5.5, 5.5, 2, () => 'a')!.change.draft
@@ -43,22 +50,64 @@ const withItems = (): MapDraft => {
   return d
 }
 
-describe('the pixels of the terrain', () => {
-  it('are the palette colours in the look of the map', () => {
-    const d = draftOf(doc())
-    const modern = terrainPixels(d)
-    expect(modern.length).toBe(200)
-    expect(modern[0]).toBe(((255 << 24) | (165 << 16) | (110 << 8) | 59) >>> 0)
-    expect(modern[199]).not.toBe(modern[0])
-    const night = terrainPixels({ ...d, theme: 'night' })
-    expect(night[0]).not.toBe(modern[0])
-    expect(new Set(night).size).toBe(2)
+describe('the land', () => {
+  const tri = (id: string, biome: string | null, over: Partial<MapShape> = {}): MapShape => ({ ...makeBiomeShape(id, 'terrain', [[2, 2], [9, 2], [6, 8]], biome, false), ...over })
+
+  it('a height is a lighter or darker tint, at most MAX_TINT, and none without a range', () => {
+    expect(heightTint(0, 4000)).toBe(0)
+    expect(heightTint(2000, 4000)).toBeCloseTo(MAX_TINT / 2)
+    expect(heightTint(-9000, 4000)).toBeCloseTo(-MAX_TINT)
+    expect(heightTint(500, 0)).toBe(0)
+    expect(heightTint(Number.NaN, 4000)).toBe(0)
   })
 
-  it('use the first terrain for an index the palette does not have', () => {
-    const d = draftOf(doc())
-    d.cells[3] = 9
-    expect(terrainPixels(d)[3]).toBe(terrainPixels(d)[0])
+  it('fills the map with the base biome, darker when the base is under sea level', () => {
+    const flat = recorder()
+    drawMap(flat.ctx, base(draftOf(doc())))
+    expect(flat.fills[0]).toBe('#a4c34a')
+    expect(flat.fills).not.toContain('#000000')
+    const deep = recorder()
+    drawMap(deep.ctx, base({ ...draftOf(doc()), base: { biome: 'saltwater', height: -2000 } }))
+    expect(deep.fills.slice(0, 2)).toEqual(['#2f62b0', '#000000'])
+  })
+
+  it('draws the biome shapes in their order, each in its colour, later over earlier', () => {
+    const r = recorder()
+    drawMap(r.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'forest'), tri('b', 'freshwater')] }))
+    const forest = r.fills.indexOf('#3f8f3a'), lake = r.fills.indexOf('#6fb8e8')
+    expect(forest).toBeGreaterThan(0)
+    expect(lake).toBeGreaterThan(forest)
+  })
+
+  it('draws raised land lighter, and a shape with no biome only as a tint over what is under it', () => {
+    const r = recorder()
+    drawMap(r.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'rocky', { heightMode: 'raise', height: 3000 })] }))
+    expect(r.fills.slice(-2)).toEqual(['#8e8e8e', '#ffffff'])
+    const hills = recorder()
+    drawMap(hills.ctx, base({ ...draftOf(doc()), shapes: [tri('a', null, { heightMode: 'raise', height: 800 })] }))
+    expect(hills.fills).toEqual(['#a4c34a', '#ffffff'])
+    const flat = recorder()
+    drawMap(flat.ctx, base({ ...draftOf(doc()), shapes: [tri('a', null)] }))
+    expect(flat.fills).toEqual(['#a4c34a'])
+  })
+
+  it('draws a biome it cannot find in gray, and nothing of a hidden biomes layer but a faint wash', () => {
+    const r = recorder()
+    drawMap(r.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'gone')] }))
+    expect(r.fills).toContain('#9a9a9a')
+    const hidden = recorder()
+    const d = toggleLayer({ ...draftOf(doc()), shapes: [tri('a', 'forest')] }, 'terrain', 'visible')!.draft
+    drawMap(hidden.ctx, base(d))
+    expect(hidden.fills).toEqual(['#000'])
+  })
+
+  it('writes the name of a named area inside it when the area is big enough', () => {
+    const r = recorder()
+    drawMap(r.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'forest', { name: 'Greenwood' })] }))
+    expect(r.texts()).toContain('Greenwood')
+    const small = recorder()
+    drawMap(small.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'forest', { name: 'Greenwood' })] }, { view: { zoom: 4, x: 10, y: 10 } }))
+    expect(small.texts()).not.toContain('Greenwood')
   })
 })
 
@@ -123,13 +172,13 @@ describe('drawing a map', () => {
     expect(small.texts()).toEqual([])
   })
 
-  it('outlines the chosen item and the brush', () => {
+  it('outlines the chosen item', () => {
     vi.stubGlobal('Path2D', FakePath)
     const r = recorder()
     const d = withItems()
-    drawMap(r.ctx, base(d, { selected: { kind: 'symbol', id: 'sym_a' }, brush: [[1, 1], [2, 1]] }))
-    // the frame, the selection twice (halo and ink) and a box per brush cell
-    expect(r.count('strokeRect')).toBe(1 + 2 + 2)
+    drawMap(r.ctx, base(d, { selected: { kind: 'symbol', id: 'sym_a' } }))
+    // the frame, and the selection twice (halo and ink)
+    expect(r.count('strokeRect')).toBe(1 + 2)
   })
 
   it('draws the grid only when a cell is big enough', () => {
@@ -221,7 +270,7 @@ describe('drawing lines and regions', () => {
     const d = mapWith(shape({ points: [pt(2, 2, true), pt(8, 2), pt(8, 6)] }))
     drawMap(r.ctx, base(d, { selected: { kind: 'shape', id: 's1' }, selectedNode: 1 }))
     // a square for each of the three points (fill and stroke), and the smooth one's two handle dots
-    expect(r.count('fillRect')).toBe(3)
+    expect(r.count('fillRect')).toBe(1 + 3) // the base, then the points
     expect(r.count('arc')).toBe(2)
     const pend = recorder()
     drawMap(pend.ctx, base(mapWith(), { pending: { type: 'line', points: [[2, 2], [4, 3]], cursor: [6, 3], pen: LINE_PRESETS[0].pen } }))

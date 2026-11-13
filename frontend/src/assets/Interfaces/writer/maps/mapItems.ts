@@ -1,11 +1,12 @@
-import type { MapLabel, MapShape, MapShapeType, MapSymbol } from '../../../../api/types'
-import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeShape, shapeBounds, type Pen } from './mapShapes'
+import type { MapHeightMode, MapLabel, MapShape, MapShapeType, MapSymbol } from '../../../../api/types'
+import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeBiomeShape, makeShape, shapeBounds, type Pen } from './mapShapes'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
-import { change, type Change, type MakeId, type MapDraft } from './mapModel'
+import { biomeLayer, change, type Change, type MakeId, type MapDraft } from './mapModel'
+import { resolveBiome, usedBiomeIds, type BiomeIndex } from './mapBiomes'
 
-// The things on a map besides its terrain: symbols (stamps), labels (text) and shapes (lines and regions, mapShapes.ts), each on a layer of its kind. All pure: placing, moving, editing and
-// removing return a new draft (and the undo entry), and the hit test, the legend and the scale bar are computed from a draft. Positions are in cells
-// (a symbol's or label's centre), so they stay where they are when the view zooms.
+// The things on a map: biome shapes (the land, on the biomes layer), symbols (stamps), labels (text) and shapes (lines and regions, mapShapes.ts), each on
+// a layer of its kind. All pure: placing, moving, editing and removing return a new draft (and the undo entry), and the hit test, the legend and the scale
+// bar are computed from a draft. Positions are in cells (a symbol's or label's centre), so they stay where they are when the view zooms.
 
 export const MAX_SYMBOLS = 5000
 export const MAX_LABELS = 1000
@@ -13,6 +14,8 @@ export const SYMBOL_SIZE_RANGE = { min: 0.25, max: 16 } as const
 export const LABEL_SIZE_RANGE = { min: 0.25, max: 16 } as const
 export const LABEL_TEXT_MAX = 120
 export const MAX_SHAPES = 2000
+export const MAX_BIOME_SHAPES = 2000
+export const HEIGHT_LIMIT = 100000
 
 export type ItemKind = 'symbol' | 'label' | 'shape'
 export interface ItemRef { kind: ItemKind; id: string }
@@ -63,11 +66,14 @@ function freshId(prefix: string, taken: Set<string>, makeId: MakeId): string {
   return id
 }
 
+// The ids a new symbol or shape must not take: ids name places, so a symbol and a shape never share one.
+const placeIds = (draft: Pick<MapDraft, 'symbols' | 'shapes'>) => new Set([...draft.symbols.map(s => s.id), ...draft.shapes.map(s => s.id)])
+
 export function addSymbol(draft: MapDraft, kind: string, x: number, y: number, size: number, makeId: MakeId = randomId): { change: NonNullable<Change>; id: string } | null {
   const layerId = activeLayerId(draft, 'symbols')
   if (!layerId || draft.symbols.length >= MAX_SYMBOLS) return null
   const [px, py] = held(draft, x, y)
-  const id = freshId('sym', new Set(draft.symbols.map(s => s.id)), makeId)
+  const id = freshId('sym', placeIds(draft), makeId)
   const symbol: MapSymbol = { id, layerId, kind, x: px, y: py, size: clamp(size, SYMBOL_SIZE_RANGE.min, SYMBOL_SIZE_RANGE.max), color: null, name: '', mapIds: [] }
   return { change: change(draft, { symbols: [...draft.symbols, symbol] }), id }
 }
@@ -87,8 +93,32 @@ export function addShape(draft: MapDraft, type: MapShapeType, points: Array<[num
   const layerId = activeLayerId(draft, 'shapes')
   if (!layerId || draft.shapes.length >= MAX_SHAPES || points.length < MIN_POINTS[type] || points.length > MAX_POINTS) return null
   const held_ = points.map(([x, y]) => held(draft, x, y))
-  const id = freshId('shp', new Set(draft.shapes.map(s => s.id)), makeId)
+  const id = freshId('shp', placeIds(draft), makeId)
   return { change: change(draft, { shapes: [...draft.shapes, makeShape(id, layerId, type, held_, pen)] }), id }
+}
+
+// A biome shape (an area of land in a biome) from the points that were clicked, on the biomes layer, drawn over the biome shapes already there. None when
+// there are too few points, the biomes layer is hidden or locked, or the map has as many as it can hold.
+export function addBiomeShape(draft: MapDraft, points: Array<[number, number]>, biome: string | null, smooth: boolean, makeId: MakeId = randomId): { change: NonNullable<Change>; id: string } | null {
+  const layer = biomeLayer(draft)
+  const count = draft.shapes.filter(s => s.type === 'biome').length
+  if (!layer || count >= MAX_BIOME_SHAPES || points.length < MIN_POINTS.biome || points.length > MAX_POINTS) return null
+  const held_ = points.map(([x, y]) => held(draft, x, y))
+  const id = freshId('bio', placeIds(draft), makeId)
+  return { change: change(draft, { shapes: [...draft.shapes, makeBiomeShape(id, layer.id, held_, biome, smooth)] }), id }
+}
+
+// A shape brought to the front of its layer (drawn last, on top of the others) or sent to the back.
+export function moveShapeOrder(draft: MapDraft, id: string, to: 'front' | 'back'): Change {
+  const shape = draft.shapes.find(s => s.id === id)
+  if (!shape) return null
+  const rest = draft.shapes.filter(s => s.id !== id)
+  const mates = rest.filter(s => s.layerId === shape.layerId)
+  if (mates.length === 0) return null
+  const anchor = to === 'front' ? mates[mates.length - 1] : mates[0]
+  const at = rest.indexOf(anchor) + (to === 'front' ? 1 : 0)
+  const shapes = [...rest.slice(0, at), shape, ...rest.slice(at)]
+  return shapes.every((s, i) => s === draft.shapes[i]) ? null : change(draft, { shapes })
 }
 
 // A shape replaced by an edited copy of itself, as a change of the map (one undo step).
@@ -103,7 +133,10 @@ export function withShape(draft: MapDraft, shape: MapShape): MapDraft {
   return { ...draft, shapes: draft.shapes.map(s => (s.id === shape.id ? shape : s)) }
 }
 
-export function editShape(draft: MapDraft, id: string, fields: Partial<Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern'>>): Change {
+export function editShape(
+  draft: MapDraft, id: string,
+  fields: Partial<Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern' | 'biome' | 'heightMode' | 'height'>>,
+): Change {
   const old = draft.shapes.find(s => s.id === id)
   if (!old) return null
   const next: MapShape = { ...old }
@@ -113,6 +146,11 @@ export function editShape(draft: MapDraft, id: string, fields: Partial<Pick<MapS
   if (fields.fill !== undefined) next.fill = fields.fill
   if (fields.width !== undefined && Number.isFinite(fields.width)) next.width = clamp(fields.width, SHAPE_WIDTH_RANGE.min, SHAPE_WIDTH_RANGE.max)
   if (fields.opacity !== undefined && Number.isFinite(fields.opacity)) next.opacity = clamp(fields.opacity, 0, 1)
+  if (old.type === 'biome') {
+    if (fields.biome !== undefined) next.biome = fields.biome
+    if (fields.heightMode !== undefined) next.heightMode = fields.heightMode as MapHeightMode
+    if (fields.height !== undefined && Number.isFinite(fields.height)) next.height = clamp(Math.round(fields.height), -HEIGHT_LIMIT, HEIGHT_LIMIT)
+  }
   const same = (Object.keys(next) as Array<keyof MapShape>).every(k => k === 'points' || next[k] === old[k])
   return same ? null : change(draft, { shapes: draft.shapes.map(s => (s.id === id ? next : s)) })
 }
@@ -145,9 +183,44 @@ export function editSymbol(draft: MapDraft, id: string, fields: Partial<Pick<Map
 
 // ---- places ----
 
-// A symbol with a name is a place: a scene can happen there, and the maps in `mapIds` open from it.
-export const isPlace = (s: Pick<MapSymbol, 'name'>) => s.name !== ''
+// A symbol, region or biome shape with a name is a place: a scene can happen there, and the maps in `mapIds` open from it.
+export const isPlace = (s: { name?: string; type?: MapShapeType }) => !!s.name && s.type !== 'line'
 export const placeKey = (mapId: string, placeId: string) => `${mapId}/${placeId}`
+
+export interface MapPlaceItem { ref: ItemRef; name: string; mapIds: string[] }
+
+// The places of a map: its named symbols, then its named regions and biome shapes.
+export function placesOf(draft: Pick<MapDraft, 'symbols' | 'shapes'>): MapPlaceItem[] {
+  return [
+    ...draft.symbols.filter(isPlace).map(s => ({ ref: { kind: 'symbol' as const, id: s.id }, name: s.name, mapIds: s.mapIds })),
+    ...draft.shapes.filter(isPlace).map(s => ({ ref: { kind: 'shape' as const, id: s.id }, name: s.name ?? '', mapIds: s.mapIds ?? [] })),
+  ]
+}
+
+// The place a symbol or shape is (its name and the maps that open from it), none for a label or a line.
+export function placeOf(draft: MapDraft, ref: ItemRef): { name: string; mapIds: string[] } | null {
+  if (ref.kind === 'symbol') {
+    const s = draft.symbols.find(x => x.id === ref.id)
+    return s ? { name: s.name, mapIds: s.mapIds } : null
+  }
+  if (ref.kind === 'shape') {
+    const s = draft.shapes.find(x => x.id === ref.id)
+    return s && s.type !== 'line' ? { name: s.name ?? '', mapIds: s.mapIds ?? [] } : null
+  }
+  return null
+}
+
+// Name a symbol or an area (making it a place, or no longer one when the name is cleared), or change the maps that open from it.
+export function editPlace(draft: MapDraft, ref: ItemRef, fields: { name?: string; mapIds?: string[] }): Change {
+  if (ref.kind === 'symbol') return editSymbol(draft, ref.id, fields)
+  const old = ref.kind === 'shape' ? draft.shapes.find(s => s.id === ref.id) : undefined
+  if (!old || old.type === 'line') return null
+  const name = fields.name !== undefined ? fields.name.trim().slice(0, PLACE_NAME_MAX) : old.name ?? ''
+  const mapIds = fields.mapIds !== undefined ? [...new Set(fields.mapIds)].slice(0, MAX_PLACE_MAPS) : old.mapIds ?? []
+  const was = old.mapIds ?? []
+  if (name === (old.name ?? '') && mapIds.length === was.length && mapIds.every((m, i) => m === was[i])) return null
+  return change(draft, { shapes: draft.shapes.map(s => (s.id === old.id ? { ...s, name, mapIds } : s)) })
+}
 
 // New places for these names (symbols that are named), on the topmost shown, unlocked symbols layer, laid out in rows from the top left, three cells apart;
 // they are meant to be dragged to where they belong. None when there is no layer to put them on or the map is full.
@@ -183,12 +256,17 @@ export function removeItem(draft: MapDraft, ref: ItemRef): Change {
 }
 
 // The topmost item at a point (in cells): layers from the top down, each layer's later items first. A hidden or locked layer cannot be picked from.
-// A small thing is given a little room, so it can be hit with the pointer.
+// A small thing is given a little room, so it can be hit with the pointer. A biome shape is hit inside its outline (the land under the pointer).
 export function hitItem(draft: MapDraft, x: number, y: number, slack = 0.3): ItemRef | null {
   for (let i = draft.layers.length - 1; i >= 0; i -= 1) {
     const layer = draft.layers[i]
     if (!layer.visible || layer.locked) continue
-    if (layer.kind === 'symbols') {
+    if (layer.kind === 'terrain') {
+      for (let n = draft.shapes.length - 1; n >= 0; n -= 1) {
+        const sh = draft.shapes[n]
+        if (sh.type === 'biome' && sh.layerId === layer.id && hitShape(sh, x, y, 0)) return { kind: 'shape', id: sh.id }
+      }
+    } else if (layer.kind === 'symbols') {
       for (let n = draft.symbols.length - 1; n >= 0; n -= 1) {
         const s = draft.symbols[n]
         if (s.layerId !== layer.id) continue
@@ -198,7 +276,7 @@ export function hitItem(draft: MapDraft, x: number, y: number, slack = 0.3): Ite
     } else if (layer.kind === 'shapes') {
       for (let n = draft.shapes.length - 1; n >= 0; n -= 1) {
         const sh = draft.shapes[n]
-        if (sh.layerId === layer.id && hitShape(sh, x, y, slack)) return { kind: 'shape', id: sh.id }
+        if (sh.type !== 'biome' && sh.layerId === layer.id && hitShape(sh, x, y, slack)) return { kind: 'shape', id: sh.id }
       }
     } else if (layer.kind === 'labels') {
       for (let n = draft.labels.length - 1; n >= 0; n -= 1) {
@@ -216,11 +294,19 @@ export function hitItem(draft: MapDraft, x: number, y: number, slack = 0.3): Ite
 
 export type LegendEntry = { type: 'terrain'; name: string; color: string } | { type: 'symbol'; kind: string; name: string }
 
-// What the legend lists: the terrains that cover some of the map, in the palette's order, then the kinds of symbol that are on it, in the library's order
-// (a kind the library does not have goes last under its own name). `counts` is the number of cells of each terrain.
-export function legendEntries(draft: Pick<MapDraft, 'terrains' | 'symbols' | 'layers'>, counts: number[]): LegendEntry[] {
+// What the legend lists: the biomes the map is drawn with (its base and its biome shapes, in the biome list's order), then the kinds of symbol that are on
+// it, in the library's order (a kind the library does not have goes last under its own name).
+export function legendEntries(draft: Pick<MapDraft, 'base' | 'shapes' | 'symbols' | 'layers'>, biomes: BiomeIndex): LegendEntry[] {
   const out: LegendEntry[] = []
-  draft.terrains.forEach((t, i) => { if ((counts[i] ?? 0) > 0) out.push({ type: 'terrain', name: t.name, color: t.color }) })
+  const used = new Set(usedBiomeIds(draft))
+  for (const b of biomes.values()) if (used.delete(b.id)) out.push({ type: 'terrain', name: b.name, color: b.color })
+  for (const id of used) { const b = resolveBiome(biomes, id); out.push({ type: 'terrain', name: b.name, color: b.color }) }
+  out.push(...symbolEntries(draft))
+  return out
+}
+
+function symbolEntries(draft: Pick<MapDraft, 'symbols' | 'layers'>): LegendEntry[] {
+  const out: LegendEntry[] = []
   const shown = new Set(draft.layers.filter(l => l.kind === 'symbols' && l.visible).map(l => l.id))
   const used = new Set(draft.symbols.filter(s => shown.has(s.layerId)).map(s => s.kind))
   for (const set of SYMBOL_SETS) for (const def of set.symbols) if (used.delete(def.id)) out.push({ type: 'symbol', kind: def.id, name: def.name })

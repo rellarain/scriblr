@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..deps import get_app_data_storage_root, get_storage_root
-from ..storage import author_feedback, book_publishing as publishing, project_store, reader_social, reader_store, world_publishing
+from ..storage import author_feedback, book_publishing as publishing, map_biomes_store, project_store, reader_social, reader_store, world_publishing
 from ..storage.reader_schema import BookFeedback, BookSummary
 from ..storage.schema import BookListing, BookMeta, ChapterAuthorNotes, ReaderLevelName
 
@@ -42,10 +42,10 @@ def put_meta(project_id: str, book_id: str, body: BookMeta, root: Path = Depends
 
 
 @router.post(f"{_BOOK}/publish", response_model=BookListing)
-def publish(project_id: str, book_id: str, root: Path = Depends(get_storage_root)) -> BookListing:
+def publish(project_id: str, book_id: str, root: Path = Depends(get_storage_root), app_root: Path = Depends(get_app_data_storage_root)) -> BookListing:
     """Publish the book: a new numbered edition from the chapters published so far, and the book is listed for sale and loan."""
     try:
-        return publishing.publish_book(root, project_id, book_id)
+        return publishing.publish_book(root, project_id, book_id, map_biomes_store.published_biomes(app_root))
     except _ERRORS as exc:
         raise _translate(exc) from exc
 
@@ -122,10 +122,13 @@ def get_reader_extras(project_id: str, root: Path = Depends(get_storage_root)) -
 
 
 @router.get(f"{_BOOK}/extras-preview", response_model=world_publishing.BookExtras)
-def get_extras_preview(project_id: str, book_id: str, chapter: int = Query(default=0, ge=0, le=10000), root: Path = Depends(get_storage_root)) -> world_publishing.BookExtras:
+def get_extras_preview(
+    project_id: str, book_id: str, chapter: int = Query(default=0, ge=0, le=10000), root: Path = Depends(get_storage_root),
+    app_root: Path = Depends(get_app_data_storage_root),
+) -> world_publishing.BookExtras:
     """The published maps and characters as a reader who has reached `chapter` would see them (the author's preview; 0 = a reader who has not started)."""
     try:
-        return world_publishing.project_preview(root, project_id, book_id, chapter)
+        return world_publishing.project_preview(root, project_id, book_id, chapter, map_biomes_store.published_biomes(app_root))
     except _ERRORS as exc:
         raise _translate(exc) from exc
     except project_store.ProjectNotFoundError as exc:

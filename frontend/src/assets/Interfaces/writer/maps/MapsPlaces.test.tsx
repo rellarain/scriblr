@@ -14,8 +14,8 @@ vi.mock('./mapExport', async importOriginal => ({ ...(await importOriginal<typeo
 beforeEach(() => { saved.mockClear(); vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
 
 const symbol = (over: Partial<MapSymbol> = {}): MapSymbol => ({ id: 'sym_1', kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null, layerId: 'symbols', name: '', mapIds: [], ...over })
-const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', kind: 'world', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
-const town = (): MapDoc => newMap('map_b', { title: 'Port Veyra', kind: 'town', width: 4, height: 4, parentId: 'map_a' }, 0)
+const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
+const town = (): MapDoc => newMap('map_b', { title: 'Port Veyra', level: 'local', width: 4, height: 4, parentId: 'map_a' }, 0)
 
 async function open(maps: MapDoc[], scenes: ScenePlace[] = [], onSetLocation = vi.fn()) {
   const backend = mapsBackend(maps)

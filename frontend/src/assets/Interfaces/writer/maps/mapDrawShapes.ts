@@ -105,6 +105,22 @@ function drawPattern(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapVi
   ctx.restore()
 }
 
+// A biome shape: its outline filled in its biome's colour (no line round it: the land meets the land), then lightened or darkened by its height (`tint` is
+// how much, -1 to 1: white over it above sea level, black below; the same rule the base follows).
+export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: Pick<MapShape, 'type' | 'points'>, view: MapView, color: string, tint = 0) {
+  if (shape.points.length < 3) return
+  ctx.save()
+  trace(ctx, shape, view)
+  ctx.fillStyle = color
+  ctx.fill()
+  if (tint !== 0) {
+    ctx.globalAlpha = Math.min(1, Math.abs(tint))
+    ctx.fillStyle = tint > 0 ? '#ffffff' : '#000000'
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef) {
   if (shape.points.length < 2) return
   const w = Math.max(1, shape.width * view.zoom)
@@ -158,13 +174,24 @@ export function drawShapeEditor(ctx: CanvasRenderingContext2D, shape: MapShape, 
   ctx.restore()
 }
 
-export interface PendingShape { type: MapShapeType; points: Array<[number, number]>; cursor: [number, number] | null; pen: Pen }
+// The shape being drawn: its kind, what has been clicked, where the pointer is, the pen it is drawn with and, for a biome shape, its biome's colour.
+export interface PendingShape { type: MapShapeType; points: Array<[number, number]>; cursor: [number, number] | null; pen: Pen; color?: string }
 
-// The shape being drawn: what has been clicked, and a piece on to the pointer; a dot at each point.
+// The shape being drawn: what has been clicked, and a piece on to the pointer; a dot at each point. A biome shape shows its fill with a dashed outline.
 export function drawPending(ctx: CanvasRenderingContext2D, pending: PendingShape, view: MapView, theme: MapThemeDef) {
   const pts = pending.cursor ? [...pending.points, pending.cursor] : pending.points
   if (pts.length === 0) return
-  if (pts.length >= 2) drawShape(ctx, makeShape('pending', '', pending.type, pts, pending.pen), view, theme)
+  if (pending.type === 'biome' && pts.length >= 2) {
+    const shape = makeShape('pending', '', 'biome', pts, pending.pen)
+    if (pts.length >= 3) drawBiomeShape(ctx, shape, view, pending.color ?? DEFAULT_FILL)
+    ctx.save()
+    trace(ctx, shape, view)
+    ctx.setLineDash([5, 3])
+    ctx.strokeStyle = theme.ink
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+    ctx.restore()
+  } else if (pts.length >= 2) drawShape(ctx, makeShape('pending', '', pending.type, pts, pending.pen), view, theme)
   ctx.save()
   ctx.strokeStyle = theme.ink
   ctx.fillStyle = theme.halo

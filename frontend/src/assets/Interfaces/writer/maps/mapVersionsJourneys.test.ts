@@ -8,7 +8,7 @@ import { appliesLabel, baseIdOf, familyOf, isVersion, versionAt, versionsOf } fr
 
 const point = (id: string, index: number): StoryPoint => ({ id, kind: 'chapter', title: `Chapter ${index + 1}`, label: `Book > Chapter ${index + 1}`, index })
 const POINTS = ['c1', 'c2', 'c3', 'c4'].map(point)
-const summary = (id: string, over: Partial<MapSummary> = {}): MapSummary => ({ id, title: id, kind: 'town', parentId: null, order: 0, width: 4, height: 4, updatedAt: '', ...over })
+const summary = (id: string, over: Partial<MapSummary> = {}): MapSummary => ({ id, title: id, kind: 'town', level: 'local', parentId: null, order: 0, width: 4, height: 4, updatedAt: '', ...over })
 
 describe('versions of a map', () => {
   const maps = [

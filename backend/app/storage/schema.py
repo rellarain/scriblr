@@ -11,7 +11,8 @@ SCHEMA_VERSION = 2
 # knows (see project_store). 2: one file per project; 3: plot clusters; 4: tree history as sparse keyframes and deltas (tree_pack);
 # 5: a book's paragraph indent in spaces (PreviewFormat.paragraphIndentSpaces) instead of em.
 # 6: the Schedule console: faceted activity (events, daily and monthly totals, a 28-day slot profile), revision flags and the planner.
-PROJECT_FILE_VERSION = 6
+# 7: maps by level with biome shapes (MapDoc.mapFormat 2); the painted cells of older maps traced into biome shapes once (map_trace).
+PROJECT_FILE_VERSION = 7
 
 
 def utcnow() -> datetime:
@@ -676,6 +677,8 @@ class BookEdition(BaseModel):
     characters: list["EditionCharacter"] = Field(default_factory=list)
     # The copies of models the characters' figures were made from, frozen with the edition (key -> copy).
     figureModels: dict[str, "FigureModel"] = Field(default_factory=dict)
+    # The biomes the edition's maps are drawn with, frozen with it (id -> biome), so a later change to the biome list waits for the next edition.
+    biomes: dict[str, "MapBiome"] = Field(default_factory=dict)
 
 
 class BookListing(BaseModel):
@@ -3450,10 +3453,218 @@ MAP_TERRAIN_SETS: dict[str, list[tuple[str, str, str]]] = {
     "town": [("ground", "Ground", "#d8cfb4"), ("road", "Road", "#8a8076"), ("building", "Building", "#b5654a"), ("park", "Park", "#7fb069"), ("water", "Water", "#4a86b8")],
     "interior": [("void", "Outside", "#2a2330"), ("floor", "Floor", "#d9c8a8"), ("wall", "Wall", "#5a4a42"), ("door", "Door", "#9a6a3a"), ("water", "Water", "#4a86b8")],
 }
-# The layers a new map starts with, bottom to top.
+# The layers a new map starts with, bottom to top. The layer of the kind `terrain` holds the biome shapes (it was the painted cells before maps had levels).
 MAP_DEFAULT_LAYERS: list[tuple[str, str, str]] = [
-    ("terrain", "Terrain", "terrain"), ("shapes", "Regions and lines", "shapes"), ("symbols", "Symbols", "symbols"), ("labels", "Labels", "labels"), ("notes", "Notes", "notes"),
+    ("terrain", "Biomes", "terrain"), ("shapes", "Regions and lines", "shapes"), ("symbols", "Symbols", "symbols"), ("labels", "Labels", "labels"), ("notes", "Notes", "notes"),
 ]
+
+# The levels of a map, from the largest to the smallest: what a map holds (a star system holds planets, a nation its states ...). A place's child map is the
+# next level down by default. `kind` was the map's only classification before levels; a map without a level gets the one its kind becomes.
+MapLevel = Literal["intergalactic", "galactic", "planetary", "continental", "national", "regional", "local", "architectural", "interior"]
+MAP_LEVELS: tuple[str, ...] = ("intergalactic", "galactic", "planetary", "continental", "national", "regional", "local", "architectural", "interior")
+LEVEL_OF_KIND: dict[str, str] = {"world": "planetary", "town": "local", "interior": "interior"}
+MapUnits = Literal["metric", "imperial", "custom"]
+METRES_PER_FOOT = 0.3048
+
+
+class _LevelDefaults(BaseModel):
+    kind: str
+    base: str
+    baseHeight: float
+    # The height that reads lightest (and the depth that reads darkest), in metres; 0 = the level is not shaded by height.
+    heightRange: float
+    metric: tuple[float, str]
+    imperial: tuple[float, str]
+
+
+# What a new map of each level starts with (the frontend's mapLevels.ts holds the same table). Heights are in metres here; a map in imperial units keeps feet.
+MAP_LEVEL_DEFAULTS: dict[str, _LevelDefaults] = {
+    "intergalactic": _LevelDefaults(kind="world", base="space", baseHeight=0, heightRange=0, metric=(1, "ly"), imperial=(1, "ly")),
+    "galactic": _LevelDefaults(kind="world", base="space", baseHeight=0, heightRange=0, metric=(0.1, "AU"), imperial=(0.1, "AU")),
+    "planetary": _LevelDefaults(kind="world", base="saltwater", baseHeight=-3000, heightRange=8000, metric=(100, "km"), imperial=(60, "mi")),
+    "continental": _LevelDefaults(kind="world", base="saltwater", baseHeight=-200, heightRange=6000, metric=(25, "km"), imperial=(15, "mi")),
+    "national": _LevelDefaults(kind="world", base="plain", baseHeight=0, heightRange=4000, metric=(10, "km"), imperial=(6, "mi")),
+    "regional": _LevelDefaults(kind="world", base="plain", baseHeight=0, heightRange=2000, metric=(2, "km"), imperial=(1, "mi")),
+    "local": _LevelDefaults(kind="town", base="plain", baseHeight=0, heightRange=300, metric=(10, "m"), imperial=(30, "ft")),
+    "architectural": _LevelDefaults(kind="interior", base="outside", baseHeight=0, heightRange=0, metric=(1, "m"), imperial=(3, "ft")),
+    "interior": _LevelDefaults(kind="interior", base="wood", baseHeight=0, heightRange=0, metric=(0.5, "m"), imperial=(1, "ft")),
+}
+
+# ---- biomes: what colours the land (and the floors of buildings, and space). A biome's colour is how it looks at sea level; height lightens or darkens it.
+MapBiomeGroup = Literal["land", "water", "material", "space"]
+MAP_MAX_BIOMES = 128
+MAP_MAX_PROJECT_BIOMES = 64
+MAP_BIOME_HISTORY_MAX = 20
+_BIOME_ID = re.compile(r"^[A-Za-z0-9_-]{1,60}$")
+# The levels a biome of each group is offered on when it names none of its own.
+BIOME_GROUP_LEVELS: dict[str, tuple[str, ...]] = {
+    "land": ("planetary", "continental", "national", "regional", "local"),
+    "water": ("planetary", "continental", "national", "regional", "local"),
+    "material": ("architectural", "interior"),
+    "space": ("intergalactic", "galactic"),
+}
+
+
+def biome_id_or_none(value: Any) -> Optional[str]:
+    return value if isinstance(value, str) and _BIOME_ID.match(value) else None
+
+
+class MapBiome(BaseModel):
+    """One entry of the biome list: an id maps refer to, a name, the colour at sea level, its group and the levels it is offered on (none = the group's).
+    `retired` is a biome taken out of the list after maps used it: it is no longer offered, and the maps that use it keep its colour."""
+
+    id: str = Field(min_length=1, max_length=60)
+    name: str = Field(default="", max_length=40)
+    color: str = "#888888"
+    group: MapBiomeGroup = "land"
+    levels: list[MapLevel] = Field(default_factory=list)
+    retired: bool = False
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _id(cls, value: Any) -> Any:
+        if biome_id_or_none(value) is None:
+            raise ValueError("a biome id is letters, digits, - and _")
+        return value
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> Any:
+        return value.strip()[:40] if isinstance(value, str) else ""
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _color(cls, value: Any) -> Any:
+        return value.lower() if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else "#888888"
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def _group(cls, value: Any) -> Any:
+        return value if value in BIOME_GROUP_LEVELS else "land"
+
+    @field_validator("levels", mode="before")
+    @classmethod
+    def _levels(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            if item in MAP_LEVELS and item not in out:
+                out.append(item)
+        return [lv for lv in MAP_LEVELS if lv in out]
+
+    @field_validator("retired", mode="before")
+    @classmethod
+    def _retired(cls, value: Any) -> Any:
+        return value is True
+
+
+def biome_list(value: Any, limit: int) -> list[MapBiome]:
+    """The biomes of a list that can be read, each id once, at most `limit`."""
+    seen: set[str] = set()
+    out: list[MapBiome] = []
+    for item in value if isinstance(value, list) else []:
+        try:
+            biome = item if isinstance(item, MapBiome) else MapBiome.model_validate(item)
+        except ValueError:
+            continue
+        if biome.id in seen:
+            continue
+        seen.add(biome.id)
+        out.append(biome)
+        if len(out) >= limit:
+            break
+    return out
+
+
+# The admin's starter list (published as version 1 on a new install). Ids are fixed: maps refer to them.
+MAP_BIOME_SEED: list[tuple[str, str, str, str, tuple[str, ...]]] = [
+    ("saltwater", "Saltwater", "#2f62b0", "water", ()),
+    ("freshwater", "Freshwater", "#6fb8e8", "water", ("planetary", "continental", "national", "regional", "local", "architectural", "interior")),
+    ("desert", "Desert", "#d2b48c", "land", ()),
+    ("plain", "Plain", "#a4c34a", "land", ()),
+    ("forest", "Forest", "#3f8f3a", "land", ()),
+    ("swamp", "Swamp", "#7a7a2e", "land", ()),
+    ("tundra", "Tundra", "#e9eef0", "land", ()),
+    ("taiga", "Taiga", "#6f8f76", "land", ()),
+    ("rocky", "Rocky", "#8e8e8e", "land", ()),
+    ("lava", "Lava fields", "#e3702a", "land", ()),
+    ("savannah", "Savannah", "#d4a62a", "land", ()),
+    ("jungle", "Jungle and rainforest", "#1f6b36", "land", ()),
+    ("mangrove", "Mangrove", "#3f8a74", "land", ()),
+    ("ice", "Ice and glacier", "#cfe8f2", "land", ()),
+    ("beach", "Beach and sand", "#ecdcab", "land", ()),
+    ("steppe", "Steppe and grassland", "#c9bd7a", "land", ()),
+    ("badlands", "Badlands and canyon", "#a5583a", "land", ()),
+    ("urban", "Urban and settlement", "#9e948a", "land", ()),
+    ("farmland", "Farmland", "#d8c45a", "land", ()),
+    ("wood", "Wood", "#b98a5a", "material", ()),
+    ("stone", "Stone", "#9a948c", "material", ()),
+    ("tile", "Tile", "#d9d4c7", "material", ()),
+    ("marble", "Marble", "#e8e4dc", "material", ()),
+    ("carpet", "Carpet", "#9c4a4a", "material", ()),
+    ("dirt", "Dirt", "#9b7b55", "material", ("local", "architectural", "interior")),
+    ("paving", "Paving", "#b5aea3", "material", ("local", "architectural", "interior")),
+    ("grass", "Grass", "#7fae5a", "material", ()),
+    ("outside", "Outside", "#4a4450", "material", ()),
+    ("space", "Space", "#0f1626", "space", ()),
+]
+
+
+def seed_biomes() -> list[MapBiome]:
+    return [MapBiome(id=i, name=n, color=c, group=g, levels=list(lv)) for i, n, c, g, lv in MAP_BIOME_SEED]
+
+
+class PublishedBiomes(BaseModel):
+    version: int
+    publishedAt: datetime
+    biomes: list[MapBiome] = Field(default_factory=list)
+
+    @field_validator("biomes", mode="before")
+    @classmethod
+    def _biomes(cls, value: Any) -> Any:
+        return biome_list(value, MAP_MAX_BIOMES * 2)
+
+
+class MapBiomeCatalog(BaseModel):
+    """The admin's biome list (app data, map-biomes.json): a draft edited on Configuration > Maps and the published list every project draws with, with
+    its earlier versions. `seedVersion` is how much of the starter list has been merged in, so a later build can add new starter biomes without undoing edits."""
+
+    schemaVersion: int = 1
+    seedVersion: int = 1
+    draft: list[MapBiome] = Field(default_factory=list)
+    published: Optional[PublishedBiomes] = None
+    history: list[PublishedBiomes] = Field(default_factory=list)
+    nextVersion: int = 1
+
+    @field_validator("draft", mode="before")
+    @classmethod
+    def _draft(cls, value: Any) -> Any:
+        return biome_list(value, MAP_MAX_BIOMES)
+
+
+class MapBiomeDraft(BaseModel):
+    biomes: list[MapBiome] = Field(default_factory=list)
+
+    @field_validator("biomes", mode="before")
+    @classmethod
+    def _biomes(cls, value: Any) -> Any:
+        return biome_list(value, MAP_MAX_BIOMES)
+
+
+class MapBase(BaseModel):
+    """What lies under every biome shape of a map: a biome and its height (in the map's height unit: metres, or feet for imperial maps)."""
+
+    biome: str = "saltwater"
+    height: float = 0.0
+
+    @field_validator("biome", mode="before")
+    @classmethod
+    def _biome(cls, value: Any) -> Any:
+        return biome_id_or_none(value) or "saltwater"
+
+    @field_validator("height", mode="before")
+    @classmethod
+    def _height(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -100000.0, 100000.0)
 
 
 class MapTerrain(BaseModel):
@@ -3598,11 +3809,13 @@ class MapLabel(BaseModel):
 
 
 MAP_MAX_SHAPES = 2000
+MAP_MAX_BIOME_SHAPES = 2000
 MAP_MAX_SHAPE_POINTS = 500
-MapShapeType = Literal["line", "region"]
+MapShapeType = Literal["line", "region", "biome"]
 MapLineStyle = Literal["solid", "dashed", "dotted", "road", "wall", "fence"]
 MapPattern = Literal["solid", "hatch", "cross", "dots"]
-_SHAPE_MIN_POINTS = {"line": 2, "region": 3}
+MapHeightMode = Literal["none", "raise", "lower", "set"]
+_SHAPE_MIN_POINTS = {"line": 2, "region": 3, "biome": 3}
 
 
 class MapShapePoint(BaseModel):
@@ -3638,7 +3851,8 @@ class MapShapePoint(BaseModel):
 
 
 class MapShape(BaseModel):
-    """A line (a river, a road, a border, a wall, a fence) or a region (a closed outline, filled) drawn over the terrain."""
+    """A line (a river, a road, a border, a wall, a fence), a region (a closed outline, filled, drawn over the land) or a biome shape (a closed outline
+    on the biomes layer: the land itself, coloured by its biome and lifted or sunk by its height). A region or a biome shape with a name is a place."""
 
     id: str = Field(min_length=1, max_length=40)
     layerId: str = Field(min_length=1, max_length=40)
@@ -3652,6 +3866,51 @@ class MapShape(BaseModel):
     fill: Optional[str] = None
     opacity: float = 0.35
     pattern: MapPattern = "solid"
+    # A biome shape's biome (an id of the biome list; none = it keeps the biome under it and only changes the height), and what it does to the height
+    # under it: nothing, raise or lower it by `height`, or set it to `height` (in the map's height unit).
+    biome: Optional[str] = None
+    heightMode: MapHeightMode = "none"
+    height: float = 0.0
+    # A region or biome shape with a name is a place: a scene's location can be it, and `mapIds` are the maps that open from it.
+    name: str = Field(default="", max_length=80)
+    mapIds: list[str] = Field(default_factory=list)
+
+    @field_validator("biome", mode="before")
+    @classmethod
+    def _biome_or_none(cls, value: Any) -> Any:
+        return biome_id_or_none(value)
+
+    @field_validator("heightMode", mode="before")
+    @classmethod
+    def _height_mode(cls, value: Any) -> Any:
+        return value if value in ("none", "raise", "lower", "set") else "none"
+
+    @field_validator("height", mode="before")
+    @classmethod
+    def _height(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -100000.0, 100000.0)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _cut_name(cls, value: Any) -> Any:
+        return value.strip()[:80] if isinstance(value, str) else ""
+
+    @field_validator("mapIds", mode="before")
+    @classmethod
+    def _map_ids(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            if isinstance(item, str) and 0 < len(item) <= 80 and item not in out:
+                out.append(item)
+        return out[:MAP_MAX_PLACE_MAPS]
+
+    @model_validator(mode="after")
+    def _by_type(self) -> "MapShape":
+        if self.type == "line":
+            self.name, self.mapIds = "", []
+        if self.type != "biome":
+            self.biome, self.heightMode, self.height = None, "none", 0.0
+        return self
 
     @field_validator("points", mode="before")
     @classmethod
@@ -3802,11 +4061,24 @@ class MapJourney(BaseModel):
         return out[:MAP_MAX_STOPS]
 
 
+MAP_FORMAT = 2
+
+
 class MapDoc(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=80)
     title: str = Field(default="Untitled map", max_length=120)
+    # The classification before levels (kept as stored, so an older build can still read the map; a new map gets the kind its level was).
     kind: MapKind = "world"
+    # What the map holds (see MapLevel). A map without one gets the level its kind becomes.
+    level: MapLevel = "planetary"
+    # 1: the land is the painted `cells` (from before levels); 2: the land is biome shapes over `base`, and `cells`/`terrains` are kept unused, as they
+    # were (the grid they were painted on is `legacyGrid`). A map of format 1 is traced into biome shapes once (map_trace).
+    mapFormat: int = 1
+    base: MapBase = Field(default_factory=MapBase)
+    # The unit system of the map: metric and imperial convert into each other; custom (paces, leagues, cells ...) keeps its unit as written.
+    units: MapUnits = "custom"
+    legacyGrid: Optional[list[int]] = None
     # The map this one is inside (a place on the parent opens this map), and its place among its siblings.
     parentId: Optional[str] = None
     order: int = 0
@@ -3840,6 +4112,40 @@ class MapDoc(BaseModel):
     # The paths of characters over the map (never shown to readers).
     journeys: list[MapJourney] = Field(default_factory=list)
     updatedAt: datetime = Field(default_factory=utcnow)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _level_from_kind(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("level") not in MAP_LEVELS:
+            data = {**data, "level": LEVEL_OF_KIND.get(data.get("kind") if isinstance(data.get("kind"), str) else "world", "planetary")}
+        return data
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind_or_world(cls, value: Any) -> Any:
+        return value if value in ("world", "town", "interior") else "world"
+
+    @field_validator("mapFormat", mode="before")
+    @classmethod
+    def _format(cls, value: Any) -> Any:
+        return value if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= MAP_FORMAT else 1
+
+    @field_validator("base", mode="before")
+    @classmethod
+    def _base(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, MapBase)) else {}
+
+    @field_validator("units", mode="before")
+    @classmethod
+    def _units(cls, value: Any) -> Any:
+        return value if value in ("metric", "imperial", "custom") else "custom"
+
+    @field_validator("legacyGrid", mode="before")
+    @classmethod
+    def _legacy_grid(cls, value: Any) -> Any:
+        if isinstance(value, list) and len(value) == 2 and all(isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAP_MAX_SIDE for v in value):
+            return value
+        return None
 
     @field_validator("versionOf", "appliesFrom", mode="before")
     @classmethod
@@ -3922,7 +4228,8 @@ class MapDoc(BaseModel):
             if t.id not in seen:
                 seen.add(t.id)
                 terrains.append(t)
-        if not terrains:
+        # A map of format 2 keeps its old palette and cells as they were (unused): nothing is filled in or padded for it.
+        if not terrains and self.mapFormat < 2:
             terrains = [MapTerrain(id=i, name=n, color=c, builtIn=True) for i, n, c in MAP_TERRAIN_SETS[self.kind]]
         self.terrains = terrains
         layers: list[MapLayer] = []
@@ -3932,29 +4239,43 @@ class MapDoc(BaseModel):
                 seen.add(layer.id)
                 layers.append(layer)
         if not any(layer.kind == "terrain" for layer in layers):
-            layers.insert(0, MapLayer(id="terrain", name="Terrain", kind="terrain", locked=False))
+            layers.insert(0, MapLayer(id="terrain", name="Biomes" if self.mapFormat >= 2 else "Terrain", kind="terrain", locked=False))
         self.layers = layers
-        self.cells = repair_map_runs(self.cells, self.width * self.height, len(terrains))
+        if self.mapFormat < 2:
+            self.cells = repair_map_runs(self.cells, self.width * self.height, len(terrains))
         self.symbols = self._kept(self.symbols, "symbols", MAP_MAX_SYMBOLS)
         self.labels = self._kept(self.labels, "labels", MAP_MAX_LABELS)
         self.shapes = self._kept_shapes()
         return self
 
     def _kept_shapes(self) -> list[MapShape]:
-        """The shapes that sit on a shapes layer and have enough points (2 for a line, 3 for a region), each id once, at most MAP_MAX_SHAPES, held to the map."""
-        layer_ids = {layer.id for layer in self.layers if layer.kind == "shapes"}
+        """The shapes that sit on a layer of their kind (lines and regions on a shapes layer, biome shapes on the biomes layer) and have enough points
+        (2 for a line, 3 otherwise), each id once and never the id of a symbol (a shape that has one is given a new one: ids name places), at most
+        MAP_MAX_SHAPES lines and regions and MAP_MAX_BIOME_SHAPES biome shapes, held to the map."""
+        shape_layers = {layer.id for layer in self.layers if layer.kind == "shapes"}
+        biome_layers = {layer.id for layer in self.layers if layer.kind == "terrain"}
+        taken: set[str] = {s.id for s in self.symbols}
         seen: set[str] = set()
         out: list[MapShape] = []
+        counts = {"shapes": 0, "biomes": 0}
         for shape in self.shapes:
-            if shape.layerId not in layer_ids or shape.id in seen or len(shape.points) < _SHAPE_MIN_POINTS[shape.type]:
+            group = "biomes" if shape.type == "biome" else "shapes"
+            layers = biome_layers if group == "biomes" else shape_layers
+            if shape.layerId not in layers or shape.id in seen or len(shape.points) < _SHAPE_MIN_POINTS[shape.type]:
                 continue
+            if counts[group] >= (MAP_MAX_BIOME_SHAPES if group == "biomes" else MAP_MAX_SHAPES):
+                continue
+            if shape.id in taken:
+                n = 1
+                while f"{shape.id[:34]}_{n}" in taken or f"{shape.id[:34]}_{n}" in seen:
+                    n += 1
+                shape.id = f"{shape.id[:34]}_{n}"
             seen.add(shape.id)
+            counts[group] += 1
             for p in shape.points:
                 p.x = min(float(self.width), max(0.0, p.x))
                 p.y = min(float(self.height), max(0.0, p.y))
             out.append(shape)
-            if len(out) >= MAP_MAX_SHAPES:
-                break
         return out
 
     def _kept(self, items: list[Any], kind: str, limit: int) -> list[Any]:
@@ -3972,6 +4293,22 @@ class MapDoc(BaseModel):
             if len(out) >= limit:
                 break
         return out
+
+
+class NamedPlace(BaseModel):
+    """A place of a map: a named symbol, or a named region or biome shape. `kind` is the symbol's kind, or "area"."""
+
+    id: str
+    name: str
+    kind: str
+    mapIds: list[str] = Field(default_factory=list)
+
+
+def named_places(doc: MapDoc) -> list[NamedPlace]:
+    """The places of a map: its named symbols, then its named regions and biome shapes (ids are unique across both, see MapDoc._kept_shapes)."""
+    out = [NamedPlace(id=s.id, name=s.name, kind=s.kind, mapIds=list(s.mapIds)) for s in doc.symbols if s.name]
+    out.extend(NamedPlace(id=sh.id, name=sh.name, kind="area", mapIds=list(sh.mapIds)) for sh in doc.shapes if sh.name and sh.type != "line")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -5104,12 +5441,21 @@ class ProjectFile(BaseModel):
     worldLinks: list[WorldLink] = Field(default_factory=list)
     # Item id -> the item (the library of things that pass from hand to hand). Read the way the characters are.
     items: dict[str, ItemDoc] = Field(default_factory=dict)
+    # The project's own biomes (besides the admin's list): a writer's crystal fields or ash plains; ids start with "own_".
+    mapBiomes: list[MapBiome] = Field(default_factory=list)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)
     # Sections that could not be read, as they were stored: key -> (raw value, the default put in their place). Not persisted by itself: the
     # store writes the raw value back unless the section was replaced, so an unreadable section is kept for a build that can read it.
     _unreadable: dict[str, tuple[Any, Any]] = PrivateAttr(default_factory=dict)
+    # Set when reading the file upgraded something in memory (maps traced into biome shapes): the store writes it back once.
+    _maps_upgraded: bool = PrivateAttr(default=False)
+
+    @field_validator("mapBiomes", mode="before")
+    @classmethod
+    def _map_biomes(cls, value: Any) -> Any:
+        return biome_list(value, MAP_MAX_PROJECT_BIOMES)
 
 
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.storage.schema import MAP_MAX_SIDE, MAP_TERRAIN_SETS, MapDoc, repair_map_runs
+from app.storage.schema import MAP_MAX_SIDE, MapDoc, repair_map_runs
 
 
 def _project(client: TestClient) -> str:
@@ -41,24 +41,30 @@ def test_a_bad_pair_is_dropped_and_an_index_past_the_palette_becomes_the_first_t
 
 # ---- creating and reading ----
 
-def test_a_new_map_has_its_terrain_set_its_layers_and_is_filled_with_the_first_terrain(client: TestClient) -> None:
+def test_a_new_map_has_its_level_its_base_its_layers_and_no_cells(client: TestClient) -> None:
     pid = _project(client)
-    doc = _new(client, pid, title="The Known World", kind="world", width=28, height=18, cellSize=10, unit="miles")
+    doc = _new(client, pid, title="The Known World", level="continental", units="metric", width=28, height=18, cellSize=25, unit="km")
     assert doc["id"].startswith("map_")
-    assert [t["id"] for t in doc["terrains"]] == [t[0] for t in MAP_TERRAIN_SETS["world"]]
-    assert all(t["builtIn"] for t in doc["terrains"])
-    assert [(layer["kind"], layer["visible"], layer["locked"]) for layer in doc["layers"]] == [
-        ("terrain", True, False), ("shapes", True, False), ("symbols", True, False), ("labels", True, False), ("notes", True, False),
+    assert (doc["level"], doc["mapFormat"], doc["units"], doc["kind"]) == ("continental", 2, "metric", "world")
+    assert doc["base"] == {"biome": "saltwater", "height": -200.0}
+    assert doc["terrains"] == [] and doc["cells"] == [] and doc["shapes"] == []
+    assert [(layer["kind"], layer["name"], layer["visible"], layer["locked"]) for layer in doc["layers"]] == [
+        ("terrain", "Biomes", True, False), ("shapes", "Regions and lines", True, False), ("symbols", "Symbols", True, False), ("labels", "Labels", True, False),
+        ("notes", "Notes", True, False),
     ]
-    assert doc["cells"] == [0, 28 * 18]
-    assert (doc["cellSize"], doc["unit"], doc["parentId"], doc["order"]) == (10, "miles", None, 0)
+    assert (doc["cellSize"], doc["unit"], doc["parentId"], doc["order"]) == (25, "km", None, 0)
 
 
-def test_each_kind_starts_with_its_own_terrains(client: TestClient) -> None:
+def test_each_level_starts_with_its_own_base_and_an_old_kind_still_makes_a_map(client: TestClient) -> None:
     pid = _project(client)
-    for kind in ("world", "town", "interior"):
-        doc = _new(client, pid, kind=kind, width=4, height=3)
-        assert [t["id"] for t in doc["terrains"]] == [t[0] for t in MAP_TERRAIN_SETS[kind]]
+    assert _new(client, pid, level="interior")["base"]["biome"] == "wood"
+    assert _new(client, pid, level="galactic")["base"]["biome"] == "space"
+    imperial = _new(client, pid, level="planetary", units="imperial")
+    assert imperial["base"] == {"biome": "saltwater", "height": round(-3000 / 0.3048)}
+    old = _new(client, pid, kind="town", width=4, height=3)  # a client from before levels
+    assert (old["level"], old["mapFormat"], old["kind"]) == ("local", 2, "town")
+    chosen = _new(client, pid, level="regional", base={"biome": "forest", "height": 120})
+    assert chosen["base"] == {"biome": "forest", "height": 120.0}
 
 
 def test_the_list_has_summaries_without_cells_in_tree_order(client: TestClient) -> None:
@@ -69,7 +75,7 @@ def test_the_list_has_summaries_without_cells_in_tree_order(client: TestClient) 
     rows = client.get(f"/api/projects/{pid}/maps").json()
     assert [r["title"] for r in rows] == ["First", "Inside", "Second"]  # order 0, 0, 1
     assert second["order"] == 1 and inner["order"] == 0
-    assert set(rows[0]) == {"id", "title", "kind", "parentId", "order", "width", "height", "updatedAt", "versionOf", "appliesFrom"}
+    assert set(rows[0]) == {"id", "title", "kind", "level", "parentId", "order", "width", "height", "updatedAt", "versionOf", "appliesFrom"}
 
 
 def test_a_map_can_be_made_only_inside_a_map_that_exists_and_a_project_for_one_that_exists(client: TestClient) -> None:
@@ -87,19 +93,28 @@ def test_a_side_past_the_largest_is_refused(client: TestClient) -> None:
 
 # ---- saving ----
 
-def test_painted_cells_a_new_terrain_and_a_hidden_layer_round_trip(client: TestClient) -> None:
+def _biome_shape(**over) -> dict:
+    return {
+        "id": "b1", "layerId": "terrain", "type": "biome", "biome": "forest", "heightMode": "raise", "height": 400,
+        "points": [{"x": 1, "y": 1}, {"x": 4, "y": 1}, {"x": 4, "y": 3}], **over,
+    }
+
+
+def test_biome_shapes_a_base_and_a_hidden_layer_round_trip(client: TestClient) -> None:
     pid = _project(client)
-    doc = _new(client, pid, kind="town", width=4, height=2)
-    doc["terrains"].append({"id": "ter_salt", "name": "Salt flats", "color": "#efe6d2", "builtIn": False})
-    doc["cells"] = [0, 3, 5, 2, 1, 3]
+    doc = _new(client, pid, level="regional", width=6, height=4)
+    doc["shapes"] = [_biome_shape(), _biome_shape(id="b2", biome=None, heightMode="lower", height=50, name="The Hollow")]
+    doc["base"] = {"biome": "plain", "height": 10}
     doc["layers"][2]["visible"] = False
     doc["layers"][0]["locked"] = True
     doc["title"] = "Port Veyra"
     resp = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
     assert resp.status_code == 200, resp.text
     again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
-    assert again["cells"] == [0, 3, 5, 2, 1, 3]
-    assert again["terrains"][-1] == {"id": "ter_salt", "name": "Salt flats", "color": "#efe6d2", "builtIn": False}
+    assert [(s["id"], s["biome"], s["heightMode"], s["height"], s["name"]) for s in again["shapes"]] == [
+        ("b1", "forest", "raise", 400.0, ""), ("b2", None, "lower", 50.0, "The Hollow"),
+    ]
+    assert again["base"] == {"biome": "plain", "height": 10.0}
     assert [layer["visible"] for layer in again["layers"]] == [True, True, False, True, True]
     assert again["layers"][0]["locked"] is True
     assert again["title"] == "Port Veyra"
@@ -110,25 +125,57 @@ def test_odd_values_are_repaired_not_refused(client: TestClient) -> None:
     doc = _new(client, pid, width=3, height=2)
     doc["title"] = "   "
     doc["unit"] = ""
-    doc["terrains"] = [{"id": "a", "name": "x" * 90, "color": "not a colour"}, {"id": "a", "name": "again", "color": "#112233"}]
+    doc["level"] = "galaxy-brain"
+    doc["units"] = "furlongs"
+    doc["base"] = {"biome": "not ok!", "height": "high"}
     doc["layers"] = [{"id": "labels", "name": "Names", "kind": "labels"}]
-    doc["cells"] = [0, 2, 5, 9, "x", 1]
+    doc["shapes"] = [_biome_shape(layerId="gone")]  # dropped: on a layer that is not there
     resp = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
     assert resp.status_code == 200, resp.text
     saved = resp.json()
     assert saved["title"] == "Untitled map" and saved["unit"] == "cells"
-    assert [t["id"] for t in saved["terrains"]] == ["a"]  # the repeat is dropped
-    assert len(saved["terrains"][0]["name"]) == 40 and saved["terrains"][0]["color"] == "#888888"
-    assert [layer["kind"] for layer in saved["layers"]] == ["terrain", "labels"]  # a map always has its terrain layer
-    assert saved["cells"] == [0, 6] and _total(saved["cells"]) == 6
+    assert saved["level"] == "planetary" and saved["units"] == "custom"  # a level that is not one is the one its kind becomes
+    assert saved["base"] == {"biome": "saltwater", "height": 0.0}
+    assert [layer["kind"] for layer in saved["layers"]] == ["terrain", "labels"]  # a map always has its biomes layer
+    assert saved["layers"][0]["name"] == "Biomes"
+    assert saved["shapes"] == [] and saved["cells"] == []
 
 
-def test_a_map_with_no_palette_gets_its_kinds_set(client: TestClient) -> None:
+def test_a_biome_shape_with_odd_values_is_repaired_and_a_line_has_no_biome_or_name(client: TestClient) -> None:
     pid = _project(client)
-    doc = _new(client, pid, kind="interior", width=2, height=2)
-    doc["terrains"] = []
+    doc = _new(client, pid, width=6, height=4)
+    doc["shapes"] = [
+        _biome_shape(biome="bad id!", heightMode="sideways", height="tall"),
+        _biome_shape(id="b2", layerId="shapes"),  # a biome shape off the biomes layer is dropped
+        {"id": "l1", "layerId": "shapes", "type": "line", "points": [{"x": 0, "y": 0}, {"x": 2, "y": 2}], "biome": "forest", "name": "Road", "mapIds": ["x"]},
+    ]
     saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()
-    assert [t["id"] for t in saved["terrains"]] == [t[0] for t in MAP_TERRAIN_SETS["interior"]]
+    assert [(s["id"], s["biome"], s["heightMode"], s["height"]) for s in saved["shapes"]] == [("b1", None, "none", 0.0), ("l1", None, "none", 0.0)]
+    assert (saved["shapes"][1]["name"], saved["shapes"][1]["mapIds"]) == ("", [])
+
+
+def test_a_shape_with_the_id_of_a_symbol_is_given_another(client: TestClient) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=10, height=8)
+    doc["symbols"] = [_item(id="s1")]
+    doc["shapes"] = [_biome_shape(id="s1")]
+    saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()
+    assert saved["symbols"][0]["id"] == "s1" and saved["shapes"][0]["id"] == "s1_1"
+
+
+def test_the_kept_cells_and_palette_of_a_traced_map_are_not_for_a_save_to_change(client: TestClient, storage_root: Path) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=4, height=2)
+    path = storage_root / pid / "project.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["maps"][doc["id"]].update(cells=[0, 8], terrains=[{"id": "ocean", "name": "Ocean", "color": "#3b6ea5", "builtIn": True}], legacyGrid=[4, 2])
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    from app.storage import project_store
+
+    project_store._cache.clear()
+    sent = {**doc, "cells": [9, 9], "terrains": [], "width": 8}
+    saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=sent).json()
+    assert saved["cells"] == [0, 8] and [t["id"] for t in saved["terrains"]] == ["ocean"] and saved["legacyGrid"] == [4, 2] and saved["width"] == 8
 
 
 def test_the_id_must_match_the_address_and_the_map_must_exist(client: TestClient) -> None:
@@ -187,7 +234,8 @@ def test_a_project_saved_before_maps_loads_with_none(client: TestClient, storage
     raw.pop("maps", None)
     path.write_text(json.dumps(raw), encoding="utf-8")
     assert client.get(f"/api/projects/{pid}/maps").json() == []
-    assert MapDoc(id="map_x", width=2, height=2).cells == [0, 4]
+    assert MapDoc(id="map_x", width=2, height=2).cells == [0, 4]  # a document of format 1 (from before levels) still repairs its cells
+    assert MapDoc(id="map_x", width=2, height=2, mapFormat=2).cells == []
 
 
 def test_maps_are_stored_in_project_json_and_survive_a_cold_read(client: TestClient, storage_root: Path) -> None:
@@ -195,12 +243,12 @@ def test_maps_are_stored_in_project_json_and_survive_a_cold_read(client: TestCli
 
     pid = _project(client)
     doc = _new(client, pid, title="Kept", width=5, height=5)
-    doc["cells"] = [1, 10, 2, 15]
+    doc["shapes"] = [_biome_shape()]
     client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
     project_store._cache.clear()
     raw = json.loads((storage_root / pid / "project.json").read_text(encoding="utf-8"))
-    assert raw["maps"][doc["id"]]["cells"] == [1, 10, 2, 15]
-    assert client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()["cells"] == [1, 10, 2, 15]
+    assert [s["id"] for s in raw["maps"][doc["id"]]["shapes"]] == ["b1"]
+    assert client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()["shapes"][0]["biome"] == "forest"
 
 
 # ---- symbols, labels, the look and what is drawn over the map ----
@@ -209,12 +257,10 @@ def _item(**over) -> dict:
     return {"id": "s1", "layerId": "symbols", "kind": "castle", "x": 3.5, "y": 2.5, "size": 2.0, "color": None, **over}
 
 
-def test_a_new_map_has_the_modern_look_and_the_scale_and_compass_on(client: TestClient) -> None:
+def test_a_new_map_has_the_scale_and_compass_on(client: TestClient) -> None:
     pid = _project(client)
     doc = _new(client, pid)
-    assert (doc["theme"], doc["scaleBar"], doc["compass"], doc["legend"], doc["symbols"], doc["labels"]) == ("modern", True, True, False, [], [])
-    assert _new(client, pid, theme="night")["theme"] == "night"
-    assert client.post(f"/api/projects/{pid}/maps", json={"theme": "neon"}).status_code == 422
+    assert (doc["scaleBar"], doc["compass"], doc["legend"], doc["symbols"], doc["labels"]) == (True, True, False, [], [])
 
 
 def test_symbols_and_labels_round_trip(client: TestClient) -> None:
@@ -222,12 +268,12 @@ def test_symbols_and_labels_round_trip(client: TestClient) -> None:
     doc = _new(client, pid, width=10, height=8)
     doc["symbols"] = [_item(), _item(id="s2", kind="tree", color="#336699", x=1, y=1)]
     doc["labels"] = [{"id": "l1", "layerId": "labels", "text": "Port Veyra", "x": 4, "y": 3, "size": 1.5}]
-    doc.update(theme="blueprint", scaleBar=False, compass=False, legend=True)
+    doc.update(scaleBar=False, compass=False, legend=True)
     assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).status_code == 200
     again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
     assert [(s["id"], s["kind"], s["color"]) for s in again["symbols"]] == [("s1", "castle", None), ("s2", "tree", "#336699")]
     assert again["labels"] == [{"id": "l1", "layerId": "labels", "text": "Port Veyra", "x": 4.0, "y": 3.0, "size": 1.5}]
-    assert (again["theme"], again["scaleBar"], again["compass"], again["legend"]) == ("blueprint", False, False, True)
+    assert (again["scaleBar"], again["compass"], again["legend"]) == (False, False, True)
 
 
 def test_odd_items_are_repaired_or_dropped_not_refused(client: TestClient) -> None:

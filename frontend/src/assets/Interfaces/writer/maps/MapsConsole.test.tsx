@@ -9,8 +9,8 @@ import MapsConsole from './MapsConsole'
 // jsdom has no canvas: the canvas draws nothing here (painting itself is covered by mapModel.test.ts).
 beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
 
-const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', kind: 'world', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
-const town = (): MapDoc => ({ ...newMap('map_b', { title: 'Port Veyra', kind: 'town', width: 4, height: 4, parentId: 'map_a' }, 0) })
+const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
+const town = (): MapDoc => ({ ...newMap('map_b', { title: 'Port Veyra', level: 'local', width: 4, height: 4, parentId: 'map_a' }, 0) })
 
 async function open(maps: MapDoc[] = [world(), town()]) {
   const backend = mapsBackend(maps)
@@ -19,20 +19,24 @@ async function open(maps: MapDoc[] = [world(), town()]) {
   return backend
 }
 const save = () => screen.getByRole('button', { name: 'Save' })
-const puts = (b: ReturnType<typeof mapsBackend>) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit | undefined)?.method === 'PUT')
+// The saves of maps (the project's own biomes are saved on their own route).
+const puts = (b: ReturnType<typeof mapsBackend>) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit | undefined)?.method === 'PUT' && String(c[0]).includes('/maps/'))
 const lastPut = (b: ReturnType<typeof mapsBackend>) => JSON.parse((puts(b).at(-1)![1] as RequestInit).body as string) as MapDoc
 
 describe('the Maps console', () => {
-  it('lists the maps, nested ones under their map, and opens the first with its terrains and layers', async () => {
+  it('lists the maps with their levels, nested ones under their map, and opens the first with its biomes and layers', async () => {
     await open()
     const list = within(await screen.findByRole('navigation', { name: 'Maps' }))
-    expect(list.getAllByRole('button', { name: /^Open / }).map(b => b.textContent)).toEqual(['Known World8×6', 'Port Veyra4×4'])
+    expect(list.getAllByRole('button', { name: /^Open / }).map(b => b.textContent)).toEqual(['Known WorldPlanetary', 'Port VeyraLocal'])
     expect(await screen.findByRole('img', { name: 'Known World, a map 8 by 6 cells' })).toBeInTheDocument()
-    const terrains = within(screen.getByRole('region', { name: 'Terrain' }))
-    expect(terrains.getAllByRole('button', { pressed: undefined }).length).toBeGreaterThan(8)
-    expect(terrains.getByRole('button', { name: 'Paint with Plains' })).toHaveAttribute('aria-pressed', 'true')
+    const biomes = within(screen.getByRole('region', { name: 'Biomes' }))
+    expect(biomes.getByRole('button', { name: 'Draw with Saltwater' })).toBeInTheDocument()
+    expect(biomes.getByRole('button', { name: 'Draw with Forest' })).toHaveAttribute('aria-pressed', 'true')
+    // A planetary map offers land and water, not floor materials.
+    expect(biomes.queryByRole('button', { name: 'Draw with Carpet' })).not.toBeInTheDocument()
+    expect(biomes.getByRole('combobox', { name: 'Biome under everything' })).toHaveValue('saltwater')
     const layers = within(screen.getByRole('region', { name: 'Layers' }))
-    expect(layers.getByRole('textbox', { name: 'Name of the Terrain layer' })).toBeInTheDocument()
+    expect(layers.getByRole('textbox', { name: 'Name of the Biomes layer' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Map title' })).toHaveValue('Known World')
   })
 
@@ -43,13 +47,13 @@ describe('the Maps console', () => {
     await user.click(screen.getByRole('button', { name: 'New map' }))
     const form = within(screen.getByRole('form', { name: 'New map' }))
     await user.type(form.getByRole('textbox', { name: 'Title of the new map' }), 'Harbour')
-    await user.selectOptions(form.getByRole('combobox', { name: 'Kind of map' }), 'town')
+    await user.selectOptions(form.getByRole('combobox', { name: 'Level of the new map' }), 'local')
     await user.click(form.getByRole('button', { name: 'Small' }))
     await user.click(form.getByRole('button', { name: 'Make the map' }))
     expect(await screen.findByRole('img', { name: 'Harbour, a map 32 by 24 cells' })).toBeInTheDocument()
     expect(backend.of('POST')).toHaveLength(1)
     const sent = JSON.parse(backend.fetch.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === 'POST')![1].body as string)
-    expect(sent).toMatchObject({ title: 'Harbour', kind: 'town', width: 32, height: 24, unit: 'paces', parentId: null })
+    expect(sent).toMatchObject({ title: 'Harbour', level: 'local', units: 'metric', width: 32, height: 24, cellSize: 10, unit: 'm', base: { biome: 'plain', height: 0 }, parentId: null })
     expect(screen.queryByRole('form', { name: 'New map' })).not.toBeInTheDocument()
   })
 
@@ -58,7 +62,7 @@ describe('the Maps console', () => {
     const backend = await open([])
     await user.click(await screen.findByRole('button', { name: 'New map' }))
     await user.type(screen.getByRole('textbox', { name: 'Title of the new map' }), 'Cellar{Enter}')
-    expect(await screen.findByRole('img', { name: 'Cellar, a map 64 by 48 cells' })).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'Cellar, a map 128 by 64 cells' })).toBeInTheDocument()
     expect(backend.of('POST')).toHaveLength(1)
   })
 
@@ -74,7 +78,8 @@ describe('the Maps console', () => {
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     const doc = lastPut(backend)
     expect(doc.layers.find(l => l.id === 'labels')!.visible).toBe(false)
-    expect(doc.cells).toEqual([0, 48])
+    expect(doc.cells).toBeUndefined()
+    expect(doc.base).toEqual({ biome: 'saltwater', height: -3000 })
   })
 
   it('renames the map when the field is left, and a blank title is put back', async () => {
@@ -92,42 +97,65 @@ describe('the Maps console', () => {
     expect(field).toHaveValue('The Old World')
   })
 
-  it('adds, renames, recolours and removes a terrain', async () => {
+  it('adds a biome of the project, renames and recolours it, and removes it after asking', async () => {
     const user = userEvent.setup()
     const backend = await open()
     await screen.findByRole('img', { name: /Known World/ })
-    const panel = () => within(screen.getByRole('region', { name: 'Terrain' }))
-    await user.click(panel().getByRole('button', { name: 'Add a terrain' }))
-    expect(panel().getByRole('button', { name: 'Paint with New terrain' })).toHaveAttribute('aria-pressed', 'true')
-    const name = panel().getByRole('textbox', { name: 'Name of New terrain' })
+    const panel = () => within(screen.getByRole('region', { name: 'Biomes' }))
+    await user.click(panel().getByRole('button', { name: 'Add a biome of this project' }))
+    expect(await panel().findByRole('button', { name: 'Draw with New biome' })).toHaveAttribute('aria-pressed', 'true')
+    const name = panel().getByRole('textbox', { name: 'Name of New biome' })
     await user.clear(name)
     await user.type(name, 'Salt flats')
     await user.tab()
     fireEvent.change(panel().getByLabelText('Colour of Salt flats'), { target: { value: '#efe6d2' } })
     fireEvent.blur(panel().getByLabelText('Colour of Salt flats'))
-    await user.click(save())
-    await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).terrains.at(-1)).toMatchObject({ name: 'Salt flats', color: '#efe6d2', builtIn: false })
-    // Nothing is painted with it, so it goes without asking.
+    await waitFor(() => expect(backend.biomes.own.get('p1')).toMatchObject([{ name: 'Salt flats', color: '#efe6d2', group: 'land' }]))
+    expect(backend.biomes.own.get('p1')![0].id).toMatch(/^own_/)
+    // The biome belongs to the project, not to the map: nothing of the map waits to be saved.
+    expect(save()).toBeDisabled()
     await user.click(panel().getByRole('button', { name: 'Remove Salt flats' }))
-    expect(panel().queryByRole('button', { name: 'Paint with Salt flats' })).not.toBeInTheDocument()
+    expect(panel().getByText(/Maps that use it keep its colour/)).toBeInTheDocument()
+    await user.click(panel().getByRole('button', { name: 'Confirm remove' }))
+    await waitFor(() => expect(backend.biomes.own.get('p1')).toEqual([]))
+    expect(panel().queryByRole('button', { name: 'Draw with Salt flats' })).not.toBeInTheDocument()
   })
 
-  it('asks before removing a terrain that is painted, and says where its cells go', async () => {
+  it('sets the biome and the height under everything', async () => {
     const user = userEvent.setup()
-    await open()
+    const backend = await open()
     await screen.findByRole('img', { name: /Known World/ })
-    const panel = () => within(screen.getByRole('region', { name: 'Terrain' }))
-    // Ocean (the first terrain) fills a new map; the second terrain, Plains, is not painted.
-    await user.click(panel().getByRole('button', { name: 'Paint with Ocean' }))
-    await user.click(panel().getByRole('button', { name: 'Remove Ocean' }))
-    expect(panel().getByRole('group', { name: 'Remove Ocean?' })).toBeInTheDocument()
-    expect(panel().getByText(/Its 48 cells become Ocean/)).toBeInTheDocument()
-    await user.click(panel().getByRole('button', { name: 'Cancel remove' }))
-    expect(panel().getByRole('button', { name: 'Paint with Ocean' })).toBeInTheDocument()
-    await user.click(panel().getByRole('button', { name: 'Remove Ocean' }))
-    await user.click(panel().getByRole('button', { name: 'Confirm remove' }))
-    expect(panel().queryByRole('button', { name: 'Paint with Ocean' })).not.toBeInTheDocument()
+    const panel = within(screen.getByRole('region', { name: 'Biomes' }))
+    await user.selectOptions(panel.getByRole('combobox', { name: 'Biome under everything' }), 'plain')
+    const height = panel.getByRole('spinbutton', { name: 'Height of the base in metres' })
+    await user.clear(height)
+    await user.type(height, '120')
+    await user.tab()
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    expect(lastPut(backend).base).toEqual({ biome: 'plain', height: 120 })
+  })
+
+  it('draws a biome area in the chosen biome on the biomes layer, and edits its biome and height', async () => {
+    const user = userEvent.setup()
+    const backend = await open()
+    const canvas = await screen.findByRole('img', { name: /Known World/ })
+    await user.click(within(screen.getByRole('region', { name: 'Biomes' })).getByRole('button', { name: 'Draw with Desert' }))
+    expect(screen.getByRole('button', { name: 'Draw a biome area' })).toHaveAttribute('aria-pressed', 'true')
+    for (const [x, y] of [[1, 1], [4, 1], [3, 4]] as const) pointer(canvas, 'pointerdown', at(x, y))
+    fireEvent.keyDown(canvas, { key: 'Enter' })
+    const chosen = () => within(screen.getByRole('region', { name: 'Chosen biome area' }))
+    expect(chosen().getByRole('combobox', { name: 'Biome of the area' })).toHaveValue('desert')
+    await user.selectOptions(chosen().getByRole('combobox', { name: 'What the area does to the height' }), 'raise')
+    const height = chosen().getByRole('spinbutton', { name: 'Height in metres' })
+    await user.clear(height)
+    await user.type(height, '1500')
+    await user.tab()
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    const [area] = lastPut(backend).shapes
+    expect(area).toMatchObject({ type: 'biome', layerId: 'terrain', biome: 'desert', heightMode: 'raise', height: 1500 })
+    expect(area.points).toHaveLength(3)
   })
 
   it('shows, locks, moves, adds and deletes layers', async () => {
@@ -139,11 +167,11 @@ describe('the Maps console', () => {
     await user.click(layers().getByRole('button', { name: 'Move Symbols up' }))
     await user.click(layers().getByRole('button', { name: 'Add a layer' }))
     await user.click(layers().getByRole('button', { name: 'Delete Notes' }))
-    expect(layers().getByRole('button', { name: 'Delete Terrain' })).toBeDisabled()
+    expect(layers().getByRole('button', { name: 'Delete Biomes' })).toBeDisabled()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     const doc = lastPut(backend)
-    expect(doc.layers.map(l => l.name)).toEqual(['Terrain', 'Regions and lines', 'Labels', 'Symbols', 'Regions and lines 2'])
+    expect(doc.layers.map(l => l.name)).toEqual(['Biomes', 'Regions and lines', 'Labels', 'Symbols', 'Regions and lines 2'])
     expect(doc.layers.find(l => l.name === 'Symbols')!.locked).toBe(true)
   })
 
@@ -160,7 +188,7 @@ describe('the Maps console', () => {
     expect(screen.getByRole('button', { name: 'Show Labels' })).toBeInTheDocument()
   })
 
-  it('resizes the map, keeping what is there from the top left', async () => {
+  it('resizes the map', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const width = await screen.findByRole('spinbutton', { name: 'Width in cells' })
@@ -170,7 +198,7 @@ describe('the Maps console', () => {
     expect(screen.getByRole('img', { name: 'Known World, a map 10 by 6 cells' })).toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend)).toMatchObject({ width: 10, height: 6, cells: [0, 60] })
+    expect(lastPut(backend)).toMatchObject({ width: 10, height: 6 })
   })
 
   it('saves what is waiting when another map is opened', async () => {
@@ -225,11 +253,11 @@ describe('the Maps console', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 
-  it('warns when the terrain layer is locked and a tool would paint', async () => {
+  it('draws no biome area while the biomes layer is locked', async () => {
     const user = userEvent.setup()
     await open()
     await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Lock Terrain' }))
+    await user.click(screen.getByRole('button', { name: 'Lock Biomes' }))
     const canvas = screen.getByRole('img', { name: /Known World/ })
     pointer(canvas, 'pointerdown', { button: 0, clientX: 400, clientY: 260 })
     // (jsdom has no pointer coordinates to paint at, so the warning is only shown where a cell is hit.)
@@ -272,7 +300,7 @@ describe('the Maps console', () => {
     expect(s.y).toBeCloseTo(2.75, 1)
   })
 
-  it('changes the size and the colour of the chosen symbol, and takes the colour back to the look', async () => {
+  it('changes the size and the colour of the chosen symbol, and takes the colour back to the ink', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
@@ -288,7 +316,7 @@ describe('the Maps console', () => {
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     expect(lastPut(backend).symbols[0]).toMatchObject({ size: 4, color: '#aa0000' })
-    await user.click(panel().getByRole('button', { name: 'Use the colour of the look' }))
+    await user.click(panel().getByRole('button', { name: 'Use the ink colour' }))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(2))
     expect(lastPut(backend).symbols[0].color).toBeNull()
@@ -395,7 +423,7 @@ describe('the Maps console', () => {
     expect(screen.getByRole('button', { name: 'Stamp a symbol' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('changes the look and turns the scale bar, compass and legend on and off, and saves them', async () => {
+  it('changes the level and turns the scale bar, compass and legend on and off, and saves them', async () => {
     const user = userEvent.setup()
     const backend = await open()
     await screen.findByRole('img', { name: /Known World/ })
@@ -403,22 +431,48 @@ describe('the Maps console', () => {
     expect(group.getByRole('checkbox', { name: 'Scale bar' })).toBeChecked()
     expect(group.getByRole('checkbox', { name: 'Compass' })).toBeChecked()
     expect(group.getByRole('checkbox', { name: 'Legend' })).not.toBeChecked()
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Look of the map' }), 'night')
+    expect(screen.queryByRole('combobox', { name: 'Look of the map' })).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Level of the map' }), 'continental')
     await user.click(group.getByRole('checkbox', { name: 'Legend' }))
     await user.click(group.getByRole('checkbox', { name: 'Compass' }))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend)).toMatchObject({ theme: 'night', legend: true, compass: false, scaleBar: true })
+    expect(lastPut(backend)).toMatchObject({ level: 'continental', legend: true, compass: false, scaleBar: true })
   })
 
-  it('makes a new map in the look that is chosen', async () => {
+  it('moves the map to imperial units, converting the numbers or keeping them, after asking', async () => {
+    const user = userEvent.setup()
+    const backend = await open([world({ cellSize: 100, unit: 'km' })])
+    await screen.findByRole('img', { name: /Known World/ })
+    const units = screen.getByRole('combobox', { name: 'Unit system of the map' })
+    await user.selectOptions(units, 'imperial')
+    const ask = within(screen.getByRole('group', { name: 'Change to imperial units' }))
+    await user.click(ask.getByRole('button', { name: 'Cancel the change of units' }))
+    expect(units).toHaveValue('metric')
+    await user.selectOptions(units, 'imperial')
+    await user.click(within(screen.getByRole('group', { name: 'Change to imperial units' })).getByRole('button', { name: 'Convert the numbers' }))
+    expect(screen.getByRole('combobox', { name: 'Unit of a cell' })).toHaveValue('mi')
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    expect(lastPut(backend)).toMatchObject({ units: 'imperial', unit: 'mi', cellSize: 62.1, base: { biome: 'saltwater', height: -9843 } })
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.selectOptions(units, 'imperial')
+    await user.click(within(screen.getByRole('group', { name: 'Change to imperial units' })).getByRole('button', { name: 'Keep the numbers' }))
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(2))
+    expect(lastPut(backend)).toMatchObject({ units: 'imperial', unit: 'mi', cellSize: 100, base: { biome: 'saltwater', height: -3000 } })
+  })
+
+  it('makes a new map of the chosen level and units, with the level\'s scale and base', async () => {
     const user = userEvent.setup()
     const backend = await open([])
     await user.click(await screen.findByRole('button', { name: 'New map' }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Look of the new map' }), 'blueprint')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Level of the new map' }), 'regional')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Unit system of the new map' }), 'imperial')
+    expect(screen.getByRole('combobox', { name: 'Unit of a cell' })).toHaveValue('mi')
     await user.click(screen.getByRole('button', { name: 'Make the map' }))
     await screen.findByRole('img', { name: /Untitled map/ })
-    expect([...backend.maps.values()][0].theme).toBe('blueprint')
+    expect([...backend.maps.values()][0]).toMatchObject({ level: 'regional', units: 'imperial', cellSize: 1, unit: 'mi', base: { biome: 'plain', height: 0 } })
   })
 
   // ---- lines and regions ----
@@ -661,7 +715,7 @@ describe('the Maps console', () => {
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     expect(shapes(backend)[0]).toMatchObject({ style: 'road', color: '#aa0000', width: 1 })
-    await user.click(panel().getByRole('button', { name: 'Use the ink of the look' }))
+    await user.click(panel().getByRole('button', { name: 'Use the ink of the map' }))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(2))
     expect(shapes(backend)[0].color).toBeNull()

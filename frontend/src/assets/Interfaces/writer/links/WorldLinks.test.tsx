@@ -123,7 +123,7 @@ describe('the links of a character', () => {
 
 describe('the links of a place', () => {
   const world = (): MapDoc => {
-    const doc = newMap('map_a', { title: 'Known World', kind: 'world', width: 8, height: 6 }, 0)
+    const doc = newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6 }, 0)
     const layer = doc.layers.find(l => l.kind === 'symbols')!.id
     return { ...doc, symbols: [{ id: 'port', layerId: layer, kind: 'town', x: 3, y: 3, size: 2, color: null, name: 'Port Veyra', mapIds: [] }] }
   }

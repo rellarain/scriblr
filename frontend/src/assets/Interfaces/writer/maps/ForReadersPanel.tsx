@@ -27,7 +27,7 @@ export function ForReadersPanel({ projectId, m, draft, selected }: { projectId: 
     m.apply(setShare(draft, { ...share, reveals }))
   }
   const chosen = selected
-    ? { id: selected.id, name: selected.kind === 'symbol' ? draft.symbols.find(s => s.id === selected.id)?.name || 'this symbol' : selected.kind === 'label' ? 'this label' : 'this line or region' }
+    ? { id: selected.id, name: selected.kind === 'symbol' ? draft.symbols.find(s => s.id === selected.id)?.name || 'this symbol' : selected.kind === 'label' ? 'this label' : draft.shapes.find(s => s.id === selected.id)?.name || 'this shape' }
     : null
 
   return (
@@ -59,7 +59,7 @@ export function ForReadersPanel({ projectId, m, draft, selected }: { projectId: 
       {open && (
         <div className="rvPreview">
           <ReachSelect chapters={chapters} value={reach} onChange={setReach} />
-          {shown ? <MapView doc={shown} /> : <p className="rvHint" role="status">{share.published ? 'Not shown yet at this point of the book, or not saved yet: the preview is of what is saved.' : 'Not shown to readers.'}</p>}
+          {shown ? <MapView doc={shown} biomes={preview?.biomes} /> :<p className="rvHint" role="status">{share.published ? 'Not shown yet at this point of the book, or not saved yet: the preview is of what is saved.' : 'Not shown to readers.'}</p>}
         </div>
       )}
     </section>

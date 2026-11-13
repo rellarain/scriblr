@@ -42,7 +42,11 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'maps', dir: 'Maps', title: 'Maps: the setting builder', group: 'Outline', height: 700,
-    summary: 'Project > Maps, where the setting is mapped: the list of maps (nested ones under their map), the canvas to paint terrain on, and the terrains, layers and fields beside it, with the Save cluster.',
+    summary: 'Project > Maps, where the setting is mapped: the list of maps at nine levels (nested ones under their map), the canvas where biome areas are drawn over a base, and the biomes, layers and fields beside it, with the Save cluster.',
+  },
+  {
+    id: 'map-biomes', dir: 'MapBiomes', title: 'Map biomes', group: 'Outline', height: 700,
+    summary: 'Admin > Configuration > Maps, where the biomes every project draws its maps with are set: colour, name, group and the levels each is offered on, saved as a draft and published as a whole.',
   },
   {
     id: 'character-models', dir: 'CharacterModels', title: 'Character models: the designer', group: 'Outline', height: 900,

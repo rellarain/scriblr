@@ -429,16 +429,33 @@ export interface BookExtrasInfo { bookId: string; title: string; chapters: Extra
 export interface ReaderCharacterField { key: string; label: string; value: string }
 export interface ReaderCharacterLink { targetId: string; targetName: string; label: string; description: string }
 export interface ReaderCharacter { id: string; name: string; portrait: CharacterPortrait; figure?: CharacterFigure | null; fields: ReaderCharacterField[]; relationships: ReaderCharacterLink[] }
-// `figureModels` are the copies of models the shown characters' figures are drawn from (key -> copy).
-export interface BookExtras { bookId: string; reach: number; maps: MapDoc[]; characters: ReaderCharacter[]; figureModels?: Record<string, FigureModel>; lockedMaps: number; lockedCharacters: number }
+// `figureModels` are the copies of models the shown characters' figures are drawn from (key -> copy); `biomes` the biomes the shown maps are drawn with.
+export interface BookExtras {
+  bookId: string; reach: number; maps: MapDoc[]; characters: ReaderCharacter[]; figureModels?: Record<string, FigureModel>; biomes?: Record<string, MapBiome>
+  lockedMaps: number; lockedCharacters: number
+}
 
 // ---- Maps (the setting) ----
 export type MapKind = 'world' | 'town' | 'interior'
+// What a map holds, from the largest to the smallest (a star system holds planets, a nation its states ...).
+export type MapLevel = 'intergalactic' | 'galactic' | 'planetary' | 'continental' | 'national' | 'regional' | 'local' | 'architectural' | 'interior'
+// Metric and imperial convert into each other; custom (paces, leagues, cells ...) keeps its unit as written.
+export type MapUnits = 'metric' | 'imperial' | 'custom'
 export type MapLayerKind = 'terrain' | 'shapes' | 'symbols' | 'labels' | 'notes'
+// The palette of a map from before levels (kept unused in the file once the map is traced into biome shapes).
 export interface MapTerrain { id: string; name: string; color: string; builtIn: boolean }
 export interface MapLayer { id: string; name: string; kind: MapLayerKind; visible: boolean; locked: boolean }
-// A map: a grid of terrain cells (painted), its palette and layers, and its place among the maps (a map can be inside another one).
-// `cells` is the terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
+// A biome: what colours the land (or a floor, or space). `color` is how it looks at sea level; `levels` the levels it is offered on (none = its group's);
+// a retired biome is no longer offered, and maps that use it keep its colour. The admin's list is published to every project; a project adds its own ("own_" ids).
+export type MapBiomeGroup = 'land' | 'water' | 'material' | 'space'
+export interface MapBiome { id: string; name: string; color: string; group: MapBiomeGroup; levels: MapLevel[]; retired: boolean }
+export interface PublishedBiomes { version: number; publishedAt: string; biomes: MapBiome[] }
+export interface MapBiomeCatalog { schemaVersion: number; seedVersion: number; draft: MapBiome[]; published: PublishedBiomes | null; history: PublishedBiomes[]; nextVersion: number }
+export const MAP_MAX_PROJECT_BIOMES = 64
+export const MAP_MAX_BIOMES = 128
+// What lies under every biome shape: a biome and its height (in the map's height unit: metres, feet on an imperial map).
+export interface MapBase { biome: string; height: number }
+// The look of a map from before levels (kept as stored, no longer used).
 export type MapThemeName = 'parchment' | 'modern' | 'night' | 'blueprint'
 // A stamp (`kind` is a symbol of the library, mapSymbols.ts): its centre in cells, how many cells wide, its own colour (null = the theme's).
 // A symbol with a name is a place (a scene can happen there); `mapIds` are the maps that open from it.
@@ -450,37 +467,49 @@ export interface MapLabel { id: string; layerId: string; text: string; x: number
 // A point of a line or of a region's outline, in cells. A smooth point is a curve through it; (hx, hy) is its handle, where the curve leaves it relative to
 // the point (it arrives on the other side), or null for the handle the neighbouring points make.
 export interface MapShapePoint { x: number; y: number; smooth: boolean; hx: number | null; hy: number | null }
-export type MapShapeType = 'line' | 'region'
+export type MapShapeType = 'line' | 'region' | 'biome'
 export type MapLineStyle = 'solid' | 'dashed' | 'dotted' | 'road' | 'wall' | 'fence'
 export type MapPattern = 'solid' | 'hatch' | 'cross' | 'dots'
-// A line (a river, a road, a border, a wall, a fence) or a region (a closed outline, filled). `color` is the line's (null = the look's ink), `width` is in
-// cells; a region's `fill` is null for the line colour, with how solid it is and a pattern over it.
+export type MapHeightMode = 'none' | 'raise' | 'lower' | 'set'
+// A line (a river, a road, a border, a wall, a fence), a region (a closed outline, filled over the land) or a biome shape (a closed outline on the biomes
+// layer: the land itself, in its biome's colour, lifted or sunk by its height). `color` is the line's (null = the ink), `width` is in cells; a region's
+// `fill` is null for the line colour, with how solid it is and a pattern over it. A region or biome shape with a `name` is a place; `mapIds` open from it.
 export interface MapShape {
   id: string; layerId: string; type: MapShapeType; points: MapShapePoint[]
   style: MapLineStyle; color: string | null; width: number
   fill: string | null; opacity: number; pattern: MapPattern
+  // A biome shape's biome (null = keeps the biome under it), and what it does to the height under it (by `height`, in the map's height unit).
+  biome?: string | null; heightMode?: MapHeightMode; height?: number
+  name?: string; mapIds?: string[]
 }
 export interface MapDoc {
   schemaVersion: number
   id: string
   title: string
-  kind: MapKind
+  level: MapLevel
+  // 2 = biome shapes over `base` (every map once it is opened by this build); 1 = painted cells (from before levels: the server traces them).
+  mapFormat: number
+  base: MapBase
+  units: MapUnits
   parentId: string | null
   order: number
   width: number
   height: number
-  // What one cell is, in `unit` (miles, paces, feet ...).
+  // What one cell is, in `unit` (km, mi, m, ft, or a custom unit such as paces).
   cellSize: number
   unit: string
   // How far a traveller goes in a day, in `unit` (null = not set).
   pace: number | null
-  terrains: MapTerrain[]
   layers: MapLayer[]
-  cells: number[]
   symbols: MapSymbol[]
   labels: MapLabel[]
   shapes: MapShape[]
-  theme: MapThemeName
+  // From before levels, kept as stored by the server (a save leaves them as they were): the old kind, look, palette and painted cells.
+  kind?: MapKind
+  theme?: MapThemeName
+  terrains?: MapTerrain[]
+  cells?: number[]
+  legacyGrid?: number[] | null
   scaleBar: boolean
   compass: boolean
   legend: boolean
@@ -498,8 +527,11 @@ export interface MapJourneyStop { id: string; x: number; y: number; at: string; 
 export interface MapJourney { id: string; characterId: string; color: string | null; stops: MapJourneyStop[] }
 export const MAP_MAX_JOURNEYS = 40
 export const MAP_MAX_STOPS = 200
-export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string; versionOf?: string | null; appliesFrom?: string | null }
-export interface MapCreate { title?: string; kind?: MapKind; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; theme?: MapThemeName }
+export interface MapSummary {
+  id: string; title: string; kind?: MapKind; level: MapLevel; parentId: string | null; order: number; width: number; height: number; updatedAt: string
+  versionOf?: string | null; appliesFrom?: string | null
+}
+export interface MapCreate { title?: string; level?: MapLevel; units?: MapUnits; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; base?: MapBase }
 export const MAP_MAX_SIDE = 512
 
 // ---- characters (the cast) ----

@@ -8,10 +8,13 @@ import { addPlaces, addSymbol, editSymbol, isPlace, placeKey } from './mapItems'
 import { MAP_FILE_FORMAT, buildMapFile, importMaps, importRows, mapFileName, parseMapFile, type Choice } from './mapFile'
 import { MapHistory, descendantIds, draftOf, mapPath, setPace, setParent, toggleLayer } from './mapModel'
 import { EXPORT_SCALES, exportSize, imageFileName, renderMapImage, withLayers } from './mapExport'
+import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
+import { makeBiomeShape } from './mapShapes'
+import type { MapBiome } from '../../../../api/types'
 import { measureText, pathLength, travelTime } from './mapView'
 
 const doc = (id: string, over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap(id, { title: id.replace('map_', 'Map '), width: 8, height: 6 }, 0), ...over })
-const sum = (m: MapDoc): MapSummary => ({ id: m.id, title: m.title, kind: m.kind, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt })
+const sum = (m: MapDoc): MapSummary => ({ id: m.id, title: m.title, kind: m.kind, level: m.level, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt })
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }
 const symbol = (id: string, name = '', mapIds: string[] = []) => ({ id, layerId: 'symbols', kind: 'town', x: 2.5, y: 2.5, size: 2, color: null, name, mapIds })
 
@@ -127,15 +130,40 @@ describe('the map file', () => {
   const outside = doc('map_out', { parentId: 'map_zzz' })
 
   it('holds the map and the maps inside it, and cuts what points outside', () => {
-    const f = buildMapFile('map_a', [root, child, sibling, outside], new Date('2026-11-06T00:00:00Z'))!
-    expect(f).toMatchObject({ format: MAP_FILE_FORMAT, version: 2, rootId: 'map_a', exportedAt: '2026-11-06T00:00:00.000Z' })
+    const f = buildMapFile('map_a', [root, child, sibling, outside], [], new Date('2026-11-06T00:00:00Z'))!
+    expect(f).toMatchObject({ format: MAP_FILE_FORMAT, version: 3, rootId: 'map_a', exportedAt: '2026-11-06T00:00:00.000Z', biomes: [] })
     expect(f.maps.map(m => m.id)).toEqual(['map_a', 'map_b'])
     expect(f.maps[0].symbols[0].mapIds).toEqual(['map_b'])
     // The root is a map of its own in the file, and the maps of the project are not changed.
-    expect(buildMapFile('map_b', [root, child], new Date())!.maps[0].parentId).toBeNull()
+    expect(buildMapFile('map_b', [root, child])!.maps[0].parentId).toBeNull()
     expect(child.parentId).toBe('map_a')
     expect(root.symbols[0].mapIds).toEqual(['map_b', 'map_out'])
     expect(buildMapFile('nope', [root])).toBeNull()
+  })
+
+  it('carries the project\'s own biomes its maps use, and cuts the links of named areas that point outside', () => {
+    const own: MapBiome[] = [
+      { id: 'own_dunes', name: 'Glass dunes', color: '#cfd8e0', group: 'land', levels: [], retired: false },
+      { id: 'own_unused', name: 'Unused', color: '#123456', group: 'land', levels: [], retired: false },
+    ]
+    const area = { ...makeBiomeShape('bio_1', 'terrain', [[1, 1], [4, 1], [2, 4]], 'own_dunes', true), name: 'The Glass', mapIds: ['map_b', 'map_out'] }
+    const f = buildMapFile('map_a', [doc('map_a', { shapes: [area] }), child, outside], own)!
+    expect(f.biomes!.map(b => b.id)).toEqual(['own_dunes'])
+    expect(f.maps[0].shapes[0].mapIds).toEqual(['map_b'])
+  })
+
+  it('reads a file of maps of levels and biome shapes (no cells), and the own biomes in it', () => {
+    const area = makeBiomeShape('bio_1', 'terrain', [[1, 1], [4, 1], [2, 4]], 'own_dunes', true)
+    const own: MapBiome[] = [{ id: 'own_dunes', name: 'Glass dunes', color: '#cfd8e0', group: 'land', levels: [], retired: false }]
+    const text = JSON.stringify(buildMapFile('map_a', [doc('map_a', { shapes: [area] })], own))
+    const parsed = parseMapFile(text)
+    expect(parsed.ok && parsed.file.maps[0].shapes[0].biome).toBe('own_dunes')
+    expect(parsed.ok && parsed.file.biomes!.map(b => b.name)).toEqual(['Glass dunes'])
+    // A map of levels without a base is not readable; an own biome without an "own_" id is left out.
+    const broken = JSON.stringify({ format: MAP_FILE_FORMAT, version: 3, maps: [{ id: 'map_a', width: 2, height: 2, mapFormat: 2, shapes: [] }] })
+    expect(parseMapFile(broken).ok).toBe(false)
+    const odd = JSON.stringify({ ...JSON.parse(text), biomes: [{ id: 'forest', name: 'Forest', color: '#000000' }, 7] })
+    expect(parseMapFile(odd).ok && (parseMapFile(odd) as { file: { biomes: MapBiome[] } }).file.biomes).toEqual([])
   })
 
   it('is read back, and refused when it is not a map file', () => {
@@ -191,7 +219,7 @@ describe('the map file', () => {
     })
 
     it('asks for each map that clashes: keep both makes a new one, replace writes over it, skip leaves it', async () => {
-      const mine = doc('map_a', { title: 'Mine', width: 4, height: 4, cells: [0, 16] })
+      const mine = doc('map_a', { title: 'Mine', width: 4, height: 4 })
       const { backend, api } = open(mine, doc('map_b', { title: 'Mine too' }))
       const f = buildMapFile('map_a', [root, child])!
       const choices = new Map<string, Choice>([['map_a', 'replace'], ['map_b', 'skip']])
@@ -232,6 +260,18 @@ describe('the map file', () => {
       expect(version).toMatchObject({ title: 'After the war', appliesFrom: 'c2', parentId: null })
       expect(made.journeys!.map(j => j.characterId)).toEqual(['chr_a'])
       expect(version.journeys!.map(j => j.characterId)).toEqual(['chr_a'])
+    })
+
+    it('makes a map of an older file at the level its kind becomes, and adds the file\'s own biomes first', async () => {
+      const { backend, api } = open()
+      const old = { ...doc('map_old'), level: undefined, mapFormat: 1, kind: 'town' as const, cells: [0, 48] } as unknown as MapDoc
+      const added: string[] = []
+      const file = { ...buildMapFile('map_old', [old])!, biomes: [{ id: 'own_x', name: 'X', color: '#111111', group: 'land' as const, levels: [], retired: false }] }
+      const r = await importMaps(file, new Map(), [], null, { ...api, addBiomes: async list => { added.push(...list.map(b => b.id)) } })
+      expect(r.error).toBeUndefined()
+      expect(added).toEqual(['own_x'])
+      expect(backend.of('POST').length).toBe(1)
+      expect(backend.maps.get(r.made[0])!.level).toBe('local')
     })
 
     it('leaves the versions out when it cannot make them', async () => {
@@ -287,14 +327,12 @@ describe('the image', () => {
     const calls: string[] = []
     const ctx = new Proxy({}, { get: (_t, n: string) => (n === 'measureText' ? () => ({ width: 10 }) : () => { calls.push(n) }), set: () => true }) as unknown as CanvasRenderingContext2D
     const canvas = { width: 0, height: 0, getContext: vi.fn(() => ctx) } as unknown as HTMLCanvasElement
-    const bitmap = { width: 0, height: 0, getContext: () => ({ createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: () => {} }) } as unknown as HTMLCanvasElement
-    const create = vi.spyOn(document, 'createElement').mockReturnValue(bitmap)
+    const index = biomeIndex(STARTER_BIOMES)
     const d = draftOf(doc('map_1'))
-    expect(renderMapImage(d, 2, new Set(d.layers.map(l => l.id)), () => canvas)).toBe(canvas)
+    expect(renderMapImage(d, index, 2, new Set(d.layers.map(l => l.id)), () => canvas)).toBe(canvas)
     expect([canvas.width, canvas.height]).toEqual([8 * 32 + 4, 6 * 32 + 4])
-    expect(calls).toContain('drawImage')
-    create.mockReturnValue({ getContext: () => null } as unknown as HTMLCanvasElement)
-    expect(renderMapImage(d, 1, new Set(), () => canvas)).toBeNull()
-    create.mockRestore()
+    expect(calls).toContain('fillRect')
+    const blind = { width: 0, height: 0, getContext: () => null } as unknown as HTMLCanvasElement
+    expect(renderMapImage(d, index, 1, new Set(), () => blind)).toBeNull()
   })
 })

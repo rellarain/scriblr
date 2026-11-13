@@ -57,6 +57,35 @@ function drawPlaceName(ctx: CanvasRenderingContext2D, name: string, cx: number, 
   ctx.restore()
 }
 
+// A named area's name, at the middle of its outline (the centre of its points' box, pulled to the centroid of its flattened outline), over a halo. Left out
+// when the area is too small on the canvas for the name to fit.
+export function drawAreaName(ctx: CanvasRenderingContext2D, name: string, outline: Array<{ x: number; y: number }>, view: MapView, theme: MapThemeDef) {
+  if (!name || outline.length < 3) return
+  const xs = outline.map(p => p.x), ys = outline.map(p => p.y)
+  const w = (Math.max(...xs) - Math.min(...xs)) * view.zoom
+  if (w < 40) return
+  let a = 0, cx = 0, cy = 0
+  for (let i = 0; i < outline.length; i += 1) {
+    const p = outline[i], q = outline[(i + 1) % outline.length]
+    const k = p.x * q.y - q.x * p.y
+    a += k; cx += (p.x + q.x) * k; cy += (p.y + q.y) * k
+  }
+  const [mx, my] = Math.abs(a) > 1e-9 ? [cx / (3 * a), cy / (3 * a)] : [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+  const size = Math.min(16, Math.max(10, w / 14))
+  ctx.save()
+  ctx.font = `600 ${size}px ${theme.font}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 3
+  ctx.strokeStyle = theme.halo
+  const x = view.x + mx * view.zoom, y = view.y + my * view.zoom
+  ctx.strokeText(name, x, y)
+  ctx.fillStyle = theme.ink
+  ctx.fillText(name, x, y)
+  ctx.restore()
+}
+
 // The smallest a label is drawn at, in pixels of height; below it the text is not legible and is left out.
 export const MIN_LABEL_PX = 6
 

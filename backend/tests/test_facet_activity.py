@@ -472,7 +472,7 @@ def test_a_phase_level_needs_its_node_and_a_project_phase_has_none(client: TestC
     refused(lambda b: b.update(phaseKinds=[{"id": "k", "title": "A"}, {"id": "k", "title": "B"}]))  # two kinds share an id
 
 
-def test_a_project_is_written_in_format_six(client: TestClient, storage_root) -> None:
+def test_a_project_is_written_in_the_current_format(client: TestClient, storage_root) -> None:
     import json
 
     from app.storage.schema import PROJECT_FILE_VERSION
@@ -480,5 +480,5 @@ def test_a_project_is_written_in_format_six(client: TestClient, storage_root) ->
     pid = _project(client)
     client.put(f"/api/projects/{pid}/planner", json=_planner())
     raw = json.loads((storage_root / pid / "project.json").read_text(encoding="utf-8"))
-    assert PROJECT_FILE_VERSION == 6 and raw["schemaVersion"] == 6
+    assert PROJECT_FILE_VERSION >= 6 and raw["schemaVersion"] == PROJECT_FILE_VERSION
     assert {"facets", "revisionFlags", "planner"} <= set(raw)

@@ -9,7 +9,7 @@ import type { MapLineStyle, MapPattern, MapShape, MapShapePoint, MapShapeType } 
 type V = [number, number]
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
-export const MIN_POINTS: Record<MapShapeType, number> = { line: 2, region: 3 }
+export const MIN_POINTS: Record<MapShapeType, number> = { line: 2, region: 3, biome: 3 }
 export const MAX_POINTS = 500
 export const SHAPE_WIDTH_RANGE = { min: 0.05, max: 4 } as const
 export const LINE_STYLES: Array<{ id: MapLineStyle; name: string }> = [
@@ -19,7 +19,8 @@ export const PATTERNS: Array<{ id: MapPattern; name: string }> = [
   { id: 'solid', name: 'Solid' }, { id: 'hatch', name: 'Hatched' }, { id: 'cross', name: 'Cross-hatched' }, { id: 'dots', name: 'Dotted' },
 ]
 
-export const isClosed = (shape: Pick<MapShape, 'type'>) => shape.type === 'region'
+// A region and a biome shape are closed (the last point joins the first); a line is open.
+export const isClosed = (shape: Pick<MapShape, 'type'>) => shape.type !== 'line'
 
 // ---- the curve ----
 
@@ -232,5 +233,13 @@ export function makeShape(id: string, layerId: string, type: MapShapeType, point
   return {
     id, layerId, type, style: pen.style, color: pen.color, width: pen.width, fill: type === 'region' ? pen.fill : null, opacity: pen.opacity, pattern: type === 'region' ? pen.pattern : 'solid',
     points: points.map(([x, y]) => ({ x, y, smooth: pen.smooth, hx: null, hy: null })),
+  }
+}
+
+// A new biome shape (an area of the land in a biome) from the points that were clicked.
+export function makeBiomeShape(id: string, layerId: string, points: Array<[number, number]>, biome: string | null, smooth: boolean): MapShape {
+  return {
+    id, layerId, type: 'biome', style: 'solid', color: null, width: 0.25, fill: null, opacity: 1, pattern: 'solid', biome, heightMode: 'none', height: 0, name: '', mapIds: [],
+    points: points.map(([x, y]) => ({ x, y, smooth, hx: null, hy: null })),
   }
 }

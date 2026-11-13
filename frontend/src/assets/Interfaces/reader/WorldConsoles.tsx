@@ -3,6 +3,7 @@ import { getBookExtras } from '../../../api/reader'
 import type { BookExtras, MapDoc } from '../../../api/types'
 import type { CatalogBook } from '../../../api/reader'
 import { CharacterCard, MapView } from '../writer/readers/WorldViews'
+import { placesOf } from '../writer/maps/mapItems'
 import { Card } from './ReaderBits'
 import type { ReaderCtx } from './readerContext'
 
@@ -78,14 +79,14 @@ export function MapsConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }
             </div>
           )}
           <Card title={open.title}>
-            <MapView doc={open} />
-            {open.symbols.some(s => s.name) && (
+            <MapView doc={open} biomes={loaded.extras.biomes} />
+            {placesOf(open).length > 0 && (
               <ul className="rdList" aria-label="Places on this map">
-                {open.symbols.filter(s => s.name).map(s => {
-                  // A place that has a map of its own opens it when that map is one the reader can see.
+                {placesOf(open).map(s => {
+                  // A place (a named symbol or area) that has a map of its own opens it when that map is one the reader can see.
                   const inside = s.mapIds.map(id => maps.find(m => m.id === id)).find((m): m is MapDoc => m !== undefined)
                   return (
-                    <li key={s.id} className="rdItem">
+                    <li key={s.ref.id} className="rdItem">
                       <div className="rdItemMain">
                         <b>{s.name}</b>
                         {inside ? <button type="button" className="wvLink" aria-label={`Open ${inside.title}, the map of ${s.name}`} onClick={() => { setPicked(inside.id); setPickedVersion(null) }}>{inside.title}</button> : s.mapIds.length > 0 && <span className="rdMuted">has a map of its own</span>}

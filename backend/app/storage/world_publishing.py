@@ -18,11 +18,14 @@ from .schema import (
     EditionCharacterField,
     EditionMap,
     EditionRelationship,
+    MapBiome,
     MapDoc,
     OutlineNode,
     FigureModel,
     ProjectFile,
     ReaderShare,
+    named_places,
+    seed_biomes,
 )
 
 MAX_WARNINGS = 60
@@ -69,6 +72,8 @@ class BookExtras(BaseModel):
     characters: list[ReaderCharacter] = Field(default_factory=list)
     # The copies of models the shown characters' figures are drawn from (key -> copy).
     figureModels: dict[str, FigureModel] = Field(default_factory=dict)
+    # The biomes the shown maps are drawn with (id -> biome), as the edition froze them.
+    biomes: dict[str, MapBiome] = Field(default_factory=dict)
     lockedMaps: int = 0
     lockedCharacters: int = 0
 
@@ -164,11 +169,18 @@ def _visible_map(frozen: EditionMap, reach: int, public_ids: set[str]) -> MapDoc
         for s in doc.symbols
         if shown(reveals.get(s.id), reach)
     ]
+    shapes = [
+        s.model_copy(update={"mapIds": [i for i in s.mapIds if i in public_ids]})
+        for s in doc.shapes
+        if shown(reveals.get(s.id), reach)
+    ]
     return doc.model_copy(
         update={
             "symbols": symbols,
             "labels": [l for l in doc.labels if shown(reveals.get(l.id), reach)],
-            "shapes": [s for s in doc.shapes if shown(reveals.get(s.id), reach)],
+            "shapes": shapes,
+            "cells": [],
+            "terrains": [],
             "parentId": doc.parentId if doc.parentId in public_ids else None,
             "pace": None,
             "journeys": [],
@@ -183,7 +195,27 @@ def freeze_figure_models(pf: ProjectFile, characters: list[EditionCharacter]) ->
     return {key: pf.figureModels[key].model_copy(deep=True) for key in sorted(keys) if key in pf.figureModels}
 
 
-def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCharacter], reach: int, figure_models: Optional[dict[str, FigureModel]] = None) -> BookExtras:
+def biomes_of(docs: list[MapDoc]) -> set[str]:
+    """The biome ids some maps are drawn with (their bases and biome shapes)."""
+    used: set[str] = set()
+    for doc in docs:
+        used.add(doc.base.biome)
+        used.update(s.biome for s in doc.shapes if s.type == "biome" and s.biome)
+    return used
+
+
+def freeze_biomes(pf: ProjectFile, maps: list[EditionMap], published: list[MapBiome]) -> dict[str, MapBiome]:
+    """The biomes the frozen maps use, as they are now (the project's own first, then the admin's published list): what a new edition holds."""
+    by_id = {b.id: b for b in published}
+    by_id.update({b.id: b for b in pf.mapBiomes})
+    used = biomes_of([m.doc for m in maps])
+    return {bid: by_id[bid].model_copy(deep=True) for bid in sorted(used) if bid in by_id}
+
+
+def extras_view(
+    book_id: str, maps: list[EditionMap], characters: list[EditionCharacter], reach: int, figure_models: Optional[dict[str, FigureModel]] = None,
+    biomes: Optional[dict[str, MapBiome]] = None,
+) -> BookExtras:
     """What a reader who has reached chapter `reach` sees: what is revealed by then, with what is not left out."""
     open_maps = [m for m in maps if shown(m.doc.reader.revealAt, reach)]
     open_chars = [c for c in characters if shown(c.revealAt, reach)]
@@ -206,21 +238,25 @@ def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCh
     ]
     held = figure_models or {}
     shown_keys = {c.figure.model for c in cards if c.figure is not None}
+    visible = [_visible_map(m, reach, public_maps) for m in open_maps]
+    frozen_biomes = biomes or {}
     return BookExtras(
         bookId=book_id,
         reach=reach,
-        maps=[_visible_map(m, reach, public_maps) for m in open_maps],
+        maps=visible,
         characters=cards,
         figureModels={key: held[key] for key in sorted(shown_keys) if key in held},
+        biomes={bid: frozen_biomes[bid] for bid in sorted(biomes_of(visible)) if bid in frozen_biomes},
         lockedMaps=len(maps) - len(open_maps),
         lockedCharacters=len(characters) - len(open_chars),
     )
 
 
-def preview(pf: ProjectFile, book_id: str, chapter: int) -> BookExtras:
+def preview(pf: ProjectFile, book_id: str, chapter: int, published_biomes: Optional[list[MapBiome]] = None) -> BookExtras:
     """The author's preview: the maps and characters as they are now, shown as a reader who has reached `chapter` would see them."""
     maps, characters = freeze_world(pf)
-    return extras_view(book_id, maps, characters, max(0, chapter), freeze_figure_models(pf, characters))
+    biomes = freeze_biomes(pf, maps, published_biomes if published_biomes is not None else seed_biomes())
+    return extras_view(book_id, maps, characters, max(0, chapter), freeze_figure_models(pf, characters), biomes)
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ the author's chapters and warnings
@@ -266,11 +302,11 @@ def warnings_for(pf: ProjectFile, chapters: list[ExtrasChapter]) -> list[ExtrasW
         n = chapter_number(node.id)
         if n is None:
             continue
-        symbol = next((s for s in doc.symbols if s.id == symbol_id), None)
+        place = next((p for p in named_places(doc) if p.id == symbol_id), None)
         whole, part = doc.reader.revealAt or 0, doc.reader.reveals.get(symbol_id) or 0
         reveal = max(whole, part)
         if reveal > n:
-            name = (symbol.name if symbol and symbol.name else "") or doc.title
+            name = (place.name if place else "") or doc.title
             out.append(ExtrasWarning(kind="map" if whole > n else "place", targetId=doc.id if whole > n else f"{doc.id}/{symbol_id}", name=doc.title if whole > n else name,
                                      revealAt=reveal, sceneId=node.id, sceneTitle=node.title, chapter=n))
     for character in pf.characters.values():
@@ -301,10 +337,10 @@ def project_infos(root: Path, project_id: str) -> list[BookExtrasInfo]:
     return book_infos(pf)
 
 
-def project_preview(root: Path, project_id: str, book_id: str, chapter: int) -> BookExtras:
+def project_preview(root: Path, project_id: str, book_id: str, chapter: int, published_biomes: Optional[list[MapBiome]] = None) -> BookExtras:
     from . import project_store as store
     from .book_publishing import book_node
 
     pf, _errors = store._load_project_file(root, project_id)
     book_node(pf, book_id)
-    return preview(pf, book_id, chapter)
+    return preview(pf, book_id, chapter, published_biomes)

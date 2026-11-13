@@ -998,6 +998,14 @@ export function PolygonIcon(props: IconProps) {
   </IconBase>
 }
 
+// The outline of an island with a hill on it: draw a biome area (the land itself).
+export function BiomeIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 13c0-5 4-8 8-8s9 2 8 7-3 8-8 8-8-2-8-7Z" />
+    <path d="M7.5 15.5l3.5-5 2.5 3 1.5-1.5 2 3.5" />
+  </IconBase>
+}
+
 // A ruler: measure a distance on the map.
 export function RulerIcon(props: IconProps) {
   return <IconBase {...props}>

@@ -84,7 +84,26 @@ def test_nothing_is_shown_until_it_is_published(client: TestClient) -> None:
     _share_map(client, w["pid"], {"published": False})
     _share_character(client, w["pid"], "Ada", {"published": False, "fields": ["role"]})
     _publish(client, w)
-    assert _extras(client, w) == {"bookId": w["book"], "reach": 0, "maps": [], "characters": [], "figureModels": {}, "lockedMaps": 0, "lockedCharacters": 0}
+    assert _extras(client, w) == {
+        "bookId": w["book"], "reach": 0, "maps": [], "characters": [], "figureModels": {}, "biomes": {}, "lockedMaps": 0, "lockedCharacters": 0,
+    }
+
+
+def test_an_edition_freezes_the_colours_of_the_biomes_its_maps_use(client: TestClient) -> None:
+    w = _world(client)
+    _share_map(client, w["pid"], {"published": True}, shapes=[
+        {"id": "isle", "layerId": "terrain", "type": "biome", "biome": "forest", "points": [{"x": 1, "y": 1}, {"x": 5, "y": 1}, {"x": 5, "y": 4}]},
+    ])
+    _publish(client, w)
+    # A later change to the admin's list waits for the next edition.
+    draft = client.get("/api/map-biomes").json()["draft"]
+    next(b for b in draft if b["id"] == "forest")["color"] = "#000000"
+    client.put("/api/map-biomes", json={"biomes": draft})
+    client.post("/api/map-biomes/publish")
+    extras = _extras(client, w)
+    assert set(extras["biomes"]) == {"saltwater", "forest"} and extras["biomes"]["forest"]["color"] == "#3f8f3a"
+    preview = client.get(f"/api/projects/{w['pid']}/books/b1/extras-preview?chapter=0").json()
+    assert preview["biomes"]["forest"]["color"] == "#000000"  # the author's preview is of what is there now
 
 
 def test_a_published_map_is_shown_from_its_chapter_and_a_symbol_from_its_own(client: TestClient) -> None:

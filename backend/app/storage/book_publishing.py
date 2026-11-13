@@ -15,10 +15,12 @@ from .schema import (
     EditionChapter,
     EditionFlagPassage,
     EditionFootnote,
+    MapBiome,
     OutlineNode,
     ProjectFile,
     Publication,
     ReaderLevelName,
+    seed_biomes,
     utcnow,
 )
 
@@ -94,7 +96,7 @@ def _sentence_exists(paragraphs: list[str], paragraph: int, sentence: int) -> bo
     return paragraph < len(paragraphs) and sentence < len(split_sentences(paragraphs[paragraph]))
 
 
-def _build_edition(pf: ProjectFile, book_id: str, listing: BookListing, n: int) -> BookEdition:
+def _build_edition(pf: ProjectFile, book_id: str, listing: BookListing, n: int, published_biomes: Optional[list[MapBiome]] = None) -> BookEdition:
     flag_keys = {f.key for f in listing.meta.flags}
     chapters: list[EditionChapter] = []
     for chapter in chapters_in_order(pf.outline.nodes, book_id):
@@ -125,12 +127,13 @@ def _build_edition(pf: ProjectFile, book_id: str, listing: BookListing, n: int) 
         )
     if not chapters:
         raise NothingToPublishError("publish at least one chapter before publishing the book")
-    from .world_publishing import freeze_figure_models, freeze_world
+    from .world_publishing import freeze_biomes, freeze_figure_models, freeze_world
 
     maps, characters = freeze_world(pf)
     return BookEdition(
         n=n, publishedAt=utcnow(), wordCount=sum(c.words for c in chapters), chapters=chapters, maps=maps, characters=characters,
         figureModels=freeze_figure_models(pf, characters),
+        biomes=freeze_biomes(pf, maps, published_biomes if published_biomes is not None else seed_biomes()),
     )
 
 
@@ -165,11 +168,11 @@ def update_meta(root: Path, project_id: str, book_id: str, meta: BookMeta) -> Bo
     return _edit(root, project_id, book_id, apply)
 
 
-def publish_book(root: Path, project_id: str, book_id: str) -> BookListing:
-    """Make a new edition from the chapters published so far, and list the book."""
+def publish_book(root: Path, project_id: str, book_id: str, published_biomes: Optional[list[MapBiome]] = None) -> BookListing:
+    """Make a new edition from the chapters published so far, and list the book. `published_biomes` is the admin's biome list (the maps' colours are frozen)."""
 
     def apply(pf: ProjectFile, listing: BookListing) -> None:
-        listing.editions.append(_build_edition(pf, book_id, listing, len(listing.editions) + 1))
+        listing.editions.append(_build_edition(pf, book_id, listing, len(listing.editions) + 1, published_biomes))
         listing.listed = True
 
     return _edit(root, project_id, book_id, apply)

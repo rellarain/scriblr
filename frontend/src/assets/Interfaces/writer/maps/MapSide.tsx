@@ -1,17 +1,25 @@
 import { useMemo, useState } from 'react'
-import { MAP_MAX_SIDE, type OutlineNode, type PlotNode, type MapSummary, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
+import {
+  MAP_MAX_PROJECT_BIOMES, MAP_MAX_SIDE, type MapBiome, type MapHeightMode, type MapLevel, type MapUnits, type OutlineNode, type PlotNode, type MapSummary, type MapLayerKind,
+  type MapLineStyle, type MapPattern, type MapShape, type MapShapeType,
+} from '../../../../api/types'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, FolderPlusIcon, ImageIcon, LockIcon, MapIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
 import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
-import { LABEL_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, SYMBOL_SIZE_RANGE, addPlaces, editLabel, editShape, editSymbol, findItem, placeKey, removeItem, replaceShape, type ItemRef } from './mapItems'
+import {
+  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, SYMBOL_SIZE_RANGE, addPlaces, editLabel, editPlace, editShape, editSymbol, findItem, moveShapeOrder, placeKey,
+  placeOf, removeItem, replaceShape, type ItemRef,
+} from './mapItems'
 import { looksLikePlaceKey } from './placesStore'
 import type { ScenePlace } from './MapsConsole'
 import { LINE_PRESETS, LINE_STYLES, PATTERNS, REGION_PRESETS, SHAPE_WIDTH_RANGE, setAllSmooth, type Pen } from './mapShapes'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
-import { MAP_THEMES } from './mapThemes'
+import { biomeCounts, offeredBiomes, ownBiomeId, resolveBiome, saveOwnBiomes, type BiomesView } from './mapBiomes'
+import { LEVELS, defaultsFor, levelDef, levelsBelow, nextLevelDown } from './mapLevels'
+import { heightUnit, roundNice, unitsOf, type ConvertMode } from './mapUnits'
 import {
-  LAYER_NAMES, MAP_TITLE_MAX, addLayer, addTerrain, editTerrain, moveLayer, removeLayer, removeTerrain, renameLayer, resize, setScale, setTitle, terrainCounts,
-  descendantIds, setAppliesFrom, setOverlay, setPace, setParent, setTheme, toggleLayer, type MapDraft,
+  LAYER_NAMES, MAP_TITLE_MAX, addLayer, moveLayer, removeLayer, renameLayer, resize, setScale, setTitle,
+  descendantIds, setAppliesFrom, setBase, setLevel, setOverlay, setPace, setParent, setUnits, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
 import { ForReadersPanel } from './ForReadersPanel'
@@ -22,9 +30,12 @@ import { WorldLinks } from '../links/WorldLinks'
 // What a pen and a drawn shape have in common: how they are drawn.
 type ShapeLook = Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern'>
 
-const NEW_TERRAIN_COLOURS = ['#c06c84', '#6c9bd2', '#d9a441', '#7a5c8e', '#4fa89a', '#b5654a', '#9aa86a', '#5a6f8e']
+const NEW_BIOME_COLOURS = ['#c06c84', '#6c9bd2', '#d9a441', '#7a5c8e', '#4fa89a', '#b5654a', '#9aa86a', '#5a6f8e']
 const LAYER_KINDS: Array<Exclude<MapLayerKind, 'terrain'>> = ['shapes', 'symbols', 'labels', 'notes']
-const KIND_NAMES = { world: 'World or region', town: 'Town or city', interior: 'Interior' } as const
+const HEIGHT_MODES: Array<{ id: MapHeightMode; name: string }> = [
+  { id: 'none', name: 'Keeps the height' }, { id: 'raise', name: 'Raises the land' }, { id: 'lower', name: 'Lowers the land' }, { id: 'set', name: 'Sets the height' },
+]
+const UNIT_SYSTEMS: Array<{ id: MapUnits; name: string }> = [{ id: 'metric', name: 'Metric' }, { id: 'imperial', name: 'Imperial' }, { id: 'custom', name: 'Custom' }]
 
 export interface MapSideProps {
   projectId: string
@@ -41,8 +52,12 @@ export interface MapSideProps {
   onOpenScene?: (nodeId: string) => void
   m: Maps
   draft: MapDraft
-  terrain: number
-  onTerrain: (index: number) => void
+  // The biomes of the project (the admin's and its own), the one a new biome area is made in, and whether new biome areas have curved points.
+  biomes: BiomesView
+  biome: string
+  onBiome: (id: string) => void
+  biomeSmooth: boolean
+  onBiomeSmooth: (on: boolean) => void
   // The symbol that the Symbol tool stamps, and how wide a new one is.
   symbolKind: string
   onSymbolKind: (id: string) => void
@@ -62,19 +77,21 @@ export interface MapSideProps {
   onSetLocation?: (sceneId: string, location: string) => void
 }
 
-// The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
+// The right-hand side of the Maps console: what is chosen on the map, the biomes to draw with, the symbols to stamp, the layers, and the map's own fields.
+export function MapSide(p: MapSideProps) {
+  const { projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, symbolKind, onSymbolKind, symbolSize, onSymbolSize } = p
+  const { pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation } = p
   return (
     <aside className="mapSide" aria-label="Map details">
-      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
+      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} biomes={p.biomes} />}
       <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
-      <TerrainPanel m={m} draft={draft} terrain={terrain} onTerrain={onTerrain} />
+      <BiomesPanel projectId={projectId} m={m} draft={draft} biomes={p.biomes} biome={p.biome} onBiome={p.onBiome} smooth={p.biomeSmooth} onSmooth={p.onBiomeSmooth} />
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
       <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
       <LayerPanel m={m} draft={draft} />
       <JourneysPanel m={m} draft={draft} points={points} cast={cast} state={journey} onState={onJourney} onTool={onJourneyTool} />
       <MapFieldsPanel m={m} draft={draft} points={points} />
-      <ExportPanel draft={draft} />
+      <ExportPanel draft={draft} biomes={p.biomes} />
       <ForReadersPanel projectId={projectId} m={m} draft={draft} selected={selected} />
     </aside>
   )
@@ -97,7 +114,7 @@ function ShapeFields({ type, value, onChange }: { type: MapShapeType; value: Sha
         <Field label="Colour" short>
           <span className="mapRow">
             <ColourInput label={type === 'region' ? 'Colour of the outline' : 'Colour of the line'} value={value.color ?? '#22262c'} onCommit={color => onChange({ color })} />
-            <button type="button" className="mapIconBtn" aria-label="Use the ink of the look" title="Use the ink of the look" disabled={value.color === null} onClick={() => onChange({ color: null })}><RestoreIcon size={16} /></button>
+            <button type="button" className="mapIconBtn" aria-label="Use the ink of the map" title="Use the ink of the map" disabled={value.color === null} onClick={() => onChange({ color: null })}><RestoreIcon size={16} /></button>
           </span>
         </Field>
       </div>
@@ -144,26 +161,31 @@ function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapSha
   )
 }
 
-// A symbol that has a name is a place: a scene can happen there, and the maps that open from it are listed (the town's map, the floors of a building).
-function PlaceFields({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, symbolId, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
-  const s = draft.symbols.find(y => y.id === symbolId)!
-  const linked = s.mapIds.map(id => m.maps.find(x => x.id === id)).filter((x): x is MapSummary => !!x)
-  const free = m.maps.filter(x => x.id !== draft.id && !x.versionOf && !s.mapIds.includes(x.id))
+// A symbol or an area (a biome area or a region) that has a name is a place: a scene can happen there, and the maps that open from it are listed (the town's
+// map, the floors of a building). A map made for a place is the next level down from this one, or any lower level.
+function PlaceFields({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, item, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; item: ItemRef; scenes: ScenePlace[] }) {
+  const place = placeOf(draft, item) ?? { name: '', mapIds: [] }
+  const linked = place.mapIds.map(id => m.maps.find(x => x.id === id)).filter((x): x is MapSummary => !!x)
+  const free = m.maps.filter(x => x.id !== draft.id && !x.versionOf && !place.mapIds.includes(x.id))
   const [pick, setPick] = useState('')
-  const key = placeKey(draft.id, s.id)
+  const below = levelsBelow(draft.level)
+  const [level, setLevelChoice] = useState<MapLevel>(() => nextLevelDown(draft.level))
+  const childLevel = below.includes(level) ? level : below[0] ?? draft.level
+  const key = placeKey(draft.id, item.id)
   const here = scenes.filter(sc => sc.location === key)
 
   async function makeMap() {
-    const interior = SYMBOL_SETS.find(set => set.id === 'interior')?.symbols.some(y => y.id === s.kind)
-    const id = await m.create({ title: s.name, kind: interior ? 'interior' : 'town', width: 32, height: 24, theme: draft.theme, cellSize: interior ? 5 : 10, unit: interior ? 'feet' : 'paces', parentId: draft.id }, false)
-    if (id) m.apply(editSymbol(draft, s.id, { mapIds: [...s.mapIds, id] }))
+    const units = draft.units === 'custom' ? 'metric' : draft.units
+    const d = defaultsFor(childLevel, units)
+    const id = await m.create({ title: place.name, level: childLevel, units, width: d.width, height: d.height, cellSize: d.cellSize, unit: d.unit, base: d.base, parentId: draft.id }, false)
+    if (id) m.apply(editPlace(draft, item, { mapIds: [...place.mapIds, id] }))
   }
 
   return (
     <>
-      <Field label="Place name"><CommitText label="Name of the place" value={s.name} max={PLACE_NAME_MAX} onCommit={name => m.apply(editSymbol(draft, s.id, { name }))} /></Field>
-      {s.name === '' && <p className="mapHint">Give it a name to make it a place: a scene can happen there, and maps can open from it.</p>}
-      {s.name !== '' && (
+      <Field label="Place name"><CommitText label="Name of the place" value={place.name} max={PLACE_NAME_MAX} onCommit={name => m.apply(editPlace(draft, item, { name }))} /></Field>
+      {place.name === '' && <p className="mapHint">Give it a name to make it a place: a scene can happen there, and maps can open from it.</p>}
+      {place.name !== '' && (
         <div className="mapLinks" role="group" aria-label="Maps from this place">
           <h4 className="mapSubTitle">Maps from here</h4>
           {linked.length === 0 && <p className="mapHint">No map opens from here yet. Double-click the place with the Select tool to open its first map.</p>}
@@ -171,22 +193,27 @@ function PlaceFields({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m
             {linked.map(x => (
               <li key={x.id} className="mapRow">
                 <button type="button" className="mapLinkOpen" title={`Open ${x.title}`} aria-label={`Open ${x.title}`} onClick={() => { void m.open(x.id) }}><MapIcon size={14} /><span>{x.title}</span></button>
-                <button type="button" className="mapIconBtn" aria-label={`Stop opening ${x.title} from here`} title="Stop opening this map from here" onClick={() => m.apply(editSymbol(draft, s.id, { mapIds: s.mapIds.filter(id => id !== x.id) }))}><CloseIcon size={14} /></button>
+                <button type="button" className="mapIconBtn" aria-label={`Stop opening ${x.title} from here`} title="Stop opening this map from here" onClick={() => m.apply(editPlace(draft, item, { mapIds: place.mapIds.filter(id => id !== x.id) }))}><CloseIcon size={14} /></button>
               </li>
             ))}
           </ul>
           <div className="mapRow">
-            <button type="button" className="mapIconBtn" aria-label="Make a map for this place" title="Make a map for this place (inside this map)" disabled={s.mapIds.length >= MAX_PLACE_MAPS} onClick={() => { void makeMap() }}><FolderPlusIcon size={16} /></button>
-            {free.length > 0 && (
-              <>
-                <select className="mapSelect" aria-label="Another map to open from here" value={pick} onChange={e => setPick(e.target.value)}>
-                  <option value="">Link a map that exists…</option>
-                  {free.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
-                </select>
-                <button type="button" className="mapIconBtn" aria-label="Link the map" title="Link the map" disabled={pick === ''} onClick={() => { m.apply(editSymbol(draft, s.id, { mapIds: [...s.mapIds, pick] })); setPick('') }}><PlusIcon size={16} /></button>
-              </>
+            {below.length > 0 && (
+              <select className="mapSelect" aria-label="Level of a new map for this place" value={childLevel} onChange={e => setLevelChoice(e.target.value as MapLevel)}>
+                {below.map(lv => <option key={lv} value={lv}>{levelDef(lv).name}</option>)}
+              </select>
             )}
+            <button type="button" className="mapIconBtn" aria-label="Make a map for this place" title={`Make a ${levelDef(childLevel).name.toLowerCase()} map for this place (inside this map)`} disabled={place.mapIds.length >= MAX_PLACE_MAPS} onClick={() => { void makeMap() }}><FolderPlusIcon size={16} /></button>
           </div>
+          {free.length > 0 && (
+            <div className="mapRow">
+              <select className="mapSelect" aria-label="Another map to open from here" value={pick} onChange={e => setPick(e.target.value)}>
+                <option value="">Link a map that exists…</option>
+                {free.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+              </select>
+              <button type="button" className="mapIconBtn" aria-label="Link the map" title="Link the map" disabled={pick === ''} onClick={() => { m.apply(editPlace(draft, item, { mapIds: [...place.mapIds, pick] })); setPick('') }}><PlusIcon size={16} /></button>
+            </div>
+          )}
           <h4 className="mapSubTitle">Scenes here</h4>
           {here.length === 0 ? <p className="mapHint">No scene is set here. Choose it as a scene's Location in the Outline.</p> : <ul className="mapScenes">{here.map(sc => <li key={sc.id}>{sc.title || 'Untitled scene'}</li>)}</ul>}
           <WorldLinks projectId={projectId} self={`place:${key}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} />
@@ -260,7 +287,7 @@ function OldLocations({ m, draft, scenes, onSetLocation }: { m: Maps; draft: Map
 }
 
 // Save the map as an image: a size, and which layers are in it.
-function ExportPanel({ draft }: { draft: MapDraft }) {
+function ExportPanel({ draft, biomes }: { draft: MapDraft; biomes: BiomesView }) {
   const [scale, setScale] = useState<ExportScale>(1)
   const [off, setOff] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
@@ -269,7 +296,7 @@ function ExportPanel({ draft }: { draft: MapDraft }) {
 
   async function save() {
     setNote('')
-    const r = await exportMapImage(draft, scale, chosen)
+    const r = await exportMapImage(draft, biomes.index, scale, chosen)
     if (r === 'unavailable') setNote('The image could not be made.')
   }
 
@@ -323,25 +350,77 @@ function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id
   )
 }
 
-// What is chosen on the map: a symbol (its width and colour), a label (its text and height) or a line or region (how it is drawn), and a delete.
-function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, selected, fresh, onDeleted, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[] }) {
+// What is chosen on the map: a biome area (its biome and height), a symbol (its width and colour), a label (its text and height) or a line or region (how it
+// is drawn), and a delete. An area or a symbol can be named, which makes it a place.
+function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, selected, fresh, onDeleted, scenes, biomes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[]; biomes: BiomesView }) {
   const item = findItem(draft, selected)
   if (!item) return null
   const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
+  const place = <PlaceFields projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} item={selected} scenes={scenes} />
   if (selected.kind === 'shape') {
     const sh = draft.shapes.find(y => y.id === selected.id)!
+    const order = (
+      <div className="mapSizes" role="group" aria-label="Order">
+        <button type="button" className="mapChip" onClick={() => m.apply(moveShapeOrder(draft, sh.id, 'front'))}>Bring to front</button>
+        <button type="button" className="mapChip" onClick={() => m.apply(moveShapeOrder(draft, sh.id, 'back'))}>Send to back</button>
+      </div>
+    )
+    const curves = (
+      <div className="mapSizes" role="group" aria-label="Curves">
+        <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, true)))}>Curve all points</button>
+        <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, false)))}>Straighten all points</button>
+      </div>
+    )
+    if (sh.type === 'biome') {
+      const offered = offeredBiomes(biomes.index, draft.level)
+      const current = sh.biome ? resolveBiome(biomes.index, sh.biome) : null
+      const unit = heightUnit(draft.units)
+      return (
+        <section className="mapPanel" aria-label="Chosen biome area">
+          <header className="mapPanelHead">
+            <h3 className="mapPanelTitle">{sh.name || (current ? current.name : 'Height only')}</h3>
+            <button type="button" className="mapIconBtn" aria-label="Delete the biome area" title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
+          </header>
+          <div className="mapFields">
+            <Field label="Biome">
+              <span className="mapRow">
+                {current && <span className="mapSwatch" style={{ background: current.color }} aria-hidden="true" />}
+                <select className="mapSelect" aria-label="Biome of the area" value={sh.biome ?? ''} onChange={e => m.apply(editShape(draft, sh.id, { biome: e.target.value || null }))}>
+                  <option value="">None: keeps the biome under it</option>
+                  {current && !offered.some(b => b.id === current.id) && <option value={current.id}>{current.name}</option>}
+                  {offered.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </span>
+            </Field>
+            <Field label="Height">
+              <select className="mapSelect" aria-label="What the area does to the height" value={sh.heightMode ?? 'none'} onChange={e => m.apply(editShape(draft, sh.id, { heightMode: e.target.value as MapHeightMode }))}>
+                {HEIGHT_MODES.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+              </select>
+            </Field>
+            {(sh.heightMode ?? 'none') !== 'none' && (
+              <Field label={sh.heightMode === 'set' ? `Height (${unit})` : `By (${unit})`} short>
+                <CommitNumber label={`Height in ${unit === 'm' ? 'metres' : 'feet'}`} value={sh.height ?? 0} min={sh.heightMode === 'set' ? -HEIGHT_LIMIT : 0} max={HEIGHT_LIMIT} step={unit === 'm' ? 50 : 100} onCommit={height => m.apply(editShape(draft, sh.id, { height }))} />
+              </Field>
+            )}
+          </div>
+          {order}
+          {curves}
+          {place}
+          <p className="mapHint">Higher land is drawn lighter, lower land darker. Drag the area, a point (square) or a handle (circle); double-click the outline to put a point in.</p>
+        </section>
+      )
+    }
     const kind = sh.type === 'region' ? 'region' : 'line'
     return (
       <section className="mapPanel" aria-label={`Chosen ${kind}`}>
         <header className="mapPanelHead">
-          <h3 className="mapPanelTitle">{sh.type === 'region' ? 'Region' : 'Line'}</h3>
+          <h3 className="mapPanelTitle">{sh.type === 'region' ? (sh.name || 'Region') : 'Line'}</h3>
           <button type="button" className="mapIconBtn" aria-label={`Delete the ${kind}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
         </header>
         <ShapeFields type={sh.type} value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
-        <div className="mapSizes" role="group" aria-label="Curves">
-          <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, true)))}>Curve all points</button>
-          <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, false)))}>Straighten all points</button>
-        </div>
+        {order}
+        {curves}
+        {sh.type === 'region' && place}
         <p className="mapHint">Drag the shape, a point (square) or a handle (circle). Double-click a point to curve or straighten it, the line to put a point in. With a point chosen, Delete takes it away.</p>
       </section>
     )
@@ -360,13 +439,13 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
             <span className="mapRow">
               <ColourInput label="Colour of the symbol" value={s.color ?? '#22262c'} onCommit={color => m.apply(editSymbol(draft, s.id, { color }))} />
               <button
-                type="button" className="mapIconBtn" aria-label="Use the colour of the look" title="Use the colour of the look" disabled={s.color === null}
+                type="button" className="mapIconBtn" aria-label="Use the ink colour" title="Use the ink colour" disabled={s.color === null}
                 onClick={() => m.apply(editSymbol(draft, s.id, { color: null }))}
               ><RestoreIcon size={16} /></button>
             </span>
           </Field>
         </div>
-        <PlaceFields projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} symbolId={s.id} scenes={scenes} />
+        {place}
         <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
       </section>
     )
@@ -385,62 +464,96 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
   )
 }
 
-function TerrainPanel({ m, draft, terrain, onTerrain }: { m: Maps; draft: MapDraft; terrain: number; onTerrain: (index: number) => void }) {
-  // How many cells each terrain has (counted again after every change: a stroke, a fill or an undo makes a new draft, though its cells array stays).
-  const counts = useMemo(() => terrainCounts(draft.cells, draft.terrains.length), [draft])
-  const [confirming, setConfirming] = useState(false)
-  const picked = draft.terrains[terrain]
-  const total = draft.width * draft.height
+// The biomes: what lies under everything (the base, a biome and its height), the biomes the map's level offers (choosing one draws a biome area in it),
+// and the project's own biomes (added here, renamed and recoloured; one a map still uses is kept, no longer offered, when it is removed). The admin's
+// biomes and their colours are set in Configuration > Maps.
+function BiomesPanel({ projectId, m, draft, biomes, biome, onBiome, smooth, onSmooth }: { projectId: string; m: Maps; draft: MapDraft; biomes: BiomesView; biome: string; onBiome: (id: string) => void; smooth: boolean; onSmooth: (on: boolean) => void }) {
+  const offered = offeredBiomes(biomes.index, draft.level)
+  const counts = useMemo(() => biomeCounts(draft), [draft])
+  const own = biomes.own.filter(b => !b.retired)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const unit = heightUnit(draft.units)
+  const base = resolveBiome(biomes.index, draft.base.biome)
+  const mine = own.find(b => b.id === editing)
 
-  function add() {
-    const r = addTerrain(draft, 'New terrain', NEW_TERRAIN_COLOURS[draft.terrains.length % NEW_TERRAIN_COLOURS.length])
-    if (r && m.apply(r.change)) onTerrain(r.index)
+  async function add() {
+    const fresh: MapBiome = {
+      id: ownBiomeId(biomes.own.map(b => b.id)), name: 'New biome', color: NEW_BIOME_COLOURS[biomes.own.length % NEW_BIOME_COLOURS.length],
+      group: levelDef(draft.level).drawn === 'materials' ? 'material' : levelDef(draft.level).drawn === 'space' ? 'space' : 'land', levels: [], retired: false,
+    }
+    if (await saveOwnBiomes(projectId, [...biomes.own, fresh])) { setEditing(fresh.id); onBiome(fresh.id) }
   }
-  function remove() {
-    setConfirming(false)
-    if (m.apply(removeTerrain(draft, terrain))) onTerrain(Math.max(0, Math.min(terrain, draft.terrains.length - 2)))
+  const editOwn = (id: string, patch: Partial<MapBiome>) => { void saveOwnBiomes(projectId, biomes.own.map(b => (b.id === id ? { ...b, ...patch } : b))) }
+  function removeOwn(id: string) {
+    setConfirming(null)
+    setEditing(null)
+    void saveOwnBiomes(projectId, biomes.own.filter(b => b.id !== id))
   }
 
   return (
-    <section className="mapPanel" aria-label="Terrain">
+    <section className="mapPanel" aria-label="Biomes">
       <header className="mapPanelHead">
-        <h3 className="mapPanelTitle">Terrain</h3>
-        <button type="button" className="mapIconBtn" aria-label="Add a terrain" title="Add a terrain" onClick={add}><PlusIcon size={16} /></button>
+        <h3 className="mapPanelTitle">{levelDef(draft.level).drawn === 'materials' ? 'Floors' : 'Biomes'}</h3>
+        <button type="button" className="mapIconBtn" aria-label="Add a biome of this project" title="Add a biome of this project" disabled={biomes.own.length >= MAP_MAX_PROJECT_BIOMES} onClick={() => { void add() }}><PlusIcon size={16} /></button>
       </header>
+      <div className="mapFields">
+        <Field label="Base">
+          <span className="mapRow">
+            <span className="mapSwatch" style={{ background: base.color }} aria-hidden="true" />
+            <select className="mapSelect" aria-label="Biome under everything" value={draft.base.biome} onChange={e => m.apply(setBase(draft, { biome: e.target.value }))}>
+              {!offered.some(b => b.id === base.id) && <option value={base.id}>{base.name}</option>}
+              {offered.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </span>
+        </Field>
+        {levelDef(draft.level).drawn === 'biomes' && (
+          <Field label={`Base height (${unit})`} short>
+            <CommitNumber label={`Height of the base in ${unit === 'm' ? 'metres' : 'feet'}`} value={draft.base.height} min={-HEIGHT_LIMIT} max={HEIGHT_LIMIT} step={unit === 'm' ? 50 : 100} onCommit={height => m.apply(setBase(draft, { height }))} />
+          </Field>
+        )}
+      </div>
       <ul className="mapTerrains">
-        {draft.terrains.map((t, i) => (
-          <li key={t.id}>
+        {offered.map(b => (
+          <li key={b.id}>
             <button
-              type="button" className={`mapTerrain${i === terrain ? ' mapTerrain--on' : ''}`} aria-pressed={i === terrain} aria-label={`Paint with ${t.name}`}
-              title={`Paint with ${t.name}`} onClick={() => onTerrain(i)}
+              type="button" className={`mapTerrain${b.id === biome ? ' mapTerrain--on' : ''}`} aria-pressed={b.id === biome} aria-label={`Draw with ${b.name}`}
+              title={`Draw a biome area of ${b.name}`} onClick={() => onBiome(b.id)}
             >
-              <span className="mapSwatch" style={{ background: t.color }} aria-hidden="true" />
-              <span className="mapTerrainName">{t.name}</span>
-              <span className="mapTerrainCount" title={`${counts[i]} of ${total} cells`}>{Math.round((counts[i] / total) * 100)}%</span>
+              <span className="mapSwatch" style={{ background: b.color }} aria-hidden="true" />
+              <span className="mapTerrainName">{b.name}{b.id.startsWith('own_') ? ' (this project)' : ''}</span>
+              {(counts.get(b.id) ?? 0) > 0 && <span className="mapTerrainCount" title={`${counts.get(b.id)} areas`}>{counts.get(b.id)}</span>}
             </button>
           </li>
         ))}
       </ul>
-      {picked && (
-        <div className="mapEdit">
-          <div className="mapRow">
-            <ColourInput label={`Colour of ${picked.name}`} value={picked.color} onCommit={color => m.apply(editTerrain(draft, terrain, { color }))} />
-            <CommitText label={`Name of ${picked.name}`} value={picked.name} max={40} onCommit={name => m.apply(editTerrain(draft, terrain, { name }))} />
-            {confirming ? (
-              <span className="mapConfirm" role="group" aria-label={`Remove ${picked.name}?`}>
-                <button type="button" className="mapIconBtn" aria-label="Confirm remove" title="Confirm remove" onClick={remove}><CheckIcon size={16} /></button>
-                <button type="button" className="mapIconBtn" aria-label="Cancel remove" title="Cancel" onClick={() => setConfirming(false)}><CloseIcon size={16} /></button>
-              </span>
-            ) : (
-              <button
-                type="button" className="mapIconBtn" aria-label={`Remove ${picked.name}`} title={draft.terrains.length <= 1 ? 'The last terrain stays' : `Remove ${picked.name}`}
-                disabled={draft.terrains.length <= 1} onClick={() => (counts[terrain] === 0 ? remove() : setConfirming(true))}
-              ><TrashIcon size={16} /></button>
-            )}
-          </div>
-          {confirming && <p className="mapHint">Its {counts[terrain]} cells become {draft.terrains[0].name}.</p>}
+      {own.length > 0 && (
+        <div className="mapRow" role="group" aria-label="This project's biomes">
+          <select className="mapSelect" aria-label="A biome of this project to change" value={editing ?? ''} onChange={e => setEditing(e.target.value || null)}>
+            <option value="">Change a biome of this project…</option>
+            {own.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
         </div>
       )}
+      {mine && (
+        <div className="mapEdit">
+          <div className="mapRow">
+            <ColourInput label={`Colour of ${mine.name}`} value={mine.color} onCommit={color => editOwn(mine.id, { color })} />
+            <CommitText label={`Name of ${mine.name}`} value={mine.name} max={40} onCommit={name => editOwn(mine.id, { name })} />
+            {confirming === mine.id ? (
+              <span className="mapConfirm" role="group" aria-label={`Remove ${mine.name}?`}>
+                <button type="button" className="mapIconBtn" aria-label="Confirm remove" title="Confirm remove" onClick={() => removeOwn(mine.id)}><CheckIcon size={16} /></button>
+                <button type="button" className="mapIconBtn" aria-label="Cancel remove" title="Cancel" onClick={() => setConfirming(null)}><CloseIcon size={16} /></button>
+              </span>
+            ) : (
+              <button type="button" className="mapIconBtn" aria-label={`Remove ${mine.name}`} title={`Remove ${mine.name}`} onClick={() => setConfirming(mine.id)}><TrashIcon size={16} /></button>
+            )}
+          </div>
+          {confirming === mine.id && <p className="mapHint">Maps that use it keep its colour; it is no longer offered.</p>}
+        </div>
+      )}
+      <label className="mapCheck"><input type="checkbox" checked={smooth} onChange={e => onSmooth(e.target.checked)} />Curve the points of new areas</label>
+      <p className="mapHint">Choose a biome, then click on the map to draw its outline; double-click or Enter finishes. Later areas lie over earlier ones. Higher land is drawn lighter, lower land darker.</p>
     </section>
   )
 }
@@ -481,31 +594,71 @@ function LayerPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
               onClick={() => m.apply(moveLayer(draft, layer.id, -1))}
             ><ChevronDownIcon size={16} /></button>
             <button
-              type="button" className="mapIconBtn" aria-label={`Delete ${layer.name}`} title={layer.kind === 'terrain' ? 'The terrain layer stays' : 'Delete'}
+              type="button" className="mapIconBtn" aria-label={`Delete ${layer.name}`} title={layer.kind === 'terrain' ? 'The biomes layer stays' : 'Delete'}
               disabled={layer.kind === 'terrain'} onClick={() => m.apply(removeLayer(draft, layer.id))}
             ><TrashIcon size={16} /></button>
           </li>
         ))}
       </ul>
-      <p className="mapHint">Things are placed on the top layer of their kind that is shown and not locked. A line or region goes on the top shown, unlocked layer of regions and lines.</p>
+      <p className="mapHint">Things are placed on the top layer of their kind that is shown and not locked. A line or region goes on the top shown, unlocked layer of regions and lines; a biome area on the biomes layer.</p>
     </section>
   )
 }
 
 function MapFieldsPanel({ m, draft, points }: { m: Maps; draft: MapDraft; points: StoryPoint[] }) {
+  // A move to another unit system asks first: convert the numbers, or keep them and only rename the units.
+  const [asking, setAsking] = useState<MapUnits | null>(null)
+  const units = draft.units ?? 'custom'
+  const offeredUnits = unitsOf(units)
+  function chooseUnits(next: MapUnits) {
+    if (next === units) return
+    // Into custom, or out of it, nothing is converted: no question.
+    if (next === 'custom' || units === 'custom') m.apply(setUnits(draft, next, 'keep'))
+    else setAsking(next)
+  }
+  function answer(mode: ConvertMode) {
+    if (asking) m.apply(setUnits(draft, asking, mode))
+    setAsking(null)
+  }
   return (
     <section className="mapPanel" aria-label="Map">
       <header className="mapPanelHead"><h3 className="mapPanelTitle">Map</h3></header>
       <div className="mapFields">
         <Field label="Title"><CommitText label="Map title" value={draft.title} max={MAP_TITLE_MAX} onCommit={title => m.apply(setTitle(draft, title))} /></Field>
-        <Field label="Kind"><span className="mapStatic">{KIND_NAMES[draft.kind]}</span></Field>
+        <Field label="Level">
+          <select className="mapSelect" aria-label="Level of the map" value={draft.level} onChange={e => m.apply(setLevel(draft, e.target.value as MapLevel))}>
+            {LEVELS.map(lv => <option key={lv.id} value={lv.id}>{lv.name}: {lv.holds}</option>)}
+          </select>
+        </Field>
         <div className="mapRow">
           <Field label="Width" short><CommitNumber label="Width in cells" value={draft.width} min={1} max={MAP_MAX_SIDE} onCommit={w => m.apply(resize(draft, w, draft.height))} /></Field>
           <Field label="Height" short><CommitNumber label="Height in cells" value={draft.height} min={1} max={MAP_MAX_SIDE} onCommit={h => m.apply(resize(draft, draft.width, h))} /></Field>
         </div>
+        <Field label="Units">
+          <select className="mapSelect" aria-label="Unit system of the map" value={asking ?? units} onChange={e => chooseUnits(e.target.value as MapUnits)}>
+            {UNIT_SYSTEMS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </Field>
+        {asking && (
+          <div className="mapConfirm" role="group" aria-label={`Change to ${asking} units`}>
+            <span className="mapHint">Change to {asking} units:</span>
+            <button type="button" className="mapChip" onClick={() => answer('convert')}>Convert the numbers</button>
+            <button type="button" className="mapChip" onClick={() => answer('keep')}>Keep the numbers</button>
+            <button type="button" className="mapIconBtn" aria-label="Cancel the change of units" title="Cancel" onClick={() => setAsking(null)}><CloseIcon size={16} /></button>
+          </div>
+        )}
         <div className="mapRow">
           <Field label="One cell is" short><CommitNumber label="Size of one cell" value={draft.cellSize} min={0.001} max={1_000_000} step="any" onCommit={s => m.apply(setScale(draft, s, draft.unit))} /></Field>
-          <Field label="Unit" short><CommitText label="Unit of a cell" value={draft.unit} max={20} className="mapInput mapInput--unit" onCommit={u => m.apply(setScale(draft, draft.cellSize, u))} /></Field>
+          <Field label="Unit" short>
+            {units === 'custom' ? (
+              <CommitText label="Unit of a cell" value={draft.unit} max={20} className="mapInput mapInput--unit" onCommit={u => m.apply(setScale(draft, draft.cellSize, u))} />
+            ) : (
+              <select className="mapSelect" aria-label="Unit of a cell" value={draft.unit} onChange={e => m.apply(setScale(draft, draft.cellSize, e.target.value))}>
+                {!offeredUnits.some(u => u.id === draft.unit) && <option value={draft.unit}>{draft.unit}</option>}
+                {offeredUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            )}
+          </Field>
         </div>
         {draft.versionOf ? (
           <Field label="True from">
@@ -529,17 +682,12 @@ function MapFieldsPanel({ m, draft, points }: { m: Maps; draft: MapDraft; points
             <span className="mapHint">{draft.unit} (0: not set)</span>
           </span>
         </Field>
-        <Field label="Look">
-          <select className="mapSelect" aria-label="Look of the map" value={draft.theme} onChange={e => m.apply(setTheme(draft, e.target.value as MapDraft['theme']))}>
-            {MAP_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </Field>
         <div className="mapChecks" role="group" aria-label="Drawn over the map">
           {([['scaleBar', 'Scale bar'], ['compass', 'Compass'], ['legend', 'Legend']] as const).map(([field, label]) => (
             <label key={field} className="mapCheck"><input type="checkbox" checked={draft[field]} onChange={e => m.apply(setOverlay(draft, field, e.target.checked))} />{label}</label>
           ))}
         </div>
-        <p className="mapHint">The map covers {draft.width * draft.cellSize} × {draft.height * draft.cellSize} {draft.unit}. A new size keeps the painted cells from the top left.</p>
+        <p className="mapHint">The map covers {roundNice(draft.width * draft.cellSize)} × {roundNice(draft.height * draft.cellSize)} {draft.unit}. The grid shows the scale; a new size keeps every shape where it is.</p>
       </div>
     </section>
   )

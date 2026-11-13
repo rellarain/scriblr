@@ -165,7 +165,7 @@ describe('the character for readers', () => {
 })
 
 describe('the map for readers', () => {
-  const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', kind: 'world', width: 8, height: 6 }, 0), ...over })
+  const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6 }, 0), ...over })
 
   async function openPanel(map = world(), preview: (chapter: number) => BookExtras = () => extras()) {
     const backend = mapsBackend([map])

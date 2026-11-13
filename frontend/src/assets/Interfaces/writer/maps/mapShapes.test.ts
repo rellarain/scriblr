@@ -14,14 +14,14 @@ const shape = (type: 'line' | 'region', points: MapShapePoint[], over: Partial<M
 const line = (...p: Array<[number, number]>) => shape('line', p.map(([x, y]) => pt(x, y)))
 
 const doc = (): MapDoc => ({
-  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
-  terrains: [{ id: 'sea', name: 'Sea', color: '#3b6ea5', builtIn: true }],
+  schemaVersion: 2, id: 'map_1', title: 'World', level: 'national', mapFormat: 2, base: { biome: 'plain', height: 0 }, units: 'metric',
+  parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'km', pace: null,
   layers: [
-    { id: 'terrain', name: 'Terrain', kind: 'terrain', visible: true, locked: false },
+    { id: 'terrain', name: 'Biomes', kind: 'terrain', visible: true, locked: false },
     { id: 'shapes', name: 'Shapes', kind: 'shapes', visible: true, locked: false },
     { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
   ],
-  cells: [0, 200], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: true, compass: true, legend: false, updatedAt: 'x',
+  symbols: [], labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: 'x',
 })
 const draft = (): MapDraft => draftOf(doc())
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }

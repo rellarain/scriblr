@@ -13,13 +13,14 @@ from typing import Callable, Optional, Type, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from . import settings_log, tree_pack
+from . import map_trace, settings_log, tree_pack
 from .ids import InvalidIdError, check_id
 from .schema import (
     HUE_SCHEME,
     PROJECT_FILE_VERSION,
     SCHEMA_VERSION,
     BookListing,
+    MapBiome,
     ChapterAuthorNotes,
     DailyActivityLog,
     DraftChapter,
@@ -27,6 +28,7 @@ from .schema import (
     DraftMoment,
     FacetActivity,
     FIGURE_MAX_MODELS,
+    MAP_MAX_PROJECT_BIOMES,
     FigureModel,
     CharacterDoc,
     ItemDoc,
@@ -390,6 +392,11 @@ def _load_shared(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, Sh
         return kept, {}
     signature = _file_signature(path)
     pf, errors = _load_project_file_locked(root, project_id)
+    if pf._maps_upgraded and not errors and not pf._unreadable and pf.schemaVersion <= PROJECT_FILE_VERSION:
+        # Reading upgraded the maps (traced into biome shapes): write that back once, so later reads find it done.
+        _write_project_file(root, project_id, pf)
+        pf._maps_upgraded = False
+        signature = _file_signature(path)
     if not errors and not pf._unreadable:
         _cache_put(root, project_id, path, pf, signature)
     return pf, errors
@@ -628,9 +635,12 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         figureModels=_parse_dict_section(raw, "figureModels", FigureModel, project_dir, path, errors),
         worldLinks=_parse_list_section(raw, "worldLinks", WorldLink, project_dir, path, errors),
         items=_parse_dict_section(raw, "items", ItemDoc, project_dir, path, errors),
+        mapBiomes=_parse_list_section(raw, "mapBiomes", MapBiome, project_dir, path, errors),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
         settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
+    # Maps from before levels are traced into biome shapes (once: the caller writes the result back).
+    map_trace.upgrade_project(pf)
     for key, placeholder in (
         ("outline", outline_default), ("plot", plot_default), ("activity", activity_default), ("schedule", schedule_default), ("scrap", scrap_default),
         ("facets", facets_default), ("planner", planner_default),
@@ -1484,6 +1494,9 @@ def delete_map(root: Path, project_id: str, map_id: str) -> None:
             for symbol in child.symbols:
                 if map_id in symbol.mapIds:
                     symbol.mapIds = [m for m in symbol.mapIds if m != map_id]
+            for shape in child.shapes:
+                if map_id in shape.mapIds:
+                    shape.mapIds = [m for m in shape.mapIds if m != map_id]
         pf.index.updatedAt = utcnow()
 
     _mutate(root, project_id, _do)
@@ -1494,8 +1507,8 @@ def list_map_summaries(root: Path, project_id: str) -> list[dict]:
     return _read(
         root, project_id,
         lambda pf, _errors: [
-            {"id": m.id, "title": m.title, "kind": m.kind, "parentId": m.parentId, "order": m.order, "width": m.width, "height": m.height, "updatedAt": m.updatedAt,
-             "versionOf": m.versionOf, "appliesFrom": m.appliesFrom}
+            {"id": m.id, "title": m.title, "kind": m.kind, "level": m.level, "parentId": m.parentId, "order": m.order, "width": m.width, "height": m.height,
+             "updatedAt": m.updatedAt, "versionOf": m.versionOf, "appliesFrom": m.appliesFrom}
             for m in sorted(pf.maps.values(), key=lambda m: (m.order, m.title.lower(), m.id))
         ],
         copy_result=False,
@@ -1505,6 +1518,52 @@ def list_map_summaries(root: Path, project_id: str) -> list[dict]:
 def map_parents(root: Path, project_id: str) -> dict[str, Optional[str]]:
     """Map id -> the id of the map it is inside."""
     return _read(root, project_id, lambda pf, _errors: {m.id: m.parentId for m in pf.maps.values()}, copy_result=False)
+
+
+def biomes_used(pf: ProjectFile) -> set[str]:
+    """The biome ids the project's maps use (bases and biome shapes)."""
+    used: set[str] = set()
+    for m in pf.maps.values():
+        used.add(m.base.biome)
+        used.update(s.biome for s in m.shapes if s.type == "biome" and s.biome)
+    return used
+
+
+def list_project_biomes(root: Path, project_id: str) -> list[MapBiome]:
+    return _read(root, project_id, lambda pf, _errors: list(pf.mapBiomes))
+
+
+def add_project_biomes(root: Path, project_id: str, biomes: list[MapBiome]) -> None:
+    """Add biomes the project does not have yet (by id), within the limit: those a traced map file brought."""
+
+    def _do(pf: ProjectFile) -> None:
+        known = {b.id for b in pf.mapBiomes}
+        for b in biomes:
+            if b.id not in known and len(pf.mapBiomes) < MAP_MAX_PROJECT_BIOMES:
+                pf.mapBiomes.append(b.model_copy(deep=True))
+                known.add(b.id)
+
+    if biomes:
+        _mutate(root, project_id, _do)
+
+
+def save_project_biomes(root: Path, project_id: str, biomes: list[MapBiome]) -> list[MapBiome]:
+    """Replace the project's own biomes, in the order given. One that is left out while a map still uses it is kept as retired (no longer offered, its
+    maps keep its colour)."""
+    out: list[MapBiome] = []
+
+    def _do(pf: ProjectFile) -> None:
+        kept = [b.model_copy(deep=True) for b in biomes]
+        ids = {b.id for b in kept}
+        used = biomes_used(pf)
+        for old in pf.mapBiomes:
+            if old.id not in ids and old.id in used:
+                kept.append(old.model_copy(update={"retired": True}))
+        pf.mapBiomes = kept
+        out.extend(kept)
+
+    _mutate(root, project_id, _do)
+    return out
 
 
 # ---------------------------------------------------------------------------

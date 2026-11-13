@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listCharacters } from '../../../../api/charactersApi'
 import { createMap, createMapVersion, deleteMap, getMap, listMaps, putMap } from '../../../../api/mapsApi'
-import type { MapCreate, MapDoc, MapSummary } from '../../../../api/types'
+import { getProjectBiomes, putProjectBiomes } from '../../../../api/mapBiomesApi'
+import { MAP_MAX_PROJECT_BIOMES, type MapCreate, type MapDoc, type MapSummary } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
+import { reloadOwnBiomes } from './mapBiomes'
 import { buildMapFile, importMaps, type Choice, type ImportResult, type MapFile } from './mapFile'
 import * as model from './mapModel'
-import { MapHistory, Stroke, docOf, draftOf, floodFill, metaEdit, summaryOf, type Change, type MapDraft, type MapEdit } from './mapModel'
+import { MapHistory, docOf, draftOf, metaEdit, summaryOf, type Change, type MapDraft } from './mapModel'
 
-// The Maps console's state: the project's maps (a list without cells), the open map as a draft (its cells decoded, so painting is direct), and an undo
-// log for each map that has been opened (a stroke is one step; kept while the project is open, so going to another map and back keeps its undo).
-// Edits save the way the Writer's do: the Save button, and autosave when the user has turned it on (lib/useAutosave.ts). Painting changes the cells in
-// place and tells the canvas to draw (`rev`); everything else makes a new draft.
+// The Maps console's state: the project's maps (a list), the open map as a draft, and an undo log for each map that has been opened (a drag is one step;
+// kept while the project is open, so going to another map and back keeps its undo). Edits save the way the Writer's do: the Save button, and autosave when
+// the user has turned it on (lib/useAutosave.ts). Every edit makes a new draft (`rev` counts them).
 interface Session { draft: MapDraft; history: MapHistory }
 
 const message = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback)
@@ -21,7 +22,7 @@ export function useMaps(projectId: string | null) {
   const [maps, setMaps] = useState<MapSummary[]>([])
   const [openId, setOpenId] = useState<string | null>(null)
   const [draft, setDraft] = useState<MapDraft | null>(null)
-  // Bumped when the open map's cells changed in place (a stroke in progress, an undo): the canvas draws again.
+  // Bumped at every edit (read by what has to know a change happened).
   const [rev, setRev] = useState(0)
   // What the last action could not do (a map that could not be made or opened); cleared by the next action.
   const [notice, setNotice] = useState<string | undefined>(undefined)
@@ -142,8 +143,11 @@ export function useMaps(projectId: string | null) {
       // The versions of those maps come with them.
       const kept = new Set([rootId, ...inside])
       const versions = list.filter(m => m.versionOf && kept.has(m.versionOf)).map(m => m.id)
-      const docs = await Promise.all([rootId, ...inside, ...versions].map(id => getMap(projectId, id)))
-      return buildMapFile(rootId, docs)
+      const [docs, own] = await Promise.all([
+        Promise.all([rootId, ...inside, ...versions].map(id => getMap(projectId, id))),
+        getProjectBiomes(projectId).then(r => r.biomes, () => []),
+      ])
+      return buildMapFile(rootId, docs, own)
     } catch (err) {
       setNotice(message(err, 'The map could not be exported.'))
       return null
@@ -162,7 +166,15 @@ export function useMaps(projectId: string | null) {
       put: doc => putMap(projectId, doc),
       createVersion: (mapId, body) => createMapVersion(projectId, mapId, body),
       characterIds,
+      // The file's own biomes join the project's (same id = the same biome; the project's own stays as it is).
+      addBiomes: async biomes => {
+        const mine = (await getProjectBiomes(projectId)).biomes
+        const known = new Set(mine.map(b => b.id))
+        const added = biomes.filter(b => !known.has(b.id))
+        if (added.length > 0) await putProjectBiomes(projectId, [...mine, ...added].slice(0, MAP_MAX_PROJECT_BIOMES))
+      },
     })
+    void reloadOwnBiomes(projectId)
     // What was written over is read again when it is next opened.
     for (const id of result.replaced) sessions.current.delete(id)
     setMaps(await listMaps(projectId))
@@ -195,37 +207,12 @@ export function useMaps(projectId: string | null) {
     autosaveRef.current.saveNow(docOf(next)).catch(() => undefined)
   }, [])
 
-  // A change of the map's fields (a title, a terrain, a layer ...): one undo step.
+  // A change of the map's fields (a title, a shape, a layer ...): one undo step.
   const apply = useCallback((change: Change): boolean => {
     const session = current.current
     if (!session || !change) return false
     session.history.push(change.edit)
     touched(change.draft)
-    return true
-  }, [touched])
-
-  // A paint stroke: begin it with a terrain and a brush, paint along it (the cells change in place), then end it.
-  const beginStroke = useCallback((terrain: number, size: number): Stroke | null => {
-    const session = current.current
-    return session && model.terrainEditable(session.draft) ? new Stroke(session.draft, terrain, size) : null
-  }, [])
-  const endStroke = useCallback((stroke: Stroke) => {
-    const session = current.current
-    const edit = stroke.finish()
-    if (!session || !edit) return
-    session.history.push(edit)
-    touched({ ...session.draft })
-  }, [touched])
-
-  // The fill: a change of the cells in one step. False when the terrain cannot be painted now (its layer is hidden or locked).
-  const fill = useCallback((x: number, y: number, terrain: number): boolean => {
-    const session = current.current
-    if (!session || !model.terrainEditable(session.draft)) return false
-    const edit: MapEdit | null = floodFill(session.draft, x, y, terrain)
-    if (edit) {
-      session.history.push(edit)
-      touched({ ...session.draft })
-    }
     return true
   }, [touched])
 
@@ -262,12 +249,12 @@ export function useMaps(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, maps, openId, draft, rev, notice,
-    open, create, createVersion, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo,
+    open, create, createVersion, remove, exportFile, importFile, apply, preview, commitMove, undo, redo,
     canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, createVersion, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, createVersion, remove, exportFile, importFile, apply, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Maps = ReturnType<typeof useMaps>

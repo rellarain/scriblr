@@ -21,6 +21,7 @@ from .api import (
     figure_models,
     items,
     world_links,
+    map_biomes,
     maps,
     outline,
     plot,
@@ -148,6 +149,8 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(outline.router)
     app.include_router(plot.router)
     app.include_router(maps.router)
+    app.include_router(map_biomes.router)
+    app.include_router(map_biomes.project_router)
     app.include_router(characters.router)
     app.include_router(figure_models.router)
     app.include_router(items.router)

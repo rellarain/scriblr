@@ -14,6 +14,7 @@ import { blankFigure } from '../assets/Interfaces/writer/characters/figure/figur
 import { copyOf, createMockFigureModels } from './mockFigureModels'
 import { createMockItems, seedItems } from './mockItems'
 import { createMockMaps, seedMaps } from './mockMaps'
+import { createMockMapBiomes } from './mockMapBiomes'
 import { createMockTraining, emptyProgress } from './mockTraining'
 import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
 import type { Planner } from '../lib/facets'
@@ -201,6 +202,8 @@ export function createMockBackend() {
   const training = createMockTraining(undefined, { ...emptyProgress(), enrolled: { 'writer-c1': '2026-11-02T12:00:00.000Z' } })
   // The Maps console's maps, which its edits change in memory only.
   const maps = createMockMaps(seedMaps())
+  // The admin's biome list (Configuration > Maps) and each project's own biomes.
+  const biomes = createMockMapBiomes()
   // The Characters console's cast, which its edits change in memory only.
   const cast = createMockCharacters(seedCharacters())
   // The copies of published models the cast's figures are drawn from (a model is copied from the catalog above when a character is given a figure).
@@ -246,6 +249,7 @@ export function createMockBackend() {
     if (parts[0] === 'activity' && parts[1] === 'ribbon') return json(ribbonFixture(localDay()))
     if (parts[0] === 'training') { const answer = training.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
+    if (parts[0] === 'map-biomes') { const answer = biomes.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'character-models' && method === 'GET' && parts[1] === 'published' && parts.length === 2) return json({ models: publishedModels() })
     if (parts[0] === 'character-models') { const answer = models.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'my-models') { const answer = mine.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
@@ -288,6 +292,7 @@ export function createMockBackend() {
       if (method === 'PUT') project.plot = body as PlotTree
       return json(project.plot)
     }
+    if (rest[0] === 'map-biomes') { const answer = biomes.projectRoute(parts[1], method, body); return json(answer.body, answer.status) }
     if (rest[0] === 'maps') { const answer = maps.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
     if (rest[0] === 'items') { const answer = library.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
     if (rest[0] === 'figure-models') { const answer = figures.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }

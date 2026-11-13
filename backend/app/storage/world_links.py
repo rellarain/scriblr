@@ -5,7 +5,7 @@ time the list changes."""
 from pathlib import Path
 
 from . import project_store as store
-from .schema import WORLD_LINK_REF, WORLD_MAX_LINKS, ProjectFile, WorldLink
+from .schema import WORLD_LINK_REF, WORLD_MAX_LINKS, ProjectFile, WorldLink, named_places
 
 
 class InvalidWorldLinkError(ValueError):
@@ -22,9 +22,9 @@ def _exists(pf: ProjectFile, ref: str) -> bool:
         return key in pf.items
     if kind == "scene":
         return any(n.id == key for n in pf.outline.nodes)
-    map_id, _, symbol_id = key.partition("/")
+    map_id, _, place_id = key.partition("/")
     doc = pf.maps.get(map_id)
-    return doc is not None and not doc.versionOf and any(s.id == symbol_id and s.name for s in doc.symbols)
+    return doc is not None and not doc.versionOf and any(p.id == place_id for p in named_places(doc))
 
 
 def _live(pf: ProjectFile) -> list[WorldLink]:

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { MapDoc } from '../../../../api/types'
 import { SYMBOL_SETS, UNKNOWN_SYMBOL_PATH, symbolDef, symbolName, symbolPath } from './mapSymbols'
-import { MAP_THEMES, hexToRgb, themeDef, themeRgb } from './mapThemes'
+import { LAND_STYLE, SPACE_STYLE, hexToRgb, mapStyle } from './mapThemes'
+import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
+import { makeBiomeShape } from './mapShapes'
 import {
   MAX_LABELS, MAX_SYMBOLS, activeLayerId, addLabel, addSymbol, editLabel, editSymbol, findItem, hitItem, itemBounds, labelExtent, legendEntries, movedItem,
   niceScale, removeItem, snapPoint,
@@ -9,14 +11,14 @@ import {
 import { MapHistory, draftOf, metaEdit, removeLayer, toggleLayer, type MapDraft } from './mapModel'
 
 const doc = (): MapDoc => ({
-  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
-  terrains: [{ id: 'sea', name: 'Sea', color: '#3b6ea5', builtIn: true }, { id: 'land', name: 'Land', color: '#a8c66c', builtIn: true }, { id: 'wood', name: 'Wood', color: '#4f8a4a', builtIn: true }],
+  schemaVersion: 2, id: 'map_1', title: 'World', level: 'continental', mapFormat: 2, base: { biome: 'saltwater', height: -200 }, units: 'imperial',
+  parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'mi', pace: null,
   layers: [
-    { id: 'terrain', name: 'Terrain', kind: 'terrain', visible: true, locked: false },
+    { id: 'terrain', name: 'Biomes', kind: 'terrain', visible: true, locked: false },
     { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
     { id: 'labels', name: 'Labels', kind: 'labels', visible: true, locked: false },
   ],
-  cells: [0, 200], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z',
+  symbols: [], labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z',
 })
 const draft = (): MapDraft => draftOf(doc())
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }
@@ -57,37 +59,22 @@ describe('the symbol library', () => {
   })
 })
 
-describe('the themes', () => {
-  it('has the four looks and falls back to modern', () => {
-    expect(MAP_THEMES.map(t => t.id)).toEqual(['parchment', 'modern', 'night', 'blueprint'])
-    expect(themeDef('night').name).toBe('Night')
-    expect(themeDef('nope' as never).id).toBe('modern')
+describe('the map styles', () => {
+  it('draws land levels in dark ink and space levels in light ink on the dark backdrop', () => {
+    expect(mapStyle('regional')).toBe(LAND_STYLE)
+    expect(mapStyle('interior')).toBe(LAND_STYLE)
+    expect(mapStyle('galactic')).toBe(SPACE_STYLE)
+    expect(mapStyle(undefined)).toBe(LAND_STYLE)
   })
 
-  it('shows a terrain colour as it is in the modern look', () => {
-    expect(themeRgb('#3b6ea5', 'modern')).toEqual([59, 110, 165])
+  it('reads a colour, and gray for nonsense', () => {
+    expect(hexToRgb('#3b6ea5')).toEqual([59, 110, 165])
     expect(hexToRgb('nonsense')).toEqual([136, 136, 136])
   })
 
-  it('changes the colours of the other looks and keeps the terrains apart', () => {
-    for (const theme of ['parchment', 'night', 'blueprint'] as const) {
-      const sea = themeRgb('#3b6ea5', theme), snow = themeRgb('#eef3f7', theme), land = themeRgb('#a8c66c', theme)
-      expect(sea, theme).not.toEqual([59, 110, 165])
-      expect(new Set([sea.join(), snow.join(), land.join()]).size, theme).toBe(3)
-      for (const v of [...sea, ...snow, ...land]) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(255) }
-    }
-  })
-
-  it('makes night darker and blueprint blue', () => {
-    const lum = ([r, g, b]: number[]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
-    expect(lum(themeRgb('#a8c66c', 'night'))).toBeLessThan(lum([168, 198, 108]))
-    const [r, , b] = themeRgb('#a8c66c', 'blueprint')
-    expect(b).toBeGreaterThan(r)
-  })
-
-  it('draws text and symbols so they read on their own look', () => {
+  it('draws text and symbols so they read in both styles', () => {
     const lum = (hex: string) => { const [r, g, b] = hexToRgb(hex); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
-    for (const t of MAP_THEMES) {
+    for (const t of [LAND_STYLE, SPACE_STYLE]) {
       // The halo is the other end of the lightness scale from the ink: the text stands out of it, and the halo out of any terrain behind.
       expect(Math.abs(lum(t.ink) - lum(t.halo)), t.id).toBeGreaterThan(110)
       expect(Math.abs(lum(t.symbol) - lum(t.halo)), t.id).toBeGreaterThan(110)
@@ -248,20 +235,28 @@ describe('picking an item with the pointer', () => {
 })
 
 describe('the legend', () => {
-  it('lists the terrains that are used and the kinds of symbol on the map, once each', () => {
-    let d = addSymbol(draft(), 'castle', 2, 2, 2, ids('a'))!.change.draft
+  const index = biomeIndex(STARTER_BIOMES, [{ id: 'own_x', name: 'Glass dunes', color: '#cfd8e0', group: 'land', levels: [], retired: false }])
+
+  it('lists the biomes that are used, in the list order, and the kinds of symbol on the map, once each', () => {
+    let d: MapDraft = { ...draft(), shapes: [makeBiomeShape('f', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false), makeBiomeShape('g', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false), makeBiomeShape('h', 'terrain', [[1, 1], [3, 1], [2, 3]], 'desert', false)] }
+    d = addSymbol(d, 'castle', 2, 2, 2, ids('a'))!.change.draft
     d = addSymbol(d, 'castle', 4, 2, 2, ids('b'))!.change.draft
     d = addSymbol(d, 'tree', 6, 2, 2, ids('c'))!.change.draft
     d = addSymbol(d, 'mystery', 8, 2, 2, ids('d'))!.change.draft
-    expect(legendEntries(d, [150, 0, 50])).toEqual([
-      { type: 'terrain', name: 'Sea', color: '#3b6ea5' }, { type: 'terrain', name: 'Wood', color: '#4f8a4a' },
+    expect(legendEntries(d, index)).toEqual([
+      { type: 'terrain', name: 'Saltwater', color: '#2f62b0' }, { type: 'terrain', name: 'Desert', color: '#d2b48c' }, { type: 'terrain', name: 'Forest', color: '#3f8f3a' },
       { type: 'symbol', kind: 'castle', name: 'Castle' }, { type: 'symbol', kind: 'tree', name: 'Tree' }, { type: 'symbol', kind: 'mystery', name: 'Symbol' },
     ])
   })
 
   it('leaves out the symbols of a hidden layer', () => {
     const d = toggleLayer(addSymbol(draft(), 'castle', 2, 2, 2, ids('a'))!.change.draft, 'symbols', 'visible')!.draft
-    expect(legendEntries(d, [200, 0, 0])).toEqual([{ type: 'terrain', name: 'Sea', color: '#3b6ea5' }])
+    expect(legendEntries(d, index)).toEqual([{ type: 'terrain', name: 'Saltwater', color: '#2f62b0' }])
+  })
+
+  it('names the project\'s own biomes and an unknown one', () => {
+    const d: MapDraft = { ...draft(), shapes: [makeBiomeShape('a', 'terrain', [[1, 1], [3, 1], [2, 3]], 'own_x', false), makeBiomeShape('b', 'terrain', [[1, 1], [3, 1], [2, 3]], 'gone', false)] }
+    expect(legendEntries(d, index).map(e => e.name)).toEqual(['Saltwater', 'Glass dunes', 'Unknown biome'])
   })
 })
 

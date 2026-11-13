@@ -20,6 +20,7 @@ import WriterLevels from '../assets/Interfaces/writer/levels/WriterLevels'
 import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
 import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
+import MapBiomesConsole from '../assets/Interfaces/admin/maps/MapBiomesConsole'
 import DesignerConsole from '../assets/Interfaces/admin/characters/DesignerConsole'
 import WriterLimitsConsole from '../assets/Interfaces/admin/characters/WriterLimitsConsole'
 import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
@@ -274,6 +275,17 @@ function InstructorCard() {
 }
 
 // The Maps console as it sits in the Project level's Maps tab (on the tab's surface), against the pretend Maps API.
+// Admin > Configuration > Maps as it sits in the admin panel (in the admin accent), against the pretend biomes API.
+function MapBiomesCard() {
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'auto', boxSizing: 'border-box', padding: 14 }}>
+        <MapBiomesConsole />
+      </div>
+    </div>
+  )
+}
+
 function MapsCard() {
   return (
     <div style={{ width: '100%', height: '100%', boxSizing: 'border-box', padding: 'var(--space-4)', background: 'var(--surface-side)', color: 'var(--ink)', overflow: 'hidden' }}>
@@ -414,6 +426,7 @@ export const CARDS: CardDef[] = [
   card('characters', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <CharactersCard /> }),
   card('items', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ItemsCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),
+  card('map-biomes', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapBiomesCard /> }),
   card('shelf', { defaults: { zones: ['day', 'night'] }, render: () => <ShelfCard /> }),
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),

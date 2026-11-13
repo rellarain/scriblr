@@ -1,30 +1,28 @@
-import { drawMeasure, drawLabel, drawOverlays, drawSelection, drawSymbol, type MeasureState } from './mapDrawItems'
-import { drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
+import { drawAreaName, drawMeasure, drawLabel, drawOverlays, drawSelection, drawSymbol, type MeasureState } from './mapDrawItems'
+import { drawBiomeShape, drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
 import { drawJourneys, type JourneyView } from './mapDrawJourneys'
 import type { MapShape } from '../../../../api/types'
 import { findItem, type ItemRef, type LegendEntry } from './mapItems'
 import type { MapDraft } from './mapModel'
-import { hexToRgb, themeDef, themeRgb } from './mapThemes'
+import { resolveBiome, type BiomeIndex } from './mapBiomes'
+import { landHeight } from './mapHeights'
+import { heightRangeOf } from './mapLevels'
+import { flatten } from './mapShapes'
+import { hexToRgb, mapStyle } from './mapThemes'
 import { GRID_MIN_ZOOM, type MapView } from './mapView'
 
-// Drawing a map on a canvas: the terrain as a bitmap of one pixel per cell (made when the cells change), scaled up without smoothing so each cell is a
-// crisp square, then the layers above it in their order (symbols, labels), the grid, the scale bar, compass and legend, and the brush outline.
-// The colours of the map are data (the author's terrain colours, shown through the map's look, mapThemes.ts); the frame round it takes the ink colour
-// of the page it is on.
-
-// The pixels of the terrain: one 32-bit value per cell (R, G, B, opaque, in memory order), in the colours of the map's look.
-export function terrainPixels(draft: Pick<MapDraft, 'cells' | 'terrains' | 'theme'>): Uint32Array {
-  const palette = draft.terrains.map(t => {
-    const [r, g, b] = themeRgb(t.color, draft.theme)
-    return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0
-  })
-  const out = new Uint32Array(draft.cells.length)
-  const fallback = palette[0] ?? 0xff888888
-  for (let i = 0; i < out.length; i += 1) out[i] = palette[draft.cells[i]] ?? fallback
-  return out
-}
+// Drawing a map on a canvas: the land (the base biome, then the biome shapes in their order, each in its biome's colour, lighter where it is higher and
+// darker where it is lower), then the layers above it in their order (lines and regions, symbols, labels), the names of the areas that are places, the grid,
+// the scale bar, compass and legend. The colours of the land are the biomes' (data); the frame round the map takes the ink colour of the page it is on.
 
 export { hexToRgb }
+
+// How much lighter (above sea level, > 0) or darker (below, < 0) a height makes its biome's colour: up to 0.55 at the map's height range.
+export const MAX_TINT = 0.55
+export function heightTint(height: number, range: number): number {
+  if (!(range > 0) || !Number.isFinite(height) || height === 0) return 0
+  return Math.max(-1, Math.min(1, height / range)) * MAX_TINT
+}
 
 export interface RenderOptions {
   // CSS pixels of the canvas and the device pixel ratio it is drawn at.
@@ -33,17 +31,15 @@ export interface RenderOptions {
   dpr: number
   view: MapView
   draft: MapDraft
-  // The terrain bitmap (one pixel per cell), null when it is not made yet.
-  bitmap: HTMLCanvasElement | null
+  // The biomes the map is drawn with (the admin's list and the project's own).
+  biomes: BiomeIndex
   showGrid: boolean
   // The page's ink colour, for the frame.
   ink: string
-  // The cells under the brush, to outline.
-  brush: Array<[number, number]>
   // The chosen symbol, label or shape, and the chosen point of a shape.
   selected: ItemRef | null
   selectedNode: number | null
-  // The line or region that is being drawn.
+  // The line, region or biome shape that is being drawn.
   pending: PendingShape | null
   // The path the Measure tool has so far, and what it says of it.
   measure: MeasureState | null
@@ -53,24 +49,57 @@ export interface RenderOptions {
   journeys?: JourneyView
 }
 
+// The land of a map: the base, then its biome shapes in their order.
+export function drawLand(ctx: CanvasRenderingContext2D, draft: MapDraft, biomes: BiomeIndex, view: MapView, layerId: string) {
+  const range = heightRangeOf(draft.level, draft.units)
+  const w = draft.width * view.zoom, h = draft.height * view.zoom
+  ctx.save()
+  ctx.fillStyle = resolveBiome(biomes, draft.base.biome).color
+  ctx.fillRect(view.x, view.y, w, h)
+  const baseTint = heightTint(draft.base.height, range)
+  if (baseTint !== 0) {
+    ctx.globalAlpha = Math.abs(baseTint)
+    ctx.fillStyle = baseTint > 0 ? '#ffffff' : '#000000'
+    ctx.fillRect(view.x, view.y, w, h)
+  }
+  ctx.restore()
+  // Each shape is shaded by the height it gives the land over the base (until heights are worked out point by point across shapes, a shape is one shade).
+  for (const s of draft.shapes) {
+    if (s.type !== 'biome' || s.layerId !== layerId) continue
+    if (!s.biome) {
+      // A shape that keeps the biome under it only changes the height: it lightens or darkens what is there.
+      const tint = heightTint(landHeight(draft.base.height, s, null) - draft.base.height, range)
+      if (tint !== 0) {
+        ctx.save()
+        ctx.globalAlpha = Math.min(1, Math.abs(tint))
+        drawBiomeShape(ctx, s, view, tint > 0 ? '#ffffff' : '#000000', 0)
+        ctx.restore()
+      }
+      continue
+    }
+    const biome = resolveBiome(biomes, s.biome)
+    drawBiomeShape(ctx, s, view, biome.color, heightTint(landHeight(draft.base.height, s, biome.group), range))
+  }
+}
+
 export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   const { width, height, dpr, view, draft } = o
-  const theme = themeDef(draft.theme)
+  const theme = mapStyle(draft.level)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
   const w = draft.width * view.zoom, h = draft.height * view.zoom
 
-  // The layers, bottom to top. Terrain is the bitmap (a hidden terrain layer leaves a faint wash so the map's size still shows).
+  // The layers, bottom to top. A hidden biomes layer leaves a faint wash so the map's size still shows.
   ctx.save()
   ctx.beginPath()
   ctx.rect(view.x, view.y, w, h)
   ctx.clip()
+  const shownLayers = new Set<string>()
   for (const layer of draft.layers) {
+    if (layer.visible) shownLayers.add(layer.id)
     if (layer.kind === 'terrain') {
-      if (layer.visible && o.bitmap) {
-        ctx.imageSmoothingEnabled = false
-        ctx.drawImage(o.bitmap, view.x, view.y, w, h)
-      } else if (!layer.visible) {
+      if (layer.visible) drawLand(ctx, draft, o.biomes, view, layer.id)
+      else {
         ctx.save()
         ctx.globalAlpha = 0.08
         ctx.fillStyle = o.ink
@@ -80,10 +109,14 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
     } else if (layer.kind === 'symbols' && layer.visible) {
       for (const s of draft.symbols) if (s.layerId === layer.id) drawSymbol(ctx, s, view, theme)
     } else if (layer.kind === 'shapes' && layer.visible) {
-      for (const sh of draft.shapes) if (sh.layerId === layer.id) drawShape(ctx, sh, view, theme)
+      for (const sh of draft.shapes) if (sh.layerId === layer.id && sh.type !== 'biome') drawShape(ctx, sh, view, theme)
     } else if (layer.kind === 'labels' && layer.visible) {
       for (const l of draft.labels) if (l.layerId === layer.id) drawLabel(ctx, l, view, theme)
     }
+  }
+  // The names of the areas that are places, over everything on the map.
+  for (const sh of draft.shapes) {
+    if (sh.type !== 'line' && sh.name && shownLayers.has(sh.layerId)) drawAreaName(ctx, sh.name, flatten(sh), view, theme)
   }
   ctx.restore()
   if (o.journeys) {
@@ -136,25 +169,4 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   }
   if (o.pending) drawPending(ctx, o.pending, view, theme)
   if (o.measure) drawMeasure(ctx, o.measure, view, theme, o.width)
-
-  if (o.brush.length > 0) {
-    ctx.save()
-    ctx.strokeStyle = theme.ink
-    ctx.lineWidth = 2
-    for (const [x, y] of o.brush) ctx.strokeRect(view.x + x * view.zoom + 1, view.y + y * view.zoom + 1, Math.max(1, view.zoom - 2), Math.max(1, view.zoom - 2))
-    ctx.restore()
-  }
-}
-
-// Make (or remake) the terrain bitmap for the draft; null when there is no canvas to draw on (no 2D context).
-export function renderTerrain(draft: MapDraft, into: HTMLCanvasElement | null): HTMLCanvasElement | null {
-  const canvas = into ?? document.createElement('canvas')
-  if (canvas.width !== draft.width) canvas.width = draft.width
-  if (canvas.height !== draft.height) canvas.height = draft.height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return null
-  const image = ctx.createImageData(draft.width, draft.height)
-  new Uint32Array(image.data.buffer).set(terrainPixels(draft))
-  ctx.putImageData(image, 0, 0)
-  return canvas
 }

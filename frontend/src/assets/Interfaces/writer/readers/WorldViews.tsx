@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FigureModel, MapDoc, ReaderCharacter } from '../../../../api/types'
+import type { FigureModel, MapBiome, MapDoc, ReaderCharacter } from '../../../../api/types'
 import { CharacterArt } from '../characters/figure/CharacterArt'
+import { STARTER_BIOMES, biomeIndex } from '../maps/mapBiomes'
 import { BASE_CELL_PX, renderMapImage } from '../maps/mapExport'
 import { draftOf } from '../maps/mapModel'
 import './readers.scss'
@@ -10,14 +11,16 @@ import './readers.scss'
 // The longest side of a map in pixels, as it is shown (a bigger map has smaller cells; the page scales it down to fit).
 const MAP_VIEW_PX = 960
 
-// The map drawn as it is exported: every layer, with the scale bar, compass and legend it has switched on.
-export function MapView({ doc }: { doc: MapDoc }) {
+// The map drawn as it is exported: every layer, with the scale bar, compass and legend it has switched on. `biomes` are the colours the book's edition froze
+// (the starter list fills in any biome it does not name, so a map always draws).
+export function MapView({ doc, biomes }: { doc: MapDoc; biomes?: Record<string, MapBiome> | null }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
   useEffect(() => {
     const draft = draftOf(doc)
     const scale = Math.min(1, MAP_VIEW_PX / (BASE_CELL_PX * Math.max(doc.width, doc.height)))
-    const out = renderMapImage(draft, scale, new Set(draft.layers.map(l => l.id)))
+    const index = biomeIndex(STARTER_BIOMES, Object.values(biomes ?? {}))
+    const out = renderMapImage(draft, index, scale, new Set(draft.layers.map(l => l.id)))
     const target = ref.current
     const ctx = target?.getContext('2d') ?? null
     if (!out || !target || !ctx) { setFailed(true); return }
@@ -25,7 +28,7 @@ export function MapView({ doc }: { doc: MapDoc }) {
     target.width = out.width
     target.height = out.height
     ctx.drawImage(out, 0, 0)
-  }, [doc])
+  }, [doc, biomes])
   if (failed) return <p className="rvHint" role="status">The map could not be drawn here.</p>
   return <canvas ref={ref} className="wvMap" role="img" aria-label={`Map: ${doc.title}`} />
 }

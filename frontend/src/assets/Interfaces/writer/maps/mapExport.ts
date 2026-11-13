@@ -1,6 +1,7 @@
-import { drawMap, renderTerrain } from './mapRender'
+import { drawMap } from './mapRender'
 import { legendEntries } from './mapItems'
-import { terrainCounts, type MapDraft } from './mapModel'
+import type { MapDraft } from './mapModel'
+import type { BiomeIndex } from './mapBiomes'
 
 // A map as a PNG image: the same drawing as on the canvas, at a size of its own (a cell is 16 pixels at 1x, 32 at 2x, 64 at 4x, held so that the longest side
 // stays within what a canvas can hold), without the grid or the editing marks, with the layers that were chosen and the scale bar, compass and legend the map
@@ -23,20 +24,20 @@ export function withLayers(draft: MapDraft, chosen: Set<string>): MapDraft {
   return { ...draft, layers: draft.layers.map(l => ({ ...l, visible: l.visible && chosen.has(l.id) })) }
 }
 
-// Draw the map on a new canvas (null when there is no 2D context to draw on).
-export function renderMapImage(draft: MapDraft, scale: number, chosenLayers: Set<string>, makeCanvas: () => HTMLCanvasElement = () => document.createElement('canvas')): HTMLCanvasElement | null {
+// Draw the map on a new canvas (null when there is no 2D context to draw on), with the biomes it is drawn with.
+export function renderMapImage(
+  draft: MapDraft, biomes: BiomeIndex, scale: number, chosenLayers: Set<string>, makeCanvas: () => HTMLCanvasElement = () => document.createElement('canvas'),
+): HTMLCanvasElement | null {
   const size = exportSize(draft.width, draft.height, scale)
   const shown = withLayers(draft, chosenLayers)
-  const bitmap = renderTerrain(shown, null)
   const canvas = makeCanvas()
   canvas.width = size.width
   canvas.height = size.height
   const ctx = canvas.getContext('2d')
-  if (!ctx || !bitmap) return null
-  const counts = shown.legend ? terrainCounts(shown.cells, shown.terrains.length) : []
+  if (!ctx) return null
   drawMap(ctx, {
-    width: size.width, height: size.height, dpr: 1, view: { zoom: size.cell, x: MARGIN, y: MARGIN }, draft: shown, bitmap, showGrid: false, ink: '#000000',
-    brush: [], selected: null, selectedNode: null, pending: null, measure: null, legend: shown.legend ? legendEntries(shown, counts) : null,
+    width: size.width, height: size.height, dpr: 1, view: { zoom: size.cell, x: MARGIN, y: MARGIN }, draft: shown, biomes, showGrid: false, ink: '#000000',
+    selected: null, selectedNode: null, pending: null, measure: null, legend: shown.legend ? legendEntries(shown, biomes) : null,
   })
   return canvas
 }
@@ -63,8 +64,8 @@ export function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-export async function exportMapImage(draft: MapDraft, scale: ExportScale, chosenLayers: Set<string>): Promise<'saved' | 'unavailable'> {
-  const canvas = renderMapImage(draft, scale, chosenLayers)
+export async function exportMapImage(draft: MapDraft, biomes: BiomeIndex, scale: ExportScale, chosenLayers: Set<string>): Promise<'saved' | 'unavailable'> {
+  const canvas = renderMapImage(draft, biomes, scale, chosenLayers)
   const blob = canvas ? await canvasToBlob(canvas) : null
   if (!blob) return 'unavailable'
   saveBlob(blob, imageFileName(draft.title, scale))
