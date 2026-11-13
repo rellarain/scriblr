@@ -43,6 +43,8 @@ _TERRAIN_BIOMES: dict[str, dict[str, tuple[str, float]]] = {
     "town": {"ground": ("dirt", 0.0), "road": ("paving", 0.0), "building": ("urban", 0.0), "park": ("plain", 0.0), "water": ("freshwater", 0.0)},
     "interior": {"void": ("outside", 0.0), "floor": ("wood", 0.0), "wall": ("stone", 0.0), "door": ("wood", 0.0), "water": ("freshwater", 0.0)},
 }
+# How the height of a lifted terrain spreads over its area: hills rise smoothly, mountains to a peak.
+_LIFT_PROFILE = {"hills": "hill", "mountains": "peak"}
 # The levels whose maps keep square corners (rooms, walls, streets) rather than smooth outlines.
 _SQUARE_LEVELS = ("local", "architectural", "interior")
 _MAX_POINTS_PER_MAP = 30000
@@ -282,18 +284,22 @@ def upgrade_map(doc: MapDoc, own: dict[str, MapBiome]) -> bool:
     # Each terrain of the palette as a biome and a lift.
     table = _TERRAIN_BIOMES.get(doc.kind, {})
     as_biome: list[tuple[str, float]] = []
+    profiles: list[str] = []
     for t in doc.terrains:
         known = table.get(t.id) if t.builtIn else None
         if known is not None:
             biome, lift = known
             as_biome.append((biome, round(lift * height_range)))
+            profiles.append(_LIFT_PROFILE.get(t.id, "plateau"))
         else:
             bid = own_biome_id(t.name or t.id, t.color)
             if bid not in own:
                 own[bid] = MapBiome(id=bid, name=(t.name or t.id)[:40], color=t.color, group="land")
             as_biome.append((bid, 0.0))
+            profiles.append("plateau")
     if not as_biome:
         as_biome = [(defaults.base, 0.0)]
+        profiles = ["plateau"]
 
     width, height = doc.width, doc.height
     total = width * height
@@ -369,7 +375,7 @@ def upgrade_map(doc: MapDoc, own: dict[str, MapBiome]) -> bool:
         points = [MapShapePoint(x=round(min(width, max(0.0, x)), 2), y=round(min(height, max(0.0, y)), 2), smooth=not square) for x, y in pts]
         traced.append(MapShape(
             id=sid, layerId=layer_id, type="biome", points=points, biome=biome,
-            heightMode="raise" if lift > 0 else "none", height=float(lift),
+            heightMode="raise" if lift > 0 else "none", height=float(lift), profile=profiles[areas[n][0]] if lift > 0 else "plateau",
         ))
     doc.shapes = traced + list(doc.shapes)
     doc.mapFormat = MAP_FORMAT

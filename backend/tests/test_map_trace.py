@@ -123,6 +123,8 @@ def test_hills_and_mountains_lift_the_land() -> None:
     by_biome = {s.biome: s for s in doc.shapes}
     assert (by_biome["plain"].heightMode, by_biome["plain"].height) == ("raise", 480.0)   # 6% of the 8,000 m range
     assert (by_biome["rocky"].heightMode, by_biome["rocky"].height) == ("raise", 3200.0)  # 40%
+    # Hills rise smoothly, mountains to a peak.
+    assert (by_biome["plain"].profile, by_biome["rocky"].profile) == ("hill", "peak")
 
 
 def test_the_authors_own_terrain_becomes_a_project_biome_and_a_recoloured_one_too() -> None:

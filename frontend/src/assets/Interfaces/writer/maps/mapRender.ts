@@ -5,24 +5,31 @@ import type { MapShape } from '../../../../api/types'
 import { findItem, type ItemRef, type LegendEntry } from './mapItems'
 import type { MapDraft } from './mapModel'
 import { resolveBiome, type BiomeIndex } from './mapBiomes'
-import { landHeight } from './mapHeights'
-import { heightRangeOf } from './mapLevels'
+import { MAX_TINT, contoursOf, heightTint, keptWithHeights, mapHeightRange, shadePixels, type ContourSegment } from './mapHeights'
 import { flatten } from './mapShapes'
-import { hexToRgb, mapStyle } from './mapThemes'
+import { hexToRgb, mapStyle, type MapThemeDef } from './mapThemes'
 import { GRID_MIN_ZOOM, type MapView } from './mapView'
 
-// Drawing a map on a canvas: the land (the base biome, then the biome shapes in their order, each in its biome's colour, lighter where it is higher and
-// darker where it is lower), then the layers above it in their order (lines and regions, symbols, labels), the names of the areas that are places, the grid,
-// the scale bar, compass and legend. The colours of the land are the biomes' (data); the frame round the map takes the ink colour of the page it is on.
+// Drawing a map on a canvas: the land (the base biome, then the biome shapes in their order, each in its biome's colour; then the shading of the heights
+// over it, lighter where it is higher and darker where it is lower, with relief and contour lines when the map has them on), then the layers above it in
+// their order (lines and regions, symbols, labels), the names of the areas that are places, the grid, the scale bar, compass and legend. The colours of the
+// land are the biomes' (data); the frame round the map takes the ink colour of the page it is on.
 
-export { hexToRgb }
+export { hexToRgb, MAX_TINT, heightTint }
 
-// How much lighter (above sea level, > 0) or darker (below, < 0) a height makes its biome's colour: up to 0.55 at the map's height range.
-export const MAX_TINT = 0.55
-export function heightTint(height: number, range: number): number {
-  if (!(range > 0) || !Number.isFinite(height) || height === 0) return 0
-  return Math.max(-1, Math.min(1, height / range)) * MAX_TINT
+// A canvas of a size, to draw the shading on (none in a place with no DOM, such as the tests in node: the land is then drawn without its shading).
+export type MakeCanvas = (width: number, height: number) => HTMLCanvasElement | null
+const domCanvas: MakeCanvas = (width, height) => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = width
+  c.height = height
+  return c
 }
+
+// The neutral land of the Nations view: water stays a pale blue, everything else a pale paper, so the nations' colours read over it.
+export const NATIONS_LAND = '#ebe6dc'
+export const NATIONS_WATER = '#c3d3e2'
 
 export interface RenderOptions {
   // CSS pixels of the canvas and the device pixel ratio it is drawn at.
@@ -47,39 +54,72 @@ export interface RenderOptions {
   legend: LegendEntry[] | null
   // The journeys of characters over the map (none when not given).
   journeys?: JourneyView
+  // The Nations view: the land in neutral colours and the political areas filled in their own (planetary to regional maps).
+  nations?: boolean
+  // Where the shading image is drawn (the page's own canvas when not given).
+  makeCanvas?: MakeCanvas
 }
 
-// The land of a map: the base, then its biome shapes in their order.
-export function drawLand(ctx: CanvasRenderingContext2D, draft: MapDraft, biomes: BiomeIndex, view: MapView, layerId: string) {
-  const range = heightRangeOf(draft.level, draft.units)
-  const w = draft.width * view.zoom, h = draft.height * view.zoom
+// The image of the shading of a draft's heights (cached with the heights): one pixel a sample, drawn stretched over the map, smoothed.
+function shadeImage(draft: MapDraft, biomes: BiomeIndex, makeCanvas: MakeCanvas): HTMLCanvasElement | null {
+  const relief = Boolean(draft.relief)
+  return keptWithHeights(draft, biomes, `shade:${relief}`, grid => {
+    const canvas = makeCanvas(grid.w, grid.h)
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return null
+    const img = ctx.createImageData(grid.w, grid.h)
+    img.data.set(shadePixels(grid, mapHeightRange(draft), relief))
+    ctx.putImageData(img, 0, 0)
+    return canvas
+  })
+}
+
+// The contour lines over the land: thin lines in the ink, every fifth (and sea level) a little stronger.
+function drawContours(ctx: CanvasRenderingContext2D, segments: ContourSegment[], view: MapView, theme: MapThemeDef) {
+  if (segments.length === 0) return
   ctx.save()
-  ctx.fillStyle = resolveBiome(biomes, draft.base.biome).color
-  ctx.fillRect(view.x, view.y, w, h)
-  const baseTint = heightTint(draft.base.height, range)
-  if (baseTint !== 0) {
-    ctx.globalAlpha = Math.abs(baseTint)
-    ctx.fillStyle = baseTint > 0 ? '#ffffff' : '#000000'
-    ctx.fillRect(view.x, view.y, w, h)
+  ctx.strokeStyle = theme.ink
+  ctx.lineCap = 'round'
+  for (const index of [false, true]) {
+    ctx.globalAlpha = index ? 0.5 : 0.25
+    ctx.lineWidth = index ? 1.3 : 0.8
+    ctx.beginPath()
+    for (const g of segments) {
+      if (g.index !== index) continue
+      ctx.moveTo(view.x + g.x1 * view.zoom, view.y + g.y1 * view.zoom)
+      ctx.lineTo(view.x + g.x2 * view.zoom, view.y + g.y2 * view.zoom)
+    }
+    ctx.stroke()
   }
   ctx.restore()
-  // Each shape is shaded by the height it gives the land over the base (until heights are worked out point by point across shapes, a shape is one shade).
-  for (const s of draft.shapes) {
-    if (s.type !== 'biome' || s.layerId !== layerId) continue
-    if (!s.biome) {
-      // A shape that keeps the biome under it only changes the height: it lightens or darkens what is there.
-      const tint = heightTint(landHeight(draft.base.height, s, null) - draft.base.height, range)
-      if (tint !== 0) {
-        ctx.save()
-        ctx.globalAlpha = Math.min(1, Math.abs(tint))
-        drawBiomeShape(ctx, s, view, tint > 0 ? '#ffffff' : '#000000', 0)
-        ctx.restore()
-      }
-      continue
-    }
-    const biome = resolveBiome(biomes, s.biome)
-    drawBiomeShape(ctx, s, view, biome.color, heightTint(landHeight(draft.base.height, s, biome.group), range))
+}
+
+// The land of a map: the base, then its biome shapes in their order, each in its biome's colour (a shape with no biome of its own changes only the height),
+// then the shading of the heights over it all, and the contour lines. In the Nations view the land is neutral and has no shading.
+export function drawLand(ctx: CanvasRenderingContext2D, draft: MapDraft, biomes: BiomeIndex, view: MapView, layerId: string, opts: { nations?: boolean; makeCanvas?: MakeCanvas; theme?: MapThemeDef } = {}) {
+  const w = draft.width * view.zoom, h = draft.height * view.zoom
+  const colourOf = (id: string) => {
+    const b = resolveBiome(biomes, id)
+    if (!opts.nations) return b.color
+    return b.group === 'water' ? NATIONS_WATER : b.group === 'land' ? NATIONS_LAND : b.color
   }
+  ctx.save()
+  ctx.fillStyle = colourOf(draft.base.biome)
+  ctx.fillRect(view.x, view.y, w, h)
+  ctx.restore()
+  for (const s of draft.shapes) {
+    if (s.type !== 'biome' || s.layerId !== layerId || !s.biome) continue
+    drawBiomeShape(ctx, s, view, colourOf(s.biome))
+  }
+  if (opts.nations || mapHeightRange(draft) <= 0) return
+  const shade = shadeImage(draft, biomes, opts.makeCanvas ?? domCanvas)
+  if (shade) {
+    ctx.save()
+    ctx.imageSmoothingEnabled = true
+    ctx.drawImage(shade, view.x, view.y, w, h)
+    ctx.restore()
+  }
+  if (draft.contours) drawContours(ctx, contoursOf(draft, biomes), view, opts.theme ?? mapStyle(draft.level))
 }
 
 export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
@@ -98,7 +138,7 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   for (const layer of draft.layers) {
     if (layer.visible) shownLayers.add(layer.id)
     if (layer.kind === 'terrain') {
-      if (layer.visible) drawLand(ctx, draft, o.biomes, view, layer.id)
+      if (layer.visible) drawLand(ctx, draft, o.biomes, view, layer.id, { nations: o.nations, makeCanvas: o.makeCanvas, theme })
       else {
         ctx.save()
         ctx.globalAlpha = 0.08
@@ -109,7 +149,7 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
     } else if (layer.kind === 'symbols' && layer.visible) {
       for (const s of draft.symbols) if (s.layerId === layer.id) drawSymbol(ctx, s, view, theme)
     } else if (layer.kind === 'shapes' && layer.visible) {
-      for (const sh of draft.shapes) if (sh.layerId === layer.id && sh.type !== 'biome') drawShape(ctx, sh, view, theme)
+      for (const sh of draft.shapes) if (sh.layerId === layer.id && sh.type !== 'biome') drawShape(ctx, sh, view, theme, o.nations)
     } else if (layer.kind === 'labels' && layer.visible) {
       for (const l of draft.labels) if (l.layerId === layer.id) drawLabel(ctx, l, view, theme)
     }

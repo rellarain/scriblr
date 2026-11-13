@@ -48,6 +48,8 @@ export interface MapCanvasProps {
   // The journeys to draw, and a click of the Journey tool: a stop at a cell centre of the chosen journey (false when there is no journey chosen).
   journeys?: JourneyView
   onAddStop?: (x: number, y: number) => boolean
+  // The Nations view: the land neutral and the political areas filled in their own colours.
+  nations?: boolean
 }
 
 const FALLBACK_SIZE = { width: 800, height: 520 }
@@ -159,11 +161,11 @@ export default function MapCanvas(p: MapCanvasProps) {
         pending: pendingType && pendingRef.current.points.length > 0
           ? { type: pendingType, points: pendingRef.current.points, cursor: pendingRef.current.cursor, pen: d.pen, color: resolveBiome(d.biomes, d.biome).color }
           : null,
-        legend: d.draft.legend ? legendEntries(d.draft, d.biomes) : null,
+        legend: d.draft.legend ? legendEntries(d.draft, d.biomes, d.nations) : null, nations: d.nations,
       })
     })
   }, [])
-  useEffect(() => { draw() }, [draw, size, view, draft, p.biomes, p.biome, p.showGrid, p.tool, p.selected, p.pen, p.journeys, hover, node, pending, cursor, measure, measureCursor])
+  useEffect(() => { draw() }, [draw, size, p.nations, view, draft, p.biomes, p.biome, p.showGrid, p.tool, p.selected, p.pen, p.journeys, hover, node, pending, cursor, measure, measureCursor])
   useEffect(() => () => { if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0 } }, [])
 
   // The wheel zooms at the pointer (a listener of its own: React's wheel handler cannot stop the page scrolling).

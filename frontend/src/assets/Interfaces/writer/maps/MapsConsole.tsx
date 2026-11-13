@@ -14,10 +14,11 @@ import { VersionBar } from './VersionBar'
 import { addStop, journeysOf, whereAt } from './mapJourneys'
 import type { JourneyView } from './mapDrawJourneys'
 import { MapSide } from './MapSide'
-import { addBiomeShape, addLabel, addShape, addSymbol, findItem, removeItem, replaceShape, type ItemRef } from './mapItems'
+import { addBiomeShape, addLabel, addShape, addSymbol, findItem, removeItem, replaceShape, type AreaLook, type ItemRef } from './mapItems'
 import { mapPath } from './mapModel'
 import { offeredBiomes, resolveBiome, useBiomes } from './mapBiomes'
-import { landHeight } from './mapHeights'
+import { heightAt, heightsOf } from './mapHeights'
+import { POLITICAL_LEVELS } from './mapLevels'
 import { formatHeight } from './mapUnits'
 import { DEFAULT_LINE_PEN, DEFAULT_REGION_PEN, hitShape, type Pen } from './mapShapes'
 import { DEFAULT_SYMBOL_SIZE, symbolName } from './mapSymbols'
@@ -37,6 +38,16 @@ const TOOLS: Array<{ tool: MapTool; label: string; Icon: typeof BiomeIcon }> = [
   { tool: 'hand', label: 'Move the view', Icon: HandIcon },
 ]
 const NEW_LABEL_SIZE = 1.5
+
+// The view of a map, remembered on this computer for each map: its biomes, or its nations (planetary to regional maps).
+export type MapViewMode = 'biomes' | 'nations'
+const viewKey = (mapId: string) => `scriblr.maps.view.${mapId}`
+function readView(mapId: string): MapViewMode {
+  try { return localStorage.getItem(viewKey(mapId)) === 'nations' ? 'nations' : 'biomes' } catch { return 'biomes' }
+}
+function keepView(mapId: string, mode: MapViewMode) {
+  try { if (mode === 'nations') localStorage.setItem(viewKey(mapId), mode); else localStorage.removeItem(viewKey(mapId)) } catch { /* not kept */ }
+}
 
 // Project > Maps: the maps of the setting, each of a level (intergalactic down to interior). A list of maps (nested ones under the map they are in), the open
 // map as a canvas to draw biome areas, lines and regions on and to stamp symbols and place labels on (pan and zoom, a pointer that picks and moves things,
@@ -66,8 +77,11 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   const [tool, setTool] = useState<MapTool>('select')
   // The biome a new biome area is made in (one the map's level offers; the first it offers when this one is not).
   const [biome, setBiome] = useState('forest')
-  // New biome areas have curved points (smooth outlines) unless this is off.
+  // New biome areas have curved points (smooth outlines) unless this is off, and what they do to the height.
   const [biomeSmooth, setBiomeSmooth] = useState(true)
+  const [areaLook, setAreaLook] = useState<AreaLook>({ heightMode: 'none', height: 500, profile: 'hill', slope: 0 })
+  // The Biomes or Nations view of the open map.
+  const [viewMode, setViewMode] = useState<MapViewMode>('biomes')
   const [grid, setGrid] = useState(true)
   const [hoverAt, setHoverAt] = useState<[number, number] | null>(null)
   const [symbolKind, setSymbolKind] = useState('village')
@@ -90,7 +104,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
     // Only when the list has loaded (opening is not repeated after a map is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.status])
-  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })) }, [m.openId])
+  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })); setViewMode(m.openId ? readView(m.openId) : 'biomes') }, [m.openId])
   // A link from another console asked for a place: its map opens, and the place (a symbol or an area) is chosen on it.
   const wanted = useRef<{ mapId: string; placeId: string } | null>(null)
   const pickPlace = (doc: NonNullable<typeof draft>, placeId: string) => {
@@ -134,17 +148,14 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
 
   const penType = tool === 'region' ? 'region' : 'line'
   const pen = tool === 'biome' ? { ...regionPen, smooth: biomeSmooth } : penType === 'region' ? regionPen : linePen
-  // The land under the pointer: the topmost biome area there, or the base, and its height.
+  // The land under the pointer: the topmost biome area there with a biome, or the base, and the height there (none on a map of space or a building).
+  const nationsShown = Boolean(draft && POLITICAL_LEVELS.includes(draft.level) && viewMode === 'nations')
   const under = (() => {
     if (!hoverAt || !draft) return null
-    let height = draft.base.height
     let id = draft.base.biome
-    for (const s of draft.shapes) {
-      if (s.type !== 'biome' || !hitShape(s, hoverAt[0], hoverAt[1], 0)) continue
-      height = landHeight(height, s, s.biome ? resolveBiome(biomes.index, s.biome).group : null)
-      if (s.biome) id = s.biome
-    }
-    return { name: resolveBiome(biomes.index, id).name, height }
+    for (const s of draft.shapes) if (s.type === 'biome' && s.biome && hitShape(s, hoverAt[0], hoverAt[1], 0)) id = s.biome
+    const grid = heightsOf(draft, biomes.index)
+    return { name: resolveBiome(biomes.index, id).name, height: grid ? heightAt(grid, hoverAt[0], hoverAt[1]) : null }
   })()
 
   // Stamp a symbol, or put a label (which then takes the cursor in the side panel, ready to be given its text).
@@ -171,7 +182,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   function finishShape(type: 'line' | 'region' | 'biome', points: Array<[number, number]>): boolean {
     if (!draft) return false
     setBlocked(false)
-    const r = type === 'biome' ? addBiomeShape(draft, points, chosenBiome, biomeSmooth) : addShape(draft, type, points, type === 'region' ? regionPen : linePen)
+    const r = type === 'biome' ? addBiomeShape(draft, points, chosenBiome, biomeSmooth, undefined, areaLook) : addShape(draft, type, points, type === 'region' ? regionPen : linePen)
     if (!r || !m.apply(r.change)) return false
     setPicked({ kind: 'shape', id: r.id })
     setFresh(null)
@@ -194,7 +205,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   const hint = tool === 'line' || tool === 'region' || tool === 'biome' ? ' · click to add points, double-click or Enter to finish, Esc to cancel' : ''
   const shapeKind = (id: string) => ({ region: 'Region', line: 'Line', biome: 'Biome area' } as const)[draft?.shapes.find(s => s.id === id)?.type ?? 'line']
   const statusText = hover
-    ? `Cell ${hover[0] + 1}, ${hover[1] + 1}${under ? ` · ${under.name}, ${formatHeight(under.height, draft?.units)}` : ''}`
+    ? `Cell ${hover[0] + 1}, ${hover[1] + 1}${under ? ` · ${under.name}${under.height !== null ? `, ${formatHeight(under.height, draft?.units)}` : ''}` : ''}`
     : selected && draft
       ? (selected.kind === 'symbol' ? `${symbolName(draft.symbols.find(s => s.id === selected.id)?.kind ?? '')} chosen` : selected.kind === 'shape' ? `${shapeKind(selected.id)} chosen` : 'Label chosen')
       : `${draft?.width ?? 0} × ${draft?.height ?? 0} cells`
@@ -210,6 +221,17 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
             ))}
             <span className="mapSep" aria-hidden="true" />
             <button type="button" className="mapIconBtn" aria-pressed={grid} aria-label="Grid" title="Show the grid" onClick={() => setGrid(g => !g)}><GridLinesIcon size={18} /></button>
+            {POLITICAL_LEVELS.includes(draft.level) && (
+              <span className="mapViewSwitch" role="group" aria-label="View of the map">
+                {(['biomes', 'nations'] as const).map(mode => (
+                  <button
+                    key={mode} type="button" className="mapChip" aria-pressed={viewMode === mode}
+                    title={mode === 'biomes' ? 'The land in its biomes, shaded by height' : 'The nations, states and municipalities, each in its own colour'}
+                    onClick={() => { setViewMode(mode); keepView(draft.id, mode) }}
+                  >{mode === 'biomes' ? 'Biomes' : 'Nations'}</button>
+                ))}
+              </span>
+            )}
           </div>
         )}
         <SaveCluster
@@ -242,13 +264,14 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
                 onPlace={place} onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
                 onOpenPlace={id => { void m.open(id) }} onMeasure={setMeasured}
                 onHover={(cell, at) => { setHover(cell); setHoverAt(at ?? null) }} onBlocked={() => setBlocked(true)}
-                journeys={journeyView} onAddStop={addJourneyStop}
+                journeys={journeyView} onAddStop={addJourneyStop} nations={nationsShown}
               />
               <p className="mapStatus" aria-live="off">{tool === 'measure' && measured !== null ? `${measured} · click to add a point, Backspace takes one back, Esc clears` : `${statusText} · ${formatDistance(draft.width * draft.cellSize, draft.unit)} wide${tool === 'measure' ? ' · click to start measuring' : hint}`}</p>
             </div>
             <MapSide
               projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft}
               biomes={biomes} biome={chosenBiome} onBiome={id => { setBiome(id); setTool('biome') }} biomeSmooth={biomeSmooth} onBiomeSmooth={setBiomeSmooth}
+              areaLook={areaLook} onAreaLook={patch => setAreaLook(old => ({ ...old, ...patch }))}
               symbolKind={symbolKind} onSymbolKind={id => { setSymbolKind(id); setTool('symbol') }} symbolSize={symbolSize} onSymbolSize={setSymbolSize}
               pen={pen} penType={penType}
               onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}

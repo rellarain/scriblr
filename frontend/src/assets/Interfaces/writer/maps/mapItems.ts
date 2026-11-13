@@ -1,8 +1,11 @@
-import type { MapHeightMode, MapLabel, MapShape, MapShapeType, MapSymbol } from '../../../../api/types'
-import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeBiomeShape, makeShape, shapeBounds, type Pen } from './mapShapes'
+import { MAP_MAX_SLOPE, type MapHeightMode, type MapLabel, type MapShape, type MapShapeType, type MapSymbol } from '../../../../api/types'
+import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeBiomeShape, makeShape, nearestOnShape, shapeBounds, type Pen } from './mapShapes'
+import { mapHeightRange } from './mapHeights'
+import { heightUnit } from './mapUnits'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { biomeLayer, change, type Change, type MakeId, type MapDraft } from './mapModel'
 import { resolveBiome, usedBiomeIds, type BiomeIndex } from './mapBiomes'
+import { nationFill } from './mapDrawShapes'
 
 // The things on a map: biome shapes (the land, on the biomes layer), symbols (stamps), labels (text) and shapes (lines and regions, mapShapes.ts), each on
 // a layer of its kind. All pure: placing, moving, editing and removing return a new draft (and the undo entry), and the hit test, the legend and the scale
@@ -97,15 +100,27 @@ export function addShape(draft: MapDraft, type: MapShapeType, points: Array<[num
   return { change: change(draft, { shapes: [...draft.shapes, makeShape(id, layerId, type, held_, pen)] }), id }
 }
 
+// What a new biome area does to the height (the defaults of the Biomes panel): keeps it, or sets, raises or lowers it, spread by a profile.
+export type AreaLook = Partial<Pick<MapShape, 'heightMode' | 'height' | 'profile' | 'slope'>>
+
 // A biome shape (an area of land in a biome) from the points that were clicked, on the biomes layer, drawn over the biome shapes already there. None when
 // there are too few points, the biomes layer is hidden or locked, or the map has as many as it can hold.
-export function addBiomeShape(draft: MapDraft, points: Array<[number, number]>, biome: string | null, smooth: boolean, makeId: MakeId = randomId): { change: NonNullable<Change>; id: string } | null {
+export function addBiomeShape(
+  draft: MapDraft, points: Array<[number, number]>, biome: string | null, smooth: boolean, makeId: MakeId = randomId, look: AreaLook = {},
+): { change: NonNullable<Change>; id: string } | null {
   const layer = biomeLayer(draft)
   const count = draft.shapes.filter(s => s.type === 'biome').length
   if (!layer || count >= MAX_BIOME_SHAPES || points.length < MIN_POINTS.biome || points.length > MAX_POINTS) return null
   const held_ = points.map(([x, y]) => held(draft, x, y))
   const id = freshId('bio', placeIds(draft), makeId)
-  return { change: change(draft, { shapes: [...draft.shapes, makeBiomeShape(id, layer.id, held_, biome, smooth)] }), id }
+  const shape = makeBiomeShape(id, layer.id, held_, biome, smooth)
+  if (look.heightMode && look.heightMode !== 'none') {
+    shape.heightMode = look.heightMode
+    shape.height = clamp(Math.round(look.height ?? 0), look.heightMode === 'set' ? -HEIGHT_LIMIT : 0, HEIGHT_LIMIT)
+    shape.profile = look.profile ?? 'plateau'
+    shape.slope = clamp(look.slope ?? 0, 0, MAP_MAX_SLOPE)
+  }
+  return { change: change(draft, { shapes: [...draft.shapes, shape] }), id }
 }
 
 // A shape brought to the front of its layer (drawn last, on top of the others) or sent to the back.
@@ -135,7 +150,7 @@ export function withShape(draft: MapDraft, shape: MapShape): MapDraft {
 
 export function editShape(
   draft: MapDraft, id: string,
-  fields: Partial<Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern' | 'biome' | 'heightMode' | 'height'>>,
+  fields: Partial<Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern' | 'biome' | 'heightMode' | 'height' | 'profile' | 'slope' | 'political'>>,
 ): Change {
   const old = draft.shapes.find(s => s.id === id)
   if (!old) return null
@@ -150,7 +165,10 @@ export function editShape(
     if (fields.biome !== undefined) next.biome = fields.biome
     if (fields.heightMode !== undefined) next.heightMode = fields.heightMode as MapHeightMode
     if (fields.height !== undefined && Number.isFinite(fields.height)) next.height = clamp(Math.round(fields.height), -HEIGHT_LIMIT, HEIGHT_LIMIT)
+    if (fields.profile !== undefined) next.profile = fields.profile
+    if (fields.slope !== undefined && Number.isFinite(fields.slope)) next.slope = clamp(Math.round(fields.slope * 10) / 10, 0, MAP_MAX_SLOPE)
   }
+  if (old.type === 'region' && fields.political !== undefined) next.political = fields.political
   const same = (Object.keys(next) as Array<keyof MapShape>).every(k => k === 'points' || next[k] === old[k])
   return same ? null : change(draft, { shapes: draft.shapes.map(s => (s.id === id ? next : s)) })
 }
@@ -276,7 +294,10 @@ export function hitItem(draft: MapDraft, x: number, y: number, slack = 0.3): Ite
     } else if (layer.kind === 'shapes') {
       for (let n = draft.shapes.length - 1; n >= 0; n -= 1) {
         const sh = draft.shapes[n]
-        if (sh.type !== 'biome' && sh.layerId === layer.id && hitShape(sh, x, y, slack)) return { kind: 'shape', id: sh.id }
+        if (sh.type === 'biome' || sh.layerId !== layer.id) continue
+        // A political area is only its border over the land: it is picked by its border, so the land inside it can still be picked.
+        const hit = sh.political ? (nearestOnShape(sh, x, y)?.dist ?? Infinity) <= sh.width / 2 + slack : hitShape(sh, x, y, slack)
+        if (hit) return { kind: 'shape', id: sh.id }
       }
     } else if (layer.kind === 'labels') {
       for (let n = draft.labels.length - 1; n >= 0; n -= 1) {
@@ -292,16 +313,32 @@ export function hitItem(draft: MapDraft, x: number, y: number, slack = 0.3): Ite
 
 // ---- the legend ----
 
-export type LegendEntry = { type: 'terrain'; name: string; color: string } | { type: 'symbol'; kind: string; name: string }
+export type LegendEntry =
+  | { type: 'terrain'; name: string; color: string }
+  | { type: 'symbol'; kind: string; name: string }
+  // The height scale: the darkest depth to the lightest height, in the map's height unit.
+  | { type: 'heights'; name: string; low: number; high: number; unit: string }
 
 // What the legend lists: the biomes the map is drawn with (its base and its biome shapes, in the biome list's order), then the kinds of symbol that are on
-// it, in the library's order (a kind the library does not have goes last under its own name).
-export function legendEntries(draft: Pick<MapDraft, 'base' | 'shapes' | 'symbols' | 'layers'>, biomes: BiomeIndex): LegendEntry[] {
+// it, in the library's order (a kind the library does not have goes last under its own name), then the height scale of a map shaded by height.
+export function legendEntries(draft: Pick<MapDraft, 'base' | 'shapes' | 'symbols' | 'layers' | 'level' | 'units' | 'heightRange'>, biomes: BiomeIndex, nations = false): LegendEntry[] {
   const out: LegendEntry[] = []
+  // The Nations view: the political areas that are shown, nations first, each in the colour it is filled with, then the symbols; no biomes, no heights.
+  if (nations) {
+    const shown = new Set(draft.layers.filter(l => l.kind === 'shapes' && l.visible).map(l => l.id))
+    const rank = { nation: 0, state: 1, municipality: 2 } as const
+    const areas = draft.shapes.filter(s => s.type === 'region' && s.political && shown.has(s.layerId))
+      .map((s, n) => ({ s, n })).sort((a, b) => rank[a.s.political!] - rank[b.s.political!] || a.n - b.n)
+    for (const { s } of areas) out.push({ type: 'terrain', name: s.name?.trim() || (s.political === 'nation' ? 'A nation' : s.political === 'state' ? 'A state or province' : 'A municipality'), color: nationFill(s) })
+    out.push(...symbolEntries(draft))
+    return out
+  }
   const used = new Set(usedBiomeIds(draft))
   for (const b of biomes.values()) if (used.delete(b.id)) out.push({ type: 'terrain', name: b.name, color: b.color })
   for (const id of used) { const b = resolveBiome(biomes, id); out.push({ type: 'terrain', name: b.name, color: b.color }) }
   out.push(...symbolEntries(draft))
+  const range = mapHeightRange(draft)
+  if (range > 0) out.push({ type: 'heights', name: 'Height', low: -Math.round(range), high: Math.round(range), unit: heightUnit(draft.units) })
   return out
 }
 

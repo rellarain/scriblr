@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
-  MAP_MAX_PROJECT_BIOMES, MAP_MAX_SIDE, type MapBiome, type MapHeightMode, type MapLevel, type MapUnits, type OutlineNode, type PlotNode, type MapSummary, type MapLayerKind,
+  MAP_MAX_HEIGHT_RANGE, MAP_MAX_PROJECT_BIOMES, MAP_MAX_SIDE, MAP_MAX_SLOPE, type MapBiome, type MapHeightMode, type MapLevel, type MapPolitical, type MapProfile, type MapUnits, type OutlineNode, type PlotNode, type MapSummary, type MapLayerKind,
   type MapLineStyle, type MapPattern, type MapShape, type MapShapeType,
 } from '../../../../api/types'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, FolderPlusIcon, ImageIcon, LockIcon, MapIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
 import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
 import {
-  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, SYMBOL_SIZE_RANGE, addPlaces, editLabel, editPlace, editShape, editSymbol, findItem, moveShapeOrder, placeKey,
+  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, SYMBOL_SIZE_RANGE, addPlaces, editLabel, editPlace, editShape, editSymbol, findItem, moveShapeOrder, placeKey, type AreaLook,
   placeOf, removeItem, replaceShape, type ItemRef,
 } from './mapItems'
 import { looksLikePlaceKey } from './placesStore'
@@ -15,11 +15,11 @@ import type { ScenePlace } from './MapsConsole'
 import { LINE_PRESETS, LINE_STYLES, PATTERNS, REGION_PRESETS, SHAPE_WIDTH_RANGE, setAllSmooth, type Pen } from './mapShapes'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { biomeCounts, offeredBiomes, ownBiomeId, resolveBiome, saveOwnBiomes, type BiomesView } from './mapBiomes'
-import { LEVELS, defaultsFor, levelDef, levelsBelow, nextLevelDown } from './mapLevels'
+import { LEVELS, defaultsFor, heightRangeOf, levelDef, levelsBelow, nextLevelDown } from './mapLevels'
 import { heightUnit, roundNice, unitsOf, type ConvertMode } from './mapUnits'
 import {
   LAYER_NAMES, MAP_TITLE_MAX, addLayer, moveLayer, removeLayer, renameLayer, resize, setScale, setTitle,
-  descendantIds, setAppliesFrom, setBase, setLevel, setOverlay, setPace, setParent, setUnits, toggleLayer, type MapDraft,
+  descendantIds, setAppliesFrom, setBase, setHeightRange, setLevel, setOverlay, setPace, setParent, setUnits, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
 import { ForReadersPanel } from './ForReadersPanel'
@@ -34,6 +34,15 @@ const NEW_BIOME_COLOURS = ['#c06c84', '#6c9bd2', '#d9a441', '#7a5c8e', '#4fa89a'
 const LAYER_KINDS: Array<Exclude<MapLayerKind, 'terrain'>> = ['shapes', 'symbols', 'labels', 'notes']
 const HEIGHT_MODES: Array<{ id: MapHeightMode; name: string }> = [
   { id: 'none', name: 'Keeps the height' }, { id: 'raise', name: 'Raises the land' }, { id: 'lower', name: 'Lowers the land' }, { id: 'set', name: 'Sets the height' },
+]
+const PROFILES: Array<{ id: MapProfile; name: string; title: string }> = [
+  { id: 'plateau', name: 'Plateau', title: 'Flat on top, with a ramp at the edge as wide as the slope (none: a step)' },
+  { id: 'hill', name: 'Hill', title: 'A smooth rise over the slope (0: to the middle of the area)' },
+  { id: 'peak', name: 'Peak', title: 'Rising straight to the middle of the area' },
+  { id: 'basin', name: 'Basin', title: 'Steep at the edge and flat in the middle: a bowl when it lowers the land' },
+]
+const POLITICAL: Array<{ id: MapPolitical | ''; name: string }> = [
+  { id: '', name: 'No: an ordinary region' }, { id: 'nation', name: 'A nation' }, { id: 'state', name: 'A state or province' }, { id: 'municipality', name: 'A municipality' },
 ]
 const UNIT_SYSTEMS: Array<{ id: MapUnits; name: string }> = [{ id: 'metric', name: 'Metric' }, { id: 'imperial', name: 'Imperial' }, { id: 'custom', name: 'Custom' }]
 
@@ -58,6 +67,9 @@ export interface MapSideProps {
   onBiome: (id: string) => void
   biomeSmooth: boolean
   onBiomeSmooth: (on: boolean) => void
+  // What a new biome area does to the height.
+  areaLook: AreaLook
+  onAreaLook: (patch: AreaLook) => void
   // The symbol that the Symbol tool stamps, and how wide a new one is.
   symbolKind: string
   onSymbolKind: (id: string) => void
@@ -85,7 +97,7 @@ export function MapSide(p: MapSideProps) {
     <aside className="mapSide" aria-label="Map details">
       {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} biomes={p.biomes} />}
       <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
-      <BiomesPanel projectId={projectId} m={m} draft={draft} biomes={p.biomes} biome={p.biome} onBiome={p.onBiome} smooth={p.biomeSmooth} onSmooth={p.onBiomeSmooth} />
+      <BiomesPanel projectId={projectId} m={m} draft={draft} biomes={p.biomes} biome={p.biome} onBiome={p.onBiome} smooth={p.biomeSmooth} onSmooth={p.onBiomeSmooth} look={p.areaLook} onLook={p.onAreaLook} />
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
       <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
       <LayerPanel m={m} draft={draft} />
@@ -142,6 +154,23 @@ function ShapeFields({ type, value, onChange }: { type: MapShapeType; value: Sha
   )
 }
 
+// How a height change spreads over an area: its profile (chips) and how far in from the edge the slope reaches.
+function ProfileFields({ value, onChange }: { value: AreaLook; onChange: (patch: AreaLook) => void }) {
+  const profile = value.profile ?? 'plateau'
+  return (
+    <>
+      <div className="mapSizes" role="group" aria-label="Profile of the height">
+        {PROFILES.map(pr => <button key={pr.id} type="button" className="mapChip" aria-pressed={profile === pr.id} title={pr.title} onClick={() => onChange({ profile: pr.id })}>{pr.name}</button>)}
+      </div>
+      {profile !== 'peak' && (
+        <Field label="Slope (cells)" short>
+          <CommitNumber label="How far in from the edge the slope reaches, in cells" value={value.slope ?? 0} min={0} max={MAP_MAX_SLOPE} step={0.5} onCommit={slope => onChange({ slope })} />
+        </Field>
+      )}
+    </>
+  )
+}
+
 // The pen: what a new line or region is drawn with. A preset sets it and picks the tool; the fields below change it.
 function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapShapeType; onPen: (patch: Partial<Pen>) => void; onPreset: (type: MapShapeType, pen: Pen) => void }) {
   return (
@@ -155,9 +184,22 @@ function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapSha
       </div>
       <h4 className="mapSubTitle">New {penType === 'region' ? 'regions' : 'lines'}</h4>
       <ShapeFields type={penType} value={pen} onChange={onPen} />
+      {penType === 'region' && <PoliticalField value={pen.political ?? null} onChange={political => onPen({ political })} />}
       <label className="mapCheck"><input type="checkbox" checked={pen.smooth} onChange={e => onPen({ smooth: e.target.checked })} />Curve the points</label>
       <p className="mapHint">Click to add points; double-click or Enter finishes, Escape cancels. Points snap to grid corners and cell centres; Alt: no snapping.</p>
     </section>
+  )
+}
+
+// Whether a region is a political area: a nation, a state or province, or a municipality (its border and name over the land; filled in its own colour in
+// the Nations view of planetary to regional maps).
+function PoliticalField({ value, onChange }: { value: MapPolitical | null; onChange: (value: MapPolitical | null) => void }) {
+  return (
+    <Field label="Political area">
+      <select className="mapSelect" aria-label="Political area" value={value ?? ''} onChange={e => onChange((e.target.value || null) as MapPolitical | null)}>
+        {POLITICAL.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+      </select>
+    </Field>
   )
 }
 
@@ -398,9 +440,12 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
               </select>
             </Field>
             {(sh.heightMode ?? 'none') !== 'none' && (
-              <Field label={sh.heightMode === 'set' ? `Height (${unit})` : `By (${unit})`} short>
-                <CommitNumber label={`Height in ${unit === 'm' ? 'metres' : 'feet'}`} value={sh.height ?? 0} min={sh.heightMode === 'set' ? -HEIGHT_LIMIT : 0} max={HEIGHT_LIMIT} step={unit === 'm' ? 50 : 100} onCommit={height => m.apply(editShape(draft, sh.id, { height }))} />
-              </Field>
+              <>
+                <Field label={sh.heightMode === 'set' ? `Height (${unit})` : `By (${unit})`} short>
+                  <CommitNumber label={`Height in ${unit === 'm' ? 'metres' : 'feet'}`} value={sh.height ?? 0} min={sh.heightMode === 'set' ? -HEIGHT_LIMIT : 0} max={HEIGHT_LIMIT} step={unit === 'm' ? 50 : 100} onCommit={height => m.apply(editShape(draft, sh.id, { height }))} />
+                </Field>
+                <ProfileFields value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
+              </>
             )}
           </div>
           {order}
@@ -418,6 +463,7 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
           <button type="button" className="mapIconBtn" aria-label={`Delete the ${kind}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
         </header>
         <ShapeFields type={sh.type} value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
+        {sh.type === 'region' && <PoliticalField value={sh.political ?? null} onChange={political => m.apply(editShape(draft, sh.id, { political }))} />}
         {order}
         {curves}
         {sh.type === 'region' && place}
@@ -467,7 +513,7 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
 // The biomes: what lies under everything (the base, a biome and its height), the biomes the map's level offers (choosing one draws a biome area in it),
 // and the project's own biomes (added here, renamed and recoloured; one a map still uses is kept, no longer offered, when it is removed). The admin's
 // biomes and their colours are set in Configuration > Maps.
-function BiomesPanel({ projectId, m, draft, biomes, biome, onBiome, smooth, onSmooth }: { projectId: string; m: Maps; draft: MapDraft; biomes: BiomesView; biome: string; onBiome: (id: string) => void; smooth: boolean; onSmooth: (on: boolean) => void }) {
+function BiomesPanel({ projectId, m, draft, biomes, biome, onBiome, smooth, onSmooth, look, onLook }: { projectId: string; m: Maps; draft: MapDraft; biomes: BiomesView; biome: string; onBiome: (id: string) => void; smooth: boolean; onSmooth: (on: boolean) => void; look: AreaLook; onLook: (patch: AreaLook) => void }) {
   const offered = offeredBiomes(biomes.index, draft.level)
   const counts = useMemo(() => biomeCounts(draft), [draft])
   const own = biomes.own.filter(b => !b.retired)
@@ -553,6 +599,23 @@ function BiomesPanel({ projectId, m, draft, biomes, biome, onBiome, smooth, onSm
         </div>
       )}
       <label className="mapCheck"><input type="checkbox" checked={smooth} onChange={e => onSmooth(e.target.checked)} />Curve the points of new areas</label>
+      {levelDef(draft.level).drawn === 'biomes' && (
+        <div className="mapFields" role="group" aria-label="What new areas do to the height">
+          <Field label="New areas">
+            <select className="mapSelect" aria-label="What a new area does to the height" value={look.heightMode ?? 'none'} onChange={e => onLook({ heightMode: e.target.value as MapHeightMode })}>
+              {HEIGHT_MODES.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+          </Field>
+          {(look.heightMode ?? 'none') !== 'none' && (
+            <>
+              <Field label={look.heightMode === 'set' ? `Height (${unit})` : `By (${unit})`} short>
+                <CommitNumber label={`Height of a new area in ${unit === 'm' ? 'metres' : 'feet'}`} value={look.height ?? 0} min={look.heightMode === 'set' ? -HEIGHT_LIMIT : 0} max={HEIGHT_LIMIT} step={unit === 'm' ? 50 : 100} onCommit={height => onLook({ height })} />
+              </Field>
+              <ProfileFields value={look} onChange={onLook} />
+            </>
+          )}
+        </div>
+      )}
       <p className="mapHint">Choose a biome, then click on the map to draw its outline; double-click or Enter finishes. Later areas lie over earlier ones. Higher land is drawn lighter, lower land darker.</p>
     </section>
   )
@@ -682,9 +745,24 @@ function MapFieldsPanel({ m, draft, points }: { m: Maps; draft: MapDraft; points
             <span className="mapHint">{draft.unit} (0: not set)</span>
           </span>
         </Field>
+        {levelDef(draft.level).drawn === 'biomes' && (
+          <Field label={`Height range (${heightUnit(draft.units)})`} short>
+            <span className="mapRow">
+              <CommitNumber
+                label={`The height drawn lightest (the same depth darkest), in ${heightUnit(draft.units) === 'm' ? 'metres' : 'feet'}`}
+                value={draft.heightRange ?? Math.round(heightRangeOf(draft.level, draft.units))} min={1} max={MAP_MAX_HEIGHT_RANGE} step={heightUnit(draft.units) === 'm' ? 100 : 500}
+                onCommit={n => m.apply(setHeightRange(draft, n))}
+              />
+              <button type="button" className="mapIconBtn" aria-label="Use the height range of the level" title="Use the height range of the level" disabled={!draft.heightRange} onClick={() => m.apply(setHeightRange(draft, null))}><RestoreIcon size={16} /></button>
+            </span>
+          </Field>
+        )}
         <div className="mapChecks" role="group" aria-label="Drawn over the map">
           {([['scaleBar', 'Scale bar'], ['compass', 'Compass'], ['legend', 'Legend']] as const).map(([field, label]) => (
             <label key={field} className="mapCheck"><input type="checkbox" checked={draft[field]} onChange={e => m.apply(setOverlay(draft, field, e.target.checked))} />{label}</label>
+          ))}
+          {levelDef(draft.level).drawn === 'biomes' && ([['contours', 'Contour lines'], ['relief', 'Relief']] as const).map(([field, label]) => (
+            <label key={field} className="mapCheck"><input type="checkbox" checked={Boolean(draft[field])} onChange={e => m.apply(setOverlay(draft, field, e.target.checked))} />{label}</label>
           ))}
         </div>
         <p className="mapHint">The map covers {roundNice(draft.width * draft.cellSize)} × {roundNice(draft.height * draft.cellSize)} {draft.unit}. The grid shows the scale; a new size keeps every shape where it is.</p>

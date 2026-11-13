@@ -471,6 +471,11 @@ export type MapShapeType = 'line' | 'region' | 'biome'
 export type MapLineStyle = 'solid' | 'dashed' | 'dotted' | 'road' | 'wall' | 'fence'
 export type MapPattern = 'solid' | 'hatch' | 'cross' | 'dots'
 export type MapHeightMode = 'none' | 'raise' | 'lower' | 'set'
+// How a biome shape's height change spreads over it (see mapHeights.ts), and the political areas a region can be.
+export type MapProfile = 'plateau' | 'hill' | 'peak' | 'basin'
+export type MapPolitical = 'nation' | 'state' | 'municipality'
+export const MAP_MAX_SLOPE = 64
+export const MAP_MAX_HEIGHT_RANGE = 100000
 // A line (a river, a road, a border, a wall, a fence), a region (a closed outline, filled over the land) or a biome shape (a closed outline on the biomes
 // layer: the land itself, in its biome's colour, lifted or sunk by its height). `color` is the line's (null = the ink), `width` is in cells; a region's
 // `fill` is null for the line colour, with how solid it is and a pattern over it. A region or biome shape with a `name` is a place; `mapIds` open from it.
@@ -480,6 +485,10 @@ export interface MapShape {
   fill: string | null; opacity: number; pattern: MapPattern
   // A biome shape's biome (null = keeps the biome under it), and what it does to the height under it (by `height`, in the map's height unit).
   biome?: string | null; heightMode?: MapHeightMode; height?: number
+  // How the height change spreads (absent = plateau), and how far in from the edge the slope reaches, in cells (0 = the whole shape for a hill).
+  profile?: MapProfile; slope?: number
+  // A region that is a nation, a state or province, or a municipality (null or absent = an ordinary region).
+  political?: MapPolitical | null
   name?: string; mapIds?: string[]
 }
 export interface MapDoc {
@@ -513,6 +522,10 @@ export interface MapDoc {
   scaleBar: boolean
   compass: boolean
   legend: boolean
+  // The height that reads lightest (the same depth darkest), in the map's height unit (null or absent = the level's); contour lines and relief shading.
+  heightRange?: number | null
+  contours?: boolean
+  relief?: boolean
   // What readers may see of the map (absent = nothing).
   reader?: ReaderShare
   // A version of another map as it is later in the story: the map it is a version of, and the outline chapter or scene from which it is the true one (absent = not a version).

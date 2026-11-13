@@ -26,6 +26,8 @@ const doc = (): MapDoc => ({
 const draft = (): MapDraft => draftOf(doc())
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }
 
+
+const presetPen = (id: string) => REGION_PRESETS.find(p => p.id === id)!.pen
 describe('the curve of a shape', () => {
   it('is straight between corners', () => {
     const segs = segmentsOf(line([0, 0], [4, 0], [4, 3]))
@@ -264,7 +266,7 @@ describe('shapes on the map', () => {
   })
 
   it('changes a shape\'s style, colour, width, fill, opacity and pattern, holding numbers to their ranges', () => {
-    const d = addShape(draft(), 'region', [[1, 1], [4, 1], [4, 4]], REGION_PRESETS[0].pen, ids('a'))!.change.draft
+    const d = addShape(draft(), 'region', [[1, 1], [4, 1], [4, 4]], presetPen('territory'), ids('a'))!.change.draft
     const edit = (f: Parameters<typeof editShape>[2]) => editShape(d, 'shp_a', f)
     expect(edit({ style: 'wall' })!.draft.shapes[0].style).toBe('wall')
     expect(edit({ color: null })!.draft.shapes[0].color).toBeNull()
@@ -313,9 +315,20 @@ describe('shapes on the map', () => {
     expect(hitItem(d, 5, 5.2)).toEqual({ kind: 'symbol', id: 'sym_1' })
   })
 
+  it('makes political areas from the Nation, State and Municipality pens, picked only by their border', () => {
+    let d = addShape(draft(), 'region', [[1, 1], [9, 1], [9, 9], [1, 9]], presetPen('nation'), ids('a'))!.change.draft
+    expect(d.shapes[0].political).toBe('nation')
+    expect(hitItem(d, 5, 5)).toBeNull()
+    expect(hitItem(d, 5, 1.05)).toEqual({ kind: 'shape', id: 'shp_a' })
+    d = addShape(d, 'region', [[2, 2], [4, 2], [4, 4]], presetPen('water'), ids('b'))!.change.draft
+    expect(d.shapes[1].political).toBeUndefined()
+    expect(editShape(d, 'shp_b', { political: 'state' })!.draft.shapes[1].political).toBe('state')
+    expect(editShape(d, 'shp_a', { political: null })!.draft.shapes[0].political).toBeNull()
+  })
+
   it('picks the later of two shapes that overlap', () => {
-    let d = addShape(draft(), 'region', [[1, 1], [9, 1], [9, 9]], REGION_PRESETS[1].pen, ids('a'))!.change.draft
-    d = addShape(d, 'region', [[2, 2], [8, 2], [8, 8]], REGION_PRESETS[2].pen, ids('b'))!.change.draft
+    let d = addShape(draft(), 'region', [[1, 1], [9, 1], [9, 9]], presetPen('water'), ids('a'))!.change.draft
+    d = addShape(d, 'region', [[2, 2], [8, 2], [8, 8]], presetPen('forest'), ids('b'))!.change.draft
     expect(hitItem(d, 6, 4)).toEqual({ kind: 'shape', id: 'shp_b' })
   })
 

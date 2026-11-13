@@ -144,6 +144,8 @@ function biomeArea(id: string, points: Array<[number, number]>, biome: string | 
 export function seedMaps(): MapDoc[] {
   const world = newMap('map_world', { title: 'The Known World', level: 'continental', units: 'imperial', width: 28, height: 18, cellSize: 20, unit: 'mi', base: { biome: 'saltwater', height: -650 } }, 0)
   world.legend = true
+  world.relief = true
+  world.contours = true
   world.pace = 25
   const stamp = (id: string, kind: string, x: number, y: number, size = 2, name = '', mapIds: string[] = []) => ({ id, layerId: 'symbols', kind, x, y, size, color: null, name, mapIds })
   world.symbols = [
@@ -161,11 +163,15 @@ export function seedMaps(): MapDoc[] {
     biomeArea('bio_beach', ellipse(4.6, 10.4, 1.6, 2.4, 10), 'beach'),
     biomeArea('bio_forest', ellipse(13, 11.6, 5.2, 3.2, 12), 'forest', { name: 'Greenwood' }),
     // Hills under the forest: no biome of their own (the forest stays green), only higher, so lighter.
-    biomeArea('bio_hills', ellipse(14.5, 12.4, 2.4, 1.5, 10), null, { heightMode: 'raise', height: 4000 }),
+    biomeArea('bio_hills', ellipse(14.5, 12.4, 2.4, 1.5, 10), null, { heightMode: 'raise', height: 4000, profile: 'hill' }),
     biomeArea('bio_lake', ellipse(8, 9.5, 1.3, 0.9, 10, 0.04), 'freshwater', { name: 'Mirror Lake' }),
-    biomeArea('bio_spine', ellipse(22, 5, 3.6, 3, 12), 'rocky', { name: 'The Spine', heightMode: 'raise', height: 6500 }),
-    biomeArea('bio_peak', ellipse(22.3, 4.6, 1.4, 1.1, 10), 'tundra', { heightMode: 'raise', height: 4000 }),
-    // Regions and lines.
+    biomeArea('bio_spine', ellipse(22, 5, 3.6, 3, 12), 'rocky', { name: 'The Spine', heightMode: 'raise', height: 6500, profile: 'peak' }),
+    biomeArea('bio_peak', ellipse(22.3, 4.6, 1.4, 1.1, 10), 'tundra', { heightMode: 'raise', height: 4000, profile: 'hill' }),
+    // Two nations: their borders and names over the land, filled in the Nations view.
+    shape('shp_veyra', 'region', [pt(3.6, 8, true), pt(6.5, 4.6, true), pt(10.5, 3.4, true), pt(13.2, 3.6, false), pt(13.8, 8.6, false), pt(11.6, 14.6, false), pt(7, 14.2, true), pt(4, 11.6, true)],
+      { name: 'Kingdom of Veyra', political: 'nation', color: '#7a3b2e', fill: '#d98c6a', opacity: 0.6, width: 0.14 }),
+    shape('shp_holds', 'region', [pt(13.2, 3.6, false), pt(17, 3, true), pt(21.5, 2.4, true), pt(24.8, 4.6, true), pt(23.5, 8, true), pt(19.5, 13.4, true), pt(15, 15, true), pt(11.6, 14.6, false), pt(13.8, 8.6, false)],
+      { name: 'The Spine Holds', political: 'nation', color: '#7a3b2e', fill: '#7fa8d9', opacity: 0.6, width: 0.14 }),
     shape('shp_a', 'region', [pt(14, 11.5, false), pt(17.5, 10.5, false), pt(19, 13.5, false), pt(15.5, 15, false)], { fill: '#4f8a4a', opacity: 0.4, pattern: 'dots', color: '#2f5f2c', width: 0.15 }),
     shape('shp_b', 'line', [pt(22, 5), pt(19.5, 7.5), pt(17, 8), pt(14, 7.5), pt(11.5, 9.5), pt(9, 9)], { color: '#3b6ea5', width: 0.35 }),
     shape('shp_c', 'line', [pt(11.5, 8.5), pt(13, 10), pt(15, 10.5), pt(17.5, 9)], { style: 'road', color: '#6b4a2b', width: 0.3 }),

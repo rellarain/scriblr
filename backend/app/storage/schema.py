@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 import colorsys
+import math
 import re
 
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_validator, model_validator
@@ -3815,6 +3816,15 @@ MapShapeType = Literal["line", "region", "biome"]
 MapLineStyle = Literal["solid", "dashed", "dotted", "road", "wall", "fence"]
 MapPattern = Literal["solid", "hatch", "cross", "dots"]
 MapHeightMode = Literal["none", "raise", "lower", "set"]
+# How a biome shape's height change spreads over it: plateau (flat, a ramp `slope` cells wide at its edge), hill (a smooth rise over `slope` cells, or
+# the whole shape), peak (rising straight to its deepest point) or basin (steep at the edge, flat in the middle).
+MapProfile = Literal["plateau", "hill", "peak", "basin"]
+MAP_PROFILES = ("plateau", "hill", "peak", "basin")
+MAP_MAX_SLOPE = 64.0
+# A region that is a political area: drawn as a border and a name over the land, and filled in its own colour in the Nations view.
+MapPolitical = Literal["nation", "state", "municipality"]
+# The height that reads lightest (the same depth reads darkest), at most.
+MAP_MAX_HEIGHT_RANGE = 100000.0
 _SHAPE_MIN_POINTS = {"line": 2, "region": 3, "biome": 3}
 
 
@@ -3871,6 +3881,11 @@ class MapShape(BaseModel):
     biome: Optional[str] = None
     heightMode: MapHeightMode = "none"
     height: float = 0.0
+    # How the height change spreads over the shape, and how far in from its edge the slope reaches, in cells (0 = the whole shape for a hill).
+    profile: MapProfile = "plateau"
+    slope: float = 0.0
+    # A region that is a nation, a state or province, or a municipality (none = an ordinary region).
+    political: Optional[MapPolitical] = None
     # A region or biome shape with a name is a place: a scene's location can be it, and `mapIds` are the maps that open from it.
     name: str = Field(default="", max_length=80)
     mapIds: list[str] = Field(default_factory=list)
@@ -3889,6 +3904,21 @@ class MapShape(BaseModel):
     @classmethod
     def _height(cls, value: Any) -> Any:
         return _finite(value, 0.0, -100000.0, 100000.0)
+
+    @field_validator("profile", mode="before")
+    @classmethod
+    def _profile(cls, value: Any) -> Any:
+        return value if value in MAP_PROFILES else "plateau"
+
+    @field_validator("slope", mode="before")
+    @classmethod
+    def _slope(cls, value: Any) -> Any:
+        return _finite(value, 0.0, 0.0, MAP_MAX_SLOPE)
+
+    @field_validator("political", mode="before")
+    @classmethod
+    def _political(cls, value: Any) -> Any:
+        return value if value in ("nation", "state", "municipality") else None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -3909,7 +3939,9 @@ class MapShape(BaseModel):
         if self.type == "line":
             self.name, self.mapIds = "", []
         if self.type != "biome":
-            self.biome, self.heightMode, self.height = None, "none", 0.0
+            self.biome, self.heightMode, self.height, self.profile, self.slope = None, "none", 0.0, "plateau", 0.0
+        if self.type != "region":
+            self.political = None
         return self
 
     @field_validator("points", mode="before")
@@ -4103,6 +4135,11 @@ class MapDoc(BaseModel):
     scaleBar: bool = True
     compass: bool = True
     legend: bool = False
+    # The height that reads lightest (the same depth reads darkest), in the map's height unit (none = the level's), and whether contour lines and relief
+    # shading are drawn over the land.
+    heightRange: Optional[float] = None
+    contours: bool = False
+    relief: bool = False
     # What readers may see of this map (see ReaderShare); `reveals` is keyed by the ids of its symbols, labels and shapes.
     reader: ReaderShare = Field(default_factory=ReaderShare)
     # A version of another map as it is later in the story: `versionOf` is the map it is a version of (the first one, never a version itself), `appliesFrom` the outline
@@ -4139,6 +4176,18 @@ class MapDoc(BaseModel):
     @classmethod
     def _units(cls, value: Any) -> Any:
         return value if value in ("metric", "imperial", "custom") else "custom"
+
+    @field_validator("heightRange", mode="before")
+    @classmethod
+    def _height_range(cls, value: Any) -> Any:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            return None
+        return min(float(value), MAP_MAX_HEIGHT_RANGE)
+
+    @field_validator("contours", "relief", mode="before")
+    @classmethod
+    def _flag(cls, value: Any) -> Any:
+        return value if isinstance(value, bool) else False
 
     @field_validator("legacyGrid", mode="before")
     @classmethod

@@ -38,11 +38,11 @@ export const formatHeight = (value: number, units: MapUnits | undefined): string
 
 export type ConvertMode = 'convert' | 'keep'
 
-export interface UnitChange { units: MapUnits; unit: string; cellSize: number; pace: number | null; base: MapDoc['base']; shapes: MapShape[] }
+export interface UnitChange { units: MapUnits; unit: string; cellSize: number; pace: number | null; base: MapDoc['base']; shapes: MapShape[]; heightRange?: number | null }
 
 // A map moved to another unit system. `convert` turns every number into the new units (1 cell: 10 km -> 6.21 mi; heights m -> ft); `keep` keeps the numbers
 // and only renames the units (10 km -> 10 mi). Into custom nothing changes but the system; out of custom the level's own unit is taken, numbers kept.
-export function changeUnits(doc: Pick<MapDoc, 'units' | 'unit' | 'cellSize' | 'pace' | 'base' | 'shapes' | 'level'>, to: MapUnits, mode: ConvertMode): UnitChange {
+export function changeUnits(doc: Pick<MapDoc, 'units' | 'unit' | 'cellSize' | 'pace' | 'base' | 'shapes' | 'level' | 'heightRange'>, to: MapUnits, mode: ConvertMode): UnitChange {
   const same = { units: to, unit: doc.unit, cellSize: doc.cellSize, pace: doc.pace, base: doc.base, shapes: doc.shapes }
   if (to === doc.units) return same
   if (to === 'custom') return same
@@ -63,5 +63,6 @@ export function changeUnits(doc: Pick<MapDoc, 'units' | 'unit' | 'cellSize' | 'p
     pace: doc.pace === null ? null : length(doc.pace),
     base: { ...doc.base, height: height(doc.base.height) },
     shapes: doc.shapes.map(s => (s.type === 'biome' && s.height ? { ...s, height: height(s.height) } : s)),
+    heightRange: doc.heightRange ? height(doc.heightRange) : doc.heightRange ?? null,
   }
 }

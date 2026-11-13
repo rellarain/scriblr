@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MapDoc } from '../../../../api/types'
+import type { MapDoc, MapShape } from '../../../../api/types'
 import { SYMBOL_SETS, UNKNOWN_SYMBOL_PATH, symbolDef, symbolName, symbolPath } from './mapSymbols'
 import { LAND_STYLE, SPACE_STYLE, hexToRgb, mapStyle } from './mapThemes'
 import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
@@ -236,6 +236,7 @@ describe('picking an item with the pointer', () => {
 
 describe('the legend', () => {
   const index = biomeIndex(STARTER_BIOMES, [{ id: 'own_x', name: 'Glass dunes', color: '#cfd8e0', group: 'land', levels: [], retired: false }])
+  const noScale = (d: MapDraft) => legendEntries(d, index).filter(e => e.type !== 'heights')
 
   it('lists the biomes that are used, in the list order, and the kinds of symbol on the map, once each', () => {
     let d: MapDraft = { ...draft(), shapes: [makeBiomeShape('f', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false), makeBiomeShape('g', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false), makeBiomeShape('h', 'terrain', [[1, 1], [3, 1], [2, 3]], 'desert', false)] }
@@ -243,7 +244,7 @@ describe('the legend', () => {
     d = addSymbol(d, 'castle', 4, 2, 2, ids('b'))!.change.draft
     d = addSymbol(d, 'tree', 6, 2, 2, ids('c'))!.change.draft
     d = addSymbol(d, 'mystery', 8, 2, 2, ids('d'))!.change.draft
-    expect(legendEntries(d, index)).toEqual([
+    expect(noScale(d)).toEqual([
       { type: 'terrain', name: 'Saltwater', color: '#2f62b0' }, { type: 'terrain', name: 'Desert', color: '#d2b48c' }, { type: 'terrain', name: 'Forest', color: '#3f8f3a' },
       { type: 'symbol', kind: 'castle', name: 'Castle' }, { type: 'symbol', kind: 'tree', name: 'Tree' }, { type: 'symbol', kind: 'mystery', name: 'Symbol' },
     ])
@@ -251,12 +252,35 @@ describe('the legend', () => {
 
   it('leaves out the symbols of a hidden layer', () => {
     const d = toggleLayer(addSymbol(draft(), 'castle', 2, 2, 2, ids('a'))!.change.draft, 'symbols', 'visible')!.draft
-    expect(legendEntries(d, index)).toEqual([{ type: 'terrain', name: 'Saltwater', color: '#2f62b0' }])
+    expect(noScale(d)).toEqual([{ type: 'terrain', name: 'Saltwater', color: '#2f62b0' }])
+  })
+
+  it('ends with the height scale on a map of land: the range of the level, or the map\'s own, in its unit', () => {
+    const d = draft()
+    const last = legendEntries(d, index).at(-1)
+    expect(last).toEqual({ type: 'heights', name: 'Height', low: -19685, high: 19685, unit: 'ft' })
+    expect(legendEntries({ ...d, heightRange: 1500 }, index).at(-1)).toEqual({ type: 'heights', name: 'Height', low: -1500, high: 1500, unit: 'ft' })
+    expect(legendEntries({ ...d, units: 'metric' }, index).at(-1)).toMatchObject({ high: 6000, unit: 'm' })
+    expect(legendEntries({ ...d, level: 'galactic' }, index).some(e => e.type === 'heights')).toBe(false)
+    expect(legendEntries({ ...d, level: 'interior' }, index).some(e => e.type === 'heights')).toBe(false)
+  })
+
+  it('in the Nations view lists the political areas that are shown, nations first, in their fill, and no biomes or heights', () => {
+    const region = (id: string, political: MapShape['political'], name: string, fill: string | null): MapShape => ({
+      id, layerId: 'shapes', type: 'region', style: 'solid', color: null, width: 0.2, fill, opacity: 0.6, pattern: 'solid', political, name,
+      points: [{ x: 1, y: 1, smooth: false, hx: null, hy: null }, { x: 3, y: 1, smooth: false, hx: null, hy: null }, { x: 2, y: 3, smooth: false, hx: null, hy: null }],
+    })
+    const d: MapDraft = { ...draft(), layers: [...draft().layers, { id: 'shapes', name: 'Shapes', kind: 'shapes', visible: true, locked: false }], shapes: [
+      makeBiomeShape('f', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false),
+      region('s', 'state', 'Lowmarch', '#7fa8d9'), region('n', 'nation', 'Veyra', '#d98c6a'), region('r', null, 'Old road', '#123456'),
+    ] }
+    expect(legendEntries(d, index, true)).toEqual([{ type: 'terrain', name: 'Veyra', color: '#d98c6a' }, { type: 'terrain', name: 'Lowmarch', color: '#7fa8d9' }])
+    expect(legendEntries(toggleLayer(d, 'shapes', 'visible')!.draft, index, true)).toEqual([])
   })
 
   it('names the project\'s own biomes and an unknown one', () => {
     const d: MapDraft = { ...draft(), shapes: [makeBiomeShape('a', 'terrain', [[1, 1], [3, 1], [2, 3]], 'own_x', false), makeBiomeShape('b', 'terrain', [[1, 1], [3, 1], [2, 3]], 'gone', false)] }
-    expect(legendEntries(d, index).map(e => e.name)).toEqual(['Saltwater', 'Glass dunes', 'Unknown biome'])
+    expect(noScale(d).map(e => e.name)).toEqual(['Saltwater', 'Glass dunes', 'Unknown biome'])
   })
 })
 

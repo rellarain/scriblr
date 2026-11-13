@@ -191,14 +191,41 @@ export function drawOverlays(ctx: CanvasRenderingContext2D, o: OverlayOptions) {
   }
 
   if (o.legend && o.legend.length > 0 && w >= 200 && h >= 120) {
-    const room = Math.max(1, Math.floor((h * 0.6 - 12) / 18))
-    const rows = o.legend.slice(0, room)
-    const more = o.legend.length - rows.length
+    const scale = o.legend.find((e): e is Extract<LegendEntry, { type: 'heights' }> => e.type === 'heights')
+    const listed = o.legend.filter(e => e.type !== 'heights')
+    // The height scale takes a block of its own under the rows: a ramp from the darkest depth to the lightest height, and three numbers under it.
+    const scaleH = scale ? 40 : 0
+    const room = Math.max(1, Math.floor((h * 0.6 - 12 - scaleH) / 18))
+    const rows = listed.slice(0, room)
+    const more = listed.length - rows.length
     ctx.textAlign = 'left'
-    const widest = Math.max(...rows.map(e => ctx.measureText(e.name).width), more > 0 ? ctx.measureText(`+ ${more} more`).width : 0)
-    const bw = widest + 38, bh = (rows.length + (more > 0 ? 1 : 0)) * 18 + 12
+    const widest = Math.max(0, ...rows.map(e => ctx.measureText(e.name).width), more > 0 ? ctx.measureText(`+ ${more} more`).width : 0)
+    const bw = Math.max(widest + 38, scale ? 156 : 0), bh = (rows.length + (more > 0 ? 1 : 0)) * 18 + 12 + scaleH
     const px = x + w - PAD - bw, py = y + h - PAD - bh
     plate(ctx, px, py, bw, bh, theme)
+    if (scale) {
+      const rx = px + 8, ry = py + bh - scaleH + 2, rw = bw - 16, steps = 12
+      // A neutral gray, darkened toward the depths and lightened toward the heights the way the land is.
+      for (let k = 0; k < steps; k += 1) {
+        const v = ((k + 0.5) / steps) * 2 - 1
+        ctx.fillStyle = '#8c8c8c'
+        ctx.fillRect(rx + (k * rw) / steps, ry, rw / steps + 0.5, 10)
+        ctx.save()
+        ctx.globalAlpha = Math.abs(v) * 0.55
+        ctx.fillStyle = v > 0 ? '#ffffff' : '#000000'
+        ctx.fillRect(rx + (k * rw) / steps, ry, rw / steps + 0.5, 10)
+        ctx.restore()
+      }
+      ctx.strokeStyle = theme.ink; ctx.lineWidth = 1
+      ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, 9)
+      ctx.fillStyle = theme.ink
+      const num = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('en')}`
+      const ty = ry + 22
+      ctx.textAlign = 'left'; ctx.fillText(num(scale.low), rx, ty)
+      ctx.textAlign = 'center'; ctx.fillText('0', rx + rw / 2, ty)
+      ctx.textAlign = 'right'; ctx.fillText(`${num(scale.high)} ${scale.unit}`, rx + rw, ty)
+      ctx.textAlign = 'left'
+    }
     rows.forEach((e, i) => {
       const ry = py + 6 + i * 18 + 9
       if (e.type === 'terrain') {
@@ -206,7 +233,7 @@ export function drawOverlays(ctx: CanvasRenderingContext2D, o: OverlayOptions) {
         ctx.fillRect(px + 8, ry - 6, 14, 12)
         ctx.strokeStyle = theme.ink; ctx.lineWidth = 1
         ctx.strokeRect(px + 8.5, ry - 5.5, 13, 11)
-      } else {
+      } else if (e.type === 'symbol') {
         const p = pathOf(e.kind)
         if (p) {
           ctx.save()

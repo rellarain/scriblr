@@ -1,5 +1,5 @@
 import type { MapBase, MapDoc, MapLayer, MapLayerKind, MapLevel, MapSummary, MapUnits, ReaderShare } from '../../../../api/types'
-import { MAP_MAX_SIDE, NO_SHARE, shareOf } from '../../../../api/types'
+import { MAP_MAX_HEIGHT_RANGE, MAP_MAX_SIDE, NO_SHARE, shareOf } from '../../../../api/types'
 import { changeUnits, type ConvertMode } from './mapUnits'
 
 // Maps, as pure functions: the working copy of a map, the changes of its own fields and layers, and the undo log. The land is biome shapes over a base
@@ -105,8 +105,14 @@ export function setPace(draft: MapDraft, pace: number | null): Change {
   return next === draft.pace ? null : change(draft, { pace: next })
 }
 
-export function setOverlay(draft: MapDraft, field: 'scaleBar' | 'compass' | 'legend', on: boolean): Change {
-  return draft[field] === on ? null : change(draft, { [field]: on })
+export function setOverlay(draft: MapDraft, field: 'scaleBar' | 'compass' | 'legend' | 'contours' | 'relief', on: boolean): Change {
+  return Boolean(draft[field]) === on ? null : change(draft, { [field]: on })
+}
+
+// The height that reads lightest (the same depth reads darkest), in the map's height unit; null = the level's.
+export function setHeightRange(draft: MapDraft, range: number | null): Change {
+  const next = range !== null && Number.isFinite(range) && range > 0 ? Math.min(Math.round(range), MAP_MAX_HEIGHT_RANGE) : null
+  return next === (draft.heightRange ?? null) ? null : change(draft, { heightRange: next })
 }
 
 // The outline chapter or scene from which a version is the map that is true (null = not placed yet).

@@ -169,3 +169,28 @@ def test_a_named_area_is_a_place_that_opens_maps_and_can_be_linked(client: TestC
     assert client.post(f"/api/projects/{pid}/world-links", json={"a": f"place:{world['id']}/nope", "b": f"char:{ada['id']}"}).status_code == 422
     assert client.delete(f"/api/projects/{pid}/maps/{nation['id']}").status_code == 204
     assert client.get(f"/api/projects/{pid}/maps/{world['id']}").json()["shapes"][0]["mapIds"] == []
+
+
+def test_heights_profiles_political_areas_and_the_height_view_are_kept_and_repaired(client: TestClient) -> None:
+    pid = _project(client)
+    world = client.post(f"/api/projects/{pid}/maps", json={"title": "Heights", "level": "regional", "width": 10, "height": 8}).json()
+    assert (world["heightRange"], world["contours"], world["relief"]) == (None, False, False)
+    world["shapes"] = [
+        _area(id="hill", heightMode="raise", height=400, profile="hill", slope=3.5),
+        _area(id="odd", profile="volcano", slope=-2, political="nation"),
+        _area(id="steep", profile="peak", slope=500),
+        {"id": "kingdom", "layerId": "shapes", "type": "region", "points": [{"x": 6, "y": 1}, {"x": 9, "y": 1}, {"x": 9, "y": 4}], "political": "nation", "profile": "peak", "slope": 4},
+        {"id": "realm", "layerId": "shapes", "type": "region", "points": [{"x": 6, "y": 1}, {"x": 9, "y": 1}, {"x": 9, "y": 4}], "political": "empire"},
+    ]
+    world.update(heightRange=1500, contours=True, relief=True)
+    saved = client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()
+    by_id = {s["id"]: s for s in saved["shapes"]}
+    assert (by_id["hill"]["profile"], by_id["hill"]["slope"]) == ("hill", 3.5)
+    assert (by_id["odd"]["profile"], by_id["odd"]["slope"], by_id["odd"]["political"]) == ("plateau", 0.0, None)  # an area is never political
+    assert by_id["steep"]["slope"] == 64.0
+    assert (by_id["kingdom"]["political"], by_id["kingdom"]["profile"], by_id["kingdom"]["slope"]) == ("nation", "plateau", 0.0)
+    assert by_id["realm"]["political"] is None
+    assert (saved["heightRange"], saved["contours"], saved["relief"]) == (1500.0, True, True)
+    for bad in (0, -5, "high", True):
+        world["heightRange"] = bad
+        assert client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()["heightRange"] is None

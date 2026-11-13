@@ -34,6 +34,9 @@ export const LEVELS: LevelDef[] = [
 
 export const MAP_LEVELS: MapLevel[] = LEVELS.map(l => l.id)
 
+// The levels whose maps have a Nations view (borders of nations, states and municipalities filled in their own colours).
+export const POLITICAL_LEVELS: MapLevel[] = ['planetary', 'continental', 'national', 'regional']
+
 export const levelDef = (id: MapLevel | undefined): LevelDef => LEVELS.find(l => l.id === id) ?? LEVELS[2]
 export const levelName = (id: MapLevel | undefined): string => levelDef(id).name
 

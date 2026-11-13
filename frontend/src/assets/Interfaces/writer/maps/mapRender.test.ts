@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MapDoc, MapShape } from '../../../../api/types'
 import { addLabel, addSymbol } from './mapItems'
-import { MAX_TINT, drawMap, heightTint } from './mapRender'
+import { MAX_TINT, NATIONS_LAND, NATIONS_WATER, drawMap, heightTint, type MakeCanvas } from './mapRender'
 import { LINE_PRESETS, makeBiomeShape } from './mapShapes'
 import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
 import { draftOf, setOverlay, toggleLayer, type MapDraft } from './mapModel'
@@ -27,6 +27,26 @@ function recorder() {
 }
 
 class FakePath { constructor(public d: string) {} }
+
+// A stand-in for the offscreen canvas the shading is drawn into: keeps the pixels put into it and the samples a cell.
+function shadeCanvas() {
+  const images: Array<{ w: number; h: number; data: Uint8ClampedArray }> = []
+  const make: MakeCanvas = (w, h) => ({
+    width: w, height: h,
+    getContext: () => ({
+      createImageData: (iw: number, ih: number) => ({ width: iw, height: ih, data: new Uint8ClampedArray(iw * ih * 4) }),
+      putImageData: (img: { data: Uint8ClampedArray }) => { images.push({ w, h, data: img.data }) },
+    }),
+  }) as unknown as HTMLCanvasElement
+  // The pixel at a point of the map (in cells) of the last image: [red, alpha].
+  const at = (x: number, y: number, cellsAcross = 20) => {
+    const img = images[images.length - 1]
+    const s = img.w / cellsAcross
+    const k = (Math.floor(y * s) * img.w + Math.floor(x * s)) * 4
+    return [img.data[k], img.data[k + 3]]
+  }
+  return { make, images, at }
+}
 afterEach(() => { vi.unstubAllGlobals() })
 
 const doc = (): MapDoc => ({
@@ -61,14 +81,18 @@ describe('the land', () => {
     expect(heightTint(Number.NaN, 4000)).toBe(0)
   })
 
-  it('fills the map with the base biome, darker when the base is under sea level', () => {
-    const flat = recorder()
-    drawMap(flat.ctx, base(draftOf(doc())))
+  it('fills the map with the base biome, and shades it darker when the base is under sea level', () => {
+    const flat = recorder(), fc = shadeCanvas()
+    drawMap(flat.ctx, base(draftOf(doc()), { makeCanvas: fc.make }))
     expect(flat.fills[0]).toBe('#a4c34a')
-    expect(flat.fills).not.toContain('#000000')
-    const deep = recorder()
-    drawMap(deep.ctx, base({ ...draftOf(doc()), base: { biome: 'saltwater', height: -2000 } }))
-    expect(deep.fills.slice(0, 2)).toEqual(['#2f62b0', '#000000'])
+    expect(fc.at(5, 5)[1]).toBe(0)
+    const deep = recorder(), dc = shadeCanvas()
+    drawMap(deep.ctx, base({ ...draftOf(doc()), base: { biome: 'saltwater', height: -2000 } }, { makeCanvas: dc.make }))
+    expect(deep.fills[0]).toBe('#2f62b0')
+    expect(deep.count('drawImage')).toBe(1)
+    const [red, alpha] = dc.at(5, 5)
+    expect(red).toBe(0)
+    expect(alpha).toBe(Math.round(0.5 * MAX_TINT * 255))
   })
 
   it('draws the biome shapes in their order, each in its colour, later over earlier', () => {
@@ -79,16 +103,51 @@ describe('the land', () => {
     expect(lake).toBeGreaterThan(forest)
   })
 
-  it('draws raised land lighter, and a shape with no biome only as a tint over what is under it', () => {
-    const r = recorder()
-    drawMap(r.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'rocky', { heightMode: 'raise', height: 3000 })] }))
-    expect(r.fills.slice(-2)).toEqual(['#8e8e8e', '#ffffff'])
-    const hills = recorder()
-    drawMap(hills.ctx, base({ ...draftOf(doc()), shapes: [tri('a', null, { heightMode: 'raise', height: 800 })] }))
-    expect(hills.fills).toEqual(['#a4c34a', '#ffffff'])
-    const flat = recorder()
-    drawMap(flat.ctx, base({ ...draftOf(doc()), shapes: [tri('a', null)] }))
+  it('shades raised land lighter in its own colour, and a shape with no biome only changes the shading', () => {
+    const r = recorder(), rc = shadeCanvas()
+    drawMap(r.ctx, base({ ...draftOf(doc()), shapes: [tri('a', 'rocky', { heightMode: 'raise', height: 3000 })] }, { makeCanvas: rc.make }))
+    expect(r.fills).toEqual(['#a4c34a', '#8e8e8e'])
+    expect(rc.at(6, 4)).toEqual([255, Math.round(0.75 * MAX_TINT * 255)])
+    expect(rc.at(15, 8)[1]).toBe(0)
+    const hills = recorder(), hc = shadeCanvas()
+    drawMap(hills.ctx, base({ ...draftOf(doc()), shapes: [tri('a', null, { heightMode: 'raise', height: 800 })] }, { makeCanvas: hc.make }))
+    expect(hills.fills).toEqual(['#a4c34a'])
+    expect(hc.at(6, 4)[0]).toBe(255)
+    expect(hc.at(6, 4)[1]).toBeGreaterThan(0)
+    const flat = recorder(), lc = shadeCanvas()
+    drawMap(flat.ctx, base({ ...draftOf(doc()), shapes: [tri('a', null)] }, { makeCanvas: lc.make }))
     expect(flat.fills).toEqual(['#a4c34a'])
+    expect(lc.at(6, 4)[1]).toBe(0)
+  })
+
+  it('draws contour lines when they are on, and relief changes the shading of a slope', () => {
+    const peak = (over: Partial<MapDraft> = {}) => ({ ...draftOf(doc()), shapes: [tri('a', 'rocky', { heightMode: 'raise', height: 3000, profile: 'peak' })], ...over })
+    const off = recorder()
+    drawMap(off.ctx, base(peak(), { makeCanvas: shadeCanvas().make }))
+    const on = recorder()
+    drawMap(on.ctx, base(setOverlay(peak(), 'contours', true)!.draft, { makeCanvas: shadeCanvas().make }))
+    expect(on.count('lineTo')).toBeGreaterThan(off.count('lineTo') + 10)
+    const plain = shadeCanvas(), lit = shadeCanvas()
+    drawMap(recorder().ctx, base(peak(), { makeCanvas: plain.make }))
+    drawMap(recorder().ctx, base(setOverlay(peak(), 'relief', true)!.draft, { makeCanvas: lit.make }))
+    const a = plain.images[0].data, b = lit.images[0].data
+    let differ = 0
+    for (let k = 3; k < a.length; k += 4) if (a[k] !== b[k] || a[k - 3] !== b[k - 3]) differ += 1
+    expect(differ).toBeGreaterThan(20)
+  })
+
+  it('in the Nations view draws the land and the water plain, unshaded, and fills the political areas', () => {
+    const nation: MapShape = { id: 'n', layerId: 'shapes', type: 'region', style: 'solid', color: null, width: 0.2, fill: '#d98c6a', opacity: 0.6, pattern: 'solid', political: 'nation', points: [{ x: 1, y: 1, smooth: false, hx: null, hy: null }, { x: 9, y: 1, smooth: false, hx: null, hy: null }, { x: 9, y: 9, smooth: false, hx: null, hy: null }] }
+    const d: MapDraft = { ...draftOf(doc()), layers: [...draftOf(doc()).layers, { id: 'shapes', name: 'Shapes', kind: 'shapes', visible: true, locked: false }], shapes: [tri('a', 'freshwater', { heightMode: 'raise', height: 900 }), nation] }
+    const biomesView = recorder(), bc = shadeCanvas()
+    drawMap(biomesView.ctx, base(d, { makeCanvas: bc.make }))
+    expect(biomesView.fills).not.toContain('#d98c6a')
+    expect(biomesView.count('drawImage')).toBe(1)
+    const nationsView = recorder()
+    drawMap(nationsView.ctx, base(d, { nations: true, makeCanvas: shadeCanvas().make }))
+    expect(nationsView.fills.slice(0, 2)).toEqual([NATIONS_LAND, NATIONS_WATER])
+    expect(nationsView.fills).toContain('#d98c6a')
+    expect(nationsView.count('drawImage')).toBe(0)
   })
 
   it('draws a biome it cannot find in gray, and nothing of a hidden biomes layer but a faint wash', () => {

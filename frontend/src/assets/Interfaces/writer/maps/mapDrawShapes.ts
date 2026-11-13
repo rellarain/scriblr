@@ -105,8 +105,8 @@ function drawPattern(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapVi
   ctx.restore()
 }
 
-// A biome shape: its outline filled in its biome's colour (no line round it: the land meets the land), then lightened or darkened by its height (`tint` is
-// how much, -1 to 1: white over it above sea level, black below; the same rule the base follows).
+// A biome shape: its outline filled in its biome's colour (no line round it: the land meets the land). The shading by height is drawn over the whole land
+// afterwards (mapHeights.ts); `tint` (-1 to 1: white over it, or black) is for a shape shown on its own, such as one being drawn.
 export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: Pick<MapShape, 'type' | 'points'>, view: MapView, color: string, tint = 0) {
   if (shape.points.length < 3) return
   ctx.save()
@@ -121,13 +121,31 @@ export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: Pick<MapSha
   ctx.restore()
 }
 
-export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef) {
+// The colour a political area is filled with in the Nations view: its own fill, else its line colour, else one of a few drawn from its id.
+const NATION_FILLS = ['#d98c6a', '#7fa8d9', '#c9b45a', '#9a7fc4', '#6fb58f', '#d17a9b', '#b9935f', '#5fa9b0']
+export function nationFill(shape: Pick<MapShape, 'id' | 'fill' | 'color'>): string {
+  if (shape.fill) return shape.fill
+  if (shape.color) return shape.color
+  let n = 0
+  for (const ch of shape.id) n = (n * 31 + ch.charCodeAt(0)) >>> 0
+  return NATION_FILLS[n % NATION_FILLS.length]
+}
+
+// A line or region. A political region (a nation, a state, a municipality) is only its border over the land, unless `nations` is on (the Nations view),
+// when it is filled in its own colour.
+export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef, nations = false) {
   if (shape.points.length < 2) return
   const w = Math.max(1, shape.width * view.zoom)
   const colour = shape.color ?? theme.ink
   const again = () => trace(ctx, shape, view)
   ctx.save()
-  if (isClosed(shape) && shape.points.length >= 3) {
+  if (isClosed(shape) && shape.points.length >= 3 && shape.political && nations) {
+    trace(ctx, shape, view)
+    ctx.globalAlpha = shape.political === 'nation' ? 0.6 : 0.35
+    ctx.fillStyle = nationFill(shape)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  } else if (isClosed(shape) && shape.points.length >= 3 && !shape.political) {
     const fill = shape.fill ?? shape.color ?? DEFAULT_FILL
     trace(ctx, shape, view)
     ctx.globalAlpha = shape.pattern === 'solid' ? shape.opacity : shape.opacity * 0.5

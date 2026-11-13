@@ -1,4 +1,4 @@
-import type { MapLineStyle, MapPattern, MapShape, MapShapePoint, MapShapeType } from '../../../../api/types'
+import type { MapLineStyle, MapPattern, MapPolitical, MapShape, MapShapePoint, MapShapeType } from '../../../../api/types'
 
 // Lines and regions on a map, as geometry: pure functions on a shape. A shape is a list of points in cells; a line is open and a region is closed (its last
 // point joins its first). A point is a corner, or smooth: the curve passes through it with a handle, a cubic Bezier between each pair of points whose
@@ -206,6 +206,8 @@ export interface Pen {
   fill: string | null
   opacity: number
   pattern: MapPattern
+  // A region drawn as a political area (a nation, a state or province, a municipality): its border and name over the land.
+  political?: MapPolitical | null
 }
 
 const linePen = (style: MapLineStyle, color: string | null, width: number, smooth: boolean): Pen => ({ style, color, width, smooth, fill: null, opacity: 0.35, pattern: 'solid' })
@@ -219,20 +221,27 @@ export const LINE_PRESETS: Array<{ id: string; name: string; pen: Pen }> = [
   { id: 'wall', name: 'Wall', pen: linePen('wall', null, 0.22, false) },
   { id: 'fence', name: 'Fence', pen: linePen('fence', '#6b4a2b', 0.14, false) },
 ]
+// A political area: a border in its style (a nation's the strongest), and the colour it is filled with in the Nations view.
+const politicalPen = (political: MapPolitical, style: MapLineStyle, width: number, fill: string): Pen => ({ style, color: null, width, smooth: false, fill, opacity: 0.6, pattern: 'solid', political })
+
 export const REGION_PRESETS: Array<{ id: string; name: string; pen: Pen }> = [
+  { id: 'nation', name: 'Nation', pen: politicalPen('nation', 'solid', 0.22, '#d98c6a') },
+  { id: 'state', name: 'State or province', pen: politicalPen('state', 'dashed', 0.16, '#7fa8d9') },
+  { id: 'municipality', name: 'Municipality', pen: politicalPen('municipality', 'dotted', 0.12, '#c9b45a') },
   { id: 'territory', name: 'Territory', pen: regionPen('#c06c84', 0.3, 'hatch', '#8a3a55', 'dashed') },
   { id: 'water', name: 'Water', pen: regionPen('#4a86b8', 0.45, 'solid', '#2f6593') },
   { id: 'forest', name: 'Forest', pen: regionPen('#4f8a4a', 0.4, 'dots', '#2f5f2c') },
   { id: 'danger', name: 'Danger', pen: regionPen('#b5342a', 0.28, 'cross', '#7e211a', 'dashed') },
 ]
 export const DEFAULT_LINE_PEN: Pen = LINE_PRESETS[0].pen
-export const DEFAULT_REGION_PEN: Pen = REGION_PRESETS[0].pen
+export const DEFAULT_REGION_PEN: Pen = REGION_PRESETS.find(p => p.id === 'territory')!.pen
 
 // A new shape from the points that were clicked and the pen.
 export function makeShape(id: string, layerId: string, type: MapShapeType, points: Array<[number, number]>, pen: Pen): MapShape {
   return {
     id, layerId, type, style: pen.style, color: pen.color, width: pen.width, fill: type === 'region' ? pen.fill : null, opacity: pen.opacity, pattern: type === 'region' ? pen.pattern : 'solid',
     points: points.map(([x, y]) => ({ x, y, smooth: pen.smooth, hx: null, hy: null })),
+    ...(type === 'region' && pen.political ? { political: pen.political } : {}),
   }
 }
 
