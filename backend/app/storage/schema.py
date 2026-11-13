@@ -3493,7 +3493,8 @@ MAP_LEVEL_DEFAULTS: dict[str, _LevelDefaults] = {
 }
 
 # ---- biomes: what colours the land (and the floors of buildings, and space). A biome's colour is how it looks at sea level; height lightens or darkens it.
-MapBiomeGroup = Literal["land", "water", "material", "space"]
+# `planet` and `star` are the kinds of planet and star of the space levels: a planet's or a star's shape takes one as its biome, so it is coloured by it.
+MapBiomeGroup = Literal["land", "water", "material", "space", "planet", "star"]
 MAP_MAX_BIOMES = 128
 MAP_MAX_PROJECT_BIOMES = 64
 MAP_BIOME_HISTORY_MAX = 20
@@ -3504,6 +3505,8 @@ BIOME_GROUP_LEVELS: dict[str, tuple[str, ...]] = {
     "water": ("planetary", "continental", "national", "regional", "local"),
     "material": ("architectural", "interior"),
     "space": ("intergalactic", "galactic"),
+    "planet": ("galactic",),
+    "star": ("intergalactic", "galactic"),
 }
 
 
@@ -3608,7 +3611,24 @@ MAP_BIOME_SEED: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     ("grass", "Grass", "#7fae5a", "material", ()),
     ("outside", "Outside", "#4a4450", "material", ()),
     ("space", "Space", "#0f1626", "space", ()),
+    # Added with the space levels (seed version 2).
+    ("star_yellow", "Yellow star", "#ffd54a", "star", ()),
+    ("star_red", "Red dwarf", "#ff7a4a", "star", ()),
+    ("star_blue", "Blue giant", "#8fb8ff", "star", ()),
+    ("star_white_dwarf", "White dwarf", "#f4f7ff", "star", ()),
+    ("star_neutron", "Neutron star", "#c9e6ff", "star", ()),
+    ("star_black_hole", "Black hole", "#0b0b10", "star", ()),
+    ("planet_rocky", "Rocky planet", "#a08a72", "planet", ()),
+    ("planet_ocean", "Ocean world", "#3a78c2", "planet", ()),
+    ("planet_gas_giant", "Gas giant", "#d9a066", "planet", ()),
+    ("planet_ice", "Ice world", "#cfe3ee", "planet", ()),
+    ("planet_lava", "Lava world", "#d4542a", "planet", ()),
+    ("planet_desert", "Desert world", "#d9b77e", "planet", ()),
+    ("planet_garden", "Garden world", "#4f9a5a", "planet", ()),
 ]
+
+# The starter biomes each seed version added (a catalog made before a version gets the biomes of the later ones once).
+MAP_BIOME_SEED_VERSIONS: dict[int, int] = {1: 29, 2: 42}
 
 
 def seed_biomes() -> list[MapBiome]:
@@ -3817,11 +3837,13 @@ MAP_MAX_MARKERS = 5000
 MAP_MAX_SHAPE_POINTS = 500
 MAP_MAX_HOLES = 64
 MAP_MAX_ROUGH = 100
-MapShapeType = Literal["line", "region", "biome"]
+# An orbit is the path a planet or a moon goes round on (an ellipse, `ellipse`; no points), on a space map.
+MapShapeType = Literal["line", "region", "biome", "orbit"]
 # `halo` draws no line: a ring in the map's halo colour round the shape, so a marker reads over any land.
 MapLineStyle = Literal["solid", "dashed", "dotted", "road", "wall", "fence", "halo"]
 MAP_LINE_STYLES = ("solid", "dashed", "dotted", "road", "wall", "fence", "halo")
-MapPattern = Literal["solid", "hatch", "cross", "dots"]
+# `glow` is a soft light inside the region's edge (a nebula, a territory of space).
+MapPattern = Literal["solid", "hatch", "cross", "dots", "glow"]
 MapHeightMode = Literal["none", "raise", "lower", "set"]
 # How a biome shape's height change spreads over it: plateau (flat, a ramp `slope` cells wide at its edge), hill (a smooth rise over `slope` cells, or
 # the whole shape), peak (rising straight to its deepest point) or basin (steep at the edge, flat in the middle).
@@ -3832,7 +3854,45 @@ MAP_MAX_SLOPE = 64.0
 MapPolitical = Literal["nation", "state", "municipality"]
 # The height that reads lightest (the same depth reads darkest), at most.
 MAP_MAX_HEIGHT_RANGE = 100000.0
-_SHAPE_MIN_POINTS = {"line": 2, "region": 3, "biome": 3}
+_SHAPE_MIN_POINTS = {"line": 2, "region": 3, "biome": 3, "orbit": 0}
+MAP_MAX_ORBIT_TURN = 180.0
+
+
+class MapEllipse(BaseModel):
+    """The path of an orbit: its centre and its two radii in cells, turned by `turn` degrees (clockwise) about the centre."""
+
+    cx: float = 0.0
+    cy: float = 0.0
+    rx: float = 4.0
+    ry: float = 4.0
+    turn: float = 0.0
+
+    @field_validator("cx", "cy", mode="before")
+    @classmethod
+    def _centre(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -1.0, 100000.0)
+
+    @field_validator("rx", "ry", mode="before")
+    @classmethod
+    def _radius(cls, value: Any) -> Any:
+        return _finite(value, 4.0, 0.1, 100000.0)
+
+    @field_validator("turn", mode="before")
+    @classmethod
+    def _turn(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -MAP_MAX_ORBIT_TURN, MAP_MAX_ORBIT_TURN)
+
+
+class MapOrbitRef(BaseModel):
+    """Where a planet or a moon is on an orbit: the orbit's id and the angle along it (degrees, 0 = the orbit's own right, clockwise)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    angle: float = 0.0
+
+    @field_validator("angle", mode="before")
+    @classmethod
+    def _angle(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -100000.0, 100000.0) % 360.0
 
 
 class MapShapePoint(BaseModel):
@@ -3903,6 +3963,14 @@ class MapShape(BaseModel):
     seed: int = 0
     # The library shape it was placed from ("marker:castle", "land:island" ...; none = drawn by hand).
     kind: Optional[str] = None
+    # An orbit's path (orbits only), and, for a planet or a moon, the orbit it goes round on and where on it (none = not on one).
+    ellipse: Optional[MapEllipse] = None
+    orbit: Optional[MapOrbitRef] = None
+
+    @field_validator("ellipse", "orbit", mode="before")
+    @classmethod
+    def _optional_part(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, BaseModel)) else None
 
     @field_validator("biome", mode="before")
     @classmethod
@@ -3985,6 +4053,13 @@ class MapShape(BaseModel):
             self.political = None
         if self.type == "line":
             self.holes = []
+        if self.type == "orbit":
+            self.name, self.mapIds, self.points, self.holes, self.fill, self.pattern, self.rough = "", [], [], [], None, "solid", 0
+            self.orbit = None
+        else:
+            self.ellipse = None
+        if self.type == "line":
+            self.orbit = None
         return self
 
     @field_validator("points", mode="before")
@@ -4000,7 +4075,7 @@ class MapShape(BaseModel):
     @field_validator("pattern", mode="before")
     @classmethod
     def _pattern_or_solid(cls, value: Any) -> Any:
-        return value if value in ("solid", "hatch", "cross", "dots") else "solid"
+        return value if value in ("solid", "hatch", "cross", "dots", "glow") else "solid"
 
     @field_validator("color", "fill", mode="before")
     @classmethod
@@ -4360,6 +4435,8 @@ class MapDoc(BaseModel):
             layers = biome_layers if group == "biomes" else shape_layers
             if shape.layerId not in layers or shape.id in seen or len(shape.points) < _SHAPE_MIN_POINTS[shape.type]:
                 continue
+            if shape.type == "orbit" and shape.ellipse is None:
+                continue
             if counts[group] >= limits[group]:
                 continue
             if shape.id in taken:
@@ -4372,7 +4449,16 @@ class MapDoc(BaseModel):
             for p in [*shape.points, *(q for ring in shape.holes for q in ring)]:
                 p.x = min(float(self.width), max(0.0, p.x))
                 p.y = min(float(self.height), max(0.0, p.y))
+            if shape.ellipse is not None:
+                e = shape.ellipse
+                e.cx, e.cy = min(float(self.width), max(0.0, e.cx)), min(float(self.height), max(0.0, e.cy))
+                side = float(max(self.width, self.height))
+                e.rx, e.ry = min(side, e.rx), min(side, e.ry)
             out.append(shape)
+        orbits = {s.id for s in out if s.type == "orbit"}
+        for shape in out:
+            if shape.orbit is not None and shape.orbit.id not in orbits:
+                shape.orbit = None
         return out
 
     def _kept(self, items: list[Any], kind: str, limit: int) -> list[Any]:
@@ -4508,7 +4594,7 @@ class MapLibraryShape(BaseModel):
     @field_validator("pattern", mode="before")
     @classmethod
     def _pattern(cls, value: Any) -> Any:
-        return value if value in ("solid", "hatch", "cross", "dots") else "solid"
+        return value if value in ("solid", "hatch", "cross", "dots", "glow") else "solid"
 
     @field_validator("color", "fill", mode="before")
     @classmethod

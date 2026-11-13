@@ -7,14 +7,14 @@ import { hasPending, usePendingOpen } from '../links/worldNav'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
-import { FollowIcon, BiomeIcon, ChevronLeftIcon, CursorIcon, GridLinesIcon, HandIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, TextSizeIcon } from '../../../icons'
+import { FollowIcon, BiomeIcon, ChevronLeftIcon, CursorIcon, GridLinesIcon, HandIcon, OrbitIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, TextSizeIcon } from '../../../icons'
 import MapCanvas, { type MapTool } from './MapCanvas'
 import { MapList } from './MapList'
 import { VersionBar } from './VersionBar'
 import { addStop, journeysOf, whereAt } from './mapJourneys'
 import type { JourneyView } from './mapDrawJourneys'
 import { MapSide } from './MapSide'
-import { addBiomeShape, addLabel, addLibraryShape, addShape, addTemplateShape, combineShapes, findItem, isMarker, removeItem, replaceShape, type AreaLook, type ItemRef } from './mapItems'
+import { addBiomeShape, addLabel, addLibraryShape, addOrbit, addShape, addTemplateShape, combineShapes, findItem, isMarker, isSpace, removeItem, replaceShape, type AreaLook, type ItemRef } from './mapItems'
 import { mapPath } from './mapModel'
 import { fitInBox, ownBox, shapeFromLibrary } from './mapLibrary'
 import { templatePoints } from './mapTemplates'
@@ -36,6 +36,7 @@ const TOOLS: Array<{ tool: MapTool; label: string; Icon: typeof BiomeIcon }> = [
   { tool: 'select', label: 'Select and move', Icon: CursorIcon },
   { tool: 'biome', label: 'Draw a biome area', Icon: BiomeIcon },
   { tool: 'shape', label: 'Place a shape', Icon: StampIcon },
+  { tool: 'orbit', label: 'Draw an orbit', Icon: OrbitIcon },
   { tool: 'label', label: 'Place a label', Icon: TextSizeIcon },
   { tool: 'line', label: 'Draw a line', Icon: PathIcon },
   { tool: 'region', label: 'Draw a region', Icon: PolygonIcon },
@@ -115,7 +116,7 @@ export default function MapsConsole({ projectId, projectTitle = '', scenes = [],
     // Only when the list has loaded (opening is not repeated after a map is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.status])
-  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })); setViewMode(m.openId ? readView(m.openId) : 'biomes'); setCombining(null); setCombineNote(null) }, [m.openId])
+  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })); setViewMode(m.openId ? readView(m.openId) : 'biomes'); setCombining(null); setCombineNote(null); setTool(t => (t === 'orbit' ? 'select' : t)) }, [m.openId])
   // A link from another console asked for a place: its map opens, and the place (a symbol or an area) is chosen on it.
   const wanted = useRef<{ mapId: string; placeId: string } | null>(null)
   const pickPlace = (doc: NonNullable<typeof draft>, placeId: string) => {
@@ -227,6 +228,17 @@ export default function MapsConsole({ projectId, projectTitle = '', scenes = [],
       : { id: 'preview', layerId: '', type: 'region' as const, points: pts, style: regionPen.style, color: regionPen.color, width: regionPen.width, fill: regionPen.fill, opacity: regionPen.opacity, pattern: regionPen.pattern }
   }
 
+  // An orbit drawn on a space map (it is chosen, so its size and turn can be set).
+  function placeOrbit(cx: number, cy: number, radius: number): boolean {
+    if (!draft) return false
+    setBlocked(false)
+    const r = addOrbit(draft, cx, cy, radius)
+    if (!r || !m.apply(r.change)) return false
+    setPicked({ kind: 'shape', id: r.id })
+    setFresh(null)
+    return true
+  }
+
   // A shape picked on the map to combine the chosen one with: merged into it, cut out of it, or the line it is split along.
   function pickToCombine(ref: ItemRef | null) {
     if (!draft || !combineNow) return
@@ -259,11 +271,12 @@ export default function MapsConsole({ projectId, projectTitle = '', scenes = [],
   const path = draft ? mapPath(m.maps, draft.id) : []
   const hint = combineNow ? ({ merge: ' · pick the shape to merge with, Esc stops', cut: ' · pick the shape to cut out, Esc stops', split: ' · pick the line to split along, Esc stops' } as const)[combineNow.action]
     : tool === 'line' || tool === 'region' || tool === 'biome' ? ' · click to add points, double-click or Enter to finish, Esc to cancel'
-      : tool === 'shape' ? ' · drag a box to place the shape, or click to place it at its own size' : ''
+      : tool === 'shape' ? ' · drag a box to place the shape, or click to place it at its own size'
+        : tool === 'orbit' ? ' · press on a star and drag out to draw an orbit round it (a click: 4 cells round); planets dropped on it go round on it' : ''
   const shapeKind = (id: string) => {
     const sh = draft?.shapes.find(s => s.id === id)
     if (sh && isMarker(sh)) return sh.kind ? markerName(sh.kind) : 'Marker'
-    return ({ region: 'Region', line: 'Line', biome: 'Biome area' } as const)[sh?.type ?? 'line']
+    return ({ region: 'Region', line: 'Line', biome: 'Biome area', orbit: 'Orbit' } as const)[sh?.type ?? 'line']
   }
   const statusText = hover
     ? `Cell ${hover[0] + 1}, ${hover[1] + 1}${under ? ` · ${under.name}${under.height !== null ? `, ${formatHeight(under.height, draft?.units)}` : ''}` : ''}`
@@ -277,7 +290,7 @@ export default function MapsConsole({ projectId, projectTitle = '', scenes = [],
         <h2 className="mapBarTitle">Maps</h2>
         {draft && (
           <div className="mapTools" role="toolbar" aria-label="Map tools">
-            {TOOLS.map(({ tool: t, label, Icon }) => (
+            {TOOLS.filter(({ tool: t }) => t !== 'orbit' || isSpace(draft)).map(({ tool: t, label, Icon }) => (
               <button key={t} type="button" className="mapIconBtn" aria-pressed={tool === t} aria-label={label} title={label} onClick={() => setTool(t)}><Icon size={18} /></button>
             ))}
             <span className="mapSep" aria-hidden="true" />
@@ -323,7 +336,7 @@ export default function MapsConsole({ projectId, projectTitle = '', scenes = [],
               <VersionBar m={m} draft={draft} points={points} />
               <MapCanvas
                 draft={draft} biomes={biomes.index} biome={chosenBiome} tool={tool} showGrid={grid} pen={pen} selected={selected} onSelect={setPicked}
-                onPlace={place} onPlaceShape={(box, at) => placeShape(box, at)} previewShape={box => previewShape(box)}
+                onPlace={place} onPlaceShape={(box, at) => placeShape(box, at)} previewShape={box => previewShape(box)} onPlaceOrbit={placeOrbit}
                 picking={combineNow !== null} onPick={pickToCombine}
                 onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
                 onOpenPlace={id => { void m.open(id) }} onMeasure={setMeasured}

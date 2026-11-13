@@ -235,7 +235,13 @@ describe('the pens', () => {
   })
 
   it('has a few of each, every one drawn in a style the map knows', () => {
-    expect(LINE_PRESETS.map(p => p.id)).toEqual(['river', 'road', 'trail', 'border', 'wall', 'fence'])
+    expect(LINE_PRESETS.map(p => p.id)).toEqual(['river', 'road', 'trail', 'border', 'wall', 'fence', 'route'])
+    // Each level is offered its own: rivers on land, routes and nebulae in space.
+    const offered = (list: typeof LINE_PRESETS, drawn: 'biomes' | 'materials' | 'space') => list.filter(p => p.drawn.includes(drawn)).map(p => p.id)
+    expect(offered(LINE_PRESETS, 'space')).toEqual(['border', 'route'])
+    expect(offered(LINE_PRESETS, 'biomes')).toContain('river')
+    expect(offered(REGION_PRESETS, 'space')).toEqual(['danger', 'nebula', 'space-territory'])
+    expect(REGION_PRESETS.find(p => p.id === 'nebula')!.pen.pattern).toBe('glow')
     expect(new Set(LINE_PRESETS.map(p => p.pen.style)).size).toBeGreaterThanOrEqual(5)
     expect(REGION_PRESETS.length).toBeGreaterThanOrEqual(4)
     expect(DEFAULT_LINE_PEN.style).toBe('solid')

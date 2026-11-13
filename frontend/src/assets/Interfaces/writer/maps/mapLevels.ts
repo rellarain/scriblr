@@ -55,6 +55,8 @@ export const GROUP_LEVELS: Record<MapBiomeGroup, MapLevel[]> = {
   water: ['planetary', 'continental', 'national', 'regional', 'local'],
   material: ['architectural', 'interior'],
   space: ['intergalactic', 'galactic'],
+  planet: ['galactic'],
+  star: ['intergalactic', 'galactic'],
 }
 
 export const FEET_PER_METRE = 1 / 0.3048

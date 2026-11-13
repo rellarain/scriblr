@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MapDoc, MapShape } from '../../../../api/types'
 import { addLabel, addLibraryShape } from './mapItems'
 import { starterShapes } from './mapShapeSeed'
-import { MAX_TINT, NATIONS_LAND, NATIONS_WATER, drawMap, heightTint, type MakeCanvas } from './mapRender'
+import { MAX_TINT, NATIONS_LAND, NATIONS_WATER, drawMap, heightTint, starfieldOf, type MakeCanvas } from './mapRender'
+import { makeOrbit } from './mapOrbits'
 import { LINE_PRESETS, makeBiomeShape } from './mapShapes'
 import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
 import { draftOf, setOverlay, toggleLayer, type MapDraft } from './mapModel'
@@ -13,6 +14,8 @@ function recorder() {
   const calls: Array<[string, unknown[]]> = []
   const fills: string[] = []
   const props: Record<string, unknown> = {}
+  // Every property set, in order (a shadow's colour and blur, say).
+  const sets: Array<[string, unknown]> = []
   const ctx = new Proxy({}, {
     get(_t, name: string) {
       if (name === 'measureText') return (text: string) => ({ width: text.length * 6 })
@@ -22,9 +25,9 @@ function recorder() {
         if (name === 'fill' || name === 'fillRect') fills.push(String(props.fillStyle))
       }
     },
-    set(_t, name: string, value) { props[name] = value; return true },
+    set(_t, name: string, value) { props[name] = value; sets.push([name, value]); return true },
   }) as unknown as CanvasRenderingContext2D
-  return { ctx, calls, fills, texts: () => calls.filter(([n]) => n === 'fillText').map(([, a]) => String(a[0])), count: (n: string) => calls.filter(([c]) => c === n).length }
+  return { ctx, calls, fills, sets, texts: () => calls.filter(([n]) => n === 'fillText').map(([, a]) => String(a[0])), count: (n: string) => calls.filter(([c]) => c === n).length }
 }
 
 class FakePath { constructor(public d: string) {} }
@@ -354,5 +357,56 @@ describe('drawing lines and regions', () => {
     const r = recorder()
     drawMap(r.ctx, base(mapWith(shape({ points: [pt(2, 2)] }))))
     expect(r.count('lineTo')).toBe(0)
+  })
+})
+
+describe('drawing space', () => {
+  const pt = (x: number, y: number) => ({ x, y, smooth: true, hx: null, hy: null })
+  const round = (cx: number, cy: number, r: number) => [0, 1, 2, 3, 4, 5].map(k => pt(cx + r * Math.cos((k / 6) * Math.PI * 2), cy + r * Math.sin((k / 6) * Math.PI * 2)))
+  const body = (id: string, biome: string, cx: number, cy: number, r = 1): MapShape => ({
+    id, layerId: 'terrain', type: 'biome', points: round(cx, cy, r), style: 'solid', color: null, width: 0.05, fill: null, opacity: 1, pattern: 'solid', biome, name: '', mapIds: [],
+  })
+  const space = (...shapes: MapShape[]): MapDraft => {
+    const d = draftOf({ ...doc(), level: 'galactic', base: { biome: 'space', height: 0 } })
+    d.layers = [d.layers[0], { id: 'shapes', name: 'Regions and lines', kind: 'shapes', visible: true, locked: false }, ...d.layers.slice(1)]
+    d.shapes = shapes
+    return d
+  }
+
+  it('draws a backdrop of faint stars on a map of space, the same for a map each time, and none on land', () => {
+    const r = recorder()
+    drawMap(r.ctx, base(space()))
+    expect(r.count('fillRect')).toBeGreaterThan(50)
+    expect(starfieldOf('map_1', 20, 10)).toBe(starfieldOf('map_1', 20, 10))
+    expect(Array.from(starfieldOf('map_1', 20, 10))).not.toEqual(Array.from(starfieldOf('map_2', 20, 10)))
+    const land = recorder()
+    drawMap(land.ctx, base(draftOf(doc())))
+    expect(land.count('fillRect')).toBeLessThan(5)
+  })
+
+  it('draws a star with a glow in its own colour, a black hole with a warm one, and a planet in the colour of its kind without one', () => {
+    const r = recorder()
+    drawMap(r.ctx, base(space(body('bio_sun', 'star_yellow', 10, 5, 1.5), body('bio_hole', 'star_black_hole', 4, 4), body('bio_giant', 'planet_gas_giant', 15, 5))))
+    expect(r.fills).toEqual(expect.arrayContaining(['#ffd54a', '#0b0b10', '#d9a066']))
+    const glows = r.sets.filter(([n]) => n === 'shadowColor').map(([, v]) => v)
+    expect(glows).toEqual(['#ffd54a', '#ffb15c'])
+    expect(r.sets.some(([n, v]) => n === 'shadowBlur' && Number(v) > 0)).toBe(true)
+  })
+
+  it('draws an orbit as a dashed path round its centre, never filled', () => {
+    const r = recorder()
+    drawMap(r.ctx, base(space(makeOrbit('orb_a', 'shapes', 10, 5, 3))))
+    expect(r.count('fill')).toBe(0)
+    expect(r.count('stroke')).toBeGreaterThanOrEqual(1)
+    expect(r.count('lineTo')).toBeGreaterThanOrEqual(96)
+    expect(r.calls.some(([n, a]) => n === 'setLineDash' && (a[0] as number[]).length > 0)).toBe(true)
+  })
+
+  it('draws a glowing region with its edge blurred inside its outline', () => {
+    const r = recorder()
+    const nebula: MapShape = { id: 'shp_n', layerId: 'shapes', type: 'region', points: round(6, 5, 3), style: 'dotted', color: '#b48ce0', width: 0.06, fill: '#9a5fd0', opacity: 0.4, pattern: 'glow' }
+    drawMap(r.ctx, base(space(nebula)))
+    expect(r.count('clip')).toBeGreaterThanOrEqual(1)
+    expect(r.sets).toEqual(expect.arrayContaining([['shadowColor', '#9a5fd0']]))
   })
 })

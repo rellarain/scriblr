@@ -1,4 +1,4 @@
-import type { MapShape, MapShapePoint } from '../../../../api/types'
+import type { MapEllipse, MapShape, MapShapePoint } from '../../../../api/types'
 import { flatten, isClosed } from './mapShapes'
 
 // The outline of a shape as it is drawn: its rings (the outline and its holes, each a polyline in cells) with the rough edge applied. One function, so the
@@ -96,6 +96,13 @@ const cache = new WeakMap<MapShape, Rings>()
 export function ringsOf(shape: MapShape): Rings {
   const hit = cache.get(shape)
   if (hit) return hit
+  // An orbit is its ellipse, as a closed path (the first point again at the end).
+  if (shape.type === 'orbit') {
+    const pts = shape.ellipse ? ellipseRing(shape.ellipse, 96) : []
+    const rings = { outer: pts.length > 0 ? [...pts, pts[0]] : [], holes: [] }
+    cache.set(shape, rings)
+    return rings
+  }
   const closed = isClosed(shape)
   const outer0 = ringOf(shape.points, closed)
   const holes0 = closed ? (shape.holes ?? []).filter(h => h.length >= 3).map(h => ringOf(h, true)) : []
@@ -147,7 +154,17 @@ export function distanceToEdge(shape: MapShape, x: number, y: number): number {
 }
 
 // Whether a shape's drawn outline is not its points' own curve (rough, or with more rings): then it is drawn from its rings.
-export const drawnFromRings = (shape: MapShape) => (shape.rough ?? 0) > 0 || (isClosed(shape) && (shape.holes?.length ?? 0) > 0)
+export const drawnFromRings = (shape: MapShape) => shape.type === 'orbit' || (shape.rough ?? 0) > 0 || (isClosed(shape) && (shape.holes?.length ?? 0) > 0)
+
+// A point of an ellipse at an angle (degrees, 0 = its own right, clockwise on the map), turned by its turn.
+export function ellipseAt(e: MapEllipse, angle: number): XY {
+  const a = (angle * Math.PI) / 180, t = (e.turn * Math.PI) / 180
+  const lx = e.rx * Math.cos(a), ly = e.ry * Math.sin(a)
+  return { x: e.cx + lx * Math.cos(t) - ly * Math.sin(t), y: e.cy + lx * Math.sin(t) + ly * Math.cos(t) }
+}
+
+// An ellipse as `n` points round it.
+export const ellipseRing = (e: MapEllipse, n: number): XY[] => Array.from({ length: n }, (_, k) => ellipseAt(e, (k / n) * 360))
 
 // A seed for a new rough shape.
 export const newSeed = () => Math.floor(Math.random() * 2 ** 31)

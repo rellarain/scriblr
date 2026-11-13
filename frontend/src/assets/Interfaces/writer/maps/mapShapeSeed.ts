@@ -8,7 +8,7 @@ import { templatePoints } from './mapTemplates'
 // server turns old symbols into; the design system's pretend backend reads the same list. Pure: the same build gives the same list.
 
 // How much of this list a catalog has seen (raise it when shapes are added: they join the admin's draft and published list once).
-export const SEED_VERSION = 1
+export const SEED_VERSION = 2
 
 export const LAND_LEVELS: MapLevel[] = ['planetary', 'continental', 'national', 'regional', 'local']
 export const SPACE_LEVELS: MapLevel[] = ['intergalactic', 'galactic']
@@ -173,16 +173,26 @@ export function starterShapes(): MapLibraryShape[] {
     shape('land:plateau', 'Plateau', 'land', LAND_LEVELS, 'biome', 10, 8, ellipseRing(0.5, 0.5, 0.49, 0.48, 8, [1, 0.97, 1, 0.95]), [], LAND,
       { heightMode: 'raise', height: 800, profile: 'plateau', slope: 1.5, rough: 25 }),
   )
-  // Space objects (more in the space slice).
+  // Space objects. A star, a planet, a moon and a star system are biome shapes: their kind (a kind of star or planet in the biome list) colours them.
   const SPACE: Base = { ...REGION, style: 'halo', width: 0.05 }
+  const BODY: Base = { ...LAND, width: 0.05 }
+  const round = (n: number) => ellipseRing(0.5, 0.5, 0.5, 0.5, n)
   out.push(
-    shape('space:star', 'Star', 'space', SPACE_LEVELS, 'region', 2, 2, ellipseRing(0.5, 0.5, 0.5, 0.5, 8), [], SPACE, { fill: '#f5c542' }),
-    shape('space:planet', 'Planet', 'space', SPACE_LEVELS, 'region', 1.5, 1.5, ellipseRing(0.5, 0.5, 0.5, 0.5, 8), [], SPACE, { fill: '#5b8fd1' }),
+    shape('space:star', 'Star', 'space', SPACE_LEVELS, 'biome', 2, 2, round(8), [], BODY, { biome: 'star_yellow' }),
+    shape('space:planet', 'Planet', 'space', ['galactic'], 'biome', 1.5, 1.5, round(8), [], BODY, { biome: 'planet_rocky' }),
+    shape('space:moon', 'Moon', 'space', ['galactic'], 'biome', 0.6, 0.6, round(8), [], BODY, { biome: 'planet_rocky' }),
+    shape('space:star-system', 'Star system', 'space', ['intergalactic'], 'biome', 2, 2, round(12), [ellipseRing(0.5, 0.5, 0.4, 0.4, 12), ellipseRing(0.5, 0.5, 0.2, 0.2, 8)], BODY, { biome: 'star_yellow' }),
+    shape('space:station', 'Station', 'space', ['galactic'], 'region', 1, 1,
+      [[0.4, 0], [0.6, 0], [0.6, 0.4], [1, 0.4], [1, 0.6], [0.6, 0.6], [0.6, 1], [0.4, 1], [0.4, 0.6], [0, 0.6], [0, 0.4], [0.4, 0.4]].map(([x, y]) => corner({ x, y })), [], SPACE, { fill: '#c8d0da' }),
+    shape('space:comet', 'Comet', 'space', SPACE_LEVELS, 'region', 3, 1,
+      [{ x: 1, y: 0.5, smooth: true, hx: null, hy: null }, { x: 0.84, y: 0.92, smooth: true, hx: null, hy: null }, { x: 0.66, y: 0.62, smooth: true, hx: null, hy: null }, corner({ x: 0, y: 0.5 }),
+        { x: 0.66, y: 0.38, smooth: true, hx: null, hy: null }, { x: 0.84, y: 0.08, smooth: true, hx: null, hy: null }], [], SPACE, { fill: '#cfe8ff', opacity: 0.9 }),
+    shape('space:asteroid', 'Asteroid', 'space', ['galactic'], 'region', 0.8, 0.6, templatePoints('blob', unitBox, { seed: 31 }), [], SPACE, { fill: '#8a8273', rough: 40 }),
     shape('space:ring', 'Ring', 'space', SPACE_LEVELS, 'region', 6, 2, ellipseRing(0.5, 0.5, 0.5, 0.5, 10), [ellipseRing(0.5, 0.5, 0.36, 0.3, 10)], SPACE, { fill: '#c9b48a', opacity: 0.85 }),
     shape('space:asteroid-belt', 'Asteroid belt', 'space', SPACE_LEVELS, 'region', 20, 20, ellipseRing(0.5, 0.5, 0.5, 0.5, 12), [ellipseRing(0.5, 0.5, 0.42, 0.42, 12)],
       { ...REGION, style: 'dotted', color: '#8a8273', width: 0.08 }, { fill: '#8a8273', opacity: 0.35, pattern: 'dots', rough: 30 }),
     shape('space:nebula', 'Nebula', 'space', SPACE_LEVELS, 'region', 14, 10, templatePoints('blob', unitBox, { seed: 23 }), [], { ...REGION, style: 'dotted', color: '#b48ce0', width: 0.06 },
-      { fill: '#9a5fd0', opacity: 0.3, rough: 60 }),
+      { fill: '#9a5fd0', opacity: 0.4, pattern: 'glow', rough: 60 }),
   )
   // Building parts.
   const ROOM: Base = { ...REGION, style: 'wall', width: 0.25, fill: '#e8dcc4', opacity: 0.55 }

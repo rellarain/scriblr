@@ -113,7 +113,13 @@ describe('the biomes', () => {
     expect(offeredBiomes(index, 'regional').map(b => b.id)).not.toContain('own_old')
     expect(offeredBiomes(index, 'interior').map(b => b.id)).toEqual(expect.arrayContaining(['wood', 'carpet', 'freshwater', 'dirt']))
     expect(offeredBiomes(index, 'interior').map(b => b.id)).not.toContain('forest')
-    expect(offeredBiomes(index, 'galactic').map(b => b.id)).toEqual(['space'])
+    // A star system offers space, the kinds of star and the kinds of planet; between star systems, no planets.
+    const galactic = offeredBiomes(index, 'galactic').map(b => b.id)
+    expect(galactic).toEqual(expect.arrayContaining(['space', 'star_yellow', 'star_black_hole', 'planet_garden', 'planet_gas_giant']))
+    expect(galactic).not.toContain('forest')
+    expect(offeredBiomes(index, 'intergalactic').map(b => b.id)).toEqual(expect.arrayContaining(['space', 'star_red']))
+    expect(offeredBiomes(index, 'intergalactic').map(b => b.id)).not.toContain('planet_ice')
+    expect(offeredBiomes(index, 'planetary').map(b => b.id)).not.toContain('star_yellow')
     expect(levelsOfBiome(STARTER_BIOMES.find(b => b.id === 'paving')!)).toEqual(['local', 'architectural', 'interior'])
   })
 

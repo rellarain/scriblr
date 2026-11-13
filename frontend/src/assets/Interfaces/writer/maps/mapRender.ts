@@ -1,5 +1,6 @@
 import { drawAreaName, drawMeasure, drawLabel, drawOverlays, drawPlaceName, drawSelection, type MeasureState } from './mapDrawItems'
-import { drawBiomeShape, drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
+import { drawBiomeShape, drawPending, drawShape, drawShapeEditor, starGlow, type PendingShape } from './mapDrawShapes'
+import { levelDef } from './mapLevels'
 import { drawJourneys, type JourneyView } from './mapDrawJourneys'
 import type { MapShape } from '../../../../api/types'
 import { findItem, showsPoints, type ItemRef, type LegendEntry } from './mapItems'
@@ -96,6 +97,36 @@ function drawContours(ctx: CanvasRenderingContext2D, segments: ContourSegment[],
   ctx.restore()
 }
 
+// The backdrop of a space map: faint stars, the same for a map every time (seeded by its id and size), a few brighter, about one in every two cells.
+const STARFIELDS = new Map<string, Float32Array>()
+export function starfieldOf(id: string, width: number, height: number): Float32Array {
+  const key = `${id}:${width}x${height}`
+  const hit = STARFIELDS.get(key)
+  if (hit) return hit
+  let seed = 2166136261
+  for (const ch of key) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619) >>> 0
+  const rand = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296 }
+  const n = Math.min(6000, Math.round(width * height * 0.5))
+  const out = new Float32Array(n * 3)
+  for (let i = 0; i < n; i += 1) { out[i * 3] = rand() * width; out[i * 3 + 1] = rand() * height; out[i * 3 + 2] = rand() }
+  if (STARFIELDS.size > 16) STARFIELDS.clear()
+  STARFIELDS.set(key, out)
+  return out
+}
+
+function drawStarfield(ctx: CanvasRenderingContext2D, draft: MapDraft, view: MapView, theme: MapThemeDef) {
+  const stars = starfieldOf(draft.id, draft.width, draft.height)
+  ctx.save()
+  ctx.fillStyle = theme.ink
+  for (let i = 0; i < stars.length; i += 3) {
+    const b = stars[i + 2]
+    const r = b > 0.97 ? 1.6 : b > 0.85 ? 1.1 : 0.7
+    ctx.globalAlpha = 0.25 + b * 0.6
+    ctx.fillRect(view.x + stars[i] * view.zoom - r / 2, view.y + stars[i + 1] * view.zoom - r / 2, r, r)
+  }
+  ctx.restore()
+}
+
 // The land of a map: the base, then its biome shapes in their order, each in its biome's colour (a shape with no biome of its own changes only the height),
 // then the shading of the heights over it all, and the contour lines. In the Nations view the land is neutral and has no shading.
 export function drawLand(ctx: CanvasRenderingContext2D, draft: MapDraft, biomes: BiomeIndex, view: MapView, layerId: string, opts: { nations?: boolean; makeCanvas?: MakeCanvas; theme?: MapThemeDef } = {}) {
@@ -109,9 +140,12 @@ export function drawLand(ctx: CanvasRenderingContext2D, draft: MapDraft, biomes:
   ctx.fillStyle = colourOf(draft.base.biome)
   ctx.fillRect(view.x, view.y, w, h)
   ctx.restore()
+  const space = levelDef(draft.level).drawn === 'space'
+  if (space) drawStarfield(ctx, draft, view, opts.theme ?? mapStyle(draft.level))
   for (const s of draft.shapes) {
     if (s.type !== 'biome' || s.layerId !== layerId || !s.biome) continue
-    drawBiomeShape(ctx, s, view, colourOf(s.biome))
+    const b = resolveBiome(biomes, s.biome)
+    drawBiomeShape(ctx, s, view, colourOf(s.biome), 0, space && b.group === 'star' ? starGlow(b.color) : undefined)
   }
   if (opts.nations || mapHeightRange(draft) <= 0) return
   const shade = shadeImage(draft, biomes, opts.makeCanvas ?? domCanvas)

@@ -7,6 +7,7 @@ import { GROUP_LEVELS } from '../../writer/maps/mapLevels'
 
 export const BIOME_GROUPS: Array<{ id: MapBiomeGroup; name: string }> = [
   { id: 'land', name: 'Land' }, { id: 'water', name: 'Water' }, { id: 'material', name: 'Floor material' }, { id: 'space', name: 'Space' },
+  { id: 'star', name: 'Kind of star' }, { id: 'planet', name: 'Kind of planet' },
 ]
 
 const NEW_COLOURS = ['#7fae5a', '#c9a36a', '#6c9bd2', '#b5654a', '#9aa86a', '#d9a441', '#4fa89a', '#8e7aa8']

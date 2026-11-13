@@ -1,5 +1,5 @@
 {
- "seedVersion": 1,
+ "seedVersion": 2,
  "shapes": [
   {
    "style": "solid",
@@ -1051,13 +1051,13 @@
    "holes": []
   },
   {
-   "style": "halo",
+   "style": "solid",
    "color": null,
    "width": 0.05,
-   "fill": "#f5c542",
+   "fill": null,
    "opacity": 1,
    "pattern": "solid",
-   "biome": null,
+   "biome": "star_yellow",
    "heightMode": "none",
    "height": 0,
    "profile": "plateau",
@@ -1070,7 +1070,7 @@
     "intergalactic",
     "galactic"
    ],
-   "type": "region",
+   "type": "biome",
    "w": 2,
    "h": 2,
    "points": [
@@ -1134,13 +1134,13 @@
    "holes": []
   },
   {
-   "style": "halo",
+   "style": "solid",
    "color": null,
    "width": 0.05,
-   "fill": "#5b8fd1",
+   "fill": null,
    "opacity": 1,
    "pattern": "solid",
-   "biome": null,
+   "biome": "planet_rocky",
    "heightMode": "none",
    "height": 0,
    "profile": "plateau",
@@ -1150,10 +1150,9 @@
    "name": "Planet",
    "category": "space",
    "levels": [
-    "intergalactic",
     "galactic"
    ],
-   "type": "region",
+   "type": "biome",
    "w": 1.5,
    "h": 1.5,
    "points": [
@@ -1209,6 +1208,611 @@
     {
      "x": 0.1464,
      "y": 0.1464,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    }
+   ],
+   "holes": []
+  },
+  {
+   "style": "solid",
+   "color": null,
+   "width": 0.05,
+   "fill": null,
+   "opacity": 1,
+   "pattern": "solid",
+   "biome": "planet_rocky",
+   "heightMode": "none",
+   "height": 0,
+   "profile": "plateau",
+   "slope": 0,
+   "rough": 0,
+   "id": "space:moon",
+   "name": "Moon",
+   "category": "space",
+   "levels": [
+    "galactic"
+   ],
+   "type": "biome",
+   "w": 0.6,
+   "h": 0.6,
+   "points": [
+    {
+     "x": 0.5,
+     "y": 0,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.8536,
+     "y": 0.1464,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 1,
+     "y": 0.5,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.8536,
+     "y": 0.8536,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.5,
+     "y": 1,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.1464,
+     "y": 0.8536,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0,
+     "y": 0.5,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.1464,
+     "y": 0.1464,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    }
+   ],
+   "holes": []
+  },
+  {
+   "style": "solid",
+   "color": null,
+   "width": 0.05,
+   "fill": null,
+   "opacity": 1,
+   "pattern": "solid",
+   "biome": "star_yellow",
+   "heightMode": "none",
+   "height": 0,
+   "profile": "plateau",
+   "slope": 0,
+   "rough": 0,
+   "id": "space:star-system",
+   "name": "Star system",
+   "category": "space",
+   "levels": [
+    "intergalactic"
+   ],
+   "type": "biome",
+   "w": 2,
+   "h": 2,
+   "points": [
+    {
+     "x": 0.5,
+     "y": 0,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.75,
+     "y": 0.067,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.933,
+     "y": 0.25,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 1,
+     "y": 0.5,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.933,
+     "y": 0.75,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.75,
+     "y": 0.933,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.5,
+     "y": 1,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.25,
+     "y": 0.933,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.067,
+     "y": 0.75,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0,
+     "y": 0.5,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.067,
+     "y": 0.25,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.25,
+     "y": 0.067,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    }
+   ],
+   "holes": [
+    [
+     {
+      "x": 0.5,
+      "y": 0.1,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.7,
+      "y": 0.1536,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.8464,
+      "y": 0.3,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.9,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.8464,
+      "y": 0.7,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.7,
+      "y": 0.8464,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.5,
+      "y": 0.9,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.3,
+      "y": 0.8464,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1536,
+      "y": 0.7,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1536,
+      "y": 0.3,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.3,
+      "y": 0.1536,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     }
+    ],
+    [
+     {
+      "x": 0.5,
+      "y": 0.3,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.6414,
+      "y": 0.3586,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.7,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.6414,
+      "y": 0.6414,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.5,
+      "y": 0.7,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.3586,
+      "y": 0.6414,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.3,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.3586,
+      "y": 0.3586,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     }
+    ]
+   ]
+  },
+  {
+   "style": "halo",
+   "color": null,
+   "width": 0.05,
+   "fill": "#c8d0da",
+   "opacity": 1,
+   "pattern": "solid",
+   "biome": null,
+   "heightMode": "none",
+   "height": 0,
+   "profile": "plateau",
+   "slope": 0,
+   "rough": 0,
+   "id": "space:station",
+   "name": "Station",
+   "category": "space",
+   "levels": [
+    "galactic"
+   ],
+   "type": "region",
+   "w": 1,
+   "h": 1,
+   "points": [
+    {
+     "x": 0.4,
+     "y": 0,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.6,
+     "y": 0,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.6,
+     "y": 0.4,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 1,
+     "y": 0.4,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 1,
+     "y": 0.6,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.6,
+     "y": 0.6,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.6,
+     "y": 1,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.4,
+     "y": 1,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.4,
+     "y": 0.6,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0,
+     "y": 0.6,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0,
+     "y": 0.4,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.4,
+     "y": 0.4,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    }
+   ],
+   "holes": []
+  },
+  {
+   "style": "halo",
+   "color": null,
+   "width": 0.05,
+   "fill": "#cfe8ff",
+   "opacity": 0.9,
+   "pattern": "solid",
+   "biome": null,
+   "heightMode": "none",
+   "height": 0,
+   "profile": "plateau",
+   "slope": 0,
+   "rough": 0,
+   "id": "space:comet",
+   "name": "Comet",
+   "category": "space",
+   "levels": [
+    "intergalactic",
+    "galactic"
+   ],
+   "type": "region",
+   "w": 3,
+   "h": 1,
+   "points": [
+    {
+     "x": 1,
+     "y": 0.5,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.84,
+     "y": 0.92,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.66,
+     "y": 0.62,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0,
+     "y": 0.5,
+     "smooth": false,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.66,
+     "y": 0.38,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.84,
+     "y": 0.08,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    }
+   ],
+   "holes": []
+  },
+  {
+   "style": "halo",
+   "color": null,
+   "width": 0.05,
+   "fill": "#8a8273",
+   "opacity": 1,
+   "pattern": "solid",
+   "biome": null,
+   "heightMode": "none",
+   "height": 0,
+   "profile": "plateau",
+   "slope": 0,
+   "rough": 40,
+   "id": "space:asteroid",
+   "name": "Asteroid",
+   "category": "space",
+   "levels": [
+    "galactic"
+   ],
+   "type": "region",
+   "w": 0.8,
+   "h": 0.6,
+   "points": [
+    {
+     "x": 0.499,
+     "y": 0.14,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.747,
+     "y": 0.143,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.854,
+     "y": 0.418,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.832,
+     "y": 0.66,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.609,
+     "y": 0.943,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.382,
+     "y": 0.974,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.156,
+     "y": 0.72,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.022,
+     "y": 0.434,
+     "smooth": true,
+     "hx": null,
+     "hy": null
+    },
+    {
+     "x": 0.153,
+     "y": 0.166,
      "smooth": true,
      "hx": null,
      "hy": null
@@ -1589,8 +2193,8 @@
    "color": "#b48ce0",
    "width": 0.06,
    "fill": "#9a5fd0",
-   "opacity": 0.3,
-   "pattern": "solid",
+   "opacity": 0.4,
+   "pattern": "glow",
    "biome": null,
    "heightMode": "none",
    "height": 0,
@@ -7737,5 +8341,269 @@
    ],
    "holes": []
   }
- ]
+ ],
+ "replaces": {
+  "space:star": [
+   {
+    "style": "halo",
+    "color": null,
+    "width": 0.05,
+    "fill": "#f5c542",
+    "opacity": 1,
+    "pattern": "solid",
+    "biome": null,
+    "heightMode": "none",
+    "height": 0,
+    "profile": "plateau",
+    "slope": 0,
+    "rough": 0,
+    "id": "space:star",
+    "name": "Star",
+    "category": "space",
+    "levels": [
+     "intergalactic",
+     "galactic"
+    ],
+    "type": "region",
+    "w": 2,
+    "h": 2,
+    "points": [
+     {
+      "x": 0.5,
+      "y": 0,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.8536,
+      "y": 0.1464,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 1,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.8536,
+      "y": 0.8536,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.5,
+      "y": 1,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1464,
+      "y": 0.8536,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1464,
+      "y": 0.1464,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     }
+    ],
+    "holes": []
+   }
+  ],
+  "space:planet": [
+   {
+    "style": "halo",
+    "color": null,
+    "width": 0.05,
+    "fill": "#5b8fd1",
+    "opacity": 1,
+    "pattern": "solid",
+    "biome": null,
+    "heightMode": "none",
+    "height": 0,
+    "profile": "plateau",
+    "slope": 0,
+    "rough": 0,
+    "id": "space:planet",
+    "name": "Planet",
+    "category": "space",
+    "levels": [
+     "intergalactic",
+     "galactic"
+    ],
+    "type": "region",
+    "w": 1.5,
+    "h": 1.5,
+    "points": [
+     {
+      "x": 0.5,
+      "y": 0,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.8536,
+      "y": 0.1464,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 1,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.8536,
+      "y": 0.8536,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.5,
+      "y": 1,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1464,
+      "y": 0.8536,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0,
+      "y": 0.5,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.1464,
+      "y": 0.1464,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     }
+    ],
+    "holes": []
+   }
+  ],
+  "space:nebula": [
+   {
+    "style": "dotted",
+    "color": "#b48ce0",
+    "width": 0.06,
+    "fill": "#9a5fd0",
+    "opacity": 0.3,
+    "pattern": "solid",
+    "biome": null,
+    "heightMode": "none",
+    "height": 0,
+    "profile": "plateau",
+    "slope": 0,
+    "rough": 60,
+    "id": "space:nebula",
+    "name": "Nebula",
+    "category": "space",
+    "levels": [
+     "intergalactic",
+     "galactic"
+    ],
+    "type": "region",
+    "w": 14,
+    "h": 10,
+    "points": [
+     {
+      "x": 0.486,
+      "y": 0.14,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.76,
+      "y": 0.215,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.852,
+      "y": 0.394,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.898,
+      "y": 0.795,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.636,
+      "y": 0.9,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.389,
+      "y": 0.982,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.118,
+      "y": 0.712,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.138,
+      "y": 0.406,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     },
+     {
+      "x": 0.205,
+      "y": 0.134,
+      "smooth": true,
+      "hx": null,
+      "hy": null
+     }
+    ],
+    "holes": []
+   }
+  ]
+ }
 }

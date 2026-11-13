@@ -12,6 +12,7 @@ from typing import Callable
 from . import project_store
 from .schema import (
     MAP_BIOME_HISTORY_MAX,
+    MAP_BIOME_SEED_VERSIONS,
     MapBiome,
     MapBiomeCatalog,
     PublishedBiomes,
@@ -20,7 +21,7 @@ from .schema import (
 )
 
 # How much of the starter list a catalog has seen (raise it when starter biomes are added: they join the draft and the published list once).
-SEED_VERSION = 1
+SEED_VERSION = max(MAP_BIOME_SEED_VERSIONS)
 
 _lock = threading.RLock()
 
@@ -51,7 +52,18 @@ def load_catalog(root: Path) -> MapBiomeCatalog:
             catalog = default_catalog()
             save_catalog(root, catalog)
             return catalog
-        return project_store._read_shard(path, MapBiomeCatalog)
+        catalog = project_store._read_shard(path, MapBiomeCatalog)
+        # Starter biomes added by a later build (the kinds of star and planet) join the draft and the published list once, after the admin's own.
+        if catalog.seedVersion < SEED_VERSION:
+            seen = MAP_BIOME_SEED_VERSIONS.get(catalog.seedVersion, 0)
+            ids = {b.id for b in catalog.draft} | ({b.id for b in catalog.published.biomes} if catalog.published else set())
+            fresh = [b for b in seed_biomes()[seen:] if b.id not in ids]
+            catalog.draft.extend(b.model_copy() for b in fresh)
+            if catalog.published:
+                catalog.published.biomes.extend(b.model_copy() for b in fresh)
+            catalog.seedVersion = SEED_VERSION
+            save_catalog(root, catalog)
+        return catalog
 
 
 def save_catalog(root: Path, catalog: MapBiomeCatalog) -> None:

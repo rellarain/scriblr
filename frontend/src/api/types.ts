@@ -447,7 +447,8 @@ export interface MapTerrain { id: string; name: string; color: string; builtIn: 
 export interface MapLayer { id: string; name: string; kind: MapLayerKind; visible: boolean; locked: boolean }
 // A biome: what colours the land (or a floor, or space). `color` is how it looks at sea level; `levels` the levels it is offered on (none = its group's);
 // a retired biome is no longer offered, and maps that use it keep its colour. The admin's list is published to every project; a project adds its own ("own_" ids).
-export type MapBiomeGroup = 'land' | 'water' | 'material' | 'space'
+// `planet` and `star`: the kinds of planet and star of the space levels (a planet's or star's shape takes one as its biome).
+export type MapBiomeGroup = 'land' | 'water' | 'material' | 'space' | 'planet' | 'star'
 export interface MapBiome { id: string; name: string; color: string; group: MapBiomeGroup; levels: MapLevel[]; retired: boolean }
 export interface PublishedBiomes { version: number; publishedAt: string; biomes: MapBiome[] }
 export interface MapBiomeCatalog { schemaVersion: number; seedVersion: number; draft: MapBiome[]; published: PublishedBiomes | null; history: PublishedBiomes[]; nextVersion: number }
@@ -466,10 +467,12 @@ export interface MapLabel { id: string; layerId: string; text: string; x: number
 // A point of a line or of a region's outline, in cells. A smooth point is a curve through it; (hx, hy) is its handle, where the curve leaves it relative to
 // the point (it arrives on the other side), or null for the handle the neighbouring points make.
 export interface MapShapePoint { x: number; y: number; smooth: boolean; hx: number | null; hy: number | null }
-export type MapShapeType = 'line' | 'region' | 'biome'
+// An orbit is the path a planet or a moon goes round on (its `ellipse`; no points), on a space map.
+export type MapShapeType = 'line' | 'region' | 'biome' | 'orbit'
 // `halo` draws no line: a ring in the map's halo colour round the shape, so a marker reads over any land.
 export type MapLineStyle = 'solid' | 'dashed' | 'dotted' | 'road' | 'wall' | 'fence' | 'halo'
-export type MapPattern = 'solid' | 'hatch' | 'cross' | 'dots'
+// `glow`: a soft light inside the edge (a nebula, a territory of space).
+export type MapPattern = 'solid' | 'hatch' | 'cross' | 'dots' | 'glow'
 export type MapHeightMode = 'none' | 'raise' | 'lower' | 'set'
 // How a biome shape's height change spreads over it (see mapHeights.ts), and the political areas a region can be.
 export type MapProfile = 'plateau' | 'hill' | 'peak' | 'basin'
@@ -498,7 +501,14 @@ export interface MapShape {
   rough?: number; seed?: number
   // The library shape it was placed from ("marker:castle", "land:island" ...), so the legend can name markers.
   kind?: string | null
+  // An orbit's path (orbits only); for a planet or a moon, the orbit it goes round on and where on it.
+  ellipse?: MapEllipse | null
+  orbit?: MapOrbitRef | null
 }
+// The path of an orbit: its centre and two radii in cells, turned `turn` degrees clockwise (-180 to 180) about the centre.
+export interface MapEllipse { cx: number; cy: number; rx: number; ry: number; turn: number }
+// Where a body is on an orbit: the orbit's id and the angle along it (degrees, 0 = the orbit's own right, clockwise).
+export interface MapOrbitRef { id: string; angle: number }
 // A shape of a library: a line, region or biome shape in a box of 1 by 1 (`w` by `h` cells when placed at its own size), with what it is drawn with
 // (heights in metres). The admin's default shapes are offered to every project by level (none = every level); "My shapes" are a writer's own.
 export type MapShapeCategory = 'land' | 'space' | 'building' | 'marker'

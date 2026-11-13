@@ -26,10 +26,18 @@ def _seed_path() -> Path:
 
 
 @lru_cache(maxsize=1)
-def _seed_file() -> tuple[int, tuple[MapLibraryShape, ...]]:
+def _seed_file() -> tuple[int, tuple[MapLibraryShape, ...], dict[str, tuple[MapLibraryShape, ...]]]:
     raw = json.loads(_seed_path().read_text(encoding="utf-8"))
     shapes = library_list(raw.get("shapes"), MAP_MAX_LIBRARY_SHAPES)
-    return int(raw.get("seedVersion", 1)), tuple(shapes)
+    replaces: dict[str, tuple[MapLibraryShape, ...]] = {}
+    for sid, olds in (raw.get("replaces") or {}).items():
+        replaces[sid] = tuple(library_list(olds, 50))
+    return int(raw.get("seedVersion", 1)), tuple(shapes), replaces
+
+
+def replaced_shapes() -> dict[str, tuple[MapLibraryShape, ...]]:
+    """The earlier forms of starter shapes a later seed changed (by id): one an admin left as it was is brought up to date."""
+    return _seed_file()[2]
 
 
 def seed_version() -> int:

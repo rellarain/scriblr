@@ -57,10 +57,20 @@ def load_catalog(root: Path) -> MapShapeCatalog:
             save_catalog(root, catalog)
             return catalog
         catalog = project_store._read_shard(path, MapShapeCatalog)
-        # Starter shapes added by a later build join the draft and the published list once.
+        # Starter shapes added by a later build join the draft and the published list once; a starter shape a later build changed is brought up to
+        # date where the admin left it as an earlier build gave it (the seed file keeps the earlier forms, `replaces`).
         if catalog.seedVersion < map_markers.seed_version():
+            seed = {s.id: s for s in map_markers.seed_shapes()}
+            earlier = map_markers.replaced_shapes()
+
+            def updated(shapes: list[MapLibraryShape]) -> list[MapLibraryShape]:
+                return [seed[s.id].model_copy(deep=True) if s.id in seed and any(s == old for old in earlier.get(s.id, ())) else s for s in shapes]
+
+            catalog.draft = updated(catalog.draft)
+            if catalog.published:
+                catalog.published.shapes = updated(catalog.published.shapes)
             ids = {s.id for s in catalog.draft} | ({s.id for s in catalog.published.shapes} if catalog.published else set())
-            fresh = [s for s in map_markers.seed_shapes() if s.id not in ids]
+            fresh = [s for s in seed.values() if s.id not in ids]
             catalog.draft.extend(s.model_copy(deep=True) for s in fresh)
             if catalog.published:
                 catalog.published.shapes.extend(s.model_copy(deep=True) for s in fresh)

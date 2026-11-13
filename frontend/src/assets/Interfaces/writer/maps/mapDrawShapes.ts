@@ -96,6 +96,18 @@ function drawPattern(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapVi
   ctx.save()
   trace(ctx, shape, view)
   ctx.clip(fillRule(shape))
+  // A glow: the edge stroked wide and blurred inside the outline, so the region is brightest at its edge and fades in (a nebula, a territory of space).
+  if (shape.pattern === 'glow') {
+    ctx.globalAlpha = Math.min(1, shape.opacity + 0.3)
+    ctx.strokeStyle = colour
+    ctx.shadowColor = colour
+    ctx.shadowBlur = Math.max(8, view.zoom * 1.2)
+    ctx.lineWidth = Math.max(2, view.zoom * 0.6)
+    trace(ctx, shape, view)
+    ctx.stroke()
+    ctx.restore()
+    return
+  }
   ctx.globalAlpha = Math.min(1, shape.opacity + 0.45)
   ctx.strokeStyle = colour
   ctx.fillStyle = colour
@@ -119,12 +131,20 @@ function drawPattern(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapVi
 }
 
 // A biome shape: its outline filled in its biome's colour (no line round it: the land meets the land). The shading by height is drawn over the whole land
-// afterwards (mapHeights.ts); `tint` (-1 to 1: white over it, or black) is for a shape shown on its own, such as one being drawn.
-export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, color: string, tint = 0) {
+// afterwards (mapHeights.ts); `tint` (-1 to 1: white over it, or black) is for a shape shown on its own, such as one being drawn. A star is drawn with a
+// `glow` round it, in its own colour (a dark star, a black hole, in a warm light).
+export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, color: string, tint = 0, glow?: string) {
   if (shape.points.length < 3) return
   ctx.save()
   trace(ctx, shape, view)
   ctx.fillStyle = color
+  if (glow) {
+    const b = shapeBounds({ ...shape, width: 0 })
+    ctx.shadowColor = glow
+    ctx.shadowBlur = Math.min(48, Math.max(6, Math.max(b.x1 - b.x0, b.y1 - b.y0) * view.zoom * 0.6))
+    ctx.fill(fillRule(shape))
+    ctx.shadowBlur = 0
+  }
   ctx.fill(fillRule(shape))
   if (tint !== 0) {
     ctx.globalAlpha = Math.min(1, Math.abs(tint))
@@ -132,6 +152,13 @@ export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: MapShape, v
     ctx.fill(fillRule(shape))
   }
   ctx.restore()
+}
+
+// The glow of a star of a colour: its own, or a warm light round a dark one (a black hole's disc of light).
+export function starGlow(color: string): string {
+  const n = parseInt(color.slice(1), 16)
+  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255
+  return Number.isFinite(lum) && lum < 0.12 ? '#ffb15c' : color
 }
 
 // The colour a political area is filled with in the Nations view: its own fill, else its line colour, else one of a few drawn from its id.
@@ -147,7 +174,7 @@ export function nationFill(shape: Pick<MapShape, 'id' | 'fill' | 'color'>): stri
 // A line or region. A political region (a nation, a state, a municipality) is only its border over the land, unless `nations` is on (the Nations view),
 // when it is filled in its own colour.
 export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef, nations = false) {
-  if (shape.points.length < 2) return
+  if (shape.type === 'orbit' ? !shape.ellipse : shape.points.length < 2) return
   if (shape.style === 'halo') { drawMarker(ctx, shape, view, theme); return }
   const w = Math.max(1, shape.width * view.zoom)
   const colour = shape.color ?? theme.ink

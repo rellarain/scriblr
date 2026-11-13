@@ -39,6 +39,20 @@ const SEED: Seed[] = [
   ['grass', 'Grass', '#7fae5a', 'material'],
   ['outside', 'Outside', '#4a4450', 'material'],
   ['space', 'Space', '#0f1626', 'space'],
+  // Added with the space levels (seed version 2): the kinds of star and planet.
+  ['star_yellow', 'Yellow star', '#ffd54a', 'star'],
+  ['star_red', 'Red dwarf', '#ff7a4a', 'star'],
+  ['star_blue', 'Blue giant', '#8fb8ff', 'star'],
+  ['star_white_dwarf', 'White dwarf', '#f4f7ff', 'star'],
+  ['star_neutron', 'Neutron star', '#c9e6ff', 'star'],
+  ['star_black_hole', 'Black hole', '#0b0b10', 'star'],
+  ['planet_rocky', 'Rocky planet', '#a08a72', 'planet'],
+  ['planet_ocean', 'Ocean world', '#3a78c2', 'planet'],
+  ['planet_gas_giant', 'Gas giant', '#d9a066', 'planet'],
+  ['planet_ice', 'Ice world', '#cfe3ee', 'planet'],
+  ['planet_lava', 'Lava world', '#d4542a', 'planet'],
+  ['planet_desert', 'Desert world', '#d9b77e', 'planet'],
+  ['planet_garden', 'Garden world', '#4f9a5a', 'planet'],
 ]
 
 export const STARTER_BIOMES: MapBiome[] = SEED.map(([id, name, color, group, levels]) => ({ id, name, color, group, levels: levels ?? [], retired: false }))

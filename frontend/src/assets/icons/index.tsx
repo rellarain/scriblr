@@ -977,6 +977,15 @@ export function StampIcon(props: IconProps) {
   </IconBase>
 }
 
+// A star with a path round it and a planet on the path: draw an orbit.
+export function OrbitIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M3 12a9 5.5 0 1 0 18 0a9 5.5 0 1 0-18 0" />
+    <circle cx="19" cy="8.6" r="1.6" />
+  </IconBase>
+}
+
 // A curved line with a point at each end: draw a line.
 export function PathIcon(props: IconProps) {
   return <IconBase {...props}>

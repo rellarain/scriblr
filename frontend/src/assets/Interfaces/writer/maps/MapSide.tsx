@@ -7,9 +7,10 @@ import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, Ey
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
 import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
 import {
-  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MARKER_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, addPlaces, editLabel, editPlace, editShape, findItem, isMarker, moveShapeOrder, placeKey, type AreaLook,
-  placeOf, removeItem, replaceShape, resizeShape, shapeWidth, type ItemRef,
+  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MARKER_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, addPlaces, bodiesOn, editLabel, editOrbit, editPlace, editShape, findItem, isMarker, leaveOrbit,
+  moveShapeOrder, placeKey, type AreaLook, placeOf, removeItem, replaceShape, resizeShape, shapeWidth, type ItemRef,
 } from './mapItems'
+import { ORBIT_RADIUS, ORBIT_TURN } from './mapOrbits'
 import { ShapeTools, ShapesPanel, type ShapeSource } from './ShapesPanel'
 import type { CombineAction } from './mapCombine'
 import { markerName } from './mapShapeSeed'
@@ -83,7 +84,7 @@ export interface MapSideProps {
   pen: Pen
   penType: MapShapeType
   onPen: (patch: Partial<Pen>) => void
-  onPreset: (type: MapShapeType, pen: Pen) => void
+  onPreset: (type: 'line' | 'region', pen: Pen) => void
   // The chosen symbol or label (null = none); `fresh` is true for one that was just made (its text takes the cursor).
   selected: ItemRef | null
   fresh: boolean
@@ -104,7 +105,7 @@ export function MapSide(p: MapSideProps) {
       <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
       <BiomesPanel projectId={projectId} m={m} draft={draft} biomes={p.biomes} biome={p.biome} onBiome={p.onBiome} smooth={p.biomeSmooth} onSmooth={p.onBiomeSmooth} look={p.areaLook} onLook={p.onAreaLook} />
       <ShapesPanel draft={draft} source={p.shapeSource} onSource={p.onShapeSource} />
-      <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
+      <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} level={draft.level} />
       <LayerPanel m={m} draft={draft} />
       <JourneysPanel m={m} draft={draft} points={points} cast={cast} state={journey} onState={onJourney} onTool={onJourneyTool} />
       <MapFieldsPanel m={m} draft={draft} points={points} />
@@ -177,15 +178,17 @@ function ProfileFields({ value, onChange }: { value: AreaLook; onChange: (patch:
 }
 
 // The pen: what a new line or region is drawn with. A preset sets it and picks the tool; the fields below change it.
-function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapShapeType; onPen: (patch: Partial<Pen>) => void; onPreset: (type: MapShapeType, pen: Pen) => void }) {
+function PenPanel({ pen, penType, onPen, onPreset, level }: { pen: Pen; penType: MapShapeType; onPen: (patch: Partial<Pen>) => void; onPreset: (type: 'line' | 'region', pen: Pen) => void; level: MapLevel }) {
+  // The kinds the map's level offers: rivers and roads on land, routes and nebulae in space.
+  const drawn = levelDef(level).drawn
   return (
     <section className="mapPanel" aria-label="Lines and regions">
       <header className="mapPanelHead"><h3 className="mapPanelTitle">Lines and regions</h3></header>
       <div className="mapSizes" role="group" aria-label="Kinds of line">
-        {LINE_PRESETS.map(pr => <button key={pr.id} type="button" className="mapChip" title={`Draw a ${pr.name.toLowerCase()}`} onClick={() => onPreset('line', pr.pen)}>{pr.name}</button>)}
+        {LINE_PRESETS.filter(pr => pr.drawn.includes(drawn)).map(pr => <button key={pr.id} type="button" className="mapChip" title={`Draw a ${pr.name.toLowerCase()}`} onClick={() => onPreset('line', pr.pen)}>{pr.name}</button>)}
       </div>
       <div className="mapSizes" role="group" aria-label="Kinds of region">
-        {REGION_PRESETS.map(pr => <button key={pr.id} type="button" className="mapChip" title={`Draw a ${pr.name.toLowerCase()} region`} onClick={() => onPreset('region', pr.pen)}>{pr.name}</button>)}
+        {REGION_PRESETS.filter(pr => pr.drawn.includes(drawn)).map(pr => <button key={pr.id} type="button" className="mapChip" title={`Draw a ${pr.name.toLowerCase()} region`} onClick={() => onPreset('region', pr.pen)}>{pr.name}</button>)}
       </div>
       <h4 className="mapSubTitle">New {penType === 'region' ? 'regions' : 'lines'}</h4>
       <ShapeFields type={penType} value={pen} onChange={onPen} />
@@ -387,16 +390,54 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
         <button type="button" className="mapChip" onClick={() => m.apply(moveShapeOrder(draft, sh.id, 'back'))}>Send to back</button>
       </div>
     )
+    // A planet or a moon going round on an orbit: it keeps to it when dragged, until it leaves it.
+    const onOrbit = sh.orbit && draft.shapes.some(o => o.id === sh.orbit!.id) ? (
+      <div className="mapRow" role="group" aria-label="Orbit">
+        <span className="mapHint">Goes round on an orbit: dragging it keeps it on the orbit.</span>
+        <button type="button" className="mapChip" title="Take it off the orbit, where it is" onClick={() => m.apply(leaveOrbit(draft, sh.id))}>Leave the orbit</button>
+      </div>
+    ) : null
     const curves = (
       <div className="mapSizes" role="group" aria-label="Curves">
         <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, true)))}>Curve all points</button>
         <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, false)))}>Straighten all points</button>
       </div>
     )
+    if (sh.type === 'orbit') {
+      const e = sh.ellipse ?? { cx: 0, cy: 0, rx: 4, ry: 4, turn: 0 }
+      const bodies = bodiesOn(draft, sh.id)
+      return (
+        <section className="mapPanel" aria-label="Chosen orbit">
+          <header className="mapPanelHead">
+            <h3 className="mapPanelTitle">Orbit</h3>
+            <button type="button" className="mapIconBtn" aria-label="Delete the orbit" title="Delete (Delete key): its planets stay where they are" onClick={remove}><TrashIcon size={16} /></button>
+          </header>
+          <div className="mapFields">
+            <Field label="Across (cells)" short>
+              <CommitNumber label="Radius of the orbit across, in cells" value={e.rx} min={ORBIT_RADIUS.min} max={ORBIT_RADIUS.max} step={0.5} onCommit={rx => m.apply(editOrbit(draft, sh.id, { rx }))} />
+            </Field>
+            <Field label="Down (cells)" short>
+              <CommitNumber label="Radius of the orbit down, in cells" value={e.ry} min={ORBIT_RADIUS.min} max={ORBIT_RADIUS.max} step={0.5} onCommit={ry => m.apply(editOrbit(draft, sh.id, { ry }))} />
+            </Field>
+            <Field label="Turn (degrees)" short>
+              <CommitNumber label="Turn of the orbit, in degrees" value={e.turn} min={ORBIT_TURN.min} max={ORBIT_TURN.max} step={5} onCommit={turn => m.apply(editOrbit(draft, sh.id, { turn }))} />
+            </Field>
+          </div>
+          <ShapeFields type="line" value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
+          <p className="mapHint">
+            {bodies.length === 0 ? 'Nothing goes round on it yet: drop a planet or a moon on its path.' : `${bodies.length === 1 ? 'One body goes' : `${bodies.length} bodies go`} round on it: ${bodies.map(b => b.name || resolveBiome(biomes.index, b.biome).name).join(', ')}.`}
+            {' '}Drag it to move it with them; a different size or turn takes them along.
+          </p>
+          {order}
+        </section>
+      )
+    }
     if (sh.type === 'biome') {
       const offered = offeredBiomes(biomes.index, draft.level)
       const current = sh.biome ? resolveBiome(biomes.index, sh.biome) : null
       const unit = heightUnit(draft.units)
+      // On a space map a biome area is a planet or a star: its biome is its kind, and it has no height.
+      const space = levelDef(draft.level).drawn === 'space'
       return (
         <section className="mapPanel" aria-label="Chosen biome area">
           <header className="mapPanelHead">
@@ -404,22 +445,22 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
             <button type="button" className="mapIconBtn" aria-label="Delete the biome area" title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
           </header>
           <div className="mapFields">
-            <Field label="Biome">
+            <Field label={space ? 'Kind' : 'Biome'}>
               <span className="mapRow">
                 {current && <span className="mapSwatch" style={{ background: current.color }} aria-hidden="true" />}
-                <select className="mapSelect" aria-label="Biome of the area" value={sh.biome ?? ''} onChange={e => m.apply(editShape(draft, sh.id, { biome: e.target.value || null }))}>
-                  <option value="">None: keeps the biome under it</option>
+                <select className="mapSelect" aria-label={space ? 'Kind of planet or star' : 'Biome of the area'} value={sh.biome ?? ''} onChange={e => m.apply(editShape(draft, sh.id, { biome: e.target.value || null }))}>
+                  <option value="">{space ? 'None' : 'None: keeps the biome under it'}</option>
                   {current && !offered.some(b => b.id === current.id) && <option value={current.id}>{current.name}</option>}
                   {offered.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </span>
             </Field>
-            <Field label="Height">
+            {!space && <Field label="Height">
               <select className="mapSelect" aria-label="What the area does to the height" value={sh.heightMode ?? 'none'} onChange={e => m.apply(editShape(draft, sh.id, { heightMode: e.target.value as MapHeightMode }))}>
                 {HEIGHT_MODES.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
-            </Field>
-            {(sh.heightMode ?? 'none') !== 'none' && (
+            </Field>}
+            {!space && (sh.heightMode ?? 'none') !== 'none' && (
               <>
                 <Field label={sh.heightMode === 'set' ? `Height (${unit})` : `By (${unit})`} short>
                   <CommitNumber label={`Height in ${unit === 'm' ? 'metres' : 'feet'}`} value={sh.height ?? 0} min={sh.heightMode === 'set' ? -HEIGHT_LIMIT : 0} max={HEIGHT_LIMIT} step={unit === 'm' ? 50 : 100} onCommit={height => m.apply(editShape(draft, sh.id, { height }))} />
@@ -428,11 +469,12 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
               </>
             )}
           </div>
+          {onOrbit}
           {order}
           {curves}
           {shapeTools}
           {place}
-          <p className="mapHint">Higher land is drawn lighter, lower land darker. Drag the area, a point (square) or a handle (circle); double-click the outline to put a point in.</p>
+          <p className="mapHint">{space ? 'A star or a planet takes the colour of its kind. Drop a planet on an orbit to set it going round.' : 'Higher land is drawn lighter, lower land darker.'} Drag the area, a point (square) or a handle (circle); double-click the outline to put a point in.</p>
         </section>
       )
     }
@@ -472,6 +514,7 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
         </header>
         <ShapeFields type={sh.type} value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
         {sh.type === 'region' && <PoliticalField value={sh.political ?? null} onChange={political => m.apply(editShape(draft, sh.id, { political }))} />}
+        {onOrbit}
         {order}
         {curves}
         {shapeTools}

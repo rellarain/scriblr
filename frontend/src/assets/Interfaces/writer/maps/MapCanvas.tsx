@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MapShape } from '../../../../api/types'
 import { FitIcon, ZoomInIcon, ZoomOutIcon } from '../../../icons'
-import { findItem, hitItem, legendEntries, movedItem, placeOf as placeOfItem, showsPoints, snapPoint, withShape, type ItemRef } from './mapItems'
+import { findItem, hitItem, legendEntries, movedItem, placeOf as placeOfItem, settled, showsPoints, snapPoint, withShape, type ItemRef } from './mapItems'
+import { isBody, makeOrbit, middleOf } from './mapOrbits'
 import type { MapDraft } from './mapModel'
 import type { JourneyView } from './mapDrawJourneys'
 import { drawMap } from './mapRender'
@@ -11,7 +12,7 @@ import { boxFrom } from './mapTemplates'
 import { cellAt, fitView, measureText, panBy, pathLength, zoomAt, type MapView } from './mapView'
 import { moveStop, stopNear } from './mapJourneys'
 
-export type MapTool = 'select' | 'biome' | 'shape' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
+export type MapTool = 'select' | 'biome' | 'shape' | 'orbit' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
 type DrawTool = 'line' | 'region' | 'biome'
 const drawsShape = (tool: MapTool): tool is DrawTool => tool === 'line' || tool === 'region' || tool === 'biome'
 
@@ -33,6 +34,8 @@ export interface MapCanvasProps {
   onPlaceShape?: (box: Rect | null, at: [number, number], square: boolean) => boolean
   // What a box would place, drawn while it is dragged.
   previewShape?: (box: Rect, square: boolean) => MapShape | null
+  // The orbit tool: an orbit was drawn round a centre (a body's middle when it was pressed on one), with a radius in cells; false when it cannot be.
+  onPlaceOrbit?: (cx: number, cy: number, radius: number) => boolean
   // Picking a shape for something (combining the chosen shape with another): a click hands over what is under it (null: Esc, nothing picked).
   picking?: boolean
   onPick?: (ref: ItemRef | null) => void
@@ -61,6 +64,11 @@ export interface MapCanvasProps {
 }
 
 const FALLBACK_SIZE = { width: 800, height: 520 }
+// The orbit being drawn: round its centre, out to the pointer (none until it is a quarter cell wide).
+const orbitPreview = (from: [number, number], to: [number, number]): MapShape | null => {
+  const r = Math.hypot(to[0] - from[0], to[1] - from[1])
+  return r < 0.25 ? null : makeOrbit('preview', '', from[0], from[1], r)
+}
 // How close, in pixels, the pointer has to be to a point or a handle of the chosen shape to take it.
 const GRAB_PX = 9
 
@@ -175,7 +183,8 @@ export default function MapCanvas(p: MapCanvasProps) {
           ? { type: pendingType, points: pendingRef.current.points, cursor: pendingRef.current.cursor, pen: d.pen, color: resolveBiome(d.biomes, d.biome).color }
           : null,
         legend: d.draft.legend ? legendEntries(d.draft, d.biomes, d.nations) : null, nations: d.nations,
-        preview: d.tool === 'shape' && placingRef.current && d.previewShape ? d.previewShape(boxFrom(placingRef.current.from, placingRef.current.to, placingRef.current.square), placingRef.current.square) : null,
+        preview: d.tool === 'shape' && placingRef.current && d.previewShape ? d.previewShape(boxFrom(placingRef.current.from, placingRef.current.to, placingRef.current.square), placingRef.current.square)
+          : d.tool === 'orbit' && placingRef.current ? orbitPreview(placingRef.current.from, placingRef.current.to) : null,
       })
     })
   }, [])
@@ -257,6 +266,18 @@ export default function MapCanvas(p: MapCanvasProps) {
     const [fx, fy] = placeOf(px, py)
     // Picking a shape for something: a click hands over what is under it, and does nothing else.
     if (p.picking) { p.onPick?.(hitItem(draft, fx, fy)); return }
+    if (p.tool === 'orbit') {
+      if (!cell) return
+      // Pressed on a body (a star): the orbit goes round its middle; else round the nearest cell middle or corner (Alt: where it is).
+      const hit = hitItem(draft, fx, fy, 0)
+      const body = hit?.kind === 'shape' ? draft.shapes.find(s => s.id === hit.id) : undefined
+      const m = body && isBody(body) ? middleOf(body) : null
+      const at: [number, number] = m ? [m.x, m.y] : shapePoint(fx, fy, e.altKey)
+      drag.current = { kind: 'box', from: at }
+      setPlacing({ from: at, to: at, square: false })
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      return
+    }
     if (p.tool === 'shape') {
       if (!cell) return
       const at = shapePoint(fx, fy, e.altKey)
@@ -349,7 +370,7 @@ export default function MapCanvas(p: MapCanvasProps) {
     }
     if (d?.kind === 'box') {
       const [fx, fy] = placeOf(px, py)
-      setPlacing({ from: d.from, to: shapePoint(fx, fy, e.altKey), square: e.shiftKey })
+      setPlacing({ from: d.from, to: p.tool === 'orbit' ? [fx, fy] : shapePoint(fx, fy, e.altKey), square: e.shiftKey })
       return
     }
     if (d?.kind === 'stop') {
@@ -373,7 +394,8 @@ export default function MapCanvas(p: MapCanvasProps) {
         next = setHandle(shape, d.i, d.sign === 1 ? fx : 2 * pt.x - fx, d.sign === 1 ? fy : 2 * pt.y - fy)
       } else {
         const snap = (n: number) => (e.altKey ? n : Math.round(n * 2) / 2)
-        next = translateShape(shape, snap(fx - d.fx), snap(fy - d.fy), draft.width, draft.height)
+        // A planet keeps to its orbit, or is caught by one it is dropped near (space maps).
+        next = settled(d.before, translateShape(shape, snap(fx - d.fx), snap(fy - d.fy), draft.width, draft.height))
       }
       d.current = withShape(d.before, next)
       p.onPreview(d.current)
@@ -400,6 +422,13 @@ export default function MapCanvas(p: MapCanvasProps) {
       const b = placingRef.current
       setPlacing(null)
       if (!b || e.type === 'pointercancel') return
+      if (p.tool === 'orbit') {
+        // A click makes an orbit 4 cells round; a drag, as wide as it was dragged (by half cells; Alt: as it is).
+        const dragged = Math.hypot(b.to[0] - b.from[0], b.to[1] - b.from[1])
+        const radius = dragged < 0.25 ? 4 : e.altKey ? dragged : Math.max(0.5, Math.round(dragged * 2) / 2)
+        if (!p.onPlaceOrbit?.(b.from[0], b.from[1], radius)) p.onBlocked()
+        return
+      }
       const r = boxFrom(b.from, b.to, b.square)
       // A click (or a box too small to hold anything) places the shape at its own size, at the middle of the cell (Alt: where it is).
       const small = r.x1 - r.x0 < 0.25 && r.y1 - r.y0 < 0.25
@@ -441,7 +470,7 @@ export default function MapCanvas(p: MapCanvasProps) {
 
   function onKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>) {
     if (p.picking && e.key === 'Escape') { p.onPick?.(null); return }
-    if (p.tool === 'shape' && e.key === 'Escape' && placing) { drag.current = null; setPlacing(null); return }
+    if ((p.tool === 'shape' || p.tool === 'orbit') && e.key === 'Escape' && placing) { drag.current = null; setPlacing(null); return }
     if (p.tool === 'measure') {
       if (e.key === 'Escape') { setMeasure([]); setMeasureCursor(null) }
       else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setMeasure(list => list.slice(0, -1)) }
@@ -479,7 +508,7 @@ export default function MapCanvas(p: MapCanvasProps) {
         const [nx, ny] = clampTo(draft, pt.x + move[0], pt.y + move[1])
         p.onCommitMove(draft, withShape(draft, movePoint(shape, node, nx, ny)))
       } else {
-        p.onCommitMove(draft, withShape(draft, translateShape(shape, move[0], move[1], draft.width, draft.height)))
+        p.onCommitMove(draft, withShape(draft, settled(draft, translateShape(shape, move[0], move[1], draft.width, draft.height))))
       }
       return
     }

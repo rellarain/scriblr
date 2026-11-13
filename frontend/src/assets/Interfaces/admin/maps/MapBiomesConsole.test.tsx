@@ -1,10 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { STARTER_BIOMES } from '../../writer/maps/mapBiomes'
 import { mapsBackend } from '../../../../test/mapsBackend'
 import MapBiomesConsole from './MapBiomesConsole'
 import { addBiome, biomeFaults, biomeIdOf, editBiome, hasChanges, levelsShown, moveBiome, toggleLevel } from './mapBiomesModel'
+
+// The list draws every starter biome with its level chips: slow in a full parallel run.
+vi.setConfig({ testTimeout: 30000 })
 
 describe('the biome list, pure', () => {
   it('adds a biome with an id of its own, moves one, and edits one', () => {

@@ -3,6 +3,7 @@ import { MAP_MAX_SIDE } from '../api/types'
 import { defaultsFor } from '../assets/Interfaces/writer/maps/mapLevels'
 import { shapeFromLibrary } from '../assets/Interfaces/writer/maps/mapLibrary'
 import { starterShapes } from '../assets/Interfaces/writer/maps/mapShapeSeed'
+import { placeOn } from '../assets/Interfaces/writer/maps/mapOrbits'
 import type { MockAnswer } from './mockPresets'
 
 // A pretend Maps API (`/api/projects/{id}/maps`), shared by the design system's previews (mockBackend.ts) and the tests (test/mapsBackend.ts): the
@@ -150,7 +151,7 @@ function biomeArea(id: string, points: Array<[number, number]>, biome: string | 
   }
 }
 
-// The maps a preview opens with: a continent in a sea (plains, a forest on hills, a lake, a rocky range raised high) and, inside it, a town.
+// The maps a preview opens with: a continent in a sea (plains, a forest on hills, a lake, a rocky range raised high), inside it a town, and a star system.
 export function seedMaps(): MapDoc[] {
   const world = newMap('map_world', { title: 'The Known World', level: 'continental', units: 'imperial', width: 28, height: 18, cellSize: 20, unit: 'mi', base: { biome: 'saltwater', height: -650 } }, 0)
   world.legend = true
@@ -197,5 +198,24 @@ export function seedMaps(): MapDoc[] {
     biomeArea('bio_square', [[10, 4], [16, 4], [16, 9], [10, 9]], 'paving', { name: 'Market Square' }),
     biomeArea('bio_park', ellipse(19.5, 11.5, 3, 2.4, 10), 'forest', { name: 'Lantern Park' }),
   ].map(s => ({ ...s, points: s.points.map(p => ({ ...p, smooth: s.id === 'bio_park' })) }))
-  return [world, town]
+  // A star system (galactic): a yellow star, two orbits with a planet on each (Veyra, the garden world the Known World is of, and a gas giant), a nebula
+  // and a trade route.
+  const system = newMap('map_system', { title: 'The Aster System', level: 'galactic', width: 32, height: 22 }, 1)
+  const orbit = (id: string, rx: number, ry: number, turn: number): MapShape & { ellipse: NonNullable<MapShape['ellipse']> } =>
+    ({ id, layerId: 'shapes', type: 'orbit', points: [], ellipse: { cx: 16, cy: 11, rx, ry, turn }, style: 'dashed', color: null, width: 0.06, fill: null, opacity: 1, pattern: 'solid' })
+  const inner = orbit('orb_inner', 5.5, 4.2, 0), outer = orbit('orb_outer', 11, 8, 12)
+  const body = (id: string, r: number, biome: string, over: Partial<MapShape> = {}) => biomeArea(id, ellipse(0, 0, r, r, 10, 0), biome, over)
+  const shapes: MapShape[] = [
+    body('bio_aster', 1.6, 'star_yellow', { name: 'Aster' }),
+    inner, outer,
+    placeOn(body('bio_veyra', 0.8, 'planet_garden', { name: 'Veyra', mapIds: ['map_world'] }), inner, 205, 32, 22),
+    placeOn(body('bio_tharos', 1.3, 'planet_gas_giant', { name: 'Tharos' }), outer, 330, 32, 22),
+    { id: 'shp_nebula', layerId: 'shapes', type: 'region', points: ellipse(5, 5, 3.6, 2.6, 10, 0.12).map(([x, y]) => ({ x, y, smooth: true, hx: null, hy: null })),
+      style: 'dotted', color: '#b48ce0', width: 0.06, fill: '#9a5fd0', opacity: 0.4, pattern: 'glow', rough: 60, seed: 3, name: 'The Veil', mapIds: [] },
+    { id: 'shp_route', layerId: 'shapes', type: 'line', points: [[16, 11], [22, 15], [30, 19]].map(([x, y]) => ({ x, y, smooth: true, hx: null, hy: null })),
+      style: 'dashed', color: '#9fc4ff', width: 0.08, fill: null, opacity: 0.35, pattern: 'solid' },
+  ]
+  // The star at the middle of the map.
+  system.shapes = shapes.map((s, i) => (i === 0 ? { ...s, points: s.points.map(p => ({ ...p, x: p.x + 16, y: p.y + 11 })) } : s))
+  return [world, town, system]
 }

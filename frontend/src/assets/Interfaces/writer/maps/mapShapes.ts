@@ -10,7 +10,7 @@ import { allRings, distanceToEdge, insideShape, newSeed, ringsOf } from './mapOu
 type V = [number, number]
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
-export const MIN_POINTS: Record<MapShapeType, number> = { line: 2, region: 3, biome: 3 }
+export const MIN_POINTS: Record<MapShapeType, number> = { line: 2, region: 3, biome: 3, orbit: 0 }
 export const MAX_POINTS = 500
 export const SHAPE_WIDTH_RANGE = { min: 0.05, max: 4 } as const
 export const LINE_STYLES: Array<{ id: MapLineStyle; name: string }> = [
@@ -18,11 +18,12 @@ export const LINE_STYLES: Array<{ id: MapLineStyle; name: string }> = [
   { id: 'halo', name: 'Halo (a marker)' },
 ]
 export const PATTERNS: Array<{ id: MapPattern; name: string }> = [
-  { id: 'solid', name: 'Solid' }, { id: 'hatch', name: 'Hatched' }, { id: 'cross', name: 'Cross-hatched' }, { id: 'dots', name: 'Dotted' },
+  { id: 'solid', name: 'Solid' }, { id: 'hatch', name: 'Hatched' }, { id: 'cross', name: 'Cross-hatched' }, { id: 'dots', name: 'Dotted' }, { id: 'glow', name: 'Glow' },
 ]
 
 // A region and a biome shape are closed (the last point joins the first); a line is open.
-export const isClosed = (shape: Pick<MapShape, 'type'>) => shape.type !== 'line'
+// Whether a shape is filled: not a line, and not an orbit (a path, drawn as a line).
+export const isClosed = (shape: Pick<MapShape, 'type'>) => shape.type !== 'line' && shape.type !== 'orbit'
 
 // ---- the curve ----
 
@@ -196,6 +197,11 @@ export function removePoint(shape: MapShape, i: number): MapShape | null {
 }
 
 export function translateShape(shape: MapShape, dx: number, dy: number, width: number, height: number): MapShape {
+  // An orbit moves its centre (held to the map).
+  if (shape.type === 'orbit') {
+    const e = shape.ellipse
+    return e ? { ...shape, ellipse: { ...e, cx: Math.min(width, Math.max(0, e.cx + dx)), cy: Math.min(height, Math.max(0, e.cy + dy)) } } : shape
+  }
   // Held as a whole: it stops at the edge of the map instead of squashing against it (its points and other rings, not its rough edge).
   const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity }
   for (const ring of [shape.points, ...(shape.holes ?? [])]) {
@@ -227,25 +233,34 @@ export interface Pen {
 const linePen = (style: MapLineStyle, color: string | null, width: number, smooth: boolean): Pen => ({ style, color, width, smooth, fill: null, opacity: 0.35, pattern: 'solid' })
 const regionPen = (fill: string, opacity: number, pattern: MapPattern, color: string | null, style: MapLineStyle = 'solid', width = 0.15): Pen => ({ style, color, width, smooth: false, fill, opacity, pattern })
 
-export const LINE_PRESETS: Array<{ id: string; name: string; pen: Pen }> = [
-  { id: 'river', name: 'River', pen: linePen('solid', '#3b6ea5', 0.35, true) },
-  { id: 'road', name: 'Road', pen: linePen('road', '#6b4a2b', 0.3, true) },
-  { id: 'trail', name: 'Trail', pen: linePen('dotted', '#6b4a2b', 0.18, true) },
-  { id: 'border', name: 'Border', pen: linePen('dashed', null, 0.16, false) },
-  { id: 'wall', name: 'Wall', pen: linePen('wall', null, 0.22, false) },
-  { id: 'fence', name: 'Fence', pen: linePen('fence', '#6b4a2b', 0.14, false) },
+// The kinds of line and region the pen offers, by how the level is drawn (`drawn`): rivers and roads on land, routes in space, walls in buildings too.
+export interface PenPreset { id: string; name: string; pen: Pen; drawn: Array<'biomes' | 'materials' | 'space'> }
+const LAND: PenPreset['drawn'] = ['biomes']
+const BUILT: PenPreset['drawn'] = ['biomes', 'materials']
+const SPACE: PenPreset['drawn'] = ['space']
+
+export const LINE_PRESETS: PenPreset[] = [
+  { id: 'river', name: 'River', pen: linePen('solid', '#3b6ea5', 0.35, true), drawn: LAND },
+  { id: 'road', name: 'Road', pen: linePen('road', '#6b4a2b', 0.3, true), drawn: LAND },
+  { id: 'trail', name: 'Trail', pen: linePen('dotted', '#6b4a2b', 0.18, true), drawn: BUILT },
+  { id: 'border', name: 'Border', pen: linePen('dashed', null, 0.16, false), drawn: [...BUILT, 'space'] },
+  { id: 'wall', name: 'Wall', pen: linePen('wall', null, 0.22, false), drawn: BUILT },
+  { id: 'fence', name: 'Fence', pen: linePen('fence', '#6b4a2b', 0.14, false), drawn: BUILT },
+  { id: 'route', name: 'Route', pen: linePen('dashed', '#9fc4ff', 0.08, true), drawn: SPACE },
 ]
 // A political area: a border in its style (a nation's the strongest), and the colour it is filled with in the Nations view.
 const politicalPen = (political: MapPolitical, style: MapLineStyle, width: number, fill: string): Pen => ({ style, color: null, width, smooth: false, fill, opacity: 0.6, pattern: 'solid', political })
 
-export const REGION_PRESETS: Array<{ id: string; name: string; pen: Pen }> = [
-  { id: 'nation', name: 'Nation', pen: politicalPen('nation', 'solid', 0.22, '#d98c6a') },
-  { id: 'state', name: 'State or province', pen: politicalPen('state', 'dashed', 0.16, '#7fa8d9') },
-  { id: 'municipality', name: 'Municipality', pen: politicalPen('municipality', 'dotted', 0.12, '#c9b45a') },
-  { id: 'territory', name: 'Territory', pen: regionPen('#c06c84', 0.3, 'hatch', '#8a3a55', 'dashed') },
-  { id: 'water', name: 'Water', pen: regionPen('#4a86b8', 0.45, 'solid', '#2f6593') },
-  { id: 'forest', name: 'Forest', pen: regionPen('#4f8a4a', 0.4, 'dots', '#2f5f2c') },
-  { id: 'danger', name: 'Danger', pen: regionPen('#b5342a', 0.28, 'cross', '#7e211a', 'dashed') },
+export const REGION_PRESETS: PenPreset[] = [
+  { id: 'nation', name: 'Nation', pen: politicalPen('nation', 'solid', 0.22, '#d98c6a'), drawn: LAND },
+  { id: 'state', name: 'State or province', pen: politicalPen('state', 'dashed', 0.16, '#7fa8d9'), drawn: LAND },
+  { id: 'municipality', name: 'Municipality', pen: politicalPen('municipality', 'dotted', 0.12, '#c9b45a'), drawn: LAND },
+  { id: 'territory', name: 'Territory', pen: regionPen('#c06c84', 0.3, 'hatch', '#8a3a55', 'dashed'), drawn: BUILT },
+  { id: 'water', name: 'Water', pen: regionPen('#4a86b8', 0.45, 'solid', '#2f6593'), drawn: BUILT },
+  { id: 'forest', name: 'Forest', pen: regionPen('#4f8a4a', 0.4, 'dots', '#2f5f2c'), drawn: LAND },
+  { id: 'danger', name: 'Danger', pen: regionPen('#b5342a', 0.28, 'cross', '#7e211a', 'dashed'), drawn: [...BUILT, 'space'] },
+  { id: 'nebula', name: 'Nebula', pen: { ...regionPen('#9a5fd0', 0.45, 'glow', '#b48ce0', 'dotted', 0.06), smooth: true }, drawn: SPACE },
+  { id: 'space-territory', name: 'Territory', pen: regionPen('#4fb3a9', 0.4, 'glow', '#7fd6cc', 'dashed', 0.08), drawn: SPACE },
 ]
 export const DEFAULT_LINE_PEN: Pen = LINE_PRESETS[0].pen
 export const DEFAULT_REGION_PEN: Pen = REGION_PRESETS.find(p => p.id === 'territory')!.pen

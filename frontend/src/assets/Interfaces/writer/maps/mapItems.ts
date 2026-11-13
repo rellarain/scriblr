@@ -1,4 +1,4 @@
-import { MAP_MAX_ROUGH, MAP_MAX_SLOPE, type MapHeightMode, type MapLabel, type MapLibraryShape, type MapShape, type MapShapePoint, type MapShapeType, type MapUnits } from '../../../../api/types'
+import { MAP_MAX_ROUGH, MAP_MAX_SLOPE, type MapEllipse, type MapHeightMode, type MapLabel, type MapLibraryShape, type MapShape, type MapShapePoint, type MapShapeType, type MapUnits } from '../../../../api/types'
 import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeBiomeShape, makeShape, nearestOnShape, shapeBounds, type Pen, type Rect as ShapeRect } from './mapShapes'
 import { mapHeightRange } from './mapHeights'
 import { heightUnit } from './mapUnits'
@@ -8,6 +8,8 @@ import { nationFill } from './mapDrawShapes'
 import { newSeed } from './mapOutline'
 import { shapeFromLibrary } from './mapLibrary'
 import { markerName, starterShapes } from './mapShapeSeed'
+import { catchBodies, followOrbit, letGo, makeOrbit, settleBody, withEllipse } from './mapOrbits'
+import { levelDef } from './mapLevels'
 
 // The things on a map: biome shapes (the land, on the biomes layer), labels (text) and shapes (lines, regions and markers, mapShapes.ts), each on a layer
 // of its kind (markers, the castles and trees and doors placed from the Markers library, on a markers layer above the regions). All pure: placing, moving,
@@ -95,7 +97,7 @@ export function addLibraryShape(draft: MapDraft, lib: MapLibraryShape, box: Shap
   const layerId = layerFor(draft, lib)
   if (!layerId || full(draft, lib)) return null
   const id = freshId(lib.type === 'biome' ? 'bio' : isMarker(lib) ? 'mrk' : 'shp', placeIds(draft), makeId)
-  const shape = heldShape(draft, shapeFromLibrary(lib, box, id, layerId, units))
+  const shape = settled(draft, heldShape(draft, shapeFromLibrary(lib, box, id, layerId, units)))
   return { change: change(draft, { shapes: [...draft.shapes, shape] }), id }
 }
 
@@ -114,12 +116,50 @@ export function addTemplateShape(
   if (type === 'biome') {
     const r = addBiomeShape(draft, held_.map(p => [p.x, p.y] as [number, number]), opts.biome ?? null, false, makeId, opts.look ?? {})
     if (!r) return null
-    return { change: change(draft, { shapes: r.change.draft.shapes.map(s => (s.id === r.id ? { ...s, points: held_ } : s)) }), id: r.id }
+    return { change: change(draft, { shapes: r.change.draft.shapes.map(s => (s.id === r.id ? settled(draft, { ...s, points: held_ }) : s)) }), id: r.id }
   }
   const r = addShape(draft, 'region', held_.map(p => [p.x, p.y] as [number, number]), opts.pen ?? { style: 'solid', color: null, width: 0.15, smooth: false, fill: null, opacity: 0.35, pattern: 'solid' }, makeId)
   if (!r) return null
-  return { change: change(draft, { shapes: r.change.draft.shapes.map(s => (s.id === r.id ? { ...s, points: held_ } : s)) }), id: r.id }
+  return { change: change(draft, { shapes: r.change.draft.shapes.map(s => (s.id === r.id ? settled(draft, { ...s, points: held_ }) : s)) }), id: r.id }
 }
+
+// ---- orbits (space maps) ----
+
+// Whether a map is of space (its bodies can go round on orbits).
+export const isSpace = (draft: Pick<MapDraft, 'level'>) => levelDef(draft.level).drawn === 'space'
+
+// A shape that was placed or moved, settled: on a space map a body keeps to its orbit or is caught by one it was dropped near (mapOrbits.ts).
+export function settled(draft: Pick<MapDraft, 'level' | 'shapes' | 'width' | 'height'>, shape: MapShape): MapShape {
+  return isSpace(draft) ? settleBody(draft.shapes, shape, draft.width, draft.height) : shape
+}
+
+// A new orbit round a centre (a star, most often), on the regions layer; the bodies lying on its path are caught by it.
+export function addOrbit(draft: MapDraft, cx: number, cy: number, radius: number, makeId: MakeId = randomId): { change: NonNullable<Change>; id: string } | null {
+  const layerId = layerFor(draft, { type: 'orbit', style: 'dashed' })
+  if (!layerId || full(draft, { type: 'orbit', style: 'dashed' })) return null
+  const [x, y] = held(draft, cx, cy)
+  const orbit = makeOrbit(freshId('orb', placeIds(draft), makeId), layerId, x, y, radius)
+  return { change: change(draft, { shapes: catchBodies([...draft.shapes, orbit], orbit, draft.width, draft.height) }), id: orbit.id }
+}
+
+// An orbit made wider, taller or turned (or moved): its bodies go with it, each at its own angle.
+export function editOrbit(draft: MapDraft, id: string, patch: Partial<MapEllipse>): Change {
+  const old = draft.shapes.find(s => s.id === id)
+  if (!old || old.type !== 'orbit') return null
+  const next = withEllipse(old, patch, draft.width, draft.height)
+  if (JSON.stringify(next.ellipse) === JSON.stringify(old.ellipse)) return null
+  return change(draft, { shapes: followOrbit(draft.shapes.map(s => (s.id === id ? next : s)), next, draft.width, draft.height) })
+}
+
+// A body taken off its orbit, where it is.
+export function leaveOrbit(draft: MapDraft, id: string): Change {
+  const old = draft.shapes.find(s => s.id === id)
+  if (!old?.orbit) return null
+  return change(draft, { shapes: draft.shapes.map(s => (s.id === id ? { ...s, orbit: null } : s)) })
+}
+
+// The bodies on an orbit, in their order.
+export const bodiesOn = (draft: Pick<MapDraft, 'shapes'>, orbitId: string) => draft.shapes.filter(s => s.orbit?.id === orbitId)
 
 export function addLabel(draft: MapDraft, text: string, x: number, y: number, size: number, makeId: MakeId = randomId): { change: NonNullable<Change>; id: string } | null {
   const layerId = activeLayerId(draft, 'labels')
@@ -198,12 +238,14 @@ export function moveShapeOrder(draft: MapDraft, id: string, to: 'front' | 'back'
 export function replaceShape(draft: MapDraft, shape: MapShape): Change {
   const old = draft.shapes.find(s => s.id === shape.id)
   if (!old || old === shape) return null
-  return change(draft, { shapes: draft.shapes.map(s => (s.id === shape.id ? shape : s)) })
+  return change(draft, { shapes: withShape(draft, shape).shapes })
 }
 
 // The draft with a shape replaced (no undo entry): for a drag that is shown as it goes.
+// An orbit takes its bodies with it.
 export function withShape(draft: MapDraft, shape: MapShape): MapDraft {
-  return { ...draft, shapes: draft.shapes.map(s => (s.id === shape.id ? shape : s)) }
+  const shapes = draft.shapes.map(s => (s.id === shape.id ? shape : s))
+  return { ...draft, shapes: shape.type === 'orbit' ? followOrbit(shapes, shape, draft.width, draft.height) : shapes }
 }
 
 export function editShape(
@@ -339,7 +381,8 @@ export function editLabel(draft: MapDraft, id: string, fields: Partial<Pick<MapL
 
 export function removeItem(draft: MapDraft, ref: ItemRef): Change {
   if (!findItem(draft, ref)) return null
-  if (ref.kind === 'shape') return change(draft, { shapes: draft.shapes.filter(s => s.id !== ref.id) })
+  // An orbit's bodies stay where they are.
+  if (ref.kind === 'shape') return change(draft, { shapes: letGo(draft.shapes.filter(s => s.id !== ref.id), ref.id) })
   return change(draft, { labels: draft.labels.filter(l => l.id !== ref.id) })
 }
 

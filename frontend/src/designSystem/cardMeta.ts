@@ -42,7 +42,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'maps', dir: 'Maps', title: 'Maps: the setting builder', group: 'Outline', height: 700,
-    summary: 'Project > Maps, where the setting is mapped: the list of maps at nine levels (nested ones under their map), the canvas where biome areas, templates, library shapes and markers are placed over a base, and the biomes, shapes, layers and fields beside it, with the Save cluster.',
+    summary: 'Project > Maps, where the setting is mapped: the list of maps at nine levels (nested ones under their map), the canvas where biome areas, templates, library shapes, markers, and in space stars, planets and orbits are placed over a base, and the biomes, shapes, layers and fields beside it, with the Save cluster.',
   },
   {
     id: 'map-biomes', dir: 'MapBiomes', title: 'Map biomes and shapes', group: 'Outline', height: 700,
