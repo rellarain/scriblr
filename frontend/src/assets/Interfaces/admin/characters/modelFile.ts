@@ -1,9 +1,10 @@
 import type {
   ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelFeatureKind, ModelFieldset, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPattern, ModelPoint,
-  ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelStateOption, ModelSwatch, ModelTint, ModelTintKind,
+  ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelStateOption, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
+import { roundWeight } from './engine/skin'
 import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks, repairRoll, roundOf } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
@@ -93,7 +94,21 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : 0, derive: tint(v.derive), shade: tint(v.shade), grad: gradient(v.grad),
     blend: (['multiply', 'screen', 'overlay'].includes(v.blend as string) ? v.blend : null) as ModelBlend | null, clip: idOrNull(v.clip),
     cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy), round: roundOf(typeof v.round === 'number' ? v.round : 0),
+    skin: skins(v.skin, list(v.pts).length),
   }
+}
+
+// Skin weights (phase O1): one entry per group (at most the limit), a weight per point held to 0..1 in hundredths.
+function skins(v: unknown, points: number): ModelSkin[] {
+  const out: ModelSkin[] = []
+  for (const raw of list(v)) {
+    const k = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+    const g = idOf(k.g)
+    if (!g || out.some(x => x.g === g)) continue
+    const w = list(k.w)
+    out.push({ g, w: Array.from({ length: points }, (_, i) => roundWeight(typeof w[i] === 'number' ? (w[i] as number) : 0)) })
+  }
+  return out.slice(0, LIMITS.skinMax)
 }
 
 function move(v: unknown): ModelMove {

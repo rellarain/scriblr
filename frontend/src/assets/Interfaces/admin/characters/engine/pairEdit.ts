@@ -6,6 +6,7 @@ import { LIMITS, linkCount } from './limits'
 import { descendantsOf, restPivot, solveAtRest, type Solved } from './rig'
 import { attachGroup, done, fail, type Edit } from './rigEdit'
 import { drawOrder } from './order'
+import { mirroredSkin } from './skin'
 import { wornUnder } from './wear'
 
 // The pure operations behind pairs, point links and the back view: making a twin of a shape, an object or a group (a derived mirror image that follows
@@ -163,7 +164,10 @@ function breakShape(c: ModelContent, id: string): Edit {
   // it keeps the paint it was drawn with (slot, tone, shading, clip...), as its original gives it
   const paint = bakedPaint(c, s)
   // and the way it fades in with a slider (a crease)
-  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0, ...paint, opBy: x.opBy ?? orig.opBy ?? null } : x)) }
+  // and the skin weights of its original, on the twin groups (phase O1)
+  const ownGroup = c.groups.find(g => g.objects.includes(c.objects.find(ob => ob.shapes.includes(id))?.id ?? ''))?.id ?? null
+  const skin = mirroredSkin(c, orig.skin, ownGroup)
+  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0, ...paint, opBy: x.opBy ?? orig.opBy ?? null, ...(skin.length ? { skin } : {}) } : x)) }
   next = mirrorShapeDrives(next, orig.id, id, pts.length)
   return done(next, linked ? 'Its point links are not copied: link its points again.' : undefined)
 }

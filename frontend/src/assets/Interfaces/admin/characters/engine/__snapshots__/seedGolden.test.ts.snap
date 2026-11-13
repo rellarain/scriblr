@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the basic model draws as it did before skin weights > at rest, from the back 1`] = `"a2db4633"`;
+
+exports[`the basic model draws as it did before skin weights > at rest, from the front 1`] = `"cb0d3d13"`;
+
+exports[`the basic model draws as it did before skin weights > every slider at its least 1`] = `"533df092"`;
+
+exports[`the basic model draws as it did before skin weights > every slider at its most 1`] = `"dd3bb6f2"`;
+
+exports[`the basic model draws as it did before skin weights > seeded random sliders 1`] = `"5c69a1ce"`;
+
+exports[`the basic model draws as it did before skin weights > seeded random sliders, from the back 1`] = `"ea81d9ec"`;

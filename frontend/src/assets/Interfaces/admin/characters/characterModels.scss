@@ -337,6 +337,11 @@
 .cmWeightRing { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmPoint--weigh { cursor: pointer; }
 .cmPoint--weighted { stroke: var(--accent); }
+// the Skin tool (phase O1): its panel, the rings that show how much each point follows the chosen group (dashed, so they are not taken for hanging weights), and the brush
+.cmSkinBar { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--ov-sink-2); box-shadow: inset 4px 0 0 var(--accent); }
+.cmSkinRing { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmSkinBrush { fill: none; stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmCanvas--skin { cursor: crosshair; }
 .cmFallSide { display: inline-flex; gap: var(--space-1); align-items: center; margin-left: var(--space-2); }
 
 // ---- the Designer's shell: the canvas fills the console, the toolbars lie over its edges ----

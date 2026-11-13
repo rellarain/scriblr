@@ -1231,6 +1231,7 @@ MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
 MODEL_UNDER_MAX = 24           # the garments or families one object is worn under
+MODEL_SKIN_MAX = 3             # skin weights (phase O1): the groups one shape follows besides its own
 MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 24
@@ -1478,6 +1479,22 @@ class ModelFade(BaseModel):
         return _finite(value, 0.0, -1000.0, 1000.0)
 
 
+class ModelSkin(BaseModel):
+    """How much each point of a shape follows a group besides its own (skin weights, phase O1): `g` the group, `w` one weight per point of the shape's outline, 0..1 in
+    hundredths. A point near a joint follows both sides, part each, so the outline bends like skin instead of breaking where two parts meet; what the weights leave is
+    the shape's own group's."""
+
+    g: str = Field(pattern=_MODEL_ID)
+    w: list[float] = Field(default_factory=list)
+
+    @field_validator("w", mode="before")
+    @classmethod
+    def _weights(cls, value: Any) -> list[float]:
+        if not isinstance(value, list):
+            return []
+        return [round(_finite(v, 0.0, 0.0, 1.0), 2) for v in value[:MODEL_POINTS_MAX]]
+
+
 class ModelShape(BaseModel):
     """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
 
@@ -1522,11 +1539,32 @@ class ModelShape(BaseModel):
     opBy: Optional[ModelFade] = None
     # Phase D4: the radius a sharp corner of the drawn outline is rounded to (0 = left sharp). A twin and a shape that follows a template take it from the shape they copy.
     round: int = 0
+    # Phase O1: skin weights, the groups the shape's points also follow (at most MODEL_SKIN_MAX, one weight per point each). A twin is skinned as its original is.
+    skin: list[ModelSkin] = Field(default_factory=list, max_length=MODEL_SKIN_MAX)
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("skin", mode="before")
+    @classmethod
+    def _skin(cls, value: Any) -> list[ModelSkin]:
+        # a bad entry is dropped, a second entry for the same group too; more than the limit is refused
+        out: list[ModelSkin] = []
+        for s in _keep_valid(ModelSkin, value):
+            if all(x.g != s.g for x in out):
+                out.append(s)
+        return out
+
+    @model_validator(mode="after")
+    def _skin_fits(self) -> "ModelShape":
+        # one weight per point: a list that is short is filled with 0, one that is long is cut
+        n = len(self.pts)
+        for s in self.skin:
+            if len(s.w) != n:
+                s.w = (s.w + [0.0] * n)[:n]
+        return self
 
     @field_validator("opBy", mode="before")
     @classmethod

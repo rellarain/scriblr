@@ -1,7 +1,8 @@
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { chainOf } from './engine/rig'
+import { roundWeight, skinFaults } from './engine/skin'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 
 // The pure side of the Characters page: editing a model's tree (groups, objects, shapes), the checks Publish makes, and ids and names. Nothing here
@@ -73,8 +74,18 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round),
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), skin: skinOf(s),
   }
+}
+// Skin weights as the server keeps them (phase O1): one entry per group, at most LIMITS.skinMax, each with one weight per point (0..1 in hundredths; a short list is filled with 0,
+// a long one cut).
+function skinOf(s: ModelShape): ModelSkin[] {
+  const out: ModelSkin[] = []
+  for (const k of s.skin ?? []) {
+    if (!k || typeof k.g !== 'string' || !k.g || out.some(x => x.g === k.g)) continue
+    out.push({ g: k.g, w: s.pts.map((_, i) => roundWeight(Number(k.w?.[i] ?? 0))) })
+  }
+  return out.slice(0, LIMITS.skinMax)
 }
 // A radius as the server keeps it: a whole number from 0 to the most, 0 when it is not a number.
 export const roundOf = (v: number | null | undefined): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(LIMITS.roundMax, Math.max(0, v))) : 0)
@@ -423,6 +434,8 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       // a clip or a cut-out that pointed at a shape that is gone no longer does
       if (s.clip && gone.shapes.has(s.clip)) out = { ...out, clip: null }
       if ((s.cut ?? []).some(t => gone.shapes.has(t))) out = { ...out, cut: (s.cut ?? []).filter(t => !gone.shapes.has(t)) }
+      // a group that is gone takes the weights of the shapes that followed it
+      if ((s.skin ?? []).some(k => gone.groups.has(k.g))) out = { ...out, skin: (s.skin ?? []).filter(k => !gone.groups.has(k.g)) }
       return out
     }),
     objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
@@ -914,6 +927,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...rigFaults(c, circular, owner, holder))
   faults.push(...pairFaults(c))
   faults.push(...linkFaults(c))
+  faults.push(...skinFaults(c))
   faults.push(...formFaults(c))
   faults.push(...classFaults(c))
   faults.push(...presetFaults(c))

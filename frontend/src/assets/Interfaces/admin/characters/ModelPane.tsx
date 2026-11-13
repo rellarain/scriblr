@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
+  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -23,6 +23,7 @@ import { ADVANCED_TABS, Inspector, type InspectorTab } from './Inspector'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import type { PaintActions } from './PaintSection'
 import { PoseBar } from './PoseBar'
+import { SkinPanel } from './SkinPanel'
 import { ProportionsTab } from './ProportionsTab'
 import { PresetsTab, type PresetActions } from './PresetsTab'
 import { PreviewStrip } from './PreviewStrip'
@@ -45,6 +46,8 @@ import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
 import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
+import { alignSkins, weightsOf } from './engine/skin'
+import { autoSkin, bendSlider, clearSkin, copySkin, defaultPartner, mirrorSkin, paintSkin, partnersOf, skinBlocked, smoothSkin, stepPointSkin } from './engine/skinEdit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisRoll, setInitialForm, toggleAxisGenre, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse, type Box } from './engine/geometry'
@@ -57,7 +60,7 @@ import { shapesInOrder } from './engine/order'
 import { addOption, addState, applyOption, removeOption, removeState, renameOption, renameState, updateOption } from './engine/states'
 import { addField, addFieldset, removeField, removeFieldset, renameFieldset, setFieldProp } from './engine/fields'
 import { deletePreset, duplicatePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
-import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
+import { chainOf, isPointDriven, restPivot, solve, valueOf, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
 import * as patternOps from './engine/patterns'
 import { addShading } from './engine/shadeEdit'
@@ -223,6 +226,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // bridges, creases and fall (phase 5b): the spots of a bridge picked so far on the canvas (null: not making one), and the Weights tool (a click on a point steps its weight)
   const [bridgeSpots, setBridgeSpots] = useState<EdgeSpot[] | null>(null)
   const [weighing, setWeighing] = useState(false)
+  // the Skin tool (phase O1): on or off, the group the selected shape's weights are painted for (null: the tool's choice), how strongly and how widely a drag paints, and
+  // picking the shape to copy weights from
+  const [skinning, setSkinning] = useState(false)
+  const [skinGroup, setSkinGroup] = useState<string | null>(null)
+  const [skinStrength, setSkinStrength] = useState(1)
+  const [skinRadius, setSkinRadius] = useState(10)
+  const [skinPick, setSkinPick] = useState(false)
   const [frameSel, setFrameSel] = useState<string | null>(null)
   const [throughId, setThroughId] = useState<string | null>(null)
   const [tileTest, setTileTest] = useState<string | null>(null)
@@ -282,7 +292,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // A change that is one undo step of its own. In a writer's designer a change that makes a count grow past a limit the admin set is not made, and the note says so.
   function commit(next: ModelContent, immediate = false): boolean {
     // every member has a shape for each shape of its pattern: an edit that added or took away a pattern's shape reaches them here
-    const synced = reconcileClasses(next, makeId)
+    // skin weights stay with their points when points are added or taken away (phase O1)
+    const synced = reconcileClasses(alignSkins(content, next), makeId)
     const refused = policy.writer ? growthRefusal(content, synced, policy.writer) : null
     if (refused) { setNote(refused); return false }
     setHistory(h => remember(h, content))
@@ -359,6 +370,21 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   const weightAt = (i: number): number | undefined => (selShape ? shapeById(canvasContent, selShape.id)?.pts[i]?.w ?? undefined : undefined)
   const weights = weighing && selShape && editable ? { onCycle: (i: number) => setWeightAt(i, cycleWeight(weightAt(i))), onStep: (i: number, dir: -1 | 1) => setWeightAt(i, stepWeight(weightAt(i), dir)) } : null
+  // The Skin tool: the weights of the selected shape for one group, painted on the canvas (they may be painted on a posed shape: the bend shows what they do).
+  const skinBlock = skinning && selShape ? skinBlocked(content, selShape.id, view, !!formTarget) : null
+  const skinPartners = skinning && selShape ? partnersOf(content, selShape.id) : []
+  const skinWith = skinning && selShape ? (skinGroup && skinPartners.some(g => g.id === skinGroup) ? skinGroup : defaultPartner(content, selShape.id)) : null
+  const skinWeights = selShape && skinWith ? weightsOf(selShape, skinWith) : []
+  const skin = skinning && selShape && skinWith && !skinBlock && !recording ? {
+    weights: skinWeights, radius: skinRadius,
+    onStep: (i: number, dir: -1 | 1) => applyEdit(stepPointSkin(content, selShape.id, skinWith, i, dir)),
+    onPaint: (points: number[]) => {
+      const next = paintSkin(content, selShape.id, skinWith, points, skinStrength)
+      if (next) models.edit(entry.id, () => next, false)
+      else setNote('A shape may follow at most 3 groups besides its own: clear one of them first.')
+    },
+  } : null
+  const bend = selShape && skinWith ? bendSlider(content, selShape.id, skinWith) : null
   function undo() {
     const r = undoHistory(history, content)
     if (!r) return
@@ -1063,7 +1089,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const fitPickData = fitPick && selObject ? { shapes: stretchTargets(content, selObject.id).filter(id => !!solved.shapes[id]?.d) } : null
   // making a bridge: any shape that is drawn and is not a twin (the spots are on the edges of the original parts)
   const bridgePickData = bridgeSpots ? { shapes: content.shapes.filter(s => !s.mirrorOf && !s.shade && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
-  const pick = bridgePickData ?? bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
+  // copying skin weights: any other shape with an outline
+  const skinPickShapes = skinPick && skinning && selShape ? { shapes: content.shapes.filter(s => s.id !== selShape.id && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
+  const pick = bridgePickData ?? bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? skinPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
 
   // Dragging the pivot of a group: an unanchored one moves to the pointer (read back into the group's own space); an anchored one is fixed again at the
   // nearest place of the same kind on its shape.
@@ -1133,6 +1161,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (applyEdit(setObjectFit(content, selObject.id, 'stretch', shapeId))) setFitPick(false)
       return
     }
+    if (skinPick && selShape) {
+      if (applyEdit(copySkin(content, selShape.id, shapeId))) setSkinPick(false)
+      return
+    }
     if (paintPick && selShape) {
       const e = paintPick === 'clip' ? paintOps.setClip(content, selShape.id, shapeId) : paintOps.toggleCut(content, selShape.id, shapeId)
       if (applyEdit(e)) setPaintPick(null)
@@ -1150,6 +1182,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
 
   const stageNote = bridgeSpots ? `Bridge: ${['click the edge of the first part, where one side of the bridge leaves it', 'click the edge of the other part, where that side arrives', 'for the other side, click an edge of either part', 'click the edge of the other part again'][bridgeSpots.length]} (spot ${bridgeSpots.length + 1} of 4). Escape stops.`
+    : skinPick && skin ? 'Click the shape to copy the skin weights from (the one under this shape). Escape stops.'
+    : skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), or drag to paint the points inside the dashed circle. A dashed ring shows how much a point follows the chosen group.'
     : weights ? 'Weights: click a point (or press Enter) to step how free it is to hang; the arrow keys step it too. A ring round a point shows its weight.'
     : weighing && selShape && !editable ? (pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to change its weights.' : 'This shape is shown, not edited.')
     : throughFrame ? `Looking through ${through?.name.trim() || 'the frame'}: the figure is cropped to it, without what it leaves out. Choose Whole figure in the Frames tab to go back.`
@@ -1204,7 +1238,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} layers={drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
-            frames={frameCanvas} through={throughFrame} weights={weights} lock={lock} onNote={setNote}
+            frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
             onSelect={choose} onSelectPoint={setSelPoint}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -1214,7 +1248,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
               setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
             }}
-            onEscape={() => { if (bridgeSpots) setBridgeSpots(null); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+            onEscape={() => { if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
           <div className="dzNotes">
@@ -1258,7 +1292,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
               <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles; click a point to step its handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setSkinPick(false); setMode('points'); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
@@ -1278,6 +1313,27 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 </span>
               )}
             </div>
+            {skinning && !recording && (
+              <SkinPanel
+                shapeName={selShape?.name.trim() ?? ''} blocked={selShape ? skinBlock : 'Pick a shape to paint its skin weights.'} partners={skinPartners} partner={skinWith} onPartner={setSkinGroup}
+                following={skinWeights.filter(w => w > 0).length}
+                strength={skinStrength} onStrength={(dir, big) => setSkinStrength(v => Math.min(1, Math.max(0, Math.round((v + dir * (big ? 0.5 : 0.1)) * 10) / 10)))}
+                radius={skinRadius} onRadius={(dir, big) => setSkinRadius(v => Math.min(60, Math.max(1, v + dir * (big ? 10 : 2))))}
+                bend={bend ? {
+                  name: bend.name.trim() || 'the joint', value: `${Math.round(valueOf(bend, values))}${bend.unit}`, atRest: valueOf(bend, values) === bend.rest,
+                  atMin: valueOf(bend, values) <= bend.min, atMax: valueOf(bend, values) >= bend.max,
+                  onStep: (dir, big) => setValues(v => ({ ...v, [bend.id]: Math.min(bend.max, Math.max(bend.min, valueOf(bend, v) + dir * (big ? 30 : 10))) })),
+                  onRest: () => setValues(v => ({ ...v, [bend.id]: bend.rest })),
+                } : null}
+                picking={skinPick}
+                onAuto={() => { if (selShape && skinWith) applyEdit(autoSkin(content, selShape.id, skinWith, skinRadius)) }}
+                onSmooth={() => { if (selShape && skinWith) applyEdit(smoothSkin(content, selShape.id, skinWith)) }}
+                onMirror={() => { if (selShape && skinWith) applyEdit(mirrorSkin(content, selShape.id, skinWith, (selShape.pts[selPoint]?.x ?? content.axis) > content.axis ? 1 : -1)) }}
+                onCopy={() => setSkinPick(k => !k)}
+                onClear={() => { if (selShape && skinWith) applyEdit(clearSkin(content, selShape.id, skinWith)) }}
+                canClear={!!selShape && (selShape.skin ?? []).some(k => k.g === skinWith)}
+              />
+            )}
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
 
             <NodeBar

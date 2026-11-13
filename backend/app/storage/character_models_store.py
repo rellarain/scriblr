@@ -331,6 +331,29 @@ def _link_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _skin_faults(content: ModelContent, parents: dict[str, Optional[str]], owner: dict[str, str], holder: dict[str, str]) -> list[str]:
+    """Skin weights (phase O1): a shape follows groups that are there and not its own, a twin is skinned as its original is (it has no weights of its own), and a shape is
+    not skinned to a group that hangs from it (that group's anchor would wait for the shape, and the shape for the group). The front end says the same (skinFaults)."""
+    faults: list[str] = []
+    groups = {g.id: g for g in content.groups}
+    for s in content.shapes:
+        if not s.skin:
+            continue
+        name = _label(s.name, s.id)
+        if s.mirrorOf:
+            faults.append(f"Shape {name} is a twin and has skin weights of its own: skin the original instead.")
+            continue
+        home = holder.get(owner.get(s.id, ""), "")
+        for sk in s.skin:
+            if sk.g not in groups:
+                faults.append(f"Shape {name} is skinned to a group that does not exist.")
+            elif sk.g == home:
+                faults.append(f"Shape {name} is skinned to its own group.")
+            elif any(groups[g].attach is not None and groups[g].attach.shape == s.id for g in [sk.g, *_ancestors(parents, sk.g)] if g in groups):
+                faults.append(f"Shape {name} is skinned to a group that hangs from it.")
+    return faults
+
+
 def _form_faults(content: ModelContent) -> list[str]:
     """Forms (phase 3): a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at
     least three points. The front end makes the same checks in the same words (modelContent.formFaults)."""
@@ -731,6 +754,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_rig_faults(content, parents, loop is not None, owner, holder))
     faults.extend(_pair_faults(content))
     faults.extend(_link_faults(content))
+    faults.extend(_skin_faults(content, parents, owner, holder))
     faults.extend(_form_faults(content))
     faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))

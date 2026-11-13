@@ -12,6 +12,7 @@ import { addFrame, toggleFrameHide } from '../assets/Interfaces/admin/characters
 import { bridgeBetween, spotFromClick } from '../assets/Interfaces/admin/characters/engine/bridgeEdit'
 import { setFade } from '../assets/Interfaces/admin/characters/engine/fadeEdit'
 import { addFall, withWeight } from '../assets/Interfaces/admin/characters/engine/fallEdit'
+import { autoSkin } from '../assets/Interfaces/admin/characters/engine/skinEdit'
 import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/admin/characters/engine/formEdit'
 import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engine/classEdit'
 import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
@@ -255,6 +256,9 @@ function riggedFigure(): ModelContent {
   c = must(crease)
   c = must(setFade(c, crease.shapeId!, 'r_elbow'))
   c = { ...c, shapes: c.shapes.map(x => (x.id === crease.shapeId ? { ...x, name: 'Crease of the elbow', opBy: { slider: 'r_elbow', hidden: 8, shown: 110 } } : x)) }
+  // skin weights (phase O1): the top of the forearm follows the upper arm partly, rising across the elbow, so the forearm's outline bends there instead of turning whole
+  // (the right forearm, a twin, is skinned as its original is)
+  c = must(autoSkin(c, 's_fore', 'g_arm', 6))
   // a ponytail on the head: it sticks out sideways at rest, and the weighted points hang under their own weight as the Hair fall slider rises (to the side the
   // test character is turned to: down, the picture's left or right, behind)
   c = addObject(c, 'g_head', { id: 'o_hair', name: 'Ponytail', layer: 'hair', shapes: [] })

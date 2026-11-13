@@ -80,6 +80,9 @@ export interface FrameCanvas {
 // The Weights tool: a click on a point of the selected shape steps its weight (how free it is to hang), and the arrow keys step it too.
 export interface WeightTool { onCycle: (i: number) => void; onStep: (i: number, dir: -1 | 1) => void }
 export interface ThroughFrame { box: Box; tile: string; name: string }
+// The Skin tool (phase O1): how much each point of the selected shape follows the chosen group. A click on a point steps its weight a tenth (Shift: down), a drag paints the points
+// within `radius` of the pointer to the tool's strength, the arrow keys step the selected point. It works on a shape that is posed (shown, not edited).
+export interface SkinTool { weights: number[]; radius: number; onStep: (i: number, dir: -1 | 1) => void; onPaint: (points: number[]) => void }
 // Picking the pivot of a group by clicking its marker (the end of a bone).
 export interface PickGroup { id: string; name: string; x: number; y: number }
 // The lock at a crossing of two outlines. `enabled` is false when none can be made (a slider is away from rest, the back view, a form is being edited); `stageOf` says how
@@ -134,6 +137,7 @@ export interface CanvasProps {
   frames?: FrameCanvas | null
   through?: ThroughFrame | null
   weights?: WeightTool | null
+  skin?: SkinTool | null
   lock?: LockTool | null
   onPivot?: (x: number, y: number) => void
   onPivotNudge?: (dx: number, dy: number) => void
@@ -160,6 +164,7 @@ type Drag =
   | { kind: 'pose' }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
   | { kind: 'pan'; startX: number; startY: number; panX: number; panY: number; target: { kind: 'grid' } | { kind: 'shape'; id: string }; moved: boolean }
+  | { kind: 'paint'; point: number; down: boolean; x0: number; y0: number; moved: boolean }
 
 // What the pointer is over while nothing is dragged: a point of the selected shape, a crossing of its outline with another, or an outline (x, y: where the large handle sits).
 type Hover =
@@ -196,6 +201,8 @@ export function DesignerCanvas(p: CanvasProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<Hover | null>(null)
   const [guides, setGuides] = useState<{ x: number | null; y: number | null } | null>(null)
+  // where the Skin tool's brush is (the pointer, in canvas space), while the tool is on
+  const [brush, setBrush] = useState<[number, number] | null>(null)
   const targetsRef = useRef<GuideTargets | null>(null)
   const crossRef = useRef<{ solved: Solved; id: string; list: Crossing[] } | null>(null)
 
@@ -250,7 +257,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const shapesById = new Map(content.shapes.map(s => [s.id, s]))
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
-  const lockOn = !!p.lock?.enabled && overlay && !p.weights
+  const lockOn = !!p.lock?.enabled && overlay && !p.weights && !p.skin
   const hoverOk = !p.pose && !p.pick && !through && !p.frames
 
   function rect() {
@@ -367,7 +374,7 @@ export function DesignerCanvas(p: CanvasProps) {
       const cr = crossingNear(crossingsFor(shape.id), wx, wy, REACH_CROSS * px)
       if (cr) return { kind: 'cross', crossing: cr }
     }
-    if (overlay && mode === 'points' && editable) {
+    if (overlay && mode === 'points' && (editable || !!p.skin)) {
       let best = -1, bd = REACH_POINT * px
       built.forEach((b, i) => { const d = Math.hypot(b.x - wx, b.y - wy); if (d <= bd) { bd = d; best = i } })
       if (best >= 0) return { kind: 'point', i: best }
@@ -405,6 +412,11 @@ export function DesignerCanvas(p: CanvasProps) {
   // A press on what the pointer is over. Returns whether it was used. A press on the body of a shape leaves the outlines of other shapes alone: it selects the shape it is on.
   function hoverDown(e: ReactPointerEvent, onBody = false): boolean {
     if (e.button !== 0 || p.pose || p.pick || p.frames || through) return false
+    if (p.skin && shape) {
+      const h = hitTest(e)
+      beginPaint(e, h?.kind === 'point' ? h.i : -1)
+      return true
+    }
     const h = hitTest(e)
     if (!h) return false
     if (h.kind === 'cross') { p.lock?.onAdvance(h.crossing); return true }
@@ -414,7 +426,7 @@ export function DesignerCanvas(p: CanvasProps) {
       p.onSelect({ kind: 'shape', id: h.shapeId })
       return true
     }
-    if (!editable || mode !== 'points' || p.weights) return false
+    if (!editable || mode !== 'points' || p.weights || p.skin) return false
     // the large handle on the selected outline: a point is added there, and the press carries on as a drag of it
     const [x, y] = toLocal(e)
     const hit = nearestEdge(shape.pts, x, y)
@@ -439,7 +451,7 @@ export function DesignerCanvas(p: CanvasProps) {
     if (e.button !== 0) return
     if (hoverDown(e)) return
     // a click on the empty grid unselects everything (not while a tool is waiting for a click of its own)
-    if (!p.pick && !p.pose && !p.frames && !p.weights && !through && sel.kind !== 'none') p.onSelect(NONE)
+    if (!p.pick && !p.pose && !p.frames && !p.weights && !p.skin && !through && sel.kind !== 'none') p.onSelect(NONE)
   }
   function onShapeDown(e: ReactPointerEvent, id: string) {
     e.stopPropagation()
@@ -467,8 +479,21 @@ export function DesignerCanvas(p: CanvasProps) {
       capture(e)
     }
   }
+  // The Skin tool: a press that stays put on a point steps its weight; one that moves paints the points near the pointer.
+  function beginPaint(e: ReactPointerEvent, i: number) {
+    if (i >= 0) p.onSelectPoint(i)
+    dragRef.current = { kind: 'paint', point: i, down: e.shiftKey, x0: e.clientX, y0: e.clientY, moved: false }
+    capture(e)
+  }
+  function paintAt(e: { clientX: number; clientY: number }) {
+    if (!p.skin) return
+    const [wx, wy] = toWorld(e), reach = Math.max(p.skin.radius, REACH_POINT * pixel())
+    const near = built.flatMap((b, i) => (Math.hypot(b.x - wx, b.y - wy) <= reach ? [i] : []))
+    if (near.length) p.skin.onPaint(near)
+  }
   function beginPoint(e: ReactPointerEvent, i: number) {
     if (!shape) return
+    if (p.skin) { beginPaint(e, i); return }
     p.onSelectPoint(i)
     if (p.weights && editable) { p.weights.onCycle(i); return }
     if (!editable || linkedSet.has(i)) return
@@ -527,8 +552,19 @@ export function DesignerCanvas(p: CanvasProps) {
 
   function onMove(e: { clientX: number; clientY: number }) {
     const d = dragRef.current
+    if (p.skin) { const at = toWorld(e); setBrush(b => (b && Math.abs(b[0] - at[0]) < 1e-6 && Math.abs(b[1] - at[1]) < 1e-6 ? b : at)) }
     if (!d) { updateHover(e); return }
     lastPointer.current = { clientX: e.clientX, clientY: e.clientY }
+    if (d.kind === 'paint') {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+        d.moved = true
+        p.onGesture()
+        paintAt({ clientX: d.x0, clientY: d.y0 })
+      }
+      paintAt(e)
+      return
+    }
     if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
     if (d.kind === 'frame') {
       const [wx, wy] = toWorld(e)
@@ -597,6 +633,7 @@ export function DesignerCanvas(p: CanvasProps) {
     setGuides(null)
     if (d && d.kind === 'pose') p.pose?.onUp()
     if (d && d.kind === 'pan' && !d.moved) p.onRightClick(d.target)
+    if (d && d.kind === 'paint' && !d.moved && d.point >= 0) p.skin?.onStep(d.point, d.down ? -1 : 1)
     // a press on a point that did not move is a click: its handles step round
     if (d && d.kind === 'point' && !d.moved && shape && shape.id === d.shapeId && editable && mode === 'points' && !p.weights) {
       p.onEditShape(shape.id, cycleMode(shape, d.index, { mirror, axis }), d.index)
@@ -617,6 +654,12 @@ export function DesignerCanvas(p: CanvasProps) {
     if (e.key === 'Escape') {
       if (dragRef.current?.kind === 'pose') { dragRef.current = null; p.pose?.onCancel() }
       else p.onEscape()
+      return
+    }
+    if (shape && p.skin) {
+      const up = e.key === 'ArrowUp' || e.key === 'ArrowRight', down = e.key === 'ArrowDown' || e.key === 'ArrowLeft'
+      if (up || down) { e.preventDefault(); p.skin.onStep(selPoint, up ? 1 : -1) }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.skin.onStep(selPoint, e.shiftKey ? -1 : 1) }
       return
     }
     if (!shape || !editable) return
@@ -659,7 +702,7 @@ export function DesignerCanvas(p: CanvasProps) {
   }
 
   const cur = built[selPoint]
-  const nudgeHint = !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : mode === 'move' ? 'Arrow keys move the shape' : 'Arrow keys move the point; Delete removes it'
+  const nudgeHint = p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : mode === 'move' ? 'Arrow keys move the shape' : 'Arrow keys move the point; Delete removes it'
   const hoverShapeId = hover ? (hover.kind === 'edge' ? hover.shapeId : shape?.id ?? null) : null
   const hoveredPoint = hover?.kind === 'point' ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
@@ -742,8 +785,8 @@ export function DesignerCanvas(p: CanvasProps) {
           return (
             <circle
               key={i} cx={b.x} cy={b.y} r={(i === selPoint || i === hoveredPoint ? 5.5 : edgeOnSelected ? 3 : 4) * u} role="button" tabIndex={-1} aria-pressed={i === selPoint}
-              aria-label={`Point ${i + 1}${linkedSet.has(i) ? ', linked' : ''}${w > 0 ? `, weight ${Math.round(w * 100)}%` : p.weights ? ', no weight' : ''}`}
-              className={`cmPoint${i === selPoint ? ' cmPoint--sel' : ''}${i === hoveredPoint ? ' cmPoint--hover' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}${w > 0 ? ' cmPoint--weighted' : ''}${p.weights ? ' cmPoint--weigh' : ''}`}
+              aria-label={`Point ${i + 1}${linkedSet.has(i) ? ', linked' : ''}${p.skin ? `, skin weight ${Math.round((p.skin.weights[i] ?? 0) * 100)}%` : w > 0 ? `, weight ${Math.round(w * 100)}%` : p.weights ? ', no weight' : ''}`}
+              className={`cmPoint${i === selPoint ? ' cmPoint--sel' : ''}${i === hoveredPoint ? ' cmPoint--hover' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}${w > 0 && !p.skin ? ' cmPoint--weighted' : ''}${p.weights || p.skin ? ' cmPoint--weigh' : ''}`}
               onPointerDown={e => onPointDown(e, i)}
             />
           )
@@ -774,7 +817,10 @@ export function DesignerCanvas(p: CanvasProps) {
             {(cur.m === 'c' || cur.m === 'sc') && <HandleDot x={cur.x} y={cur.y} hx={cur.hox} hy={cur.hoy} u={u} label="Outgoing curve handle" onDown={e => onHandleDown(e, 'ho')} />}
           </g>
         )}
-        {built.map((b, i) => {
+        {p.skin ? built.map((b, i) => {
+          const w = Math.min(1, Math.max(0, p.skin!.weights[i] ?? 0))
+          return w > 0 ? <circle key={`k${i}`} cx={b.x} cy={b.y} r={(6 + w * 6) * u} data-skin={w} className="cmSkinRing" style={{ opacity: w }} aria-hidden="true" /> : null
+        }) : built.map((b, i) => {
           const w = Math.min(1, Math.max(0, shape!.pts[i].w ?? 0))
           return w > 0 ? <circle key={`w${i}`} cx={b.x} cy={b.y} r={(6 + w * 6) * u} data-weight={w} className="cmWeightRing" style={{ opacity: 0.35 + 0.65 * w }} aria-hidden="true" /> : null
         })}
@@ -811,9 +857,9 @@ export function DesignerCanvas(p: CanvasProps) {
 
   return (
     <svg
-      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
+      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}${p.skin ? ' cmCanvas--skin' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
       aria-label={`Designer canvas. ${nudgeHint}. Click the empty grid to unselect everything, or right-click it.`}
-      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => setHover(null)} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => { setHover(null); setBrush(null) }} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
     >
       <rect x={vb.x - 1} y={vb.y - 1} width={vb.w + 2} height={vb.h + 2} className="cmCanvasBg" />
       {p.layers.map(id => <Fragment key={id}>{layerNodes[id]}</Fragment>)}
@@ -846,6 +892,7 @@ export function DesignerCanvas(p: CanvasProps) {
         </g>
       ))}
       {hoverLayer()}
+      {p.skin && brush && overlay && <circle cx={brush[0]} cy={brush[1]} r={p.skin.radius} className="cmSkinBrush" data-brush="" aria-hidden="true" />}
     </svg>
   )
 }

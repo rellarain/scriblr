@@ -4,6 +4,7 @@ import { classKey, classesOf, lookOf, membersOf, overrideFor, type Choices } fro
 import { applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
+import { influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -61,9 +62,35 @@ export function pointDrivers(c: ModelContent, shapeId: string): ModelRange[] {
 // What a prop drive comes to at a slider value: the amount at rest is the property's own (0 for a move, 100 percent for a size).
 export const propAmount = (r: ModelRange, d: ModelDrive, v: number): number => amount(r, d, v, d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey].rest : 0)
 
-// Whether a slider that changes this shape's points is away from rest, so the points on the canvas are not the ones that were drawn.
+// Whether a slider that changes this shape's points is away from rest, so the points on the canvas are not the ones that were drawn. A skinned shape is also driven when a
+// slider that moves one of the groups it follows against its own group is away from rest.
 export function isPointDriven(c: ModelContent, values: Values, shapeId: string): boolean {
-  return pointDrivers(c, shapeId).some(r => valueOf(r, values) !== r.rest)
+  return pointDrivers(c, shapeId).some(r => valueOf(r, values) !== r.rest) || isSkinPosed(c, values, shapeId)
+}
+
+// Whether a skinned shape is posed: a group between its own group and a group it follows (below where their chains meet) is turned, scaled, lengthened or slid by a slider that
+// is away from rest. A twin group moves with its original, so the original's sliders count too.
+export function isSkinPosed(c: ModelContent, values: Values, shapeId: string): boolean {
+  const s = c.shapes.find(x => x.id === shapeId)
+  if (!s || !isSkinned(s)) return false
+  const oid = c.objects.find(o => o.shapes.includes(shapeId))?.id
+  const own = oid ? c.groups.find(g => g.objects.includes(oid))?.id : undefined
+  const ownChain = own ? chainOf(c, own) : []
+  const moving = new Set<string>()
+  for (const k of s.skin ?? []) {
+    if (!k.w.some(w => w > 0)) continue
+    const theirs = chainOf(c, k.g)
+    for (const g of theirs) if (!ownChain.includes(g)) moving.add(g)
+    for (const g of ownChain) if (!theirs.includes(g)) moving.add(g)
+  }
+  for (const g of c.groups) if (g.mirrorOf && moving.has(g.id)) moving.add(g.mirrorOf)
+  if (moving.size === 0) return false
+  const bones = new Map((c.bones ?? []).map(b => [b.id, b]))
+  const away = c.ranges.filter(r => valueOf(r, values) !== r.rest)
+  if (away.some(r => r.drives.some(d => (d.kind === 'turn' && !!d.group && moving.has(d.group)) || (d.kind === 'scale' && d.target === 'group' && !!d.id && moving.has(d.id))
+    || (d.kind === 'length' && !!d.id && moving.has(bones.get(d.id)?.start ?? ''))))) return true
+  const awayIds = new Set(away.map(r => r.id))
+  return c.groups.some(g => moving.has(g.id) && g.attach?.kind === 'range' && !!g.attach.slider && awayIds.has(g.attach.slider))
 }
 
 // ---- groups ----
@@ -142,6 +169,16 @@ export interface SolvedShape {
   // For a shape of a class member that has an outline of its own: the outline it would have following the template, drawn the same way ('' otherwise).
   ghost: string
   z: number
+  // Skin weights (phase O1), for a shape whose points follow other groups or are linked to a shape that does: see SolvedSkin. Absent for every other shape.
+  skin?: SolvedSkin
+}
+// The rig outline of a skinned shape before the skin moved it (each point in the space of its base group: see skin.ts PointSkin) and what each point follows (null: a point a link
+// has already put in the shape's own space). A point linked to the shape is placed on this outline and follows the same groups; a twin reflects it and skins itself. `drawn` is
+// the same for the outline that is drawn when it is not the rig outline (a form, the back view; null when that one is not skinned).
+export interface SolvedSkin {
+  rest: ModelPoint[]
+  pts: Array<PointSkin | null>
+  drawn?: { rest: ModelPoint[]; pts: Array<PointSkin | null> } | null
 }
 export interface Solved {
   shapes: Record<string, SolvedShape>
@@ -153,6 +190,8 @@ export interface Solved {
   // Where each attached group is fixed (null when its anchor cannot be found).
   anchors: Record<string, [number, number] | null>
   global: Mat
+  // Each group's whole turn in degrees, its own and those of the groups above it added up (not wrapped): skin weights blend the turn between two groups by it.
+  turns?: Record<string, number>
 }
 
 const finiteMat = (m: Mat): boolean => m.every(Number.isFinite)
@@ -257,6 +296,21 @@ function roundUse(c: ModelContent): boolean {
   }
   return found
 }
+// Whether any shape of the model has skin weights (phase O1): a model with none is solved exactly as it was before there were any.
+const skinUses = new WeakMap<ModelContent, boolean>()
+function skinUse(c: ModelContent): boolean {
+  let found = skinUses.get(c)
+  if (found === undefined) { found = c.shapes.some(isSkinned); skinUses.set(c, found) }
+  return found
+}
+// What a spot t of the way along an edge follows: the two ends' groups mixed by t (when they are read in different groups, the nearer end's).
+function mixSkin(a: PointSkin, b: PointSkin, t: number): PointSkin {
+  if (a.base !== b.base) return t < 0.5 ? a : b
+  const m = new Map<string, number>()
+  for (const [g, w] of a.inf) m.set(g, (m.get(g) ?? 0) + w * (1 - t))
+  for (const [g, w] of b.inf) m.set(g, (m.get(g) ?? 0) + w * t)
+  return { base: a.base, inf: [...m.entries()].filter(([, w]) => w > 0) }
+}
 const plainRests = new WeakMap<ModelContent, Solved>()
 function plainRest(c: ModelContent): Solved {
   let s = plainRests.get(c)
@@ -337,10 +391,60 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return false
   }
 
-  const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G }
+  const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G, turns: {} }
+  const turns = out.turns!
   // Groups and shapes are solved when something asks for them (an anchor asks for a shape, a shape for its group, a link for another shape); a thing that
   // is being solved is not asked for again, so a circle of anchors or links cannot loop: it is cut where it closes.
   const busyGroups = new Set<string>(), busyShapes = new Set<string>()
+
+  // Skin weights (phase O1). A model with none pays nothing: no outline is skinned and every link takes the path it always took.
+  const anySkin = skinUse(c)
+  // a group's twin, either way round (a group with no twin is its own): a twin shape follows the twins of the groups its original follows
+  const twinOfGroup = new Map<string, string>()
+  for (const g of c.groups) if (g.mirrorOf && g.mirrorOf !== g.id) { twinOfGroup.set(g.mirrorOf, g.id); twinOfGroup.set(g.id, g.mirrorOf) }
+  const twinGroup = (g: string | null): string | null => (g === null ? null : twinOfGroup.get(g) ?? g)
+  const restPivots = new Map<string, [number, number]>()
+  const restPivotOf = (id: string): [number, number] | null => {
+    let p = restPivots.get(id)
+    if (!p) { const g = groupMap.get(id); if (!g) return null; p = pivotAtRest(c, g); restPivots.set(id, p) }
+    return p
+  }
+  const isAbove = (a: string, b: string): boolean => {
+    const seen = new Set<string>()
+    for (let cur = groupMap.get(b)?.parent ?? null; cur !== null && !seen.has(cur); cur = groupMap.get(cur)?.parent ?? null) { if (cur === a) return true; seen.add(cur) }
+    return false
+  }
+  const skinRig: SkinRig = {
+    mat: g => (g ? groupMat(g) : IDENTITY),
+    turn: g => { if (!g) return 0; groupMat(g); return turns[g] ?? 0 },
+    // where two groups meet at rest: the pivot of the lower one when one hangs from the other
+    joint: (a, b) => (a === null ? null : isAbove(a, b) ? restPivotOf(b) : isAbove(b, a) ? restPivotOf(a) : null),
+  }
+  // The rest outline of a skinned shape built as curves in its own space (what a point linked to it is placed on), once per shape.
+  const restCurves = new Map<string, BuiltPoint[]>()
+  const restBuilt = (id: string, s: SolvedSkin): BuiltPoint[] => {
+    let b = restCurves.get(id)
+    if (!b) { b = build(s.rest, shapeMap.get(id)?.closed ?? true); restCurves.set(id, b) }
+    return b
+  }
+  // Skins a list of points (in place) and says what was done: the list as it was before, and what each point follows; null when nothing in it is skinned. `source` is the
+  // stored outline the list was made from (the weights are read by number when it has as many points as the shape's own outline); `carried` are the points linked to a skinned
+  // shape, which follow what that shape's point follows.
+  function skinNow(sh: ModelShape, list: ModelPoint[], source: ModelPoint[], carried: Map<number, PointSkin> | null, own: string | null): { rest: ModelPoint[]; pts: Array<PointSkin | null> } | null {
+    if (!anySkin) return null
+    const inf = influencesFor(sh.skin, sh.pts, source)
+    if (!inf.some(l => l.length > 0) && !(carried && carried.size > 0)) return null
+    const rest = list.map(copyPoint)
+    const pts = list.map((p, i): PointSkin | null => {
+      const held = carried?.get(i)
+      if (held) return held
+      // a point a link has already placed (on a shape that is not skinned) is in this shape's own space as it stands
+      if (p.bind && p.bind.s !== sh.id && shapeMap.has(p.bind.s)) return null
+      return { base: own, inf: inf[i] ?? [] }
+    })
+    skinPoints(list, pts, own, skinRig)
+    return { rest, pts }
+  }
 
   // The place, size and turn authored fields give a whole shape or a whole object (phase D3c), added up over every field that changes it; the middle they are about is the
   // shape's own, or the object's at rest. The matrix is a scale, then a turn, then a move, whatever order the sliders are in.
@@ -459,12 +563,17 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const o = ownerId ? objectMap.get(ownerId) : undefined
       applyWholly(list, objectWhole, (o && objectCentre(o)) ?? centreOfPoints(own, sh.closed), { root: (o && objectRoot(o)) ?? rootOf(own), phase })
     }
-    // the runs of weighted points hang, from where the other sliders have left them: toward the way things fall, which is a direction in the picture, so it is
-    // read back into this shape's own space (a tilted head still lets its hair hang straight down)
+  }
+
+  // The runs of weighted points hang, from where the other sliders (and the skin) have left them: toward the way things fall, which is a direction in the picture, so it is
+  // read back into this shape's own space (a tilted head still lets its hair hang straight down). `sh` is the shape whose fall sliders count; a twin skinned on its own hangs
+  // the mirror way.
+  function fallNow(sh: ModelShape, list: ModelPoint[], Mg: Mat, mirrored = false) {
+    if (list.length < 3) return
     let falling = 0
     for (const r of ranges) for (const d of r.drives) if (d.kind === 'fall' && d.shape === sh.id) falling += amount(r, d, val(r)) / 100
     if (falling > 0 && list.some(p => (p.w ?? 0) > 0)) {
-      const inv = inverse(Mg), w = hangDirection(fallSide, view === 'back')
+      const inv = inverse(Mg), w0 = hangDirection(fallSide, view === 'back'), w: [number, number] = mirrored ? [-w0[0], w0[1]] : w0
       const dx = inv[0] * w[0] + inv[2] * w[1], dy = inv[1] * w[0] + inv[3] * w[1]
       applyFall(list, sh.closed, Math.min(1, falling), [dx, dy], squeezeOf(fallSide))
     }
@@ -472,16 +581,36 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // Points linked to another shape take its place: on one of its points (plus an offset), or at a spot along one of its edges, some way outward. The
   // target is read where the rig has put it (the model's space) and brought into this shape's group space. Looseness stretches the offsets.
-  function link(sh: ModelShape, list: ModelPoint[], Mg: Mat) {
-    if (!list.some(p => p.bind)) return
+  // A point linked to a skinned shape (phase O1) is placed on that shape's outline before its skin moved it, offsets and all, and is handed back with what that point follows
+  // (the returned map): the skin then carries it with the shape, so it stays on the outline and its offset turns with it.
+  function link(sh: ModelShape, list: ModelPoint[], Mg: Mat): Map<number, PointSkin> | null {
+    if (!list.some(p => p.bind)) return null
     const f = looseFactor(c, sh, values)
     let inv: Mat | null = null
+    let carried: Map<number, PointSkin> | null = null
     const leaves = new Map<number, [number, number]>()   // the points that leave along their edge, with the direction of that edge in this shape's space
     for (let k = 0; k < list.length; k++) {
       const p = list[k], b = p.bind
       if (!b || b.s === sh.id) continue
-      const a = shapeOut(b.s)?.pre
-      if (!a || a.length < 1) continue
+      const target = shapeOut(b.s)
+      const a = target?.pre
+      if (!target || !a || a.length < 1) continue
+      if (target.skin) {
+        const rest = restBuilt(b.s, target.skin), m = rest.length
+        if (m < 1) continue
+        const at = (i: number): PointSkin => target.skin!.pts[i % m] ?? { base: target.group, inf: [] }
+        let x: number, y: number, held: PointSkin
+        if (b.kind === 'point') { const q = rest[b.i % m]; x = q.x + b.d[0] * f; y = q.y + b.d[1] * f; held = at(b.i) }
+        else { [x, y] = edgeAt(rest, windSign(rest), b.e % m, b.t, b.o * f); held = mixSkin(at(b.e), at(b.e + 1), b.t) }
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+        p.x = x; p.y = y
+        ;(carried ??= new Map()).set(k, held)
+        if (b.kind === 'edge' && b.tan) {
+          const e = bezierAt(rest, b.e % m, b.t), tl = Math.hypot(e.tx, e.ty)
+          if (tl > 1e-9) leaves.set(k, [e.tx / tl, e.ty / tl])
+        }
+        continue
+      }
       const n = a.length
       let wx: number, wy: number
       if (b.kind === 'point') { const q = a[b.i % n]; wx = q.x; wy = q.y }
@@ -497,7 +626,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         }
       }
     }
-    if (leaves.size < 2) return
+    if (leaves.size < 2) return carried
     // A side between two such points locked to different shapes (the two ends of a bridge) leaves one part along the direction of its edge and arrives at the
     // other along the direction of its edge, so the outline runs on smoothly through a bend however far the parts have turned.
     const n = list.length
@@ -509,26 +638,29 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       a.ho = [ta[0] * sa * reach, ta[1] * sa * reach]
       b.hi = [tb[0] * sb * reach, tb[1] * sb * reach]
     }
+    return carried
   }
 
   // The outline of a shape that has points of its own: the base outline linked and driven (what the rig reads), and what is drawn: a chosen form's outline in its
-  // place, or in the back view the outline of its own for the back. An empty form outline hides the shape in every view.
-  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined): { rig: ModelPoint[]; drawn: ModelPoint[] } {
-    const rig = sh.pts.map(copyPoint)
-    link(sh, rig, Mg)
-    drive(sh, rig, sh.pts, Mg)
-    let drawn = rig
-    if (form) {
-      drawn = form.map(copyPoint)
-      link(sh, drawn, Mg)
-      drive(sh, drawn, sh.pts, Mg)
+  // place, or in the back view the outline of its own for the back. An empty form outline hides the shape in every view. Each is linked, driven by its sliders, moved by its
+  // skin weights and then left to hang, in that order.
+  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined): { rig: ModelPoint[]; drawn: ModelPoint[]; skin?: SolvedSkin } {
+    const own = groupOfShape.get(sh.id) ?? null
+    const outline = (source: ModelPoint[], movesOn: ModelPoint[]) => {
+      const list = source.map(copyPoint)
+      const carried = link(sh, list, Mg)
+      drive(sh, list, movesOn, Mg)
+      const skinned = skinNow(sh, list, source, carried, own)
+      fallNow(sh, list, Mg)
+      return { list, skinned }
     }
-    if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) {
-      drawn = sh.back.map(copyPoint)
-      link(sh, drawn, Mg)
-      drive(sh, drawn, sh.back, Mg)
-    }
-    return { rig, drawn }
+    const base = outline(sh.pts, sh.pts)
+    const rig = base.list
+    let drawn = rig, other: { list: ModelPoint[]; skinned: ReturnType<typeof skinNow> } | null = null
+    if (form) { other = outline(form, sh.pts); drawn = other.list }
+    if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) { other = outline(sh.back, sh.back); drawn = other.list }
+    if (!base.skinned) return { rig, drawn }
+    return { rig, drawn, skin: { ...base.skinned, ...(other ? { drawn: other.skinned } : {}) } }
   }
   const groupMatOf = (shapeId: string): Mat => { const gid = groupOfShape.get(shapeId); return gid ? groupMat(gid) : IDENTITY }
 
@@ -651,7 +783,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
-    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = ''
+    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = '', skin: SolvedSkin | undefined
     // a shape of a class member follows a shape of the template; with no points of its own it is drawn as the template's shape is, in the member's own group,
     // under the member's own choice of form
     const followed = !twin && sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
@@ -662,17 +794,33 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       // a twin is the mirror image of its original as the original is drawn: its points are the reflection of the original's (in the group's own space,
       // so a group turned with the original is turned the other way round on the twin's side)
       const o = shapeOut(twin.id)
-      rig = o ? reflectList(o.rig, axis) : []
-      drawn = o ? reflectList(o.local, axis) : []
+      if (o?.skin) {
+        // a skinned original: the twin reflects the outline before the skin moved it and skins itself with the twin groups (the two sides may be posed apart)
+        const mirrored = (s: { rest: ModelPoint[]; pts: Array<PointSkin | null> }) => {
+          const list = reflectList(s.rest, axis)
+          const pts = [...s.pts].reverse().map(ps => (ps ? { base: twinGroup(ps.base), inf: ps.inf.map(([g, w]): [string, number] => [twinGroup(g) ?? g, w]) } : null))
+          skinPoints(list, pts, groupId, skinRig)
+          fallNow(twin, list, Mg, true)
+          return { list, pts }
+        }
+        const r = mirrored(o.skin)
+        rig = r.list
+        const d = o.skin.drawn
+        drawn = d === undefined ? rig : d ? mirrored(d).list : reflectList(o.local, axis)
+        skin = { rest: reflectList(o.skin.rest, axis), pts: r.pts }
+      } else {
+        rig = o ? reflectList(o.rig, axis) : []
+        drawn = o ? reflectList(o.local, axis) : []
+      }
       closed = twin.closed
     } else if (tpl && sh.pts.length < 3) {
       const o = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId))
-      rig = o.rig; drawn = o.drawn; closed = tpl.closed
+      rig = o.rig; drawn = o.drawn; closed = tpl.closed; skin = o.skin
     } else {
       // The rig always reads the base outline. A form gives only the drawn outline (it still gets the shape's links and, when it has as many points as the
       // base, its recorded moves); an empty one hides the shape in every view.
       const o = plainOutline(sh, Mg, tpl ? memberForm(tpl.id, memberId) : formOutline(sh.id))
-      rig = o.rig; drawn = o.drawn
+      rig = o.rig; drawn = o.drawn; skin = o.skin
       if (tpl) {
         const g = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId)).drawn
         ghost = g.length >= 3 ? pathText(build(g, tpl.closed, mul(G, Mg)), tpl.closed) : ''
@@ -690,6 +838,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
       d: ok ? pathText(fin, closed) : '', poly, box: poly.length ? boxOf(poly) : NO_BOX,
       visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, fade: fadeOf(sh), z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
+      ...(skin ? { skin } : {}),
     }
   }
 
@@ -707,7 +856,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // What a group does on top of where its parent and its anchor put it: its matrix and its pivot (in the parent's frame, before the group's own movement), with
   // `forTwin` leaving out the drives that a twin does not follow (a drive with `mirror: false`: the two sides are posed apart).
-  function movement(g: ModelGroup, forTwin: boolean): { Mg: Mat; pw2: [number, number]; an: [number, number] | null } {
+  function movement(g: ModelGroup, forTwin: boolean): { Mg: Mat; pw2: [number, number]; an: [number, number] | null; angle: number } {
     const id = g.id
     const pm = (g.parent ? groupMat(g.parent) : undefined) ?? IDENTITY
     const pv = g.pivot ?? restPivot(c, g)
@@ -739,7 +888,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         if (len > 1e-6) lengthen = mul(scaleAlong(factorOf(r, d, val(r)), ux / len, uy / len, pw2[0], pw2[1]), lengthen)
       }
     }
-    return { Mg: mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), lengthen)), pw2, an }
+    return { Mg: mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), lengthen)), pw2, an, angle }
   }
   // Whether a group has drives that its twin does not follow.
   const apartFrom = (id: string): boolean => ranges.some(r => r.drives.some(d => d.mirror === false && ((d.kind === 'turn' && d.group === id) || (d.kind === 'scale' && d.target === 'group' && d.id === id) || d.kind === 'length')))
@@ -760,8 +909,13 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       // (a turn the other way round about the twin's own pivot), so the two sides are posed apart while the drawing stays mirrored.
       const Mpo = original.parent ? groupMat(original.parent) : IDENTITY
       const Mpt = g.parent ? groupMat(g.parent) : IDENTITY
-      const Mo = apartFrom(original.id) ? movement(original, true).Mg : groupMat(original.id)
+      const apart = apartFrom(original.id) ? movement(original, true) : null
+      const Mo = apart ? apart.Mg : groupMat(original.id)
       Mg = mul(Mpt, mul(RF, mul(inverse(Mpo), mul(Mo, RF))))
+      // the whole turn: the twin's parent's, less the original's own turn (a mirror turns the other way round)
+      const Tpo = original.parent ? turns[original.parent] ?? 0 : 0, Tpt = g.parent ? turns[g.parent] ?? 0 : 0
+      const To = apart ? Tpo + apart.angle : turns[original.id] ?? Tpo
+      turns[id] = Tpt - (To - Tpo)
       const po = out.pivots[original.id]
       const pw = po ? apply(Mpt, ...apply(RF, ...apply(inverse(Mpo), po[0], po[1]))) : [axis, 200]
       out.pivots[id] = [pw[0], pw[1]]
@@ -776,11 +930,13 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         }
       }
       if (angle !== 0 || sx !== 1 || sy !== 1) Mg = mul(rotate(-angle, pw[0], pw[1]), mul(scale(sx, sy, pw[0], pw[1]), Mg))
+      turns[id] -= angle
     } else {
       const m = movement(g, false)
       Mg = m.Mg
       out.pivots[id] = [m.pw2[0], m.pw2[1]]
       out.anchors[id] = g.attach ? m.an : null
+      turns[id] = (g.parent ? turns[g.parent] ?? 0 : 0) + m.angle
     }
     if (!finiteMat(Mg)) Mg = IDENTITY
     out.mats[id] = Mg
