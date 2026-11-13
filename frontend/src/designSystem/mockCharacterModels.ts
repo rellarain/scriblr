@@ -48,7 +48,8 @@ export const modelContent = (name: string, over: Partial<ModelContent> = {}): Mo
 // `writer` makes it the writer's own library (`/my-models`): it keeps the limits the admin sets for writers, holds the library to the number of models they allow and refuses to
 // publish a model over one of them.
 export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean } = {}) {
-  const state = { entries: structuredClone(initial), limits: defaultWriterLimits() }
+  // `basicUpdate`: a newer basic model waits (phase O4a), as when the admin had changed the basic model before an update of the app
+  const state = { entries: structuredClone(initial), limits: defaultWriterLimits(), basicUpdate: false }
   const catalog = () => ({ schemaVersion: 1, models: structuredClone(state.entries) })
 
   // `parts` is the path after `/character-models`: [], ['published'], [id, 'publish'], [id, 'restore', '2'] ...
@@ -68,6 +69,17 @@ export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean
     if (parts[0] === 'basic' && parts.length === 1 && method === 'POST') {
       if (state.entries.some(e => e.id === 'basic')) return fail(409, 'The basic model is already here.')
       state.entries.push(liveEntry('basic', modelContent('Adult (basic)', structuredClone(riggedFigure()))))
+      return ok(catalog())
+    }
+    if (parts[0] === 'basic' && parts[1] === 'update' && parts.length === 2) {
+      const entry = state.entries.find(e => e.id === 'basic')
+      if (method === 'GET') return ok({ available: state.basicUpdate && !!entry })
+      if (!entry) return fail(404, "no model 'basic'")
+      entry.draft = modelContent('Adult (basic)', { ...structuredClone(riggedFigure()), description: 'The newer basic adult.' })
+      if (entry.published) entry.history = [entry.published, ...entry.history].slice(0, 10)
+      entry.published = published(entry.nextVersion, entry.draft, new Date().toISOString())
+      entry.nextVersion += 1
+      state.basicUpdate = false
       return ok(catalog())
     }
     if (parts[0] === 'published' && method === 'GET') {

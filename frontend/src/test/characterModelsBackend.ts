@@ -18,6 +18,8 @@ export interface ModelsBackend {
   calls: string[]
   // Make the next request to a path fail with this status and message.
   failNext(path: string, status: number, detail: string): void
+  // A newer basic model waits (phase O4a): set before the page loads.
+  basicUpdate: boolean
 }
 
 export function modelsBackend(initial: ModelEntry[], own: ModelEntry[] = []): ModelsBackend {
@@ -49,5 +51,7 @@ export function modelsBackend(initial: ModelEntry[], own: ModelEntry[] = []): Mo
     get limits() { return mine.state.limits },
     set limits(next: WriterModelLimits) { mine.state.limits = next },
     failNext: (path, status, detail) => { failures.set(path, { status, detail }) },
+    get basicUpdate() { return mock.state.basicUpdate },
+    set basicUpdate(next: boolean) { mock.state.basicUpdate = next },
   }
 }

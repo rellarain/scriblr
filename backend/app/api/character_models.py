@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from ..deps import get_app_data_storage_root
 from ..storage import character_models_store as store
@@ -62,6 +63,10 @@ def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
     return router
 
 
+class BasicUpdateOut(BaseModel):
+    available: bool
+
+
 router = _library_router("/api/character-models", "character-models", store.ADMIN_LIBRARY, "the admin's")
 
 
@@ -72,6 +77,21 @@ def add_basic_model(root: Path = Depends(get_app_data_storage_root)) -> ModelCat
         return store.add_basic_model(root)
     except store.BasicModelPresentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/basic/update", response_model=BasicUpdateOut)
+def basic_update(root: Path = Depends(get_app_data_storage_root)) -> BasicUpdateOut:
+    """Whether a newer basic model came with this build and waits, because the admin had changed the basic model (phase O4a)."""
+    return BasicUpdateOut(available=store.basic_update_available(root))
+
+
+@router.post("/basic/update", response_model=ModelCatalog)
+def update_basic_model(root: Path = Depends(get_app_data_storage_root)) -> ModelCatalog:
+    """Replace the basic model's draft with the one this build bundles and publish it as the next version. 404 when there is no basic model."""
+    try:
+        return store.update_basic_model(root)
+    except store.UnknownModelError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # The models a writer designs for themselves (the Characters console's Models section): a second catalog in my-models.json, with ids that start with "my-".

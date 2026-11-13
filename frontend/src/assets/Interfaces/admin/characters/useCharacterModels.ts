@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { addBasicModel, adminModelsApi, type ModelsApi } from '../../../../api/characterModelsApi'
+import { addBasicModel, adminModelsApi, basicUpdateAvailable, updateBasicModel, type ModelsApi } from '../../../../api/characterModelsApi'
 import type { ModelCatalog, ModelContent, ModelDraftList, ModelEntry } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 import { copyName, moveBefore, normalizeContent, randomId, starterContent, type MakeId } from './modelContent'
@@ -36,6 +36,8 @@ export function useCharacterModels(makeId: MakeId = randomId, library: { api: Mo
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | undefined>(undefined)
+  // a newer basic model waits (the admin's catalog only; phase O4a)
+  const [basicUpdate, setBasicUpdate] = useState(false)
 
   const ref = useRef(entries)
   ref.current = entries
@@ -67,6 +69,9 @@ export function useCharacterModels(makeId: MakeId = randomId, library: { api: Mo
       ref.current = catalog.models
       setEntries(catalog.models)
       setStatus('ready')
+      if (lib.current.idPrefix === '' && catalog.models.some(e => e.id === 'basic')) {
+        basicUpdateAvailable().then(r => setBasicUpdate(r.available === true), () => setBasicUpdate(false))
+      }
     } catch (err) {
       setLoadError(message(err, 'The models could not be loaded.'))
       setStatus('error')
@@ -148,6 +153,12 @@ export function useCharacterModels(makeId: MakeId = randomId, library: { api: Mo
 
   // The basic adult that comes with the app, added and published by the server (what is waiting is saved first).
   const addBasic = () => act(() => addBasicModel())
+  // The newer basic model that came with this version, in place of the basic model's draft and published as its next version.
+  async function updateBasic(): Promise<boolean> {
+    const done = await act(() => updateBasicModel())
+    if (done) setBasicUpdate(false)
+    return done
+  }
 
   const publish = (id: string) => act(() => lib.current.api.publish(id))
   const unpublish = (id: string) => act(() => lib.current.api.unpublish(id))
@@ -156,7 +167,7 @@ export function useCharacterModels(makeId: MakeId = randomId, library: { api: Mo
 
   return {
     entries, status, loadError, reload: load, busy, actionError, clearActionError: () => setActionError(undefined),
-    edit, setDraft, addModel, removeModel, moveModel, duplicateModel, importModels, addBasic,
+    edit, setDraft, addModel, removeModel, moveModel, duplicateModel, importModels, addBasic, basicUpdate, updateBasic,
     publish, unpublish, discard, restore,
     saveStatus: combineSaveStatus(draftSave), saveCountdown: combineCountdown(draftSave), saveNow: draftSave.flush,
   }

@@ -73,6 +73,7 @@ async def _lifespan(_app: FastAPI):
         pass
     try:
         character_models_store.seed_on_first_start(get_app_data_root())  # a fresh install gets the basic adult, published
+        character_models_store.update_basic_on_start(get_app_data_root())  # a newer bundled basic adult is published as its next version, unless the admin changed it
     except (OSError, ValueError):
         pass
     yield

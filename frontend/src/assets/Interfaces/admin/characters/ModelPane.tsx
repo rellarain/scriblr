@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
+  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -203,6 +203,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [history, setHistory] = useState<History<ModelContent>>(emptyHistory)
   const [versions, setVersions] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmUpdate, setConfirmUpdate] = useState(false)
   const [note, setNote] = useState('')
   const [tabRaw, setTab] = useState<InspectorTab>('shape')
   // a tab the writer has put away with the advanced tools is not the open one, whatever was open before
@@ -1347,6 +1348,22 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 )}
               </span>
             </div>
+            {entry.id === 'basic' && models.basicUpdate && (
+              <div className="dzBasicUpdate" role="group" aria-label="A newer basic model">
+                <p className="cmHint" role="status">A newer basic model came with this version of Scriblr. This one was left as it is because it had been changed.</p>
+                {confirmUpdate ? (
+                  <span className="cmConfirm" role="group" aria-label="Update the basic model?">
+                    <button type="button" className="cmBtn cmBtn--primary cmBtn--small" onClick={() => { setConfirmUpdate(false); void models.updateBasic() }}>Replace the draft and publish</button>
+                    <button type="button" className="cmBtn cmBtn--small" onClick={() => setConfirmUpdate(false)}>Not now</button>
+                  </span>
+                ) : (
+                  <button
+                    type="button" className="cmBtn cmBtn--small" disabled={busy} title="Put the newer basic model in place of this draft and publish it as the next version (the version published now stays in Versions)"
+                    onClick={() => setConfirmUpdate(true)}
+                  ><RestoreIcon size={12} /> Update the basic model</button>
+                )}
+              </div>
+            )}
 
             <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
               <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles; click a point to step its handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>

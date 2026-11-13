@@ -26,8 +26,8 @@ export const LIMITS = {
   axesMax: 8,
   formsWarn: 24,
   formsMax: 48,
-  presetsWarn: 40,
-  presetsMax: 80,
+  presetsWarn: 80,
+  presetsMax: 120,
   // classes: per model, members per class, form choices one style keeps
   classesWarn: 12,
   classesMax: 24,

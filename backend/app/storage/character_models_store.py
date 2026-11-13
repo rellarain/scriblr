@@ -6,6 +6,7 @@ published, a frozen copy; publishing, unpublishing, discarding and bringing back
 ever touches a project or a character.
 """
 
+import hashlib
 import json
 import sys
 import threading
@@ -888,6 +889,8 @@ def find_published(root: Path, model_id: str) -> Optional[PublishedModelOut]:
 
 BASIC_MODEL_ID = "basic"
 _SEEDED_MARKER = "character-models.seeded"
+# The key of the bundled basic model last put into the catalog (phase O4a): a newer build that bundles another basic model publishes it once, as the next version.
+_BASIC_VERSION_MARKER = "character-models.basic-version"
 
 
 def _seed_path() -> Path:
@@ -929,6 +932,89 @@ def seed_on_first_start(root: Path) -> bool:
         added = False
         if not load_models(root).models:
             add_basic_model(root)
+            _record_basic(root, _content_key(basic_model_content()))
             added = True
         marker.write_text("done", encoding="utf-8")
         return added
+
+
+# ---- a newer basic model (phase O4a) ----
+
+
+def _content_key(content: ModelContent) -> str:
+    """A short key of a model's content: the same content (as the schema reads it) always gives the same key."""
+    raw = json.dumps(content.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def _same(a: ModelContent, b: ModelContent) -> bool:
+    return a.model_dump(mode="json") == b.model_dump(mode="json")
+
+
+def _applied_basic(root: Path) -> Optional[str]:
+    marker = root / _BASIC_VERSION_MARKER
+    try:
+        return marker.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def _record_basic(root: Path, key: str) -> None:
+    (root / _BASIC_VERSION_MARKER).write_text(key, encoding="utf-8")
+
+
+def _put_basic(catalog: ModelCatalog, content: ModelContent) -> None:
+    """The bundled basic model as the basic model's draft and, when it may be published, its next published version (the one before goes to the history)."""
+    entry = _entry(catalog, BASIC_MODEL_ID)
+    entry.draft = content.model_copy(deep=True)
+    taken = any(o.published and o.published.content.name.casefold() == content.name.casefold() for o in catalog.models if o.id != BASIC_MODEL_ID)
+    if taken or publish_faults(content):
+        return
+    if entry.published:
+        entry.history = [entry.published, *entry.history][:MODEL_HISTORY_MAX]
+    entry.published = _published(entry.nextVersion, content)
+    entry.nextVersion += 1
+
+
+def basic_update_available(root: Path) -> bool:
+    """Whether the catalog's basic model is behind the one this build bundles and was left as it was because the admin had changed it (see update_basic_on_start)."""
+    if not any(e.id == BASIC_MODEL_ID for e in load_models(root).models):
+        return False
+    return _applied_basic(root) != _content_key(basic_model_content())
+
+
+def update_basic_on_start(root: Path) -> bool:
+    """On the start of a build that bundles a newer basic model: when the catalog's basic model is as the app left it (its draft is its published version, and that
+    version is the bundled model last put in, or there is no record of one), the newer one is published as its next version, keeping its history, so writers find the
+    basic model as a newer version in Use another model. When the admin has changed it, it is left alone and the Designer offers Update the basic model. A catalog
+    without the basic model (never added, or deleted) is left alone. True when it was updated."""
+    with _lock:
+        bundled = basic_model_content()
+        key = _content_key(bundled)
+        applied = _applied_basic(root)
+        if applied == key:
+            return False
+        catalog = load_models(root)
+        entry = next((e for e in catalog.models if e.id == BASIC_MODEL_ID), None)
+        if entry is None:
+            return False
+        published = entry.published.content if entry.published else None
+        untouched = published is not None and _same(entry.draft, published) and (applied is None or _content_key(published) == applied)
+        if not untouched:
+            return False
+        if _same(published, bundled):
+            _record_basic(root, key)
+            return False
+        _mutate(root, lambda c: _put_basic(c, bundled))
+        _record_basic(root, key)
+        return True
+
+
+def update_basic_model(root: Path) -> ModelCatalog:
+    """Update the basic model to the one this build bundles, as the admin asks (Update the basic model): its draft is replaced and published as the next version
+    (the admin's last published version is kept in its history). Raises UnknownModelError when the catalog has no basic model."""
+    with _lock:
+        bundled = basic_model_content()
+        catalog = _mutate(root, lambda c: _put_basic(c, bundled))
+        _record_basic(root, _content_key(bundled))
+        return catalog

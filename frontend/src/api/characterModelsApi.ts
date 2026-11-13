@@ -55,3 +55,8 @@ export const putWriterLimits = (limits: WriterModelLimits): Promise<WriterModelL
 export function addBasicModel(): Promise<ModelCatalog> {
   return api.post<ModelCatalog>('/character-models/basic')
 }
+
+// Whether a newer basic adult came with this version of the app and waits because the admin had changed the basic model (phase O4a), and putting it in: the draft is
+// replaced with the newer one and published as the next version (404 when there is no basic model).
+export const basicUpdateAvailable = (): Promise<{ available: boolean }> => api.get<{ available: boolean }>('/character-models/basic/update')
+export const updateBasicModel = (): Promise<ModelCatalog> => api.post<ModelCatalog>('/character-models/basic/update')

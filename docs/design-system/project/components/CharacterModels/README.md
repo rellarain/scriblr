@@ -295,7 +295,7 @@ The hand among the Designer tools (**Pose mode**, `aria-pressed`) lets the figur
 | Point links in a model | 600 | 1200 (Publish refused) |
 | Axes of forms in an object | 4 | 8 |
 | Forms in an axis | 24 | 48 |
-| Presets in a model | 40 | 80 |
+| Presets in a model | 80 | 120 |
 | Colour slots in a model | 24 | 32 |
 | Shapes in a model | | 800 |
 | Default colours in a slot | 40 | 64 |
@@ -347,6 +347,8 @@ The page where the admin sets the limits above. A row for each limit: its name, 
 ## The basic model
 
 **Adult (basic)** is the model that comes with Scriblr: an adult in everyday clothes that a character can be made from before any model has been designed. A fresh install has it **published** (the server adds it the first time the app starts, once: a model that is deleted does not come back), and **Add the basic model** (the mannequin icon among the model level's buttons, and in the writer's Mannequin panel when nothing is published) adds it to a catalog that has none of it. It is data, not code: `backend/app/seed/basic_model.json`, written by `frontend/scripts/seed-model` (`npx vite-node scripts/seed-model/run.ts`), which builds it from the old portrait engine's exact shapes and the mockup's body, and which can be run again to change it.
+
+**A newer basic model** (phase O4a). A version of Scriblr may come with a newer basic adult. On its first start it is **published as the basic model's next version by itself** when the basic model is as the app left it (its draft is its published version, and that is the basic adult the app last put in), keeping the versions before it in *Versions*; writers then find it as the *newer version* in *Use another model*, and their characters keep the choices whose parts are still there. When the admin had changed the basic model (its draft, or a version of their own published), it is **left as it is**, and the basic model's editor shows a note with **Update the basic model** (`.dzBasicUpdate`, under the model's strip): it asks first (*Replace the draft and publish* or *Not now*), then puts the newer basic adult in place of the draft and publishes it; the version that was published stays in *Versions*. A catalog without the basic model is never given one this way.
 
 - **The face** is the old drawing: the head, ears, eyes, brows, nose and mouth, each an object with one **form** for every option of the old engine (13 head shapes, 12 ears, 14 eyes, 13 brows, 14 noses, 13 mouths). The old outlines were curves sampled at many points; they are **fitted again with a fifth of the points** (each outline stays within about 0.16 of a unit of the old one, on a head 54 units tall). A left and a right outline that mirror each other are one shape and its twin (the eyes, the brows, the ears: each an object and its twin object, so *Eye size*, *Eye spacing* and *Eye tilt* move each eye about its own middle). The old drawing lit both eyes from the upper left; the twin's highlight is the mirror of the first.
 - **The body** is the mockup's mannequin, point for point: the neck, torso, arms, hands, legs and feet, with the bridges of skin between the parts (trapezius, obliques, hip, deltoid, elbow, wrist, thigh), grouped and rigged (a twin of the left arm and the left leg), with sliders for the head, the shoulders, the waist and the hips, the arms, the legs and the face (*Smile* uses *Curve the ends*).
