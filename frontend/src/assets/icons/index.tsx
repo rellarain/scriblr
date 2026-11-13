@@ -977,6 +977,14 @@ export function StampIcon(props: IconProps) {
   </IconBase>
 }
 
+// A door in a wall with the arc it swings through: put a door or a window in a wall.
+export function DoorIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 20h5M16 20h5M8 20V8" />
+    <path d="M8 8a8 12 0 0 1 8 12" />
+  </IconBase>
+}
+
 // A star with a path round it and a planet on the path: draw an orbit.
 export function OrbitIcon(props: IconProps) {
   return <IconBase {...props}>

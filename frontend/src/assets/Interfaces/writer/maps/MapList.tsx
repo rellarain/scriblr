@@ -8,6 +8,7 @@ import { importRows, mapFileName, parseMapFile, type Choice, type MapFile } from
 import { saveBlob } from './mapExport'
 import { MAP_TITLE_MAX, mapRows } from './mapModel'
 import { LEVELS, defaultsFor, levelDef } from './mapLevels'
+import { floorName } from './mapFloors'
 import { unitsOf } from './mapUnits'
 import type { Maps } from './useMaps'
 
@@ -61,7 +62,7 @@ export function MapList({ m, points = [] }: { m: Maps; points?: StoryPoint[] }) 
             <button type="button" className="mapRowMain" aria-label={`Open ${map.title}`} aria-current={map.id === open ? 'true' : undefined} title={`Open ${map.title}`} onClick={() => { void m.open(map.id) }}>
               {depth > 0 ? <ChevronRightIcon size={14} /> : <MapIcon size={14} />}
               <span className="mapRowTitle">{map.title}</span>
-              <span className="mapRowMeta" title={`${map.width} × ${map.height} cells`}>{levelDef(map.level).name}</span>
+              <span className="mapRowMeta" title={`${map.width} × ${map.height} cells`}>{map.floor ? floorName(map.floor) : levelDef(map.level).name}</span>
             </button>
             <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Make a version of ${map.title}`} title={`Make a version of ${map.title}, to change for a later point of the story`} aria-expanded={versioning === map.id} onClick={() => setVersioning(v => (v === map.id ? null : map.id))}><CopyIcon size={16} /></button>
             <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Export ${map.title} to a file`} title={hasChildren ? `Export ${map.title} and the maps inside it to a file` : `Export ${map.title} to a file`} onClick={() => { void exportOne(map.id, map.title) }}><ExportIcon size={16} /></button>

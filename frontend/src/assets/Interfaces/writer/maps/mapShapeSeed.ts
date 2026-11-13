@@ -8,7 +8,7 @@ import { templatePoints } from './mapTemplates'
 // server turns old symbols into; the design system's pretend backend reads the same list. Pure: the same build gives the same list.
 
 // How much of this list a catalog has seen (raise it when shapes are added: they join the admin's draft and published list once).
-export const SEED_VERSION = 2
+export const SEED_VERSION = 3
 
 export const LAND_LEVELS: MapLevel[] = ['planetary', 'continental', 'national', 'regional', 'local']
 export const SPACE_LEVELS: MapLevel[] = ['intergalactic', 'galactic']
@@ -206,6 +206,13 @@ export function starterShapes(): MapLibraryShape[] {
     shape('building:stair', 'Stair', 'building', BUILDING_LEVELS, 'region', 2, 4, rect(0, 0, 1, 1), [], { ...REGION, color: '#5d564c', width: 0.05 }, { fill: '#b5aea3', opacity: 0.8, pattern: 'hatch' }),
     shape('building:table', 'Table', 'building', BUILDING_LEVELS, 'region', 2, 1.2, rect(0, 0, 1, 1), [], THING, { fill: '#8b5e3c' }),
     shape('building:bed', 'Bed', 'building', BUILDING_LEVELS, 'region', 1.2, 2.2, rect(0, 0, 1, 1), [rect(0.12, 0.05, 0.88, 0.25)], THING, { fill: '#c7b8a3' }),
+    // Added with the buildings (seed version 3).
+    shape('building:sofa', 'Sofa', 'building', BUILDING_LEVELS, 'region', 2.2, 1, rect(0, 0, 1, 1), [rect(0.1, 0.35, 0.9, 0.9)], THING, { fill: '#8a6f9e' }),
+    shape('building:desk', 'Desk', 'building', BUILDING_LEVELS, 'region', 1.6, 0.8, rect(0, 0, 1, 1), [], THING, { fill: '#9c7048' }),
+    shape('building:wardrobe', 'Wardrobe', 'building', BUILDING_LEVELS, 'region', 1.6, 0.7, rect(0, 0, 1, 1), [rect(0.49, 0.1, 0.51, 0.9)], THING, { fill: '#7d5634' }),
+    shape('building:counter', 'Counter', 'building', BUILDING_LEVELS, 'region', 3, 0.7, rect(0, 0, 1, 1), [], THING, { fill: '#b9a68a' }),
+    shape('building:bath', 'Bath', 'building', BUILDING_LEVELS, 'region', 1.8, 0.9, rect(0, 0, 1, 1), [ellipseRing(0.5, 0.5, 0.42, 0.34, 8)], { ...THING, color: '#6f7f8c' }, { fill: '#dfe6ea' }),
+    shape('building:rug', 'Rug', 'building', BUILDING_LEVELS, 'region', 3, 2, rect(0, 0, 1, 1), [], { ...THING, color: '#7e2f2f' }, { fill: '#b5534b', opacity: 0.6, pattern: 'dots' }),
   )
   // Markers: the old symbols, and a diamond for a place of no kind.
   for (const set of SYMBOL_SETS) {

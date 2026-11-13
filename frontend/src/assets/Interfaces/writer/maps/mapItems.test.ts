@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { MapDoc, MapShape } from '../../../../api/types'
 import { SYMBOL_SETS } from './mapMarkerArt'
 import { markerName, starterShapes } from './mapShapeSeed'
-import { LAND_STYLE, SPACE_STYLE, hexToRgb, mapStyle } from './mapThemes'
+import { BUILDING_STYLE, LAND_STYLE, SPACE_STYLE, hexToRgb, mapStyle } from './mapThemes'
 import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
 import { makeBiomeShape } from './mapShapes'
 import {
@@ -66,7 +66,9 @@ describe('the marker art (the old symbols)', () => {
 describe('the map styles', () => {
   it('draws land levels in dark ink and space levels in light ink on the dark backdrop', () => {
     expect(mapStyle('regional')).toBe(LAND_STYLE)
-    expect(mapStyle('interior')).toBe(LAND_STYLE)
+    expect(mapStyle('interior')).toBe(BUILDING_STYLE)
+    expect(mapStyle('architectural').plainWalls).toBe(true)
+    expect(LAND_STYLE.plainWalls).toBeFalsy()
     expect(mapStyle('galactic')).toBe(SPACE_STYLE)
     expect(mapStyle(undefined)).toBe(LAND_STYLE)
   })

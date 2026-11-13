@@ -1,5 +1,6 @@
 import type { MapLineStyle, MapPattern, MapPolitical, MapShape, MapShapePoint, MapShapeType } from '../../../../api/types'
 import { allRings, distanceToEdge, insideShape, newSeed, ringsOf } from './mapOutline'
+import { openingsAfterInsert, openingsAfterRemove } from './mapOpenings'
 
 // Lines and regions on a map, as geometry: pure functions on a shape. A shape is a list of points in cells; a line is open and a region is closed (its last
 // point joins its first). A point is a corner, or smooth: the curve passes through it with a handle, a cubic Bezier between each pair of points whose
@@ -187,13 +188,15 @@ export function insertPoint(shape: MapShape, seg: number, t: number): MapShape |
   const smooth = shape.points[s.from].smooth || shape.points[s.to].smooth
   const points = [...shape.points]
   points.splice(seg + 1, 0, { x, y, smooth, hx: null, hy: null })
-  return withPoints(shape, points)
+  // A wall's openings stay where they are: those on the piece go to whichever half holds them.
+  return shape.openings ? { ...withPoints(shape, points), openings: openingsAfterInsert(shape.openings, seg, t) } : withPoints(shape, points)
 }
 
 // Take a point away; none when the shape would have too few left.
 export function removePoint(shape: MapShape, i: number): MapShape | null {
   if (!shape.points[i] || shape.points.length <= MIN_POINTS[shape.type]) return null
-  return withPoints(shape, shape.points.filter((_, n) => n !== i))
+  const next = withPoints(shape, shape.points.filter((_, n) => n !== i))
+  return shape.openings ? { ...next, openings: openingsAfterRemove(shape.openings, i, shape.points.length - 1) } : next
 }
 
 export function translateShape(shape: MapShape, dx: number, dy: number, width: number, height: number): MapShape {

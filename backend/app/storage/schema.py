@@ -3856,6 +3856,66 @@ MapPolitical = Literal["nation", "state", "municipality"]
 MAP_MAX_HEIGHT_RANGE = 100000.0
 _SHAPE_MIN_POINTS = {"line": 2, "region": 3, "biome": 3, "orbit": 0}
 MAP_MAX_ORBIT_TURN = 180.0
+# Doors, windows and arches in a wall (a line drawn as a wall), and the floors of a building.
+MapOpeningKind = Literal["door", "window", "arch"]
+MAP_MAX_OPENINGS = 64
+MAP_OPENING_WIDTH = (0.25, 8.0)
+MAP_FLOOR_RANGE = (-3, 20)
+
+
+class MapOpening(BaseModel):
+    """A door, a window or an arch in a wall: on piece `seg` of the wall's line (from point `seg` to the next), at `t` along it (0-1, its middle), `width`
+    cells wide. A door swings to one side of the wall or, `flip`, the other."""
+
+    id: str = Field(min_length=1, max_length=40)
+    seg: int = 0
+    t: float = 0.5
+    width: float = 1.0
+    kind: MapOpeningKind = "door"
+    flip: bool = False
+
+    @field_validator("seg", mode="before")
+    @classmethod
+    def _seg(cls, value: Any) -> Any:
+        return int(_finite(value, 0.0, 0.0, float(MAP_MAX_SHAPE_POINTS)))
+
+    @field_validator("t", mode="before")
+    @classmethod
+    def _t(cls, value: Any) -> Any:
+        return _finite(value, 0.5, 0.0, 1.0)
+
+    @field_validator("width", mode="before")
+    @classmethod
+    def _width(cls, value: Any) -> Any:
+        return _finite(value, 1.0, *MAP_OPENING_WIDTH)
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value if value in ("door", "window", "arch") else "door"
+
+    @field_validator("flip", mode="before")
+    @classmethod
+    def _flip(cls, value: Any) -> Any:
+        return value is True
+
+
+class MapFloor(BaseModel):
+    """A floor of a building: a map inside a building's map (architectural), its place among the floors (-3 to 20; 0 is the ground floor, below it the
+    basements) and its own name (none: from its place)."""
+
+    order: int = 0
+    name: str = Field(default="", max_length=40)
+
+    @field_validator("order", mode="before")
+    @classmethod
+    def _order(cls, value: Any) -> Any:
+        return int(round(_finite(value, 0.0, float(MAP_FLOOR_RANGE[0]), float(MAP_FLOOR_RANGE[1]))))
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> Any:
+        return value.strip()[:40] if isinstance(value, str) else ""
 
 
 class MapEllipse(BaseModel):
@@ -3966,6 +4026,21 @@ class MapShape(BaseModel):
     # An orbit's path (orbits only), and, for a planet or a moon, the orbit it goes round on and where on it (none = not on one).
     ellipse: Optional[MapEllipse] = None
     orbit: Optional[MapOrbitRef] = None
+    # A wall's doors, windows and arches (lines only), each on one piece of it.
+    openings: list[MapOpening] = Field(default_factory=list)
+
+    @field_validator("openings", mode="before")
+    @classmethod
+    def _openings(cls, value: Any) -> Any:
+        out: list[MapOpening] = []
+        seen: set[str] = set()
+        for item in _valid_items(value, MapOpening):
+            if item.id not in seen:
+                seen.add(item.id)
+                out.append(item)
+            if len(out) >= MAP_MAX_OPENINGS:
+                break
+        return out
 
     @field_validator("ellipse", "orbit", mode="before")
     @classmethod
@@ -4060,6 +4135,10 @@ class MapShape(BaseModel):
             self.ellipse = None
         if self.type == "line":
             self.orbit = None
+            # An opening is on a piece of the line that is there.
+            self.openings = [o for o in self.openings if o.seg < len(self.points) - 1]
+        else:
+            self.openings = []
         return self
 
     @field_validator("points", mode="before")
@@ -4250,6 +4329,8 @@ class MapDoc(BaseModel):
     legacySymbols: list[MapSymbol] = Field(default_factory=list)
     labels: list[MapLabel] = Field(default_factory=list)
     # The lines and regions drawn over the terrain, each on a layer of the kind `shapes`.
+    # A floor of a building (a map inside an architectural map): its place among the floors and its name; none = not a floor.
+    floor: Optional[MapFloor] = None
     shapes: list[MapShape] = Field(default_factory=list)
     # The look of the map (how the terrain colours and the text are drawn) and what is drawn over it.
     theme: MapThemeName = "modern"
@@ -4277,6 +4358,11 @@ class MapDoc(BaseModel):
         if isinstance(data, dict) and data.get("level") not in MAP_LEVELS:
             data = {**data, "level": LEVEL_OF_KIND.get(data.get("kind") if isinstance(data.get("kind"), str) else "world", "planetary")}
         return data
+
+    @field_validator("floor", mode="before")
+    @classmethod
+    def _floor_or_none(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, BaseModel)) else None
 
     @field_validator("kind", mode="before")
     @classmethod

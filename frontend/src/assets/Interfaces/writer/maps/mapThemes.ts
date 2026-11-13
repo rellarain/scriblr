@@ -15,13 +15,19 @@ export interface MapThemeDef {
   plate: string
   // The typeface of the text.
   font: string
+  // A wall is a plain bar (a building's plan), not a wall with crenels (a town's or a castle's).
+  plainWalls?: boolean
 }
 
 export const LAND_STYLE: MapThemeDef = { id: 'land', ink: '#22262c', symbol: '#22262c', halo: '#ffffff', plate: '#f4f5f7', font: 'system-ui, "Segoe UI", sans-serif' }
+export const BUILDING_STYLE: MapThemeDef = { ...LAND_STYLE, plainWalls: true }
 export const SPACE_STYLE: MapThemeDef = { id: 'space', ink: '#dfe7f5', symbol: '#e9eef8', halo: '#0f1626', plate: '#161f33', font: 'system-ui, "Segoe UI", sans-serif' }
 
-// The style of a map of a level: space levels are drawn light on dark.
-export const mapStyle = (level: MapLevel | undefined): MapThemeDef => (levelDef(level).drawn === 'space' ? SPACE_STYLE : LAND_STYLE)
+// The style of a map of a level: space levels are drawn light on dark; buildings and rooms have plain walls.
+export function mapStyle(level: MapLevel | undefined): MapThemeDef {
+  const drawn = levelDef(level).drawn
+  return drawn === 'space' ? SPACE_STYLE : drawn === 'materials' ? BUILDING_STYLE : LAND_STYLE
+}
 
 export type RGB = [number, number, number]
 

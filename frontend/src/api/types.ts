@@ -504,7 +504,15 @@ export interface MapShape {
   // An orbit's path (orbits only); for a planet or a moon, the orbit it goes round on and where on it.
   ellipse?: MapEllipse | null
   orbit?: MapOrbitRef | null
+  // A wall's doors, windows and arches (lines only), each on one piece of it.
+  openings?: MapOpening[]
 }
+// A door, a window or an arch in a wall: on piece `seg` (from point `seg` to the next), its middle `t` along it (0-1), `width` cells wide; a door swings to
+// one side of the wall or (`flip`) the other.
+export type MapOpeningKind = 'door' | 'window' | 'arch'
+export interface MapOpening { id: string; seg: number; t: number; width: number; kind: MapOpeningKind; flip: boolean }
+// A floor of a building (a map inside an architectural map): its place among the floors (-3 to 20; 0 = the ground floor) and its own name ('' = from its place).
+export interface MapFloor { order: number; name: string }
 // The path of an orbit: its centre and two radii in cells, turned `turn` degrees clockwise (-180 to 180) about the centre.
 export interface MapEllipse { cx: number; cy: number; rx: number; ry: number; turn: number }
 // Where a body is on an orbit: the orbit's id and the angle along it (degrees, 0 = the orbit's own right, clockwise).
@@ -568,6 +576,8 @@ export interface MapDoc {
   // The paths of characters over the map.
   journeys?: MapJourney[]
   updatedAt: string
+  // A floor of a building (a map inside an architectural map); none = not a floor.
+  floor?: MapFloor | null
 }
 // Where a character is from a point of the story (an outline chapter or scene, `at`; '' = not placed yet), in cells.
 export interface MapJourneyStop { id: string; x: number; y: number; at: string; note: string }
@@ -577,8 +587,9 @@ export const MAP_MAX_STOPS = 200
 export interface MapSummary {
   id: string; title: string; kind?: MapKind; level: MapLevel; parentId: string | null; order: number; width: number; height: number; updatedAt: string
   versionOf?: string | null; appliesFrom?: string | null
+  floor?: MapFloor | null
 }
-export interface MapCreate { title?: string; level?: MapLevel; units?: MapUnits; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; base?: MapBase }
+export interface MapCreate { title?: string; level?: MapLevel; units?: MapUnits; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; base?: MapBase; floor?: MapFloor | null }
 export const MAP_MAX_SIDE = 512
 
 // ---- characters (the cast) ----

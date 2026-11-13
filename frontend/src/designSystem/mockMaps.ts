@@ -34,7 +34,7 @@ const KIND_OF: Record<MapLevel, MapKind> = {
 const side = (n: number | undefined, fallback: number) => Math.min(MAP_MAX_SIDE, Math.max(1, Math.round(n ?? fallback)))
 
 export function summaryOf(m: MapDoc): MapSummary {
-  return { id: m.id, title: m.title, kind: m.kind, level: m.level, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt, versionOf: m.versionOf ?? null, appliesFrom: m.appliesFrom ?? null }
+  return { id: m.id, title: m.title, kind: m.kind, level: m.level, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt, versionOf: m.versionOf ?? null, appliesFrom: m.appliesFrom ?? null, floor: m.floor ?? null }
 }
 
 export function newMap(id: string, body: MapCreate, order: number): MapDoc {
@@ -79,6 +79,8 @@ export function createMockMaps(initial: MapDoc[] = []) {
         if ((b.width ?? 0) > MAP_MAX_SIDE || (b.height ?? 0) > MAP_MAX_SIDE) return fail(422, 'Too large.')
         const siblings = [...maps.values()].filter(m => m.parentId === (b.parentId ?? null))
         const doc = newMap(`map_mock${next++}`, b, siblings.length)
+        // A floor of a building keeps its place among the floors (as the server's floor field).
+        if (b.floor) doc.floor = { order: Math.round(Math.min(20, Math.max(-3, b.floor.order))), name: (b.floor.name ?? '').trim().slice(0, 40) }
         maps.set(doc.id, doc)
         return ok(doc, 201)
       }
@@ -217,5 +219,27 @@ export function seedMaps(): MapDoc[] {
   ]
   // The star at the middle of the map.
   system.shapes = shapes.map((s, i) => (i === 0 ? { ...s, points: s.points.map(p => ({ ...p, x: p.x + 16, y: p.y + 11 })) } : s))
-  return [world, town, system]
+  // A building in Port Veyra (architectural): its plot, and two floors; the ground floor has walls on the cell edges with a door and windows, and rooms.
+  const inn = newMap('map_inn', { title: 'The Lantern Inn', level: 'architectural', width: 16, height: 12, parentId: 'map_town' }, 0)
+  const corner = (x: number, y: number) => ({ x, y, smooth: false, hx: null, hy: null })
+  const wall = (id: string, pts: Array<[number, number]>, openings: MapShape['openings'] = []): MapShape =>
+    ({ id, layerId: 'shapes', type: 'line', points: pts.map(([x, y]) => corner(x, y)), style: 'wall', color: null, width: 0.22, fill: null, opacity: 0.35, pattern: 'solid', openings })
+  const room = (id: string, name: string, pts: Array<[number, number]>, biome: string) => biomeArea(id, pts, biome, { name, points: pts.map(([x, y]) => corner(x, y)) })
+  inn.shapes = [room('bio_innplot', '', [[2, 2], [14, 2], [14, 10], [2, 10]], 'wood'), wall('shp_innwalls', [[2, 2], [14, 2], [14, 10], [2, 10], [2, 2]])]
+  const ground = newMap('map_inn_0', { title: 'The Lantern Inn: Ground floor', level: 'architectural', width: 16, height: 12, parentId: 'map_inn' }, 0)
+  ground.floor = { order: 0, name: '' }
+  ground.shapes = [
+    room('bio_common', 'Common room', [[2, 2], [10, 2], [10, 10], [2, 10]], 'wood'),
+    room('bio_kitchen', 'Kitchen', [[10, 2], [14, 2], [14, 10], [10, 10]], 'tile'),
+    wall('shp_outer', [[2, 2], [14, 2], [14, 10], [2, 10], [2, 2]], [
+      { id: 'opn_door', seg: 2, t: 0.75, width: 1.2, kind: 'door', flip: true },
+      { id: 'opn_w1', seg: 0, t: 0.25, width: 1.5, kind: 'window', flip: false },
+      { id: 'opn_w2', seg: 0, t: 0.6, width: 1.5, kind: 'window', flip: false },
+    ]),
+    wall('shp_inner', [[10, 2], [10, 10]], [{ id: 'opn_arch', seg: 0, t: 0.5, width: 1.5, kind: 'arch', flip: false }]),
+  ]
+  const upper = newMap('map_inn_1', { title: 'The Lantern Inn: Floor 1', level: 'architectural', width: 16, height: 12, parentId: 'map_inn' }, 1)
+  upper.floor = { order: 1, name: 'Guest rooms' }
+  upper.shapes = [room('bio_rooms', 'Guest rooms', [[2, 2], [14, 2], [14, 10], [2, 10]], 'carpet'), wall('shp_upper', [[2, 2], [14, 2], [14, 10], [2, 10], [2, 2]])]
+  return [world, town, system, inn, ground, upper]
 }

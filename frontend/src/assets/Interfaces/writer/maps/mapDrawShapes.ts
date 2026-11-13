@@ -1,5 +1,6 @@
 import type { MapLineStyle, MapShape, MapShapeType } from '../../../../api/types'
-import { isClosed, makeShape, outVector, segmentsOf, shapeBounds, type Pen } from './mapShapes'
+import { bezierAt, isClosed, makeShape, outVector, segmentsOf, shapeBounds, type Pen } from './mapShapes'
+import { gapsOf } from './mapOpenings'
 import { allRings, drawnFromRings, ringsOf } from './mapOutline'
 import type { MapThemeDef } from './mapThemes'
 import type { MapView } from './mapView'
@@ -65,6 +66,13 @@ function strokeStyled(ctx: CanvasRenderingContext2D, style: MapLineStyle, colour
       break
     case 'wall':
       ctx.lineCap = 'butt'
+      if (theme.plainWalls) {
+        // A building's wall: one plain bar, square at its ends and at the sides of its openings.
+        ctx.lineJoin = 'miter'
+        ctx.lineWidth = w * 1.6
+        ctx.stroke()
+        break
+      }
       ctx.lineWidth = w * 1.4
       ctx.stroke()
       again()
@@ -195,8 +203,85 @@ export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: 
     ctx.globalAlpha = 1
     if (shape.pattern !== 'solid') drawPattern(ctx, shape, view, fill)
   }
+  // A wall with doors, windows or arches is stroked with gaps for them, and each is drawn in its gap.
+  if (shape.type === 'line' && (shape.openings?.length ?? 0) > 0) {
+    const gapped = () => traceWithGaps(ctx, shape, view)
+    gapped()
+    strokeStyled(ctx, shape.style, colour, w, theme, gapped)
+    drawOpenings(ctx, shape, view, colour, w)
+    ctx.restore()
+    return
+  }
   trace(ctx, shape, view)
   strokeStyled(ctx, shape.style, colour, w, theme, again)
+  ctx.restore()
+}
+
+// The path of a line without the stretches its openings take.
+function traceWithGaps(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView) {
+  const gaps = gapsOf(shape)
+  const sx = (x: number) => view.x + x * view.zoom, sy = (y: number) => view.y + y * view.zoom
+  ctx.beginPath()
+  segmentsOf(shape).forEach((s, seg) => {
+    const piece = (a: number, b: number) => {
+      if (b - a < 1e-4) return
+      const steps = s.straight ? 1 : 16
+      for (let k = 0; k <= steps; k += 1) {
+        const [x, y] = bezierAt(s, a + ((b - a) * k) / steps)
+        if (k === 0) ctx.moveTo(sx(x), sy(y)); else ctx.lineTo(sx(x), sy(y))
+      }
+    }
+    let from = 0
+    for (const g of gaps.get(seg) ?? []) { piece(from, g.from); from = Math.max(from, g.to) }
+    piece(from, 1)
+  })
+}
+
+// The openings of a wall in their gaps: a door as its leaf and the arc it swings through, a window as a thin double line across, an arch as its two jambs.
+function drawOpenings(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, colour: string, w: number) {
+  const segs = segmentsOf(shape)
+  const at = (x: number, y: number): [number, number] => [view.x + x * view.zoom, view.y + y * view.zoom]
+  ctx.save()
+  ctx.strokeStyle = colour
+  ctx.setLineDash([])
+  for (const [seg, list] of gapsOf(shape)) {
+    const s = segs[seg]
+    if (!s) continue
+    for (const { from, to, opening } of list) {
+      const [ax, ay] = at(...bezierAt(s, from)), [bx, by] = at(...bezierAt(s, to))
+      const len = Math.hypot(bx - ax, by - ay)
+      if (len < 2) continue
+      const ux = (bx - ax) / len, uy = (by - ay) / len
+      const side = opening.flip ? -1 : 1
+      const nx = -uy * side, ny = ux * side
+      ctx.beginPath()
+      if (opening.kind === 'door') {
+        ctx.lineWidth = Math.max(1, w * 0.3)
+        ctx.moveTo(ax, ay); ctx.lineTo(ax + nx * len, ay + ny * len)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.lineWidth = 1
+        ctx.setLineDash([3, 2])
+        const a0 = Math.atan2(uy, ux), a1 = Math.atan2(ny, nx)
+        ctx.arc(ax, ay, len, a0, a1, side < 0)
+        ctx.stroke()
+        ctx.setLineDash([])
+      } else if (opening.kind === 'window') {
+        const off = Math.max(1, w * 0.28)
+        ctx.lineWidth = 1
+        for (const k of [-1, 1]) { ctx.moveTo(ax + -uy * off * k, ay + ux * off * k); ctx.lineTo(bx + -uy * off * k, by + ux * off * k) }
+        ctx.moveTo(ax - -uy * off, ay - ux * off); ctx.lineTo(ax + -uy * off, ay + ux * off)
+        ctx.moveTo(bx - -uy * off, by - ux * off); ctx.lineTo(bx + -uy * off, by + ux * off)
+        ctx.stroke()
+      } else {
+        const off = Math.max(2, w * 0.8)
+        ctx.lineWidth = Math.max(1, w * 0.5)
+        ctx.moveTo(ax - -uy * off, ay - ux * off); ctx.lineTo(ax + -uy * off, ay + ux * off)
+        ctx.moveTo(bx - -uy * off, by - ux * off); ctx.lineTo(bx + -uy * off, by + ux * off)
+        ctx.stroke()
+      }
+    }
+  }
   ctx.restore()
 }
 

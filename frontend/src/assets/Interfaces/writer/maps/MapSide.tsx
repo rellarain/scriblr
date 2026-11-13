@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   MAP_MAX_HEIGHT_RANGE, MAP_MAX_PROJECT_BIOMES, MAP_MAX_SIDE, MAP_MAX_SLOPE, type MapBiome, type MapHeightMode, type MapLevel, type MapPolitical, type MapProfile, type MapUnits, type OutlineNode, type PlotNode, type MapSummary, type MapLayerKind,
-  type MapLineStyle, type MapPattern, type MapShape, type MapShapeType,
+  type MapLineStyle, type MapOpeningKind, type MapPattern, type MapShape, type MapShapeType,
 } from '../../../../api/types'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, FolderPlusIcon, ImageIcon, LockIcon, MapIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
@@ -11,6 +11,8 @@ import {
   moveShapeOrder, placeKey, type AreaLook, placeOf, removeItem, replaceShape, resizeShape, shapeWidth, type ItemRef,
 } from './mapItems'
 import { ORBIT_RADIUS, ORBIT_TURN } from './mapOrbits'
+import { OPENING_KINDS, OPENING_WIDTH, editOpening, isWall, withoutOpening } from './mapOpenings'
+import { FLOOR_NAME_MAX, FLOOR_RANGE, floorName } from './mapFloors'
 import { ShapeTools, ShapesPanel, type ShapeSource } from './ShapesPanel'
 import type { CombineAction } from './mapCombine'
 import { markerName } from './mapShapeSeed'
@@ -22,7 +24,7 @@ import { LEVELS, defaultsFor, heightRangeOf, levelDef, levelsBelow, nextLevelDow
 import { heightUnit, roundNice, unitsOf, type ConvertMode } from './mapUnits'
 import {
   LAYER_NAMES, MAP_TITLE_MAX, addLayer, moveLayer, removeLayer, renameLayer, resize, setScale, setTitle,
-  descendantIds, setAppliesFrom, setBase, setHeightRange, setLevel, setOverlay, setPace, setParent, setUnits, toggleLayer, type MapDraft,
+  descendantIds, setAppliesFrom, setBase, setFloor, setHeightRange, setLevel, setOverlay, setPace, setParent, setUnits, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
 import { ForReadersPanel } from './ForReadersPanel'
@@ -80,6 +82,9 @@ export interface MapSideProps {
   combining: CombineAction | null
   onCombine: (action: CombineAction | null) => void
   projectTitle: string
+  // What the opening tool puts in a wall (buildings), and a change to it (it picks the tool).
+  opening: { kind: MapOpeningKind; width: number }
+  onOpening: (patch: Partial<{ kind: MapOpeningKind; width: number }>) => void
   // What new lines and regions are drawn with (the pen of the line tool or the region tool, whichever is in use), a change to it, and a preset (it picks the tool).
   pen: Pen
   penType: MapShapeType
@@ -106,6 +111,7 @@ export function MapSide(p: MapSideProps) {
       <BiomesPanel projectId={projectId} m={m} draft={draft} biomes={p.biomes} biome={p.biome} onBiome={p.onBiome} smooth={p.biomeSmooth} onSmooth={p.onBiomeSmooth} look={p.areaLook} onLook={p.onAreaLook} />
       <ShapesPanel draft={draft} source={p.shapeSource} onSource={p.onShapeSource} />
       <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} level={draft.level} />
+      {levelDef(draft.level).drawn === 'materials' && <OpeningsPanel value={p.opening} onChange={p.onOpening} />}
       <LayerPanel m={m} draft={draft} />
       <JourneysPanel m={m} draft={draft} points={points} cast={cast} state={journey} onState={onJourney} onTool={onJourneyTool} />
       <MapFieldsPanel m={m} draft={draft} points={points} />
@@ -195,6 +201,22 @@ function PenPanel({ pen, penType, onPen, onPreset, level }: { pen: Pen; penType:
       {penType === 'region' && <PoliticalField value={pen.political ?? null} onChange={political => onPen({ political })} />}
       <label className="mapCheck"><input type="checkbox" checked={pen.smooth} onChange={e => onPen({ smooth: e.target.checked })} />Curve the points</label>
       <p className="mapHint">Click to add points; double-click or Enter finishes, Escape cancels. Points snap to grid corners and cell centres; Alt: no snapping.</p>
+    </section>
+  )
+}
+
+// Doors and windows (buildings): what the opening tool puts in a wall, and how wide. Picking one picks the tool.
+function OpeningsPanel({ value, onChange }: { value: { kind: MapOpeningKind; width: number }; onChange: (patch: Partial<{ kind: MapOpeningKind; width: number }>) => void }) {
+  return (
+    <section className="mapPanel" aria-label="Doors and windows">
+      <header className="mapPanelHead"><h3 className="mapPanelTitle">Doors and windows</h3></header>
+      <div className="mapSizes" role="group" aria-label="Kind of opening">
+        {OPENING_KINDS.map(k => <button key={k.id} type="button" className="mapChip" aria-pressed={value.kind === k.id} title={`Put a ${k.name.toLowerCase()} in a wall`} onClick={() => onChange({ kind: k.id })}>{k.name}</button>)}
+      </div>
+      <Field label="Width (cells)" short>
+        <CommitNumber label="Width of a new opening, in cells" value={value.width} min={OPENING_WIDTH.min} max={OPENING_WIDTH.max} step={0.25} onCommit={width => onChange({ width })} />
+      </Field>
+      <p className="mapHint">Draw walls with the Wall pen: on a building they run on the cell edges. Then click on a wall with this tool to put a {value.kind} in it.</p>
     </section>
   )
 }
@@ -372,6 +394,31 @@ function ExportPanel({ draft, biomes }: { draft: MapDraft; biomes: BiomesView })
   )
 }
 
+// The doors, windows and arches of a chosen wall: each one's kind, width, where it is along its piece of the wall, the side a door swings to, and a delete.
+function WallOpenings({ shape, onChange }: { shape: MapShape; onChange: (next: MapShape) => void }) {
+  const openings = shape.openings ?? []
+  if (openings.length === 0) return <p className="mapHint">No door or window yet: use the door tool and click on the wall.</p>
+  return (
+    <div className="mapFields" role="group" aria-label="Doors and windows of the wall">
+      {openings.map((o, i) => {
+        const label = `${OPENING_KINDS.find(k => k.id === o.kind)?.name ?? 'Opening'} ${i + 1}`
+        const set = (patch: Parameters<typeof editOpening>[2]) => { const next = editOpening(shape, o.id, patch); if (next) onChange(next) }
+        return (
+          <div key={o.id} className="mapRow" role="group" aria-label={label}>
+            <select className="mapSelect" aria-label={`Kind of ${label}`} value={o.kind} onChange={e => set({ kind: e.target.value as MapOpeningKind })}>
+              {OPENING_KINDS.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+            <CommitNumber label={`Width of ${label}, in cells`} value={o.width} min={OPENING_WIDTH.min} max={OPENING_WIDTH.max} step={0.25} onCommit={width => set({ width })} />
+            <CommitNumber label={`Where ${label} is along its piece of the wall, in percent`} value={Math.round(o.t * 100)} min={0} max={100} step={5} onCommit={pc => set({ t: pc / 100 })} />
+            {o.kind === 'door' && <button type="button" className="mapChip" aria-pressed={o.flip} title="Swing the door to the other side of the wall" onClick={() => set({ flip: !o.flip })}>Other side</button>}
+            <button type="button" className="mapIconBtn" aria-label={`Take ${label} away`} title={`Take ${label.toLowerCase()} away`} onClick={() => onChange(withoutOpening(shape, o.id))}><TrashIcon size={16} /></button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 type ToolProps = { projectId: string; projectTitle: string; combining: CombineAction | null; onCombine: (action: CombineAction | null) => void }
 
 // What is chosen on the map: a biome area (its biome and height), a marker (its width and colour), a label (its text and height) or a line or region (how it
@@ -513,6 +560,7 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
           <button type="button" className="mapIconBtn" aria-label={`Delete the ${kind}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
         </header>
         <ShapeFields type={sh.type} value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
+        {isWall(sh) && <WallOpenings shape={sh} onChange={next => m.apply(replaceShape(draft, next))} />}
         {sh.type === 'region' && <PoliticalField value={sh.political ?? null} onChange={political => m.apply(editShape(draft, sh.id, { political }))} />}
         {onOrbit}
         {order}
@@ -715,6 +763,16 @@ function MapFieldsPanel({ m, draft, points }: { m: Maps; draft: MapDraft; points
       <header className="mapPanelHead"><h3 className="mapPanelTitle">Map</h3></header>
       <div className="mapFields">
         <Field label="Title"><CommitText label="Map title" value={draft.title} max={MAP_TITLE_MAX} onCommit={title => m.apply(setTitle(draft, title))} /></Field>
+        {draft.floor && (
+          <div className="mapRow" role="group" aria-label="Floor">
+            <Field label="Floor" short>
+              <CommitNumber label="Place of the floor (0 is the ground floor, below it the basements)" value={draft.floor.order} min={FLOOR_RANGE.min} max={FLOOR_RANGE.max} step={1} onCommit={order => m.apply(setFloor(draft, { order }))} />
+            </Field>
+            <Field label={`Name (empty: ${floorName({ order: draft.floor.order, name: '' })})`}>
+              <CommitText label="Name of the floor" value={draft.floor.name} max={FLOOR_NAME_MAX} onCommit={name => m.apply(setFloor(draft, { name }))} />
+            </Field>
+          </div>
+        )}
         <Field label="Level">
           <select className="mapSelect" aria-label="Level of the map" value={draft.level} onChange={e => m.apply(setLevel(draft, e.target.value as MapLevel))}>
             {LEVELS.map(lv => <option key={lv.id} value={lv.id}>{lv.name}: {lv.holds}</option>)}

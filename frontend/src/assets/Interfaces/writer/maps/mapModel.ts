@@ -1,3 +1,5 @@
+import type { MapFloor } from '../../../../api/types'
+import { cleanFloor } from './mapFloors'
 import type { MapBase, MapDoc, MapLayer, MapLayerKind, MapLevel, MapSummary, MapUnits, ReaderShare } from '../../../../api/types'
 import { MAP_MAX_HEIGHT_RANGE, MAP_MAX_SIDE, NO_SHARE, shareOf } from '../../../../api/types'
 import { changeUnits, type ConvertMode } from './mapUnits'
@@ -103,6 +105,13 @@ export function setParent(draft: MapDraft, parentId: string | null): Change {
 export function setPace(draft: MapDraft, pace: number | null): Change {
   const next = pace !== null && Number.isFinite(pace) && pace > 0 ? Math.min(pace, 1_000_000) : null
   return next === draft.pace ? null : change(draft, { pace: next })
+}
+
+// A floor's place among the floors of its building and its name (a map that is not a floor has none).
+export function setFloor(draft: MapDraft, patch: Partial<MapFloor>): Change {
+  if (!draft.floor) return null
+  const next = cleanFloor(patch, draft.floor)
+  return next.order === draft.floor.order && next.name === draft.floor.name ? null : change(draft, { floor: next })
 }
 
 export function setOverlay(draft: MapDraft, field: 'scaleBar' | 'compass' | 'legend' | 'contours' | 'relief', on: boolean): Change {
@@ -218,7 +227,7 @@ export function mapRows(maps: MapSummary[]): MapRow[] {
 
 export const summaryOf = (doc: MapDoc | MapDraft): MapSummary => ({
   id: doc.id, title: doc.title, kind: doc.kind, level: doc.level, parentId: doc.parentId, order: doc.order, width: doc.width, height: doc.height, updatedAt: doc.updatedAt,
-  versionOf: doc.versionOf ?? null, appliesFrom: doc.appliesFrom ?? null,
+  versionOf: doc.versionOf ?? null, appliesFrom: doc.appliesFrom ?? null, floor: doc.floor ?? null,
 })
 
 // The maps a map is inside, outermost first, and the map itself last (a loop in the data is cut).

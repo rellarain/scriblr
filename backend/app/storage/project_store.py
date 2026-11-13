@@ -1508,7 +1508,7 @@ def list_map_summaries(root: Path, project_id: str) -> list[dict]:
         root, project_id,
         lambda pf, _errors: [
             {"id": m.id, "title": m.title, "kind": m.kind, "level": m.level, "parentId": m.parentId, "order": m.order, "width": m.width, "height": m.height,
-             "updatedAt": m.updatedAt, "versionOf": m.versionOf, "appliesFrom": m.appliesFrom}
+             "updatedAt": m.updatedAt, "versionOf": m.versionOf, "appliesFrom": m.appliesFrom, "floor": m.floor}
             for m in sorted(pf.maps.values(), key=lambda m: (m.order, m.title.lower(), m.id))
         ],
         copy_result=False,

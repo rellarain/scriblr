@@ -3,6 +3,8 @@ import type { MapShape } from '../../../../api/types'
 import { FitIcon, ZoomInIcon, ZoomOutIcon } from '../../../icons'
 import { findItem, hitItem, legendEntries, movedItem, placeOf as placeOfItem, settled, showsPoints, snapPoint, withShape, type ItemRef } from './mapItems'
 import { isBody, makeOrbit, middleOf } from './mapOrbits'
+import { isWall } from './mapOpenings'
+import { levelDef } from './mapLevels'
 import type { MapDraft } from './mapModel'
 import type { JourneyView } from './mapDrawJourneys'
 import { drawMap } from './mapRender'
@@ -12,7 +14,7 @@ import { boxFrom } from './mapTemplates'
 import { cellAt, fitView, measureText, panBy, pathLength, zoomAt, type MapView } from './mapView'
 import { moveStop, stopNear } from './mapJourneys'
 
-export type MapTool = 'select' | 'biome' | 'shape' | 'orbit' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
+export type MapTool = 'select' | 'biome' | 'shape' | 'orbit' | 'opening' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
 type DrawTool = 'line' | 'region' | 'biome'
 const drawsShape = (tool: MapTool): tool is DrawTool => tool === 'line' || tool === 'region' || tool === 'biome'
 
@@ -34,6 +36,8 @@ export interface MapCanvasProps {
   onPlaceShape?: (box: Rect | null, at: [number, number], square: boolean) => boolean
   // What a box would place, drawn while it is dragged.
   previewShape?: (box: Rect, square: boolean) => MapShape | null
+  // The opening tool: a click at a point (in cells) puts a door, a window or an arch in the wall there.
+  onPlaceOpening?: (x: number, y: number) => void
   // The orbit tool: an orbit was drawn round a centre (a body's middle when it was pressed on one), with a radius in cells; false when it cannot be.
   onPlaceOrbit?: (cx: number, cy: number, radius: number) => boolean
   // Picking a shape for something (combining the chosen shape with another): a click hands over what is under it (null: Esc, nothing picked).
@@ -212,11 +216,14 @@ export default function MapCanvas(p: MapCanvasProps) {
   // A point of the canvas as a place on the map, in cells (not rounded).
   const placeOf = (px: number, py: number): [number, number] => [(px - view.x) / view.zoom, (py - view.y) / view.zoom]
   const screenOf = (x: number, y: number): [number, number] => [view.x + x * view.zoom, view.y + y * view.zoom]
-  // A point of a shape as drawn: snapped to the grid (corners and cell centres) unless Alt is held, and held to the map.
-  const shapePoint = (fx: number, fy: number, free: boolean): [number, number] => {
-    const [x, y] = free ? [fx, fy] : snapVertex(fx, fy)
+  // A point of a shape as drawn: snapped to the grid (corners and cell centres; a wall of a building, to corners only, so it runs on the cell edges) unless
+  // Alt is held, and held to the map.
+  const building = levelDef(draft.level).drawn === 'materials'
+  const shapePoint = (fx: number, fy: number, free: boolean, corners = false): [number, number] => {
+    const [x, y] = free ? [fx, fy] : corners ? [Math.round(fx), Math.round(fy)] : snapVertex(fx, fy)
     return clampTo(draft, x, y)
   }
+  const drawingWall = () => building && p.tool === 'line' && p.pen.style === 'wall'
 
   const chosenShape = (): MapShape | null => {
     const ref = latest.current.selected
@@ -323,9 +330,13 @@ export default function MapCanvas(p: MapCanvasProps) {
       if (!last || Math.hypot(last[0] - at[0], last[1] - at[1]) > 1e-6) setMeasure(list => [...list, at])
       return
     }
+    if (p.tool === 'opening') {
+      p.onPlaceOpening?.(fx, fy)
+      return
+    }
     if (drawsShape(p.tool)) {
       if (!cell) return
-      const at = shapePoint(fx, fy, e.altKey)
+      const at = shapePoint(fx, fy, e.altKey, drawingWall())
       const last = pending[pending.length - 1]
       // (A double-click is two presses in one place: the second is not another point.)
       if (!last || Math.hypot(last[0] - at[0], last[1] - at[1]) > 1e-6) setPending(list => [...list, at])
@@ -386,14 +397,15 @@ export default function MapCanvas(p: MapCanvasProps) {
       const [fx, fy] = placeOf(px, py)
       let next: MapShape
       if (d.kind === 'node') {
-        const [sx, sy] = shapePoint(fx, fy, e.altKey)
+        const [sx, sy] = shapePoint(fx, fy, e.altKey, building && isWall(shape))
         next = movePoint(shape, d.i, sx, sy)
       } else if (d.kind === 'handle') {
         const pt = shape.points[d.i]
         // Dragging the far end of a handle is dragging the near end from the other side.
         next = setHandle(shape, d.i, d.sign === 1 ? fx : 2 * pt.x - fx, d.sign === 1 ? fy : 2 * pt.y - fy)
       } else {
-        const snap = (n: number) => (e.altKey ? n : Math.round(n * 2) / 2)
+        // A wall of a building moves by whole cells (it stays on the cell edges); anything else by half cells.
+        const snap = (n: number) => (e.altKey ? n : building && isWall(shape) ? Math.round(n) : Math.round(n * 2) / 2)
         // A planet keeps to its orbit, or is caught by one it is dropped near (space maps).
         next = settled(d.before, translateShape(shape, snap(fx - d.fx), snap(fy - d.fy), draft.width, draft.height))
       }
@@ -410,7 +422,7 @@ export default function MapCanvas(p: MapCanvasProps) {
     }
     if (drawsShape(p.tool) && pending.length > 0) {
       const [fx, fy] = placeOf(px, py)
-      setCursor(shapePoint(fx, fy, e.altKey))
+      setCursor(shapePoint(fx, fy, e.altKey, drawingWall()))
     }
   }
 

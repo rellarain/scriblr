@@ -410,3 +410,47 @@ describe('drawing space', () => {
     expect(r.sets).toEqual(expect.arrayContaining([['shadowColor', '#9a5fd0']]))
   })
 })
+
+describe('drawing a building', () => {
+  const corner = (x: number, y: number) => ({ x, y, smooth: false, hx: null, hy: null })
+  const wall = (openings: MapShape['openings'] = []): MapShape => ({
+    id: 'shp_w', layerId: 'shapes', type: 'line', points: [corner(2, 2), corner(14, 2)], style: 'wall', color: null, width: 0.22, fill: null, opacity: 0.35, pattern: 'solid', openings,
+  })
+  const building = (...shapes: MapShape[]): MapDraft => {
+    const d = draftOf({ ...doc(), level: 'architectural', base: { biome: 'outside', height: 0 } })
+    d.layers = [d.layers[0], { id: 'shapes', name: 'Regions and lines', kind: 'shapes', visible: true, locked: false }, ...d.layers.slice(1)]
+    d.shapes = shapes
+    return d
+  }
+
+  it('draws a wall in one run, and with a gap for each opening', () => {
+    const plain = recorder()
+    drawMap(plain.ctx, base(building(wall())))
+    const gapped = recorder()
+    drawMap(gapped.ctx, base(building(wall([{ id: 'o1', seg: 0, t: 0.25, width: 1, kind: 'window', flip: false }, { id: 'o2', seg: 0, t: 0.75, width: 1, kind: 'arch', flip: false }]))))
+    // Three runs of wall between and round the two gaps (the wall style traces its path more than once).
+    expect(gapped.count('moveTo')).toBeGreaterThan(plain.count('moveTo'))
+    expect(plain.count('arc')).toBe(0)
+  })
+
+  it('draws a wall of a building as one plain bar with square corners, without the crenels of a town wall', () => {
+    const inside = recorder()
+    drawMap(inside.ctx, base(building(wall())))
+    const town = recorder()
+    drawMap(town.ctx, base({ ...building(wall()), level: 'local' }))
+    expect(inside.count('stroke')).toBe(town.count('stroke') - 1)
+    expect(inside.sets).toEqual(expect.arrayContaining([['lineJoin', 'miter']]))
+    expect(inside.calls.some(([n, a]) => n === 'setLineDash' && (a[0] as number[]).length === 2)).toBe(false)
+  })
+
+  it('draws a door as its leaf and the arc it swings through, on the side it opens to', () => {
+    const r = recorder()
+    drawMap(r.ctx, base(building(wall([{ id: 'o1', seg: 0, t: 0.5, width: 1.2, kind: 'door', flip: false }]))))
+    const arcs = r.calls.filter(([n]) => n === 'arc')
+    expect(arcs).toHaveLength(1)
+    const flipped = recorder()
+    drawMap(flipped.ctx, base(building(wall([{ id: 'o1', seg: 0, t: 0.5, width: 1.2, kind: 'door', flip: true }]))))
+    const other = flipped.calls.filter(([n]) => n === 'arc')
+    expect(other[0][1][5]).not.toBe(arcs[0][1][5]) // swings the other way
+  })
+})

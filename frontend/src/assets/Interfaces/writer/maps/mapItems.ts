@@ -1,4 +1,4 @@
-import { MAP_MAX_ROUGH, MAP_MAX_SLOPE, type MapEllipse, type MapHeightMode, type MapLabel, type MapLibraryShape, type MapShape, type MapShapePoint, type MapShapeType, type MapUnits } from '../../../../api/types'
+import { MAP_MAX_ROUGH, MAP_MAX_SLOPE, type MapEllipse, type MapHeightMode, type MapLabel, type MapOpening, type MapLibraryShape, type MapShape, type MapShapePoint, type MapShapeType, type MapUnits } from '../../../../api/types'
 import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeBiomeShape, makeShape, nearestOnShape, shapeBounds, type Pen, type Rect as ShapeRect } from './mapShapes'
 import { mapHeightRange } from './mapHeights'
 import { heightUnit } from './mapUnits'
@@ -9,6 +9,7 @@ import { newSeed } from './mapOutline'
 import { shapeFromLibrary } from './mapLibrary'
 import { markerName, starterShapes } from './mapShapeSeed'
 import { catchBodies, followOrbit, letGo, makeOrbit, settleBody, withEllipse } from './mapOrbits'
+import { isWall, withOpening } from './mapOpenings'
 import { levelDef } from './mapLevels'
 
 // The things on a map: biome shapes (the land, on the biomes layer), labels (text) and shapes (lines, regions and markers, mapShapes.ts), each on a layer
@@ -156,6 +157,20 @@ export function leaveOrbit(draft: MapDraft, id: string): Change {
   const old = draft.shapes.find(s => s.id === id)
   if (!old?.orbit) return null
   return change(draft, { shapes: draft.shapes.map(s => (s.id === id ? { ...s, orbit: null } : s)) })
+}
+
+// A door, a window or an arch put in the wall at a point (the topmost wall that is shown and not locked, near the point): the wall and the opening's id,
+// or none when there is no wall there or it is full.
+export function addOpening(
+  draft: MapDraft, x: number, y: number, kind: MapOpening['kind'], width: number, makeId: MakeId = randomId,
+): { change: NonNullable<Change>; wallId: string; id: string } | null {
+  const hit = hitItem(draft, x, y)
+  const wall = hit?.kind === 'shape' ? draft.shapes.find(s => s.id === hit.id) : undefined
+  if (!wall || !isWall(wall)) return null
+  const id = freshId('opn', new Set((wall.openings ?? []).map(o => o.id)), makeId)
+  const next = withOpening(wall, x, y, kind, width, id)
+  if (!next) return null
+  return { change: change(draft, { shapes: draft.shapes.map(s => (s.id === wall.id ? next : s)) }), wallId: wall.id, id }
 }
 
 // The bodies on an orbit, in their order.

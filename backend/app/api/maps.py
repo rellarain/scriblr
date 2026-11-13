@@ -20,6 +20,7 @@ from ..storage.schema import (
     MapBase,
     MapBiome,
     MapDoc,
+    MapFloor,
     MapKind,
     MapLayer,
     MapLevel,
@@ -43,6 +44,7 @@ class MapSummary(BaseModel):
     updatedAt: datetime
     versionOf: Optional[str] = None
     appliesFrom: Optional[str] = None
+    floor: Optional[MapFloor] = None
 
 
 class MapCreate(BaseModel):
@@ -58,6 +60,8 @@ class MapCreate(BaseModel):
     parentId: Optional[str] = None
     # What lies under every shape (none: the level's default).
     base: Optional[MapBase] = None
+    # A floor of the building it is inside (none: not a floor).
+    floor: Optional[MapFloor] = None
 
 
 def default_base(level: str, units: str) -> MapBase:
@@ -98,7 +102,7 @@ def create_map(project_id: str, body: MapCreate, root: Path = Depends(get_storag
         doc = MapDoc(
             id=store.new_id("map"), title=body.title, kind=MAP_LEVEL_DEFAULTS[level].kind, level=level, mapFormat=MAP_FORMAT, units=body.units,
             parentId=body.parentId, order=max((m["order"] for m in siblings), default=-1) + 1,
-            width=body.width, height=body.height, cellSize=body.cellSize, unit=body.unit, base=body.base or default_base(level, body.units),
+            width=body.width, height=body.height, cellSize=body.cellSize, unit=body.unit, base=body.base or default_base(level, body.units), floor=body.floor,
             layers=[MapLayer(id=i, name=n, kind=k) for i, n, k in MAP_DEFAULT_LAYERS],
         )
         store.save_map(root, project_id, doc)
