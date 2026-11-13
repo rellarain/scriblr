@@ -90,6 +90,61 @@ const wrap = (a: number): number => {
   return d
 }
 
+// Drape (phase O6): the weighted runs of a draped garment's outline turn back toward the way they were drawn, after the body (its pose and its skin) has moved them, so
+// the hem of a coat or a skirt keeps hanging when the hips tilt. Each segment of a run starts where the point before it now is and turns from the way the body put it
+// toward the way it was drawn (`rest`, the same points before the body moved them, read into the outline's own space now by `toLocal`), and its length goes back toward
+// the drawn one, both by the point's weight and the drape's strength (0..1). A run held at both ends (the hem of a skirt, between its two sides) is hung from each end
+// over its whole length and the two are blended along it, so the hem stays one line from side to side instead of meeting in a kink. Changes the points in place; pure
+// and finite for any input.
+export function applyDrape(list: ModelPoint[], closed: boolean, strength: number, rest: Array<Pick<ModelPoint, 'x' | 'y'>>, toLocal: (vx: number, vy: number) => [number, number]): void {
+  const s = clamp01(strength)
+  if (!(s > 0) || rest.length !== list.length) return
+  const was = list.map(p => ({ x: p.x, y: p.y }))
+  // the points of a chain hung from `root`, in order: where each goes and how far it turned
+  const hang = (root: number, chain: number[]): Array<{ x: number; y: number; turn: number }> => {
+    const out: Array<{ x: number; y: number; turn: number }> = []
+    let nx = was[root].x, ny = was[root].y, prev = root
+    for (const i of chain) {
+      const vx = was[i].x - was[prev].x, vy = was[i].y - was[prev].y
+      const [tx, ty] = toLocal(rest[i].x - rest[prev].x, rest[i].y - rest[prev].y)
+      const lv = Math.hypot(vx, vy), lt = Number.isFinite(tx) && Number.isFinite(ty) ? Math.hypot(tx, ty) : 0
+      const w = weightOf(list[i]) * s
+      const now = lv > 1e-9 ? Math.atan2(vy, vx) : Math.atan2(ty, tx)
+      const turn = lv > 1e-9 && lt > 1e-9 ? wrap(Math.atan2(ty, tx) - now) * w : 0
+      const l = lt > 1e-9 ? lv + (lt - lv) * w : lv
+      if (Number.isFinite(now) && Number.isFinite(l)) { nx += Math.cos(now + turn) * l; ny += Math.sin(now + turn) * l }
+      out.push({ x: nx, y: ny, turn })
+      prev = i
+    }
+    return out
+  }
+  const place = (i: number, x: number, y: number, turn: number) => {
+    const p = list[i]
+    p.x = x; p.y = y
+    if (turn !== 0) {
+      const c = Math.cos(turn), sn = Math.sin(turn)
+      if (p.hi) p.hi = [c * p.hi[0] - sn * p.hi[1], sn * p.hi[0] + c * p.hi[1]]
+      if (p.ho) p.ho = [c * p.ho[0] - sn * p.ho[1], sn * p.ho[0] + c * p.ho[1]]
+    }
+  }
+  for (const run of fallRuns(list, closed)) {
+    const whole = [...run.forward, ...[...run.backward].reverse()]
+    if (run.rootA >= 0 && run.rootB >= 0 && whole.length > 0) {
+      // hung from both ends: from the first root forward, and from the second backward, mixed by how far along the run each point is
+      const fwd = hang(run.rootA, whole), bwd = hang(run.rootB, [...whole].reverse()).reverse(), m = whole.length
+      whole.forEach((i, k) => {
+        const t = (k + 1) / (m + 1), a = fwd[k], b = bwd[k]
+        place(i, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.turn + (b.turn - a.turn) * t)
+      })
+      continue
+    }
+    for (const [root, chain] of [[run.rootA, run.forward], [run.rootB, run.backward]] as const) {
+      if (root < 0 || chain.length === 0) continue
+      hang(root, chain).forEach((q, k) => place(chain[k], q.x, q.y, q.turn))
+    }
+  }
+}
+
 // Let the weighted runs of an outline hang: `strength` 0..1 is how far toward hanging they go, `dir` the unit direction in the outline's own space, `squeeze`
 // how much to narrow what hangs across that direction (0 for none). Changes the points in place.
 export function applyFall(list: ModelPoint[], closed: boolean, strength: number, dir: [number, number], squeeze = 0): void {

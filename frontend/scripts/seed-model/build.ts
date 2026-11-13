@@ -14,6 +14,7 @@ import { CHIN_Y } from './outline'
 import { loadExact, loadMockupModel, type ExactData, type ExactShape } from './exact'
 import { buildPart, pairUp, type PartSpec } from './face'
 import { clothesParts, finishClothes } from './clothes'
+import { clothShading } from './cloth'
 import { hairParts } from './hair'
 import { itemParts, itemSpec, mirrorItem, poseArmsApart, prepareItems } from './items'
 import { AGES, BUILDS, EXPRESSIONS, POSES } from './presets'
@@ -233,6 +234,8 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
   content = skinBody(content)
   content = twinBody(content, body, make)
   content = finishClothes(content)
+  // the shading and the folds of the clothes, and the hems that hang (phase O6)
+  content = clothShading(content)
   content = nameSides(content)
   content = palmsUnderSleeves(content)
   // each arm is posed on its own, and each hand has an item of its own, in a group hung from the hand

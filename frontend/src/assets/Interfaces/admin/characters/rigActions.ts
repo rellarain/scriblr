@@ -118,6 +118,11 @@ export interface WearActions {
   toggleUnder: (objectId: string, targetId: string) => void
 }
 
+// How far the selected object drapes (phase O6).
+export interface DrapeActions {
+  stepDrape: (objectId: string, dir: -1 | 1, big: boolean) => void
+}
+
 export interface FitActions {
   setFit: (objectId: string, mode: 'scale' | 'keep' | 'stretch', fitTo?: string | null) => void
   pick: (on: boolean) => void

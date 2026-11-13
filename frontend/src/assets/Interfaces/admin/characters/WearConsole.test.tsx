@@ -106,3 +106,35 @@ describe('the Worn under list', () => {
     expect(screen.getByText('Object Shirt is worn under something that does not exist.')).toBeInTheDocument()
   })
 })
+
+// How far a garment drapes (phase O6): the Rig tab's Drape stepper, saved with the model.
+describe('the Drape stepper', () => {
+  const drape = () => within(screen.getByRole('region', { name: 'Drape' }))
+  it('steps the drape of the selected object by tenths, Shift by quarters, and saves it', async () => {
+    const { backend, user } = await open()
+    await on(user, 'Jacket')
+    expect(drape().getByText('0%')).toBeInTheDocument()
+    expect(drape().getByRole('button', { name: 'Lower Drape' })).toBeDisabled()
+    // none of its points carries a weight yet
+    expect(drape().getByText(/mark the hem with the Weights tool/)).toBeInTheDocument()
+    await user.click(drape().getByRole('button', { name: 'Raise Drape' }))
+    expect(drape().getByText('10%')).toBeInTheDocument()
+    await user.keyboard('{Shift>}')
+    await user.click(drape().getByRole('button', { name: 'Raise Drape' }))
+    await user.keyboard('{/Shift}')
+    expect(drape().getByText('35%')).toBeInTheDocument()
+    await save(user)
+    expect(saved(backend, 'oJa').drape).toBe(35)
+  })
+  it('says a twin drapes as its original does', async () => {
+    let c = worn()
+    c = { ...c, objects: c.objects.map(o => (o.id === 'oJa' ? { ...o, drape: 60 } : o)) }
+    const e = makeTwin(c, 'object', 'oJa', p => `${p}_t1`)
+    if (!e.ok) throw new Error(e.reason)
+    const { user } = await open([draftEntry('a', e.content)])
+    const twin = e.content.objects.find(o => o.mirrorOf === 'oJa')!
+    await on(user, twin.name)
+    expect(drape().getByText(/drapes as its original does \(60%\)/)).toBeInTheDocument()
+    expect(drape().queryByRole('button', { name: 'Raise Drape' })).toBeNull()
+  })
+})

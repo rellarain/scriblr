@@ -1,10 +1,10 @@
 import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelFallSide, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, roundCorners, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
 import { classKey, classesOf, lookOf, membersOf, overrideFor, type Choices } from './forms'
-import { applyFall, hangDirection, squeezeOf } from './fall'
+import { applyDrape, applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
-import { influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
+import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -589,6 +589,20 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     }
   }
 
+  // Whether the skin has moved a point from where it was before (a little more than rounding).
+  const movedFrom = (p: ModelPoint | undefined, q: ModelPoint | undefined): boolean => !!p && !!q && Math.hypot(p.x - q.x, p.y - q.y) > 0.01
+
+  // A draped garment's weighted runs hang back toward the way they were drawn (phase O6), from where the body (the pose, the links, the skin) has put them: the drawn way is a
+  // direction in the picture, read into this shape's own space now. `sh` is the shape whose object's drape counts (a twin's is its original's); `rest` the points before the body
+  // moved them.
+  function drapeNow(sh: ModelShape, list: ModelPoint[], rest: ModelPoint[], Mg: Mat) {
+    const oid = objectOfShape.get(sh.id), drape = (oid ? objectMap.get(oid)?.drape : 0) ?? 0
+    if (!(drape > 0) || list.length < 3 || !list.some(p => (p.w ?? 0) > 0)) return
+    const inv = inverse(Mg)
+    if (!finiteMat(inv)) return
+    applyDrape(list, sh.closed, Math.min(1, drape / 100), rest, (vx, vy) => [inv[0] * vx + inv[2] * vy, inv[1] * vx + inv[3] * vy])
+  }
+
   // Points linked to another shape take its place: on one of its points (plus an offset), or at a spot along one of its edges, some way outward. The
   // target is read where the rig has put it (the model's space) and brought into this shape's group space. Looseness stretches the offsets.
   // A point linked to a skinned shape (phase O1) is placed on that shape's outline before its skin moved it, offsets and all, and is handed back with what that point follows
@@ -653,15 +667,19 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // The outline of a shape that has points of its own: the base outline linked and driven (what the rig reads), and what is drawn: a chosen form's outline in its
   // place, or in the back view the outline of its own for the back. An empty form outline hides the shape in every view. Each is linked, driven by its sliders, moved by its
-  // skin weights and then left to hang, in that order.
+  // skin weights, draped and then left to hang, in that order.
   function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined): { rig: ModelPoint[]; drawn: ModelPoint[]; skin?: SolvedSkin } {
     const own = groupOfShape.get(sh.id) ?? null
     const outline = (source: ModelPoint[], movesOn: ModelPoint[]) => {
       const list = source.map(copyPoint)
       const carried = link(sh, list, Mg)
       drive(sh, list, movesOn, Mg)
+      const before = list.map(copyPoint)
       const skinned = skinNow(sh, list, source, carried, own)
+      drapeNow(sh, list, skinned?.rest ?? before, Mg)
       fallNow(sh, list, Mg)
+      // the inside of a sharp bend is a clean corner, not a dent
+      if (skinned) creaseCorners(list, sh.closed, skinned.rest, i => movedFrom(list[i], skinned.rest[i]))
       return { list, skinned }
     }
     const base = outline(sh.pts, sh.pts)
@@ -824,7 +842,10 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
           const list = reflectList(s.rest, axis)
           const pts = [...s.pts].reverse().map(ps => (ps ? { base: twinGroup(ps.base), inf: ps.inf.map(([g, w]): [string, number] => [twinGroup(g) ?? g, w]) } : null))
           skinPoints(list, pts, groupId, skinRig)
+          const before = reflectList(s.rest, axis)
+          drapeNow(twin, list, before, Mg)
           fallNow(twin, list, Mg, true)
+          creaseCorners(list, twin.closed, before, i => movedFrom(list[i], before[i]))
           return { list, pts }
         }
         const r = mirrored(o.skin)

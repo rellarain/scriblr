@@ -211,7 +211,8 @@ describe('the basic model', () => {
     const drawn = (id: string) => objectOf(id).shapes.filter(sid => rest.shapes[sid]?.visible)
     for (const id of ['shirt', 'trousers', 'shoes', 'briefs', 'bandeau']) expect(drawn(id).length, id).toBeGreaterThan(0)
     // short sleeves: the upper arms, not the forearms
-    expect(drawn('sleeves').sort()).toEqual(['sleeveUpL', 'sleeveUpR'])
+    // (the sleeves' shading drawn over them aside)
+    expect(drawn('sleeves').filter(sid => !seed.shapes.find(sh => sh.id === sid)!.shade).sort()).toEqual(['sleeveUpL', 'sleeveUpR'])
     // the garments that are put on are off to begin with
     for (const id of ['jacket', 'coat', 'skirt', 'dress']) expect(drawn(id), id).toEqual([])
   })
@@ -234,7 +235,9 @@ describe('the basic model', () => {
   })
 
   it('has what a neckline brings: buttons, flaps, a drape and a roll round the neck, each only in its own', () => {
-    const shown = (neck: string) => objectOf('shirt').shapes.filter(sid => !seed.shapes.find(sh => sh.id === sid)!.helper).filter(sid => solve(seed, defaultValues(seed), 'front', { forms: { 'shirt.neckline': neck } }).shapes[sid]?.visible)
+    // (the shirt's shading and its folds at the waist aside)
+    const own = (sid: string) => { const sh = seed.shapes.find(x => x.id === sid)!; return !sh.helper && !sh.shade && !sh.opBy }
+    const shown = (neck: string) => objectOf('shirt').shapes.filter(own).filter(sid => solve(seed, defaultValues(seed), 'front', { forms: { 'shirt.neckline': neck } }).shapes[sid]?.visible)
     expect(shown('crew')).toEqual(['shirt', 'collar'])
     expect(shown('henley')).toEqual(expect.arrayContaining(['placket', 'button1', 'button2', 'button3']))
     expect(shown('polo')).toEqual(expect.arrayContaining(['flapL', 'flapR', 'poloPlacket']))
@@ -384,6 +387,57 @@ describe('the basic model', () => {
     const point = at('Right hand', 'Point')
     expect(point[twin('indexL')].box.h).toBeCloseTo(open[twin('indexL')].box.h, 0)
     expect(point[twin('middleL')].box.h).toBeLessThan(open[twin('middleL')].box.h * 0.7)
+  })
+
+  it('drapes the coat, the skirt and the dress: their hems keep hanging when the hips tilt (phase O6)', () => {
+    for (const id of ['coat', 'skirt', 'dress']) {
+      expect(objectOf(id).drape, id).toBe(100)
+      const body = seed.shapes.find(sh => sh.id === objectOf(id).shapes[0])!
+      expect(body.pts.some(q => (q.w ?? 0) > 0), `${id} has a hem that hangs`).toBe(true)
+      expect(body.pts.filter(q => q.y < 165).every(q => !(q.w ?? 0)), `${id} holds at the hips`).toBe(true)
+    }
+    // the skirt's side from the hip to the hem stays near upright with the hips tilted; a stiff copy turns with them
+    const stiff: ModelContent = { ...seed, objects: seed.objects.map(o => (o.id === 'skirt' ? { ...o, drape: 0 } : o)) }
+    const side = (c: ModelContent, tilt: number) => {
+      const q = solve(c, { ...defaultValues(c), hipTilt: tilt }, 'front', { forms: { 'skirt.length': 'knee' } }).shapes.skirtBody.pre
+      const hip = q[2], hem = q[4]
+      return Math.atan2(hem.x - hip.x, hem.y - hip.y) * 180 / Math.PI
+    }
+    const drawn = side(seed, 0)
+    expect(Math.abs(side(seed, 15) - drawn)).toBeLessThan(6)
+    expect(Math.abs(side(stiff, 15) - drawn)).toBeGreaterThan(12)
+  })
+
+  it('shades every garment from the light at the upper left: its far side, and the inside of each sleeve and trouser leg (phase O6)', () => {
+    const shades = (id: string) => objectOf(id).shapes.map(sid => seed.shapes.find(sh => sh.id === sid)!).filter(sh => sh.shade)
+    for (const id of ['shirt', 'sleeves', 'trousers', 'skirt', 'dress', 'jacket', 'coat']) {
+      expect(shades(id).length, id).toBeGreaterThan(0)
+      expect(shades(id).length, `${id} within the limit of shading shapes`).toBeLessThanOrEqual(10)
+    }
+    // a far-side shadow lies on the picture's right
+    const box = (sid: string) => solve(seed, defaultValues(seed), 'front', { forms: { 'jacket.style': 'open' } }).shapes[sid].box
+    expect(box('jacketShade').x).toBeGreaterThan(100)
+    // the inside of each sleeve and trouser leg, on both sides
+    for (const sid of ['sleeveShadeUpL', 'sleeveShadeUpR', 'sleeveShadeForeL', 'sleeveShadeForeR', 'trouserShadeL', 'trouserShadeR']) expect(seed.shapes.some(sh => sh.id === sid), sid).toBe(true)
+  })
+
+  it('folds the cloth at the elbows, the knees and the waist as they bend, one fold for each way (phase O6)', () => {
+    const fade = (sid: string, values: Record<string, number>, forms: Record<string, string> = {}) => {
+      const out = solve(seed, { ...defaultValues(seed), ...values }, 'front', { forms }).shapes[sid]
+      return out.visible ? out.fade : 0
+    }
+    const long = { 'sleeves.length': 'long' }
+    for (const [sid, slider] of [['sleeveElbowOutL', 'elbow'], ['sleeveElbowOutR', 'elbowR'], ['trouserKneeOutL', 'knee'], ['trouserKneeOutR', 'kneeR']] as const) {
+      expect(fade(sid, {}, long), `${sid} at rest`).toBe(0)
+      expect(fade(sid, { [slider]: 70 }, long), `${sid} bent`).toBeGreaterThan(0.9)
+      // bent the other way, the fold on the other side of the joint shows instead
+      expect(fade(sid, { [slider]: -70 }, long), `${sid} bent the other way`).toBe(0)
+      expect(fade(sid.replace('Out', 'In'), { [slider]: -70 }, long), `${sid} inside`).toBeGreaterThan(0.9)
+    }
+    expect(fade('shirtWaistR', { waistBend: 22 })).toBeGreaterThan(0.9); expect(fade('shirtWaistR', { waistBend: -22 })).toBe(0)
+    expect(fade('shirtWaistL', { waistBend: -22 })).toBeGreaterThan(0.9)
+    // a short sleeve has no elbow to fold
+    expect(fade('sleeveElbowOutL', { elbow: 70 })).toBe(0)
   })
 
   it('draws each palm over the clothes and cuts it with the sleeves of its own arm', () => {

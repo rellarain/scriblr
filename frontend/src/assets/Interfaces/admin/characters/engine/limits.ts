@@ -19,7 +19,7 @@ export const LIMITS = {
   drivesWarn: 12,
   drivesMax: 24,
   // point links (a point welded to, following or locked to the edge of another shape), counted over the whole model; more than the most is refused at Publish
-  linksWarn: 600,
+  linksWarn: 1000,
   linksMax: 1200,
   // forms: axes per object, forms per axis, presets per model (the stops are the server's max_lengths)
   axesWarn: 4,

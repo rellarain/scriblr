@@ -677,7 +677,8 @@ export interface ModelAxis { id: string; name: string; options: ModelForm[]; ini
 export type ModelFit = 'scale' | 'keep' | 'stretch'
 // Which parts of a colour an object (or a style) holds at one value (phase D3a): hue 0..359, saturation and lightness 0..100. A part that is null is free: it comes from the colour chosen for the slot.
 export interface ModelHsl { h: number | null; s: number | null; l: number | null }
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl> }
+// drape (phase O6): how far, in percent, the object's weighted points hang back toward the way they were drawn when the body moves (a hem keeps hanging when the hips tilt); 0 leaves them where the body takes them.
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }

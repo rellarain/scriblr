@@ -1203,7 +1203,7 @@ MODEL_DRIVES_WARN = 12
 MODEL_DRIVES_MAX = 24
 MODEL_RANGE_NAME_MAX = 40
 MODEL_AXIS_RANGE = (40.0, 160.0)   # the line a model mirrors about (the middle of the 0..200 space by default)
-MODEL_LINKS_WARN = 600   # point links (a point welded to, following, or locked to the edge of another shape): counted over the whole model
+MODEL_LINKS_WARN = 1000  # point links (600 until phase O6, whose cloth shading and folds follow the body too) (a point welded to, following, or locked to the edge of another shape): counted over the whole model
 MODEL_LINKS_MAX = 1200   # more than this is a publish fault (raised from 100/200 for the basic model's clothes, every point of which follows the body)
 MODEL_AXES_WARN = 4      # forms: axes per object, forms per axis, presets per model
 MODEL_AXES_MAX = 8
@@ -2209,6 +2209,22 @@ class ModelObject(BaseModel):
     # What the object is worn under (phase 6b): ids of objects or classes (families) whose outlines trim it, so a shirt does not show outside a jacket and underwear does not show outside
     # the clothes. Nothing is trimmed while none of them is shown. A twin follows its original, and a member of a class that has none of its own follows the class's template.
     under: list[str] = Field(default_factory=list, max_length=MODEL_UNDER_MAX)
+    # How far the object's weighted points hang back toward the way they were drawn when the body moves (phase O6), in percent: the hem of a coat or a skirt keeps hanging
+    # when the hips tilt. 0 (the default) leaves them where the body takes them. A twin follows its original.
+    drape: int = Field(default=0, ge=0, le=100)
+
+    @field_validator("drape", mode="before")
+    @classmethod
+    def _drape(cls, value: Any) -> int:
+        if isinstance(value, bool):
+            return 0
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return 0
+        if v != v or v in (float("inf"), float("-inf")):
+            return 0
+        return int(round(min(100.0, max(0.0, v))))
 
     @field_validator("under", mode="before")
     @classmethod

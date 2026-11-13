@@ -8,7 +8,7 @@ import { defaultValues, isPointDriven, solve, type Values } from './rig'
 import { breakPair } from './pairEdit'
 import { autoSkin } from './skinEdit'
 import { parseModelFile, serializeModels } from '../modelFile'
-import { alignSkins, autoWeights, copiedSkin, mirrorWeights, paintWeights, setWeights, skinFaults, smoothWeights, stepSkin, weightsOf, withPoints } from './skin'
+import { alignSkins, autoWeights, copiedSkin, creaseCorners, mirrorWeights, paintWeights, setWeights, skinFaults, smoothWeights, stepSkin, weightsOf, withPoints } from './skin'
 
 const pt = (x: number, y: number, over: Partial<ModelPoint> = {}): ModelPoint => ({ x, y, m: 's', ...over })
 const drive = (over: Partial<ModelDrive>): ModelDrive => ({
@@ -325,5 +325,42 @@ describe('Auto toward the group a shape hangs from', () => {
     // the top of the leg (above the joint) follows the pelvis; the foot of it does not
     expect(w[0]).toBeGreaterThan(0.9); expect(w[1]).toBeGreaterThan(0.9)
     expect(w[2]).toBe(0); expect(w[3]).toBe(0)
+  })
+})
+
+describe('the inside of a sharp bend', () => {
+  it('puts a point the bend dented where the two sides meet, as a sharp corner', () => {
+    // outline: down the right side of the top part to the corner, out along the top of the bottom part, back along its bottom and up the left side
+    const list: ModelPoint[] = [
+      { x: 90, y: 60, m: 'c' }, { x: 110, y: 60, m: 'c' }, { x: 110, y: 85, m: 'c' }, { x: 107, y: 97, m: 'c' }, { x: 125, y: 100, m: 'c' }, { x: 145, y: 100, m: 'c' },
+      { x: 145, y: 120, m: 'c' }, { x: 100, y: 120, m: 'c' }, { x: 90, y: 110, m: 'c' }, { x: 90, y: 85, m: 'c' },
+    ]
+    // at rest the strip hung straight down: the same points on a straight right side
+    const rest: ModelPoint[] = list.map((p, i) => (i === 3 ? { ...p, x: 110, y: 100 } : i >= 4 && i <= 6 ? { ...p, x: 110, y: p.y + 20 } : { ...p }))
+    creaseCorners(list, true, rest, i => i >= 3 && i <= 6)
+    expect(list[3].x).toBeCloseTo(110, 3); expect(list[3].y).toBeCloseTo(100, 3)
+    expect(list[3].m).toBe('s')
+    // the points around it stay
+    expect(list[2]).toMatchObject({ x: 110, y: 85 }); expect(list[4]).toMatchObject({ x: 125, y: 100 })
+  })
+  it('leaves an outline at rest, a hollow drawn into it, and a point drawn sharp as they are', () => {
+    const list: ModelPoint[] = [{ x: 90, y: 60, m: 'c' }, { x: 110, y: 60, m: 'c' }, { x: 110, y: 85, m: 'c' }, { x: 104, y: 100, m: 'c' }, { x: 110, y: 115, m: 'c' }, { x: 110, y: 140, m: 'c' }, { x: 90, y: 140, m: 'c' }]
+    const before = list.map(p => ({ ...p }))
+    // nothing moved
+    creaseCorners(list, true, before, () => false)
+    expect(list).toEqual(before)
+    // moved, but the hollow is as deep as it was drawn
+    creaseCorners(list, true, before, () => true)
+    expect(list).toEqual(before)
+    // a sharp point is a corner on purpose
+    const sharp = list.map((p, i) => (i === 3 ? { ...p, m: 's' as const, x: 100 } : { ...p }))
+    const rest = sharp.map((p, i) => (i === 3 ? { ...p, x: 110 } : { ...p }))
+    creaseCorners(sharp, true, rest, () => true)
+    expect(sharp[3].x).toBe(100)
+  })
+  it('stays finite for any outline', () => {
+    const odd: ModelPoint[] = [{ x: 0, y: 0, m: 'c' }, { x: 0, y: 0, m: 'c' }, { x: 1e9, y: -1e9, m: 'c' }, { x: Number.NaN, y: 3, m: 'c' }, { x: 5, y: 5, m: 'c' }, { x: 5, y: 0, m: 'c' }]
+    creaseCorners(odd, true, odd.map(p => ({ ...p, x: 0, y: 0 })), () => true)
+    for (const p of odd.filter((_, i) => i !== 3)) expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true)
   })
 })

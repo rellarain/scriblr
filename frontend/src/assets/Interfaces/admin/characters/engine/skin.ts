@@ -117,6 +117,50 @@ export function skinPoints(list: ModelPoint[], skins: Array<PointSkin | null>, o
 export interface SkinEdit { ok: true; shape: ModelShape }
 
 // The weights of a shape for one group, one per point (0 where it has none).
+// The inside of a sharp bend (phase O6): the joint blend turns a point near a joint about it, keeping its distance, which rounds the outside of an elbow or a knee as skin
+// does; on the inside of the bend the same arc falls short of where the two sides meet, and the outline gets a small dent there (a notch of the background in the crease).
+// A point the skin has moved that dents the outline inward more than it did at rest goes out to where the sides on either side of it meet (the edge before
+// the point before it, and the edge after the point after it, carried on), or onto the line between its neighbours when they do not meet near it, and becomes a sharp
+// point (a point drawn sharp, the cut end of a sleeve, is left alone): the clean corner the inside of a bend has. The number of points stays the same; an outline at rest, as it was drawn, is never touched. In place.
+const DENT = 0.4
+export function creaseCorners(list: ModelPoint[], closed: boolean, rest: ModelPoint[], moved: (i: number) => boolean): void {
+  const n = list.length
+  if (n < 5 || rest.length !== n) return
+  // which way the outline winds (inward is to the same side all round)
+  let area = 0
+  for (let i = 0; i < n; i++) { const a = rest[i], b = rest[(i + 1) % n]; area += a.x * b.y - b.x * a.y }
+  if (!Number.isFinite(area) || Math.abs(area) < 1e-9) return
+  const inward = area > 0 ? 1 : -1
+  // how far a point dents inward from the line between its neighbours (negative: it stands out)
+  const dent = (a: ModelPoint, p: ModelPoint, b: ModelPoint): number => {
+    const ex = b.x - a.x, ey = b.y - a.y, len = Math.hypot(ex, ey)
+    if (!(len > 1e-9)) return 0
+    return (inward * (ex * (p.y - a.y) - ey * (p.x - a.x))) / len
+  }
+  const from = closed ? 0 : 2, to = closed ? n : n - 2
+  for (let i = from; i < to; i++) {
+    // (a sharp point is a corner drawn on purpose, the cut end of a sleeve: it is left alone)
+    if (!moved(i) || rest[i].m === 's') continue
+    const at = (k: number) => list[(i + k + n) % n], was = (k: number) => rest[(i + k + n) % n]
+    // only a dent the bend made (or made deeper): a hollow drawn in the outline at rest stays as it is drawn
+    const d = dent(at(-1), at(0), at(1))
+    if (!(d - Math.max(0, dent(was(-1), was(0), was(1))) > DENT)) continue
+    const a2 = at(-2), a1 = at(-1), b1 = at(1), b2 = at(2), p = at(0)
+    // the edge into the point before, carried on past it, and the edge out of the point after, carried back past it
+    const ux = a1.x - a2.x, uy = a1.y - a2.y, vx = b1.x - b2.x, vy = b1.y - b2.y, den = ux * vy - uy * vx
+    // (failing a corner near it, onto the line between its neighbours, straight out)
+    const ex = b1.x - a1.x, ey = b1.y - a1.y, el = Math.hypot(ex, ey) || 1
+    let x = p.x - inward * (-ey / el) * d, y = p.y - inward * (ex / el) * d
+    if (Math.abs(den) > 1e-9) {
+      const s = ((b1.x - a1.x) * vy - (b1.y - a1.y) * vx) / den, u = ((b1.x - a1.x) * uy - (b1.y - a1.y) * ux) / den
+      const cx = a1.x + ux * s, cy = a1.y + uy * s
+      const span = Math.hypot(b1.x - a1.x, b1.y - a1.y)
+      if (s >= 0 && u >= 0 && Number.isFinite(cx) && Number.isFinite(cy) && Math.hypot(cx - p.x, cy - p.y) <= Math.min(span, d * 2.5)) { x = cx; y = cy }
+    }
+    p.x = x; p.y = y; p.m = 's'; p.hi = null; p.ho = null
+  }
+}
+
 export function weightsOf(s: Pick<ModelShape, 'skin' | 'pts'>, group: string): number[] {
   const k = (s.skin ?? []).find(x => x.g === group)
   return s.pts.map((_, i) => k?.w[i] ?? 0)

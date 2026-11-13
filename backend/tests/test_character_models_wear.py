@@ -72,3 +72,24 @@ def test_wearing_something_under_what_is_not_there_or_under_itself_is_refused(cl
     c = dressed()
     c["objects"][0]["under"] = [target]
     assert words in faults_of(client, c)
+
+
+# ---- drape (phase O6): how far an object's weighted points hang back toward the way they were drawn ----
+
+
+def test_an_older_model_loads_with_no_drape(client: TestClient) -> None:
+    assert [o["drape"] for o in saved(client, dressed())["objects"]] == [0, 0]
+
+
+@pytest.mark.parametrize("value, kept", [(40, 40), (42.6, 43), (-5, 0), (250, 100), ("x", 0), (None, 0), (True, 0)])
+def test_the_drape_is_kept_as_a_whole_percent_and_repaired(client: TestClient, value: object, kept: int) -> None:
+    c = dressed()
+    c["objects"][0]["drape"] = value
+    assert saved(client, c)["objects"][0]["drape"] == kept
+
+
+def test_a_draped_model_publishes(client: TestClient) -> None:
+    c = dressed()
+    c["objects"][1]["drape"] = 80
+    save(client, {"id": "m1", "draft": c})
+    assert client.post("/api/character-models/m1/publish").status_code == 200

@@ -270,7 +270,7 @@ export function clothesParts(mock: any, body: ModelShape[]): Clothes {
 const twinOf = (c: ModelContent, id: string): string => c.shapes.find(s => s.mirrorOf === id)?.id ?? id
 
 // A list of points the other way round: the right-hand piece of a left-hand garment, every point following the twin of the body point it follows.
-function mirrored(c: ModelContent, list: ModelPoint[]): ModelPoint[] {
+export function mirrored(c: ModelContent, list: ModelPoint[]): ModelPoint[] {
   const sizeOf = (id: string): number => c.shapes.find(s => s.id === id)!.pts.length
   const out: ModelPoint[] = []
   for (let k = list.length - 1; k >= 0; k--) {
