@@ -52,45 +52,65 @@ const centre = (c: ModelContent, shapeId: string, values: Values = {}): [number,
 const byName = (c: ModelContent, name: string) => c.groups.find(g => g.name === name)!
 const shapeOfGroup = (c: ModelContent, groupId: string) => c.objects.find(o => o.id === c.groups.find(g => g.id === groupId)!.objects[0])!.shapes[0]
 const range = (c: ModelContent, role: string) => c.ranges.find(r => r.role === role)!
+// The tip of a finger or thumb shape (its lowest point at rest), where the solver draws it for these values.
+const tipOf = (c: ModelContent, shapeId: string, values: Values = {}): [number, number] => {
+  const rest = c.shapes.find(s => s.id === shapeId)!.pts
+  const i = rest.reduce((best, q, k) => (q.y > rest[best].y ? k : best), 0)
+  const p = solve(c, values).shapes[shapeId].pre[i]
+  return [p.x, p.y]
+}
 
 describe('a finger', () => {
-  it('hangs from the bottom of the forearm as a chain of joints with a Curl slider', () => {
-    const e = addFinger(arm(), 'gFore', { name: 'Index', joints: 3, role: 'curl-index' }, make)
+  it('hangs from the bottom of the forearm as one shape over two joints, with a Curl slider', () => {
+    const e = addFinger(arm(), 'gFore', { name: 'Index', role: 'curl-index' }, make)
     const c = must(e)
-    const joints = e.ok ? e.finger!.joints : []
-    expect(joints).toHaveLength(3)
-    expect(c.groups.find(g => g.id === joints[0])!.parent).toBe('gFore')
-    expect(c.groups.find(g => g.id === joints[1])!.parent).toBe(joints[0])
-    expect(c.groups.find(g => g.id === joints[2])!.parent).toBe(joints[1])
-    expect(c.groups.find(g => g.id === joints[0])!.attach).toMatchObject({ shape: 'fore', kind: 'inside', ry: 1 })
+    const joints = e.ok ? e.finger!.joints : [], sid = e.ok ? e.finger!.shapeId : ''
+    expect(joints).toHaveLength(2)
+    const [knuckle, middle] = joints.map(id => c.groups.find(g => g.id === id)!)
+    expect(knuckle.parent).toBe('gFore')
+    expect(middle.parent).toBe(knuckle.id)
+    expect(knuckle.attach).toMatchObject({ shape: 'fore', kind: 'inside', ry: 1 })
+    // the first joint holds the one shape; the second holds nothing and has its pivot at the middle joint
+    expect(knuckle.objects).toHaveLength(1)
+    expect(c.objects.find(o => o.id === knuckle.objects[0])!.shapes).toEqual([sid])
+    expect(middle.objects).toEqual([])
+    expect(middle.attach).toBeNull()
+    expect(middle.pivot![1]).toBeGreaterThan(knuckle.pivot![1])
+    // its points follow the forearm at the knuckle and the middle joint toward the tip
+    expect(c.shapes.find(x => x.id === sid)!.skin!.map(k => k.g).sort()).toEqual(['gFore', middle.id].sort())
     const r = c.ranges.find(x => x.role === 'curl-index')!
     expect(r).toMatchObject({ name: 'Index curl', min: 0, rest: 0, max: 100, unit: '%', scope: joints[0] })
     expect(r.drives.map(d => d.group)).toEqual(joints)
     expect(r.drives.every(d => d.kind === 'turn' && d.atMin === 0 && d.atMax > 0)).toBe(true)
   })
-  it('hangs straight down from the forearm, the joints one under the other', () => {
-    const e = addFinger(arm(), 'gFore', { joints: 3 }, make)
-    const c = must(e), [a, b, d] = e.ok ? e.finger!.joints.map(g => shapeOfGroup(c, g)) : []
-    const ya = centre(c, a)[1], yb = centre(c, b)[1], yd = centre(c, d)[1]
-    expect(ya).toBeLessThan(yb); expect(yb).toBeLessThan(yd)
-    expect(ya).toBeGreaterThan(186)
-    expect(centre(c, a)[0]).toBeCloseTo(131, 3)
+  it('hangs straight down from the forearm, its flat top hidden inside it and its tip below', () => {
+    const e = addFinger(arm(), 'gFore', {}, make)
+    const c = must(e), sid = e.ok ? e.finger!.shapeId : ''
+    const pts = c.shapes.find(x => x.id === sid)!.pts
+    expect(Math.min(...pts.map(q => q.y))).toBeLessThan(186)
+    expect(tipOf(c, sid)[1]).toBeGreaterThan(195)
+    expect(tipOf(c, sid)[0]).toBeCloseTo(131, 3)
+    expect(centre(c, sid)[0]).toBeCloseTo(131, 3)
   })
-  it('curls toward the side it was told, the tip moving up and across', () => {
-    const e = addFinger(arm(), 'gFore', { joints: 3, role: 'curl-index', curlSign: 1 }, make)
-    const c = must(e), tip = shapeOfGroup(c, e.ok ? e.finger!.joints[2] : ''), id = e.ok ? e.finger!.rangeId : ''
-    const open = centre(c, tip), closed = centre(c, tip, { [id]: 100 })
+  it('curls toward the side it was told, the tip moving up and across, while its top stays in the forearm', () => {
+    const e = addFinger(arm(), 'gFore', { role: 'curl-index', curlSign: 1 }, make)
+    const c = must(e), sid = e.ok ? e.finger!.shapeId : '', id = e.ok ? e.finger!.rangeId : ''
+    const open = tipOf(c, sid), closed = tipOf(c, sid, { [id]: 100 })
     expect(closed[0]).toBeLessThan(open[0] - 3)
     expect(closed[1]).toBeLessThan(open[1] - 3)
-    const e2 = addFinger(arm(), 'gFore', { joints: 3, curlSign: -1 }, make)
-    const c2 = must(e2), tip2 = shapeOfGroup(c2, e2.ok ? e2.finger!.joints[2] : '')
-    expect(centre(c2, tip2, { [e2.ok ? e2.finger!.rangeId : '']: 100 })[0]).toBeGreaterThan(centre(c2, tip2)[0] + 3)
+    // the knuckle bends like skin: the top of the outline is weighted to the forearm and does not move
+    const top = (v: Values) => solve(c, v).shapes[sid].pre[0]
+    expect(Math.hypot(top({ [id]: 100 }).x - top({}).x, top({ [id]: 100 }).y - top({}).y)).toBeLessThan(0.5)
+    const e2 = addFinger(arm(), 'gFore', { curlSign: -1 }, make)
+    const c2 = must(e2), sid2 = e2.ok ? e2.finger!.shapeId : ''
+    expect(tipOf(c2, sid2, { [e2.ok ? e2.finger!.rangeId : '']: 100 })[0]).toBeGreaterThan(tipOf(c2, sid2)[0] + 3)
   })
-  it('takes two joints as well', () => {
-    const e = addFinger(arm(), 'gFore', { joints: 2 }, make)
-    expect(e.ok && e.finger!.joints).toHaveLength(2)
-    const c = must(e)
-    expect(c.ranges.find(r => r.id === (e.ok ? e.finger!.rangeId : ''))!.drives).toHaveLength(2)
+  it('keeps its thickness at the middle joint when curled all the way', () => {
+    const e = addFinger(arm(), 'gFore', { width: 4 }, make)
+    const c = must(e), sid = e.ok ? e.finger!.shapeId : '', id = e.ok ? e.finger!.rangeId : ''
+    // the two points either side of the middle joint, across the finger from each other (indices 2 and 3 on one side, 7 and 8 on the other)
+    const across = (v: Values) => { const q = solve(c, v).shapes[sid].pre; return Math.hypot(q[2].x - q[8].x, q[2].y - q[8].y) }
+    expect(across({ [id]: 100 })).toBeGreaterThan(across({}) * 0.8)
   })
   it('keeps no role unless it is given one', () => {
     const c = must(addFinger(arm(), 'gFore', {}, make))
@@ -106,7 +126,7 @@ describe('a finger', () => {
     let deep = arm()
     let parent = 'gFore'
     for (let i = 0; i < LIMITS.chainMax - 3; i++) deep = { ...deep, groups: [...deep.groups, newGroup(`x${i}`, `x${i}`, parent)] }, parent = `x${i}`
-    expect(refused(addFinger(deep, parent, { joints: 3 }, make))).toMatch(/pivot chain/)
+    expect(refused(addFinger(deep, parent, {}, make))).toMatch(/pivot chain/)
   })
   it('is refused past the number of sliders a model may hold', () => {
     const c = arm()
@@ -124,6 +144,8 @@ describe('a thumb', () => {
     const g = c.groups.find(x => x.id === joints[0])!
     expect(g.attach).toMatchObject({ kind: 'edge', shape: 'fore' })
     expect(joints).toHaveLength(2)
+    // one shape, in the first joint, following the forearm and the tip joint
+    expect(c.shapes.find(s => s.id === (e.ok ? e.shapeId : ''))!.skin!.map(k => k.g).sort()).toEqual(['gFore', joints[1]].sort())
     // on the left side of the forearm (the side toward the axis)
     expect(centre(c, shapeOfGroup(c, joints[0]))[0]).toBeLessThan(131)
   })
@@ -134,23 +156,23 @@ describe('a thumb', () => {
   })
   it('swings out with its Swing slider, away from the palm, and folds across with Across', () => {
     const e = addThumb(arm(), 'gFore', { side: 'left' }, make)
-    const c = must(e), tip = shapeOfGroup(c, e.ok ? e.joints![1] : '')
-    const at = centre(c, tip)
-    expect(centre(c, tip, { [range(c, 'swing-thumb').id]: 40 })[0]).toBeLessThan(at[0] - 2)
-    expect(centre(c, tip, { [range(c, 'oppose-thumb').id]: 100 })[0]).toBeGreaterThan(at[0] + 2)
+    const c = must(e), sid = e.ok ? e.shapeId! : ''
+    const at = tipOf(c, sid)
+    expect(tipOf(c, sid, { [range(c, 'swing-thumb').id]: 40 })[0]).toBeLessThan(at[0] - 2)
+    expect(tipOf(c, sid, { [range(c, 'oppose-thumb').id]: 100 })[0]).toBeGreaterThan(at[0] + 2)
   })
 })
 
 describe('a whole hand', () => {
   const built = () => { const e = addHand(arm(), 'gFore', {}, make); return { c: must(e), hand: e.ok ? e.hand! : null } }
 
-  it('is a palm, four fingers of three joints and a thumb of two: fifteen groups, objects and shapes', () => {
+  it('is a palm, and four fingers and a thumb of one shape over two joints each: eleven groups, six objects and six shapes', () => {
     const base = arm(), { c, hand } = built()
-    expect(c.groups.length - base.groups.length).toBe(15)
-    expect(c.objects.length - base.objects.length).toBe(15)
-    expect(c.shapes.length - base.shapes.length).toBe(15)
+    expect(c.groups.length - base.groups.length).toBe(11)
+    expect(c.objects.length - base.objects.length).toBe(6)
+    expect(c.shapes.length - base.shapes.length).toBe(6)
     expect(hand!.fingers).toHaveLength(4)
-    expect(hand!.fingers.every(f => f.length === 3)).toBe(true)
+    expect(hand!.fingers.every(f => f.length === 2)).toBe(true)
     expect(hand!.thumb).toHaveLength(2)
     expect(c.groups.find(g => g.id === hand!.palm)).toMatchObject({ name: 'Hand', parent: 'gFore' })
   })
@@ -166,7 +188,7 @@ describe('a whole hand', () => {
     const painted = { ...base, shapes: base.shapes.map(s => (s.id === 'fore' ? { ...s, slot: 'k_skin' } : s)) }
     const c = must(addHand(painted, 'gFore', {}, make))
     const hand = c.shapes.filter(s => !['chest', 'arm', 'fore'].includes(s.id))
-    expect(hand).toHaveLength(15)
+    expect(hand).toHaveLength(6)
     expect(hand.every(s => s.slot === 'k_skin')).toBe(true)
     const gray = must(addFinger({ ...base, shapes: base.shapes.map(s => (s.id === 'fore' ? { ...s, gray: 60 } : s)) }, 'gFore', {}, make))
     expect(gray.shapes.filter(s => !['chest', 'arm', 'fore'].includes(s.id)).every(s => s.slot === null && s.gray === 60)).toBe(true)
@@ -187,15 +209,15 @@ describe('a whole hand', () => {
   })
   it('curls a fist with the sliders at their ends: every finger tip closes in', () => {
     const { c, hand } = built()
-    const open = hand!.fingers.map(f => centre(c, shapeOfGroup(c, f[2])))
+    const open = hand!.fingers.map(f => tipOf(c, shapeOfGroup(c, f[0])))
     const values: Values = {}
     for (const role of ['curl-index', 'curl-middle', 'curl-ring', 'curl-little']) values[range(c, role).id] = 100
-    const closed = hand!.fingers.map(f => centre(c, shapeOfGroup(c, f[2]), values))
+    const closed = hand!.fingers.map(f => tipOf(c, shapeOfGroup(c, f[0]), values))
     closed.forEach((p, i) => { expect(p[1]).toBeLessThan(open[i][1] - 3) })
   })
   it('spreads the fingers with the Spread slider: the index leans toward the thumb and the little finger away', () => {
     const { c, hand } = built()
-    const tip = (i: number, v: Values = {}) => centre(c, shapeOfGroup(c, hand!.fingers[i][2]), v)
+    const tip = (i: number, v: Values = {}) => tipOf(c, shapeOfGroup(c, hand!.fingers[i][0]), v)
     const v = { [range(c, 'spread').id]: 100 }
     expect(tip(0, v)[0]).toBeLessThan(tip(0)[0] - 1)
     expect(tip(3, v)[0]).toBeGreaterThan(tip(3)[0] + 1)
@@ -234,7 +256,7 @@ describe('two hands, posed apart', () => {
     const { c, hand } = built()
     expect(hand!.twin).toBeTruthy()
     expect(c.groups.find(g => g.id === hand!.twin)).toMatchObject({ mirrorOf: hand!.palm, parent: twinGroupOf(c, 'gFore') })
-    expect(c.groups.length).toBe(arm(true).groups.length + 30)
+    expect(c.groups.length).toBe(arm(true).groups.length + 22)
     const roles = c.ranges.filter(r => r.role).map(r => r.role!)
     expect(roles.filter(r => !r.endsWith('~'))).toHaveLength(8)
     expect(roles.filter(r => r.endsWith('~'))).toHaveLength(8)
@@ -246,13 +268,8 @@ describe('two hands, posed apart', () => {
     const mine = slidersByRole(c, false, hand!.palm), theirs = slidersByRole(c, true, hand!.palm)
     expect(Object.keys(mine)).toHaveLength(8)
     expect(Object.keys(theirs)).toHaveLength(8)
-    const tipOf = (palm: string, finger: number) => {
-      const g = c.groups.filter(x => x.parent === palm && /finger/.test(x.name))[finger]
-      let cur = g
-      while (true) { const next = c.groups.find(x => x.parent === cur.id); if (!next) break; cur = next }
-      return shapeOfGroup(c, cur.id)
-    }
-    const a = tipOf(hand!.palm, 1), b = tipOf(hand!.twin!, 1)
+    const fingerOf = (palm: string, finger: number) => shapeOfGroup(c, c.groups.filter(x => x.parent === palm && /finger/.test(x.name))[finger].id)
+    const a = fingerOf(hand!.palm, 1), b = fingerOf(hand!.twin!, 1)
     const rest = { a: centre(c, a), b: centre(c, b) }
     const left = centre(c, a, { [mine['curl-middle']!]: 100 }), right = centre(c, b, { [mine['curl-middle']!]: 100 })
     expect(left[1]).toBeLessThan(rest.a[1] - 3)

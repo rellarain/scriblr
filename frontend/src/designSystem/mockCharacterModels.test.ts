@@ -25,7 +25,7 @@ describe('the rigged preview model', () => {
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(56)   // five shapes, the sleeve, the shirt, the undershirt, the pocket and the two stripes of its fill pattern, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, the ponytail, and the two hands (fifteen shapes each)
+    expect(s.order).toHaveLength(38)   // five shapes, the sleeve, the shirt, the undershirt, the pocket and the two stripes of its fill pattern, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, the ponytail, and the two hands (six shapes each: a palm, four fingers and a thumb)
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -51,8 +51,8 @@ describe('the rigged preview model', () => {
     const rest = solve(adult, {})
     mirrored(rest, 's_arm', twinArm.id); mirrored(rest, 's_fore', twinFore.id)
     expect(rest.shapes[twinArm.id].box.y).toBeCloseTo(rest.shapes.s_arm.box.y, 3)
-    // the arm and the hand are two groups of the pair; the hand brings fifteen more groups each
-    expect(adult.groups.filter(g => g.mirrorOf).length).toBe(2 + 15)
+    // the arm and the hand are two groups of the pair; the hand brings eleven more groups each
+    expect(adult.groups.filter(g => g.mirrorOf).length).toBe(2 + 11)
     expect(adult.groups.filter(g => g.mirrorOf).map(g => g.mirrorOf)).toEqual(expect.arrayContaining(['g_arm', 'g_fore']))
     // the original raise moves the original arm only, the slider of the other side moves the twin, as the mirror image
     const other = (name: string) => adult.ranges.find(r => r.name === name)!.id
@@ -71,19 +71,21 @@ describe('the rigged preview model', () => {
     expect(theirs.shapes.s_arm.box.y).toBeCloseTo(rest.shapes.s_arm.box.y, 3)
   })
 
-  it('has a hand on each arm: a palm, four fingers of three joints and a thumb, each hand curled on its own', () => {
+  it('has a hand on each arm: a palm, four fingers and a thumb (each one shape over two joints), each hand curled on its own', () => {
     const palm = adult.groups.find(g => g.name === 'Hand' && !g.mirrorOf)!, twinPalm = adult.groups.find(g => g.mirrorOf === palm.id)!
     expect(palm.parent).toBe('g_fore'); expect(twinPalm.parent).toBe(adult.groups.find(g => g.mirrorOf === 'g_fore')!.id)
     const roles = adult.ranges.map(r => r.role).filter(Boolean) as string[]
     expect(roles.filter(r => !r.endsWith('~')).sort()).toEqual(['curl-index', 'curl-little', 'curl-middle', 'curl-ring', 'curl-thumb', 'oppose-thumb', 'spread', 'swing-thumb'])
     expect(roles.filter(r => r.endsWith('~'))).toHaveLength(8)
     const curl = (role: string) => adult.ranges.find(r => r.role === role)!.id
-    const tip = (name: string) => adult.shapes.find(s => s.name === name)!.id
+    const finger = adult.shapes.find(s => s.name === 'Middle finger' && !s.mirrorOf)!, twin = adult.shapes.find(s => s.mirrorOf === finger.id)!.id
+    // the tip of the finger: its lowest point at rest
+    const k = finger.pts.reduce((best, p, i) => (p.y > finger.pts[best].y ? i : best), 0)
+    const tipY = (out: ReturnType<typeof solve>, id: string) => out.shapes[id].pre[k].y
     const rest = solve(adult, {}), fist = solve(adult, { [curl('curl-middle')]: 100 }), otherFist = solve(adult, { [curl('curl-middle~')]: 100 })
-    const twinTip = adult.shapes.find(s => s.mirrorOf === tip('Middle finger 3'))!.id
-    expect(fist.shapes[tip('Middle finger 3')].box.y).toBeLessThan(rest.shapes[tip('Middle finger 3')].box.y - 3)
-    expect(fist.shapes[twinTip].box.y).toBeCloseTo(rest.shapes[twinTip].box.y, 3)                      // the other hand stays open
-    expect(otherFist.shapes[twinTip].box.y).toBeCloseTo(fist.shapes[tip('Middle finger 3')].box.y, 3)   // and curls just the same with its own slider
+    expect(tipY(fist, finger.id)).toBeLessThan(tipY(rest, finger.id) - 3)
+    expect(tipY(fist, twin)).toBeCloseTo(tipY(rest, twin), 3)                      // the other hand stays open
+    expect(tipY(otherFist, twin)).toBeCloseTo(tipY(fist, finger.id), 3)            // and curls just the same with its own slider
     // the hand is painted as the forearm (skin), and its parts are in the picture
     expect(adult.shapes.find(s => s.name === 'Hand')!.slot).toBe('k_skin')
   })
@@ -97,8 +99,9 @@ describe('the rigged preview model', () => {
     let state = applyPreset(adult, restState(adult), fistOf('Hand'))
     state = applyPreset(adult, state, adult.presets!.find(p => p.kind === 'Hand (other side)' && p.name === 'Open')!)
     const closed = solve(adult, state.values), rest = solve(adult, {})
-    const tip = (name: string) => adult.shapes.find(s => s.name === name)!.id
-    expect(closed.shapes[tip('Index finger 3')].box.y).toBeLessThan(rest.shapes[tip('Index finger 3')].box.y - 3)
+    const index = adult.shapes.find(s => s.name === 'Index finger' && !s.mirrorOf)!
+    const k = index.pts.reduce((best, p, i) => (p.y > index.pts[best].y ? i : best), 0)
+    expect(closed.shapes[index.id].pre[k].y).toBeLessThan(rest.shapes[index.id].pre[k].y - 3)
     // a pose holds with its grip, and the grip is carried by the hand
     const grip = adult.presets!.find(p => p.kind === 'Hand' && p.name === 'Grip')!
     expect(grip.grip).toBe(adult.grips![0].id)

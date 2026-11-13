@@ -28,13 +28,12 @@ export function HandSection({ content, group, held, actions }: { content: ModelC
     <>
       <section className="cmSec" aria-label="Hands and fingers">
         <h3 className="cmInsSub">Hands and fingers</h3>
-        <p className="cmInsText">Hang fingers, a thumb or a whole hand from the bottom of this group&apos;s lowest shape. Each gets a Curl slider; a hand also gets a Spread slider and the thumb its Swing and Across.</p>
+        <p className="cmInsText">Hang fingers, a thumb or a whole hand from the bottom of this group&apos;s lowest shape. Each finger is one shape bent over two joints (its skin follows the palm at the knuckle) and gets a Curl slider; a hand also gets a Spread slider and the thumb its Swing and Across.</p>
         {why && <p className="cmInsText">{why}</p>}
         <div className="cmInline">
-          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A palm, four fingers of three joints and a thumb, with their sliders (a twin arm gets a hand too, posed on its own)'} onClick={() => actions.addHand(group.id)}><HandIcon size={12} /> Add a whole hand</button>
-          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A finger of three joints with one Curl slider'} onClick={() => actions.addFinger(group.id, 3)}><PlusIcon size={12} /> Add a finger</button>
-          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A finger of two joints with one Curl slider'} onClick={() => actions.addFinger(group.id, 2)}><PlusIcon size={12} /> Add a short finger</button>
-          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A thumb of two joints on the side edge of the shape, with Swing, Curl and Across sliders'} onClick={() => actions.addThumb(group.id)}><PlusIcon size={12} /> Add a thumb</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A palm, four fingers and a thumb, each one shape bent over two joints, with their sliders (a twin arm gets a hand too, posed on its own)'} onClick={() => actions.addHand(group.id)}><HandIcon size={12} /> Add a whole hand</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A finger: one shape bent over two joints, with one Curl slider'} onClick={() => actions.addFinger(group.id)}><PlusIcon size={12} /> Add a finger</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={twin} title={why ?? 'A thumb on the side edge of the shape: one shape bent over two joints, with Swing, Curl and Across sliders'} onClick={() => actions.addThumb(group.id)}><PlusIcon size={12} /> Add a thumb</button>
         </div>
         {canApart && (
           <div className="cmInline">

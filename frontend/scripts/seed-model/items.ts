@@ -3,17 +3,18 @@
 //
 // Each hand has an item of its own (an object with one axis of forms, hidden until one is chosen). It is in a group hung from the hand, so it goes where the hand goes; the group
 // turns about the grip (a slider, "Item angle"), which a pose uses to keep the item upright whatever the arm does. The outlines are the old ones, moved so that every item's grip
-// (the middle of the fist that held it) is at the same spot, which is the middle of the mannequin's palm, with a band of skin over the item for the fingers.
+// (the middle of the fist that held it) is at the same spot, under the mannequin's fingers: the item is drawn over the palm and under the fingers and the thumb, which close
+// round it in the Grip pose (phase O5; the poses that hold a hand up take the Grip pose too).
 import type { ModelAxis, ModelContent, ModelForm, ModelGrip, ModelGroup, ModelObject, ModelPreset, ModelRange, ModelShape } from '../../src/api/types'
 import { reflectList } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
 import { apartSlider } from '../../src/assets/Interfaces/admin/characters/engine/sidesEdit'
-import { drive, range } from './body'
+import { drive, handPose, range } from './body'
 import type { ExactData, ExactShape } from './exact'
 import type { PartResult, PartSpec } from './face'
 import { CHIN_Y, HS, type Exact } from './outline'
 
-// Where a hand takes an item, in the mannequin's space with the arm hanging: the middle of the palm (the hand of the realistic body, phase O4b).
-export const GRIP_REST = { x: 149.7, y: 208.5 }
+// Where a hand takes an item, in the mannequin's space with the arm hanging: across the knuckles, under the curled fingers (phase O5).
+export const GRIP_REST = { x: 149.3, y: 215.5 }
 
 // The old drawing's space, for a place in the mannequin's.
 const toOld = (m: { x: number; y: number }): { x: number; y: number } => ({ x: 100 + (m.x - 100) / HS, y: 123 - (CHIN_Y - m.y) / HS })
@@ -71,8 +72,8 @@ const thinLines = (shapes: ExactShape[]): ExactShape[] => {
   return shapes.filter(s => s.f.toLowerCase() !== '#8a7a5a' || n++ % 2 === 0)
 }
 
-// Sets the old held items up for the mannequin: the item shapes only (the hand and the sleeve are the mannequin's own), every item's grip at the palm, a band of skin for the
-// fingers over each, the colour of a torch's wrapping as the item's, and the unrolled scroll beside the rolled one.
+// Sets the old held items up for the mannequin: the item shapes only (the hand and the sleeve are the mannequin's own: the fingers close over the item), every item's grip
+// under the fingers, the colour of a torch's wrapping as the item's, and the unrolled scroll beside the rolled one.
 export function prepareItems(data: ExactData): void {
   const want = toOld(GRIP_REST)
   const used = data.options.heldItem.map(o => {
@@ -87,10 +88,9 @@ export function prepareItems(data: ExactData): void {
     const shapes = kept.map(s => ({ ...s, ...tidy(s), n: placed(s.n, want, dx, dy, SCALE).map(p => [p[0], p[1] + lower, ...p.slice(2)] as Exact[number]) }))
     return { ...o, shapes: o.id === 'openbook' ? thinLines(shapes) : shapes }
   })
-  const withFingers = used.map(o => (o.shapes.length === 0 ? o : { ...o, shapes: [...o.shapes, shape('#c8a58a', oval(want.x, want.y, 22, 12), 1, ['skin', 'base', 0])] }))
-  const at = withFingers.findIndex(o => o.id === 'scroll')
-  withFingers.splice(at + 1, 0, { id: 'openscroll', name: 'Unrolled scroll', shapes: [...unrolledScroll(want.x, want.y).map(sh => ({ ...sh, n: placed(sh.n, want, 0, 0, SCALE) })), shape('#c8a58a', oval(want.x, want.y, 22, 12), 1, ['skin', 'base', 0])] })
-  data.options.heldUsed = withFingers
+  const at = used.findIndex(o => o.id === 'scroll')
+  used.splice(at + 1, 0, { id: 'openscroll', name: 'Unrolled scroll', shapes: unrolledScroll(want.x, want.y).map(sh => ({ ...sh, n: placed(sh.n, want, 0, 0, SCALE) })) })
+  data.options.heldUsed = used
 }
 
 export const itemSpec = (side: 'L' | 'R'): PartSpec => ({
@@ -135,9 +135,12 @@ export function itemParts(c: ModelContent, left: PartResult, right: PartResult):
     shapes: [...left.shapes, ...right.shapes], objects: [left.object, right.object], groups: [l.group, r.group], ranges: [l.range, r.range], grips: [l.grip, r.grip],
     presets: [
       preset('pose_down', 'Arms down', {}),
-      preset('pose_left_up', 'Left hand up', { shoulder: UP.shoulder, elbow: UP.elbow, armDepth: UP.armDepth, holdL: HOLD_ANGLE }),
-      preset('pose_right_up', 'Right hand up', { shoulderR: UP.shoulder, elbowR: UP.elbow, armDepthR: UP.armDepth, holdR: -HOLD_ANGLE }),
-      preset('pose_both_up', 'Both hands up', { shoulder: UP.shoulder, elbow: UP.elbow, armDepth: UP.armDepth, holdL: HOLD_ANGLE, shoulderR: UP.shoulder, elbowR: UP.elbow, armDepthR: UP.armDepth, holdR: -HOLD_ANGLE }),
+      preset('pose_left_up', 'Left hand up', { shoulder: UP.shoulder, elbow: UP.elbow, armDepth: UP.armDepth, holdL: HOLD_ANGLE, ...handPose('Grip', 'L') }),
+      preset('pose_right_up', 'Right hand up', { shoulderR: UP.shoulder, elbowR: UP.elbow, armDepthR: UP.armDepth, holdR: -HOLD_ANGLE, ...handPose('Grip', 'R') }),
+      preset('pose_both_up', 'Both hands up', {
+        shoulder: UP.shoulder, elbow: UP.elbow, armDepth: UP.armDepth, holdL: HOLD_ANGLE, ...handPose('Grip', 'L'),
+        shoulderR: UP.shoulder, elbowR: UP.elbow, armDepthR: UP.armDepth, holdR: -HOLD_ANGLE, ...handPose('Grip', 'R'),
+      }),
     ],
   }
 }

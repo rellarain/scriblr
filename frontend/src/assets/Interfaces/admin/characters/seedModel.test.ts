@@ -34,7 +34,8 @@ describe('the basic model', () => {
   })
 
   it('has a body that stands, with twins of the arms and legs and the frames of a card', () => {
-    expect(seed.groups.filter(g => g.mirrorOf).map(g => g.mirrorOf).sort()).toEqual(['armL', 'foreL', 'handL', 'legL', 'shinL', 'footL', 'toesL', 'shoulderL'].sort())
+    const digits = ['index', 'middle', 'ring', 'little', 'thumb'].flatMap(d => [`${d}L`, `${d}TipL`])
+    expect(seed.groups.filter(g => g.mirrorOf).map(g => g.mirrorOf).sort()).toEqual(['armL', 'foreL', 'handL', 'legL', 'shinL', 'footL', 'toesL', 'shoulderL', ...digits].sort())
     expect(seed.frames!.map(f => f.name)).toEqual(['Full body', 'Bust', 'Face', 'Hands', 'Feet'])
     const rest = solve(seed, defaultValues(seed), 'front')
     const drawn = Object.values(rest.shapes).filter(s => s.visible)
@@ -328,26 +329,78 @@ describe('the basic model', () => {
     expect(optionalObjects(seed).map(o => o.id)).toEqual(expect.arrayContaining(['itemL', 'itemR']))
   })
 
-  it('puts an item in the palm of its hand, and the left and the right are mirror images', () => {
+  it('puts an item in the hand across the knuckles, and the left and the right are mirror images', () => {
     for (const id of ITEMS.filter(i => i !== 'none')) {
       const l = itemBox('itemL', id), r = itemBox('itemR', id)
       expect(l.x0, `${id} in the left hand`).toBeLessThan(149); expect(l.x1, id).toBeGreaterThan(149)
-      expect(l.y0, id).toBeLessThan(211); expect(l.y1, id).toBeGreaterThan(211)
+      // it passes under the knuckles and the curled fingers (a book is held by its lower edge, a lantern by its ring)
+      expect(l.y0, id).toBeLessThan(218); expect(l.y1, id).toBeGreaterThan(213)
       expect(l.x0 + l.x1 + r.x0 + r.x1, `${id}: the two hands hold it the same, mirrored`).toBeCloseTo(400, 0)
       expect(r.y0, id).toBeCloseTo(l.y0, 0)
     }
-    // the fingers are skin over the item, in front of it
+    // the item is drawn over the palm and under the fingers and the thumb, which close round it (phase O5): no skin of its own
     const solved = solve(seed, defaultValues(seed), 'front', { forms: { 'itemL.item': 'staff' } }).shapes
-    const skin = objectOf('itemL').shapes.filter(id => seed.shapes.find(sh => sh.id === id)!.slot === 'k_skin' && solved[id].visible)
-    expect(skin).toHaveLength(1)
-    expect(solved[skin[0]].z).toBeGreaterThan(Math.max(...objectOf('itemL').shapes.filter(id => id !== skin[0] && solved[id].visible).map(id => solved[id].z)))
+    const item = objectOf('itemL').shapes.filter(id => solved[id].visible)
+    expect(item.some(id => seed.shapes.find(sh => sh.id === id)!.slot === 'k_skin')).toBe(false)
+    const zs = item.map(id => solved[id].z)
+    expect(solved.handL.z).toBeLessThan(Math.min(...zs))
+    for (const d of ['indexL', 'middleL', 'ringL', 'littleL', 'thumbL']) expect(solved[d].z, d).toBeGreaterThan(Math.max(...zs))
+  })
+
+  it('has a hand of a palm, four fingers and a thumb on each arm, each finger one shape bent over two joints (phase O5)', () => {
+    for (const d of ['index', 'middle', 'ring', 'little', 'thumb']) {
+      const shape = seed.shapes.find(sh => sh.id === `${d}L`)!
+      // the shape is in the knuckle joint's group and follows the palm at the knuckle and the end joint toward the tip
+      expect(seed.groups.find(g => g.id === `${d}L`)!.objects.flatMap(o => objectOf(o).shapes)).toEqual([`${d}L`])
+      expect(seed.groups.find(g => g.id === `${d}TipL`)!).toMatchObject({ parent: `${d}L`, objects: [] })
+      expect(shape.skin!.map(k => k.g).sort()).toEqual(['handL', `${d}TipL`].sort())
+      // the right hand's is its twin
+      expect(seed.shapes.filter(sh => sh.mirrorOf === `${d}L`)).toHaveLength(1)
+    }
+    // the deepest chain, pelvis to the tip of a finger, is the most a model may have
+    const depth = (id: string): number => { let n = 0, g = seed.groups.find(x => x.id === id); while (g) { n++; g = seed.groups.find(x => x.id === g!.parent) } return n }
+    expect(depth('indexTipL')).toBe(LIMITS.chainMax)
+    // a hand three quarters of a head long: from the wrist to the tip of the middle finger
+    const rest = solve(seed, defaultValues(seed), 'front')
+    const tip = rest.shapes.middleL.box.y + rest.shapes.middleL.box.h
+    expect((tip - rest.pivots.handL[1]) / 54).toBeCloseTo(0.75, 1)
+  })
+
+  it('poses each hand on its own with the starter poses: a fist is a row of knuckles, and the other hand stays open', () => {
+    for (const kind of ['Left hand', 'Right hand']) expect(seed.presets!.filter(p => p.kind === kind).map(p => p.name)).toEqual(['Open', 'Fist', 'Point', 'Pinch', 'Grip'])
+    const at = (kind: string, name: string) => {
+      const state = applyPreset(seed, restState(seed), seed.presets!.find(p => p.kind === kind && p.name === name)!)
+      return solve(seed, { ...defaultValues(seed), ...state.values }, 'front').shapes
+    }
+    const open = solve(seed, defaultValues(seed), 'front').shapes, fist = at('Left hand', 'Fist')
+    const twin = (id: string) => seed.shapes.find(sh => sh.mirrorOf === id)!.id
+    for (const d of ['indexL', 'middleL', 'ringL', 'littleL']) {
+      // the finger folds away from the viewer: it is drawn much shorter, from the same knuckle
+      expect(fist[d].box.h, d).toBeLessThan(open[d].box.h * 0.6)
+      expect(fist[d].box.y, d).toBeCloseTo(open[d].box.y, 0)
+      expect(fist[twin(d)].box.h, `${d} of the other hand`).toBeCloseTo(open[twin(d)].box.h, 1)
+    }
+    // pointing: the index stays out, the others fold
+    const point = at('Right hand', 'Point')
+    expect(point[twin('indexL')].box.h).toBeCloseTo(open[twin('indexL')].box.h, 0)
+    expect(point[twin('middleL')].box.h).toBeLessThan(open[twin('middleL')].box.h * 0.7)
+  })
+
+  it('draws each palm over the clothes and cuts it with the sleeves of its own arm', () => {
+    const right = seed.shapes.find(sh => sh.name === 'Palm (right)')!
+    expect(seed.shapes.find(sh => sh.id === 'handL')!.cut).toEqual(['sleeveForeL', 'jacketSleeveForeL', 'coatSleeveForeL'])
+    expect(right.cut).toEqual(['sleeveForeR', 'jacketSleeveForeR', 'coatSleeveForeR'])
+    const coat = Math.max(...objectOf('coat').shapes.map(id => seed.shapes.find(sh => sh.id === id)!.z))
+    expect(seed.shapes.find(sh => sh.id === 'handL')!.z).toBeGreaterThan(coat)
+    // the right palm is the left one's mirror image, with weights of its own on the right forearm
+    expect(right.skin!.map(k => k.g)).toEqual([seed.groups.find(g => g.mirrorOf === 'foreL')!.id])
   })
 
   it('poses each arm on its own: a slider for the left and one for the right, and the hand of the other side stays', () => {
     for (const id of ['shoulder', 'elbow', 'wrist']) expect(seed.ranges.find(r => r.id === `${id}R`), id).toBeDefined()
     expect(seed.ranges.find(r => r.id === 'shoulder')!.name).toBe('Arm raise (left)'); expect(seed.ranges.find(r => r.id === 'shoulderR')!.name).toBe('Arm raise (right)')
     const handAt = (values: Record<string, number>, id: string) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes[id].box
-    const twin = seed.shapes.find(s => s.mirrorOf === 'handL')!.id
+    const twin = seed.shapes.find(s => s.name === 'Palm (right)')!.id
     const round = (b: { x: number; y: number; w: number; h: number }) => [b.x, b.y, b.w, b.h].map(v => Math.round(v * 100) / 100)
     const rest = handAt({}, 'handL'), restR = handAt({}, twin)
     const raisedL = handAt({ shoulder: 60 }, 'handL'), rightOfThat = handAt({ shoulder: 60 }, twin)
@@ -398,7 +451,7 @@ describe('the basic model', () => {
 
   it('has a slot for the colours of an item, of a flame and a glow, of wood, of parchment and of a drink, and two grip points', () => {
     const used = new Set(objectOf('itemL').shapes.map(id => seed.shapes.find(sh => sh.id === id)!.slot))
-    for (const id of ['k_item', 'k_wood', 'k_paper', 'k_flame', 'k_wine', 'k_gem', 'k_skin', 'k_leaf', 'k_bloom']) expect(used.has(id), id).toBe(true)
+    for (const id of ['k_item', 'k_wood', 'k_paper', 'k_flame', 'k_wine', 'k_gem', 'k_leaf', 'k_bloom']) expect(used.has(id), id).toBe(true)
     expect(seed.grips!.map(g => g.group)).toEqual(['handL', seed.groups.find(g => g.mirrorOf === 'handL')!.id])
     expect(seed.slots!.length).toBeLessThanOrEqual(LIMITS.slotsWarn)
     expect(objectOf('itemL').shapes.length).toBeLessThanOrEqual(LIMITS.shapesPerObjectMax)

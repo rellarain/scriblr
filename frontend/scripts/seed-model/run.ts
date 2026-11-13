@@ -30,7 +30,7 @@ console.log(`the figure stands ${guide?.heads ?? '?'} heads tall from the crown 
 const box = (id: string) => rest.shapes[id].box
 const drawn: Record<string, number> = {
   chin: rest.pivots.head[1], elbow: rest.pivots.foreL[1], wrist: rest.pivots.handL[1], knees: rest.pivots.shinL[1], ankles: rest.pivots.footL[1],
-  crotch: Math.max(...rest.shapes.pelvis.pre.filter(q => Math.abs(q.x - 100) < 0.5).map(q => q.y)), fingertips: box('handL').y + box('handL').h, soles: box('instepL').y + box('instepL').h,
+  crotch: Math.max(...rest.shapes.pelvis.pre.filter(q => Math.abs(q.x - 100) < 0.5).map(q => q.y)), fingertips: box('middleL').y + box('middleL').h, soles: box('instepL').y + box('instepL').h,
 }
 for (const [name, want] of Object.entries(LANDMARKS)) {
   if (drawn[name] == null) continue

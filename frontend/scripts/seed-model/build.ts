@@ -8,7 +8,8 @@ import { addDepth, addRange, newRange } from '../../src/assets/Interfaces/admin/
 import { apartSlider } from '../../src/assets/Interfaces/admin/characters/engine/sidesEdit'
 import { autoSkin } from '../../src/assets/Interfaces/admin/characters/engine/skinEdit'
 import { twinIndex } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
-import { DEPTH_SLIDERS, SIDE_SLIDERS, SKIN_WEIGHTS, bodyParts, bodyRanges, bonesOf, drive, range, twinBody } from './body'
+import { breakPair } from '../../src/assets/Interfaces/admin/characters/engine/pairEdit'
+import { DEPTH_SLIDERS, HAND_SIDES, SIDE_SLIDERS, SKIN_WEIGHTS, bodyParts, bodyRanges, bonesOf, drive, handPresets, range, twinBody } from './body'
 import { CHIN_Y } from './outline'
 import { loadExact, loadMockupModel, type ExactData, type ExactShape } from './exact'
 import { buildPart, pairUp, type PartSpec } from './face'
@@ -165,12 +166,28 @@ function poseBody(c: ModelContent): ModelContent {
       drive({ kind: 'turn', group: twinLeg, atMin: 15, atMax: -15 }),
     ], { rand: [0, 0] })],
   }
-  for (const [id, other, name] of SIDE_SLIDERS) {
+  for (const [id, other, name] of [...SIDE_SLIDERS, ...HAND_SIDES]) {
     const e = apartSlider(next, id, () => other)
     if (!e.ok) throw new Error(`${id}: ${e.reason}`)
     next = { ...e.content, ranges: e.content.ranges.map(r => (r.id === id ? { ...r, name: `${name} (left)` } : r.id === other ? { ...r, name: `${name} (right)`, rand: r.rand } : r)) }
   }
   return next
+}
+
+// The palms are drawn over the clothes (a hand is in front of the coat it hangs beside) and under a held item, so the sleeves that cover the wrist cut them: each palm by the
+// sleeves of its own arm. The right palm is a twin of the left one, and a twin's cut-outs are its original's, mapped to their twins; the sleeves of the two arms are
+// separate shapes (each follows its own arm), so the right palm is made a shape of its own (its outline and skin weights are the left one's mirror image) to be cut by the
+// right sleeves.
+const SLEEVES = ['sleeveFore', 'jacketSleeveFore', 'coatSleeveFore']
+function palmsUnderSleeves(c: ModelContent): ModelContent {
+  const right = c.shapes.find(s => s.mirrorOf === 'handL')
+  if (!right) throw new Error('the right palm has no twin')
+  const e = breakPair(c, 'shape', right.id)
+  if (!e.ok) throw new Error(`right palm: ${e.reason}`)
+  return {
+    ...e.content,
+    shapes: e.content.shapes.map(s => (s.id === 'handL' ? { ...s, name: 'Palm (left)', cut: SLEEVES.map(id => `${id}L`) } : s.id === right.id ? { ...s, name: 'Palm (right)', cut: SLEEVES.map(id => `${id}R`) } : s)),
+  }
 }
 
 // The two sides are named for the character's: the original is the left (the picture's right) and its twin the right. makeTwin calls a twin "(twin)", which a writer reading the
@@ -217,6 +234,7 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
   content = twinBody(content, body, make)
   content = finishClothes(content)
   content = nameSides(content)
+  content = palmsUnderSleeves(content)
   // each arm is posed on its own, and each hand has an item of its own, in a group hung from the hand
   content = poseArmsApart(content)
   const leftItem = buildPart(data, itemSpec('L'), TOLERANCE)
@@ -227,6 +245,7 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
     ranges: [...content.ranges, ...items.ranges], presets: [...(content.presets ?? []), ...items.presets], grips: items.grips,
   }
   content = poseBody(content)
-  content = { ...content, frames: framesOf(content) }
+  // the starter hand poses for each hand, once each hand has its own sliders
+  content = { ...content, presets: [...(content.presets ?? []), ...handPresets()], frames: framesOf(content) }
   return { content, report }
 }

@@ -1,8 +1,9 @@
 // The body of the seed model (phase O4b): a realistic adult seven and a half heads tall. Only the head, the face and the hair follow the old portrait; the body is drawn from
-// anatomy (an artist's mannequin): a smooth outline of skin for each segment (neck, chest, pelvis, arm, hand, leg, foot, toes) whose points near a joint follow both segments
+// anatomy (an artist's mannequin): a smooth outline of skin for each segment (neck, chest, pelvis, arm, palm, each finger, leg, foot, toes) whose points near a joint follow both segments
 // (skin weights, given in build.ts with the engine's Auto), joints as on an anatomical mannequin (pelvis, waist, chest, neck, head, collarbone, shoulder, elbow, wrist, hip,
 // knee, ankle, toes), one-light shading that follows the skin, the sliders, and the bones. The left side is built and then given a twin.
-import type { ModelBind, ModelBone, ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelPointMode, ModelRange, ModelShape } from '../../src/api/types'
+import type { ModelBind, ModelBone, ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelPointMode, ModelPreset, ModelRange, ModelShape } from '../../src/api/types'
+import { HAND_POSES, digitOutline, type DigitSpec, type HandRole } from '../../src/assets/Interfaces/admin/characters/engine/hands'
 import { symmetric } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
 import { makeTwin } from '../../src/assets/Interfaces/admin/characters/engine/pairEdit'
 import type { MakeId } from '../../src/assets/Interfaces/admin/characters/modelContent'
@@ -88,16 +89,87 @@ export const JOINTS = {
   shoulder: [139, 71], elbow: [146, 144.5], wrist: [149.5, 192.5], hip: [119.5, 181], knee: [113, 285], ankle: [111.5, 376], ball: [112.5, 385],
 } satisfies Record<string, [number, number]>
 
-// The hand stays the mockup's mitten (five fingers come in phase O5), moved to the new wrist and made a hand three quarters of a head long.
-function handFrom(mock: any, id: string, z: number): ModelShape {
-  const s = mock.shapes[id]
-  if (!s) throw new Error(`the mockup has no shape ${id}`)
-  const kx = 1.15, ky = 1.27, [wx, wy] = JOINTS.wrist
-  const pts: ModelPoint[] = s.pts.map((p: any) => ({
-    x: r2(wx + (p.x - 148.8) * kx), y: r2(wy + (p.y - 198) * ky), m: p.m,
-    hi: p.hi ? [r2(p.hi[0] * kx), r2(p.hi[1] * ky)] : null, ho: p.ho ? [r2(p.ho[0] * kx), r2(p.ho[1] * ky)] : null,
-  }))
-  return skin(id, s.name, z, pts)
+// ---- the hands (phase O5) ----
+
+// A hand three quarters of a head long (from the wrist at 3.8 heads to the tip of the middle finger at 4.55), seen from the back with the thumb toward the body: a palm a
+// little wider at the knuckles than at the wrist, four fingers and a thumb. Each finger and the thumb is ONE smooth shape bent over two joints, as the engine's hand tools
+// build them (engine/hands.ts, digitOutline): a joint group at the knuckle holds it and a second one at the middle joint bends its end, and its points follow the palm
+// near the knuckle and the end joint toward the tip (HAND_WEIGHTS). The palm is drawn over the clothes and under a held item, the fingers and the thumb over the item (they
+// close round it); the sleeves cut the palm where they cover the wrist (build.ts, palmsUnderSleeves).
+const PALM: XY[] = [
+  [144, 188.5, 's'], [155, 188.5, 's'], [156.6, 196], [158, 203.5], [158, 209.5], [157, 213.8],
+  [153.5, 215.6], [149.5, 216], [145.5, 215.6], [141.8, 214], [140.6, 208.5], [140.6, 202.5], [142.6, 196],
+]
+export const PALM_Z = 55.5
+export const DIGIT_Z = 56.5
+export interface Digit { id: string; name: string; role: HandRole; spec: DigitSpec; spread: number }
+// across the knuckles from the thumb side (index) to the little finger; each finger's knuckle a little inside the palm's lower edge
+export const FINGERS: Digit[] = [
+  { id: 'index', name: 'Index finger', role: 'curl-index', spec: { cx: 143.5, base: 214.2, length: 16.8, width: 4.1 }, spread: 14 },
+  { id: 'middle', name: 'Middle finger', role: 'curl-middle', spec: { cx: 147.6, base: 215.2, length: 17.6, width: 4.2 }, spread: 5 },
+  { id: 'ring', name: 'Ring finger', role: 'curl-ring', spec: { cx: 151.7, base: 215, length: 16.6, width: 3.9 }, spread: -5 },
+  { id: 'little', name: 'Little finger', role: 'curl-little', spec: { cx: 155.3, base: 213.4, length: 13.4, width: 3.4 }, spread: -14 },
+]
+// on the palm's inner edge, leaning a little away from it as a thumb at rest does
+export const THUMB: Digit = { id: 'thumb', name: 'Thumb', role: 'curl-thumb', spec: { cx: 141.2, base: 201.5, length: 19.5, width: 5, lean: 15, overlap: 2.6, roundTop: true }, spread: 0 }
+const DIGITS = [...FINGERS, THUMB]
+const tipGroup = (id: string): string => `${id}TipL`
+
+function handParts(): { shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[] } {
+  const shapes: ModelShape[] = [skin('handL', 'Palm', PALM_Z, list(PALM))]
+  const objects: ModelObject[] = []
+  const groups: ModelGroup[] = []
+  for (const g of DIGITS) {
+    const { pts, joint } = digitOutline(g.spec)
+    shapes.push(skin(`${g.id}L`, g.name, DIGIT_Z, pts))
+    objects.push(obj(g.id, g.name, [`${g.id}L`]))
+    groups.push(grp(`${g.id}L`, g.name, 'handL', [g.id], [g.spec.cx, g.spec.base]), grp(tipGroup(g.id), `${g.name} tip`, `${g.id}L`, [], joint))
+  }
+  return { shapes, objects, groups }
+}
+
+// How far a finger's points follow the palm at the knuckle and its end joint toward the tip (the engine's Auto over a little more than its width), and the palm the forearm.
+export const HAND_WEIGHTS: Array<[shape: string, group: string, reach: number]> = [
+  ['handL', 'foreL', 4],
+  ...DIGITS.flatMap((g): Array<[string, string, number]> => [[`${g.id}L`, 'handL', r2(g.spec.width * 0.6)], [`${g.id}L`, tipGroup(g.id), r2(g.spec.width * 0.6)]]),
+]
+
+// The hand sliders (left hand), each with the role the starter poses look for: a Curl for each finger and the thumb, the thumb's Swing and Across, and the fingers'
+// Spread. Each is posed for each hand once the twins are made (HAND_SIDES). The hand is seen from its back, so a finger curling toward the palm folds AWAY from the
+// viewer: its Curl turns both of its segments away (Depth drives on the finger's two bones: the segment is drawn shorter and a little wider, the end segment folds
+// almost out of sight behind the knuckle), with a small turn toward the thumb, so a fist is a row of knuckles and a grip closes over what the hand holds. The thumb lies
+// across the palm's edge and curls sideways.
+const CURL_DEPTH: [knuckle: number, tip: number] = [62, 72]
+function handRanges(): ModelRange[] {
+  const curl = (g: Digit, id: string): ModelRange => range(id, `${g.name} curl`, `${g.id}L`, 0, 0, 100, '%', [
+    turn(`${g.id}L`, 0, 6), drive({ kind: 'depth', id: `b_${g.id}L`, atMin: 0, atMax: CURL_DEPTH[0] }), drive({ kind: 'depth', id: `b_${g.id}TipL`, atMin: 0, atMax: CURL_DEPTH[1] }),
+  ], { ...STILL, role: g.role })
+  return [
+    ...FINGERS.map(g => curl(g, `curl${g.id[0].toUpperCase()}${g.id.slice(1)}`)),
+    range('curlThumb', 'Thumb curl', 'thumbL', 0, 0, 100, '%', [turn('thumbL', 0, -20), turn(tipGroup('thumb'), 0, -70)], { ...STILL, role: 'curl-thumb' }),
+    range('swingThumb', 'Thumb swing', 'thumbL', -20, 0, 40, '°', [turn('thumbL', -20, 40)], { ...STILL, role: 'swing-thumb' }),
+    range('acrossThumb', 'Thumb across', 'thumbL', 0, 0, 100, '%', [turn('thumbL', 0, -45), turn(tipGroup('thumb'), 0, -15)], { ...STILL, role: 'oppose-thumb' }),
+    range('spread', 'Finger spread', 'handL', 0, 0, 100, '%', FINGERS.map(g => turn(`${g.id}L`, 0, g.spread)), { ...STILL, role: 'spread' }),
+  ]
+}
+export const HAND_SIDES: Array<[string, string, string]> = [
+  ...FINGERS.map((g): [string, string, string] => { const id = `curl${g.id[0].toUpperCase()}${g.id.slice(1)}`; return [id, `${id}R`, `${g.name} curl`] }),
+  ['curlThumb', 'curlThumbR', 'Thumb curl'], ['swingThumb', 'swingThumbR', 'Thumb swing'], ['acrossThumb', 'acrossThumbR', 'Thumb across'], ['spread', 'spreadR', 'Finger spread'],
+]
+const ROLE_SLIDER: Record<HandRole, string> = {
+  'curl-index': 'curlIndex', 'curl-middle': 'curlMiddle', 'curl-ring': 'curlRing', 'curl-little': 'curlLittle', 'curl-thumb': 'curlThumb', 'swing-thumb': 'swingThumb', 'oppose-thumb': 'acrossThumb', spread: 'spread',
+}
+// The values of a starter hand pose (engine/hands.ts HAND_POSES: Open, Fist, Point, Pinch, Grip) for one hand.
+export function handPose(name: string, side: 'L' | 'R'): Record<string, number> {
+  const pose = HAND_POSES.find(p => p.name === name)
+  if (!pose) throw new Error(`there is no hand pose ${name}`)
+  return Object.fromEntries(Object.entries(pose.values).filter(([, v]) => v).map(([role, v]) => [`${ROLE_SLIDER[role as HandRole]}${side === 'R' ? 'R' : ''}`, v!]))
+}
+// The starter hand poses as presets, a kind for each hand (a hand takes a pose on its own).
+export function handPresets(): ModelPreset[] {
+  return (['L', 'R'] as const).flatMap(side => HAND_POSES.map((p): ModelPreset => ({
+    id: `hand${side}_${p.name.toLowerCase()}`, name: p.name, kind: side === 'L' ? 'Left hand' : 'Right hand', values: handPose(p.name, side), hidden: [],
+  })))
 }
 
 // The one-light shading of the skin (light from the upper left): under the jaw and the far side of the neck, the far side of the torso (one shadow down the chest and the pelvis),
@@ -127,16 +199,18 @@ export interface Body { shapes: ModelShape[]; objects: ModelObject[]; groups: Mo
 export function bodyParts(mock: any): Body {
   const skins: ModelShape[] = [
     skin('neck', 'Neck', 21.5, NECK), skin('chest', 'Chest', 22, sym(CHEST_HALF)), skin('pelvis', 'Pelvis', 21, sym(PELVIS_HALF)),
-    skin('uarmL', 'Arm', 31.2, list(ARM)), handFrom(mock, 'handL', 31.25), handFrom(mock, 'thumbL', 31.26),
+    skin('uarmL', 'Arm', 31.2, list(ARM)),
     skin('legL', 'Leg', 20, list(LEG)), skin('instepL', 'Foot', 20.5, list(FOOT)), skin('toesL', 'Toes', 20.6, list(TOES)),
   ]
-  const shapes = [...skins, ...shading(skins)]
+  const hand = handParts()
+  const shapes = [...skins, ...shading(skins), ...hand.shapes]
   const objects: ModelObject[] = [
     obj('neck', 'Neck', ['neck', 'neckShade', 'neckSide']),
     obj('chest', 'Chest', ['chest', 'torsoShade']),
     obj('pelvis', 'Pelvis', ['pelvis']),
     obj('uarm', 'Arm', ['uarmL', 'armShadeL']),
-    obj('hand', 'Hand', ['handL', 'thumbL']),
+    obj('hand', 'Hand', ['handL']),
+    ...hand.objects,
     obj('leg', 'Leg', ['legL', 'legShadeL']),
     obj('foot', 'Foot', ['instepL']),
     obj('toes', 'Toes', ['toesL']),
@@ -151,6 +225,7 @@ export function bodyParts(mock: any): Body {
     grp('armL', 'Upper arm', 'shoulderL', ['uarm'], J.shoulder),
     grp('foreL', 'Forearm', 'armL', [], J.elbow),
     grp('handL', 'Hand', 'foreL', ['hand'], J.wrist),
+    ...hand.groups,
     grp('legL', 'Thigh', 'torso', ['leg'], J.hip),
     grp('shinL', 'Shin', 'legL', [], J.knee),
     grp('footL', 'Foot', 'shinL', ['foot'], J.ankle),
@@ -167,17 +242,18 @@ export const SKIN_WEIGHTS: Array<[shape: string, group: string, reach: number]> 
   ['chest', 'waistJ', 10],
   ['pelvis', 'waistJ', 10],
   ['uarmL', 'shoulderL', 7], ['uarmL', 'foreL', 9],
-  ['handL', 'foreL', 4], ['thumbL', 'foreL', 4],
+  ...HAND_WEIGHTS,
   ['legL', 'torso', 9], ['legL', 'shinL', 11],
   ['instepL', 'shinL', 4],
 ]
 
-// The bones: the head (the unit of the head-units guide), the neck, and each segment of the left arm and leg (the Depth sliders turn them toward the viewer).
+// The bones: the head (the unit of the head-units guide), the neck, each segment of the left arm and leg (the Depth sliders turn them toward the viewer), and the two
+// segments of each finger (their Curl folds them away from the viewer).
 export function bonesOf(c: ModelContent): ModelBone[] {
   const skull = c.shapes.find(s => s.id === 'skull')!
   const crown = skull.pts.reduce((best, p, i) => (p.y < skull.pts[best].y ? i : best), 0)
-  const hand = c.shapes.find(s => s.id === 'handL')!
-  const tip = hand.pts.reduce((best, p, i) => (p.y > hand.pts[best].y ? i : best), 0)
+  const middle = c.shapes.find(s => s.id === 'middleL')!
+  const tip = middle.pts.reduce((best, p, i) => (p.y > middle.pts[best].y ? i : best), 0)
   const toes = c.shapes.find(s => s.id === 'toesL')!
   const front = toes.pts.reduce((best, p, i) => (p.y > toes.pts[best].y ? i : best), 0)
   const toGroup = (id: string) => ({ kind: 'group' as const, id, i: 0 })
@@ -186,10 +262,18 @@ export function bonesOf(c: ModelContent): ModelBone[] {
     { id: 'b_neck', name: 'Neck', start: 'neckJ', end: toGroup('head') },
     { id: 'b_arm', name: 'Upper arm', start: 'armL', end: toGroup('foreL') },
     { id: 'b_fore', name: 'Forearm', start: 'foreL', end: toGroup('handL') },
-    { id: 'b_hand', name: 'Hand', start: 'handL', end: { kind: 'point', id: 'handL', i: tip } },
+    { id: 'b_hand', name: 'Hand', start: 'handL', end: { kind: 'point', id: 'middleL', i: tip } },
     { id: 'b_thigh', name: 'Thigh', start: 'legL', end: toGroup('shinL') },
     { id: 'b_shin', name: 'Shin', start: 'shinL', end: toGroup('footL') },
     { id: 'b_foot', name: 'Foot', start: 'footL', end: { kind: 'point', id: 'toesL', i: front } },
+    ...FINGERS.flatMap((g): ModelBone[] => {
+      const sh = c.shapes.find(s => s.id === `${g.id}L`)!
+      const end = sh.pts.reduce((best, p, i) => (p.y > sh.pts[best].y ? i : best), 0)
+      return [
+        { id: `b_${g.id}L`, name: g.name, start: `${g.id}L`, end: toGroup(tipGroup(g.id)) },
+        { id: `b_${g.id}TipL`, name: `${g.name} tip`, start: tipGroup(g.id), end: { kind: 'point', id: `${g.id}L`, i: end } },
+      ]
+    }),
   ]
 }
 
@@ -257,6 +341,7 @@ export function bodyRanges(): ModelRange[] {
   out.push(range('knee', 'Knee bend', 'shinL', -130, 0, 130, '°', [turn('shinL', 130, -130)], STILL))
   out.push(range('ankle', 'Ankle tilt', 'footL', -20, 0, 20, '°', [turn('footL', 20, -20)], STILL))
   out.push(range('legLength', 'Leg length', 'legL', 60, 100, 115, '%', [drive({ kind: 'scale', target: 'group', id: 'legL', axis: 'y', atMin: 60, atMax: 115 })]))
+  out.push(...handRanges())
   return out
 }
 

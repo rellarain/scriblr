@@ -55,27 +55,30 @@ async function toHands(user: User) {
 }
 
 describe('the Hands section', () => {
-  it('builds a whole hand: fifteen groups and eight sliders, saved with the model', async () => {
+  it('builds a whole hand: eleven groups and eight sliders, saved with the model', async () => {
     const { backend, user } = await open(armed(false))
     await toHands(user)
     const section = screen.getByRole('region', { name: 'Hands and fingers' })
     await user.click(within(section).getByRole('button', { name: /Add a whole hand/ }))
     await save(user)
     const d = draft(backend)
-    expect(d.groups.length).toBe(3 + 15)
+    // a palm, and for each finger and the thumb two joints that bend one shape
+    expect(d.groups.length).toBe(3 + 11)
+    expect(d.shapes.length).toBe(3 + 6)
     expect(d.ranges.filter(r => r.role).map(r => r.role).sort()).toEqual(['curl-index', 'curl-little', 'curl-middle', 'curl-ring', 'curl-thumb', 'oppose-thumb', 'spread', 'swing-thumb'])
     expect(d.groups.find(g => g.name === 'Hand')).toMatchObject({ parent: 'gFore' })
   })
 
-  it('adds a finger of three joints or two, with its Curl slider', async () => {
+  it('adds a finger, one shape bent over two joints, with its Curl slider', async () => {
     const { backend, user } = await open(armed(false))
     await toHands(user)
     await user.click(button(/^Add a finger$/))
-    await user.click(button(/^Add a short finger$/))
     await save(user)
     const d = draft(backend)
-    expect(d.groups.length).toBe(3 + 3 + 2)
-    expect(d.ranges.filter(r => r.name === 'Finger curl').map(r => r.drives.length).sort()).toEqual([2, 3])
+    expect(d.groups.length).toBe(3 + 2)
+    expect(d.shapes.length).toBe(3 + 1)
+    expect(d.shapes[3].skin!.map(k => k.g)).toHaveLength(2)
+    expect(d.ranges.filter(r => r.name === 'Finger curl').map(r => r.drives.length)).toEqual([2])
   })
 
   it('adds a thumb with Swing, Curl and Across', async () => {
@@ -128,7 +131,7 @@ describe('the previews of a hand', () => {
     await user.click(button(/Add a whole hand/))
     await pick(user, 'Hand', 'group')      // the group of the hand
     await openDrawer(user)
-    expect(screen.getByRole('img', { name: 'Preview 1' }).querySelectorAll('path[data-shape], path').length).toBeGreaterThanOrEqual(15)
+    expect(screen.getByRole('img', { name: 'Preview 1' }).querySelectorAll('path[data-shape], path').length).toBeGreaterThanOrEqual(6)
   })
 })
 

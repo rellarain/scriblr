@@ -585,7 +585,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // ---- hands (phase 5c) ----
 
   const hands: HandActions = {
-    addFinger: (groupId, joints) => { applyEdit(addFinger(content, groupId, { joints, role: null }, makeId)) },
+    addFinger: groupId => { applyEdit(addFinger(content, groupId, { role: null }, makeId)) },
     addThumb: groupId => { applyEdit(addThumb(content, groupId, {}, makeId)) },
     addHand: groupId => { applyEdit(addHand(content, groupId, {}, makeId)) },
     apartHand: groupId => { applyEdit(apartHand(content, groupId, makeId)) },

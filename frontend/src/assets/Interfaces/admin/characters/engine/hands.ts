@@ -1,4 +1,4 @@
-import type { ModelAttach, ModelContent, ModelGrip, ModelPreset, ModelRange } from '../../../../../api/types'
+import type { ModelAttach, ModelContent, ModelGrip, ModelPoint, ModelPreset, ModelRange } from '../../../../../api/types'
 import { KIND_MAX, NAME_MAX, addGroup, addObject, addShape, freshId, groupById, newGroup, randomId, shapeById, type MakeId } from '../modelContent'
 import { apply, clamp, r2, type Box } from './geometry'
 import { bakedPaint } from './colour'
@@ -7,18 +7,21 @@ import { freshFormId } from './formEdit'
 import { LIMITS } from './limits'
 import { makeTwin } from './pairEdit'
 import { chainDepth, descendantsOf, solveAtRest, type Solved } from './rig'
-import { addRange, addTurn, attachFromClick, attachGroup, done, fail, newRange, reparent, type Edit } from './rigEdit'
+import { addRange, addTurn, attachFromClick, attachGroup, done, fail, newRange, reparent, setPivot, type Edit } from './rigEdit'
 import { apartSlider, isApart, twinGroupOf } from './sidesEdit'
+import { autoSkin } from './skinEdit'
 
-// Hands (phase 5c): fingers and thumbs built as chains of small groups, the sliders that bend them, the starter hand poses and the grip points where a held item
-// is taken. Everything here is the same data the rest of the designer edits (groups, objects, shapes, sliders with Turn drives, presets), so a hand built by these
+// Hands (phase 5c, rebuilt in phase O5): fingers and thumbs, the sliders that bend them, the starter hand poses and the grip points where a held item is taken.
+// Everything here is the same data the rest of the designer edits (groups, objects, shapes, skin weights, sliders with Turn drives, presets), so a hand built by these
 // tools can be reshaped, re-posed and re-wired by hand afterwards.
 //
-// A finger is a chain of joint groups, each a vertical shape hung from the bottom of the one before it; its Curl slider turns every joint toward the thumb side
-// (the front view cannot show a finger folding toward the viewer, so a curl is a sideways bend). A hand is a palm with four fingers and a thumb; the thumb hangs
-// from the palm's side edge and has Swing, Curl and Across sliders. A slider carries a role (`curl-index`, `spread`...) so the starter poses can find it; the
-// slider that poses the other hand's side has the same role with `~` added. When the arm has a twin, the hand is copied to the twin side and the sliders are
-// made apart (the two hands are posed on their own).
+// A finger is ONE smooth shape bent over two joints: a joint group hung from the palm at the knuckle holds it, a second joint group hung from that one at the middle
+// joint holds nothing, and the shape's points follow the palm near the knuckle and the second joint toward the tip (skin weights, given with Auto across each joint),
+// so a curled finger bends like skin instead of breaking into pieces. Two joints keep the deepest chain of a body (pelvis, waist, chest, collarbone, upper arm,
+// forearm, hand, two finger joints) within the limit of nine. Its Curl slider turns both joints toward the thumb side (the front view cannot show a finger folding
+// toward the viewer, so a curl is a sideways bend). A hand is a palm with four fingers and a thumb; the thumb hangs from the palm's side edge, is built like a finger and
+// has Swing, Curl and Across sliders. A slider carries a role (`curl-index`, `spread`...) so the starter poses can find it; the slider that poses the other hand's side
+// has the same role with `~` added. When the arm has a twin, the hand is copied to the twin side and the sliders are made apart (the two hands are posed on their own).
 
 export const HAND_ROLES = ['curl-index', 'curl-middle', 'curl-ring', 'curl-little', 'curl-thumb', 'spread', 'swing-thumb', 'oppose-thumb'] as const
 export type HandRole = (typeof HAND_ROLES)[number]
@@ -31,9 +34,8 @@ const FINGERS: Array<{ name: string; role: HandRole; length: number; spread: num
   { name: 'Ring finger', role: 'curl-ring', length: 0.97, spread: -5 },
   { name: 'Little finger', role: 'curl-little', length: 0.8, spread: -14 },
 ]
-const SEGMENTS: Record<2 | 3, number[]> = { 2: [0.55, 0.45], 3: [0.45, 0.3, 0.25] }
-// degrees each joint of a finger turns at full curl (the last joints close further, as a real finger does)
-const CURL: Record<2 | 3, number[]> = { 2: [80, 80], 3: [75, 85, 60] }
+// degrees each joint of a finger turns at full curl: the knuckle, then the middle joint (which stands for the two joints of a real finger's end)
+const CURL = [80, 80]
 
 const cut =(name: string) => name.trim().slice(0, NAME_MAX)
 
@@ -83,6 +85,76 @@ function addPart(c: ModelContent, make: MakeId, o: { name: string; parent: strin
 
 const insideBottom = (shape: string, rx = 0.5): ModelAttach => ({ shape, kind: 'inside', i: 0, t: 0, slider: null, rx, ry: 1 })
 
+// ---- one finger or thumb: one shape over two joints ----
+
+export interface DigitSpec {
+  cx: number           // the middle of the knuckle, across
+  base: number         // the knuckle, down (the first joint's pivot)
+  length: number       // from the knuckle to the tip
+  width: number        // at the knuckle
+  overlap?: number     // how far the flat top reaches back into the palm (it is hidden under the same skin): a little more than half the width by default
+  lean?: number        // degrees the whole digit is turned about its knuckle, positive toward the picture's left (as a turn drive turns); 0 hangs straight down
+  joint?: number       // where the middle joint is, as a share of the length (0.55)
+  roundTop?: boolean   // a round top instead of a flat one, for a digit whose top shows beside the palm (a thumb's base, the mound under it)
+}
+
+const turnAbout = (cx: number, cy: number, deg: number) => {
+  const a = (deg * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a)
+  return (x: number, y: number): [number, number] => [r2(cx + (x - cx) * cos - (y - cy) * sin), r2(cy + (x - cx) * sin + (y - cy) * cos)]
+}
+
+// A finger or a thumb as one smooth outline hanging from its knuckle: a flat top hidden inside the palm (or a round one), sides that narrow a little past the middle joint and toward
+// the tip, and a round tip; and where its middle joint is (the second joint group's pivot). Two points sit either side of the middle joint, so the outline bends
+// smoothly there.
+export function digitOutline(d: DigitSpec): { pts: ModelPoint[]; joint: [number, number] } {
+  const w = clamp(Number.isFinite(d.width) ? d.width : 4, 1, 40), L = clamp(Number.isFinite(d.length) ? d.length : 16, 2, 160)
+  const top = d.base - clamp(d.overlap ?? w * 0.6, 0, L), jy = d.base + L * clamp(d.joint ?? 0.55, 0.2, 0.8), tip = d.base + L
+  const turn = turnAbout(d.cx, d.base, Number.isFinite(d.lean) ? d.lean! : 0)
+  const side: Array<[number, number]> = [[0.5, top], [0.5, d.base + L * 0.15], [0.47, jy - L * 0.12], [0.45, jy + L * 0.12], [0.41, tip - w * 0.45]]
+  const point = (x: number, y: number, m: ModelPoint['m']): ModelPoint => { const [px, py] = turn(x, y); return { x: px, y: py, m, hi: null, ho: null } }
+  const corner: ModelPoint['m'] = d.roundTop ? 'c' : 's'
+  const pts: ModelPoint[] = [
+    ...side.map(([k, y], i) => point(d.cx + k * w, y, i === 0 ? corner : 'c')),
+    point(d.cx, tip, 'c'),
+    ...[...side].reverse().map(([k, y], i, all) => point(d.cx - k * w, y, i === all.length - 1 ? corner : 'c')),
+    ...(d.roundTop ? [point(d.cx, top - w * 0.3, 'c')] : []),
+  ]
+  return { pts, joint: turn(d.cx, jy) }
+}
+
+interface Digit { c: ModelContent; joints: [string, string]; shapeId: string }
+// One finger or thumb: a joint group hung from the palm's group at the knuckle (by `attach`, or at the knuckle as a plain pivot), a second joint group hung from it
+// at the middle joint (it holds nothing), and one shape in the first whose base follows the palm and whose tip follows the second joint (Auto across each joint).
+// The shape is painted as the palm is (a finger is skin like the hand it is on).
+function addDigit(c: ModelContent, make: MakeId, o: { name: string; parent: string; attach: ModelAttach | null; spec: DigitSpec; z: number; paintFrom: string }): Digit | string {
+  if (c.groups.length + 2 > LIMITS.groupsMax) return `A model may have at most ${LIMITS.groupsMax} groups.`
+  if (c.objects.length >= LIMITS.objectsMax) return `A model may have at most ${LIMITS.objectsMax} objects.`
+  if (c.shapes.length >= LIMITS.shapesMax) return `A model may have at most ${LIMITS.shapesMax} shapes.`
+  const name = cut(o.name) || 'Finger'
+  const g1 = freshId(c, 'g', make)
+  let next = addGroup(c, newGroup(g1, name, o.parent))
+  if (o.attach) {
+    const hung = attachGroup(next, g1, o.attach)
+    if (!hung.ok) return hung.reason
+    next = hung.content
+  } else next = setPivot(next, g1, o.spec.cx, o.spec.base)
+  const oid = freshId(next, 'o', make)
+  next = addObject(next, g1, { id: oid, name, layer: 'body', shapes: [] })
+  const sid = freshId(next, 's', make)
+  const from = shapeById(c, o.paintFrom), paint = from ? bakedPaint(c, from) : null
+  const { pts, joint } = digitOutline(o.spec)
+  next = addShape(next, oid, { id: sid, name, closed: true, z: o.z, op: 1, view: 'both', pts, half: 0, template: null, slot: paint?.slot ?? null, gray: paint?.gray ?? null })
+  const g2 = freshId(next, 'g', make)
+  next = setPivot(addGroup(next, newGroup(g2, cut(`${name} tip`), g1)), g2, ...joint)
+  const reach = clamp(o.spec.width * 0.6, 1, 10)
+  for (const partner of [o.parent, g2]) {
+    const e = autoSkin(next, sid, partner, reach)
+    if (!e.ok) return e.reason
+    next = e.content
+  }
+  return { c: next, joints: [g1, g2], shapeId: sid }
+}
+
 // The turn drives of a slider set to these amounts at its maximum (and nothing at its minimum): the slider must already exist.
 function setTurns(c: ModelContent, rangeId: string, turns: Array<[string, number]>, atMin: number[] = []): Edit {
   let next = c
@@ -108,51 +180,43 @@ function addSlider(c: ModelContent, make: MakeId, o: { name: string; role: HandR
 
 // ---- a finger ----
 
-export interface FingerOptions { name?: string; joints?: 2 | 3; width?: number; length?: number; at?: number; role?: HandRole | null; curlSign?: 1 | -1 }
-export interface FingerMade { joints: string[]; rangeId: string }
+export interface FingerOptions { name?: string; width?: number; length?: number; at?: number; role?: HandRole | null; curlSign?: 1 | -1 }
+export interface FingerMade { joints: string[]; shapeId: string; rangeId: string }
 
-// Hang a finger of two or three joints from the bottom of the lowest shape of a group (at a place along that shape's bottom, 0 to 1), with a Curl slider that
-// turns every joint toward `curlSign` (1: toward the picture's left).
+// Hang a finger from the bottom of the lowest shape of a group (at a place along that shape's bottom, 0 to 1): one shape over two joints, with a Curl slider that
+// turns both joints toward `curlSign` (1: toward the picture's left).
 export function addFinger(c: ModelContent, parentGroupId: string, opts: FingerOptions = {}, make: MakeId = randomId): Edit & { finger?: FingerMade } {
   const parent = groupById(c, parentGroupId)
   if (!parent) return fail('There is no such group.')
   if (parent.mirrorOf) return fail('A twin follows its original: build the finger on the original group, and the twin gets a copy.')
-  const joints = opts.joints ?? 3
-  if (chainDepth(c, parentGroupId) + joints > LIMITS.chainMax) return fail(`That would make a pivot chain ${chainDepth(c, parentGroupId) + joints} groups long; the most is ${LIMITS.chainMax}.`)
+  if (chainDepth(c, parentGroupId) + 2 > LIMITS.chainMax) return fail(`That would make a pivot chain ${chainDepth(c, parentGroupId) + 2} groups long; the most is ${LIMITS.chainMax}.`)
   if (c.ranges.length >= LIMITS.rangesMax) return fail(`A model may have at most ${LIMITS.rangesMax} sliders.`)
   const rest = solveAtRest(c), base = lowestShape(c, rest, parentGroupId)
   if (!base) return fail('Draw an outline in this group first: the finger hangs from the bottom of its lowest shape.')
   const width = clamp(opts.width ?? base.box.w * 0.22, 2, 20), length = clamp(opts.length ?? width * 4.2, 6, 120)
   const at = clamp(opts.at ?? 0.5, 0, 1), name = cut(opts.name ?? 'Finger') || 'Finger'
-  const cx = base.box.x + base.box.w * at
-  let next = c, from = base.id, y = base.box.y + base.box.h, rx = at
-  const made: string[] = []
-  for (const [k, frac] of SEGMENTS[joints].entries()) {
-    const h = length * frac
-    const part = addPart(next, make, {
-      name: k === 0 ? name : `${name} ${k + 1}`, parent: k === 0 ? parentGroupId : made[k - 1], template: k === joints - 1 ? 'rounded' : 'rectangle',
-      box: { x: cx - width / 2, y, w: width, h }, attach: insideBottom(from, rx),
-    })
-    if (typeof part === 'string') return fail(part)
-    next = part.c; made.push(part.groupId); from = part.shapeId; y += h; rx = 0.5
-  }
+  const cx = base.box.x + base.box.w * at, knuckle = base.box.y + base.box.h
+  // drawn just over the palm, so the knuckle is one skin
+  const z = (shapeById(c, base.id)?.z ?? 40) + 0.02
+  const digit = addDigit(c, make, { name, parent: parentGroupId, attach: insideBottom(base.id, at), spec: { cx, base: knuckle, length, width }, z, paintFrom: base.id })
+  if (typeof digit === 'string') return fail(digit)
   const sign = opts.curlSign ?? 1
   // a finger with no role keeps none: the starter poses only look for the fingers of a hand
-  const slider = addSlider(next, make, {
-    name: `${name} curl`, role: opts.role ?? null, scope: made[0], min: 0, max: 100, unit: '%',
-    turns: made.map((g, k): [string, number] => [g, sign * CURL[joints][k]]),
+  const slider = addSlider(digit.c, make, {
+    name: `${name} curl`, role: opts.role ?? null, scope: digit.joints[0], min: 0, max: 100, unit: '%',
+    turns: digit.joints.map((g, k): [string, number] => [g, sign * CURL[k]]),
   })
   if (!slider.ok) return slider
-  return { ...done(slider.content), finger: { joints: made, rangeId: slider.rangeId! } }
+  return { ...done(slider.content), finger: { joints: digit.joints, shapeId: digit.shapeId, rangeId: slider.rangeId! } }
 }
 
 // ---- a thumb ----
 
 export interface ThumbOptions { side?: ThumbSide; width?: number; length?: number; at?: number }
 
-// Hang a thumb from the side edge of the lowest shape of a group (the palm): two joints, and the Swing, Curl and Across sliders. Its range is wider than a
-// finger's: it swings out, folds across the palm and bends at the tip.
-export function addThumb(c: ModelContent, palmGroupId: string, opts: ThumbOptions = {}, make: MakeId = randomId): Edit & { joints?: string[] } {
+// Hang a thumb from the side edge of the lowest shape of a group (the palm): one shape over two joints, like a finger, and the Swing, Curl and Across sliders.
+// Its range is wider than a finger's: it swings out, folds across the palm and bends at the tip.
+export function addThumb(c: ModelContent, palmGroupId: string, opts: ThumbOptions = {}, make: MakeId = randomId): Edit & { joints?: string[]; shapeId?: string } {
   const palm = groupById(c, palmGroupId)
   if (!palm) return fail('There is no such group.')
   if (palm.mirrorOf) return fail('A twin follows its original: build the thumb on the original group, and the twin gets a copy.')
@@ -168,13 +232,12 @@ export function addThumb(c: ModelContent, palmGroupId: string, opts: ThumbOption
   const anchor = attachFromClick(rest, 'edge', base.id, ...apply(rest.global, edgeX, y0))
   if (!anchor) return fail('The palm has no edge to hang the thumb from.')
   const cx = edgeX - out * width * 0.3
-  const heights = [length * 0.55, length * 0.45]
-  const first = addPart(c, make, { name: 'Thumb', parent: palmGroupId, template: 'rectangle', box: { x: cx - width / 2, y: y0, w: width, h: heights[0] }, attach: anchor })
-  if (typeof first === 'string') return fail(first)
-  const second = addPart(first.c, make, { name: 'Thumb 2', parent: first.groupId, template: 'rounded', box: { x: cx - width / 2, y: y0 + heights[0], w: width, h: heights[1] }, attach: insideBottom(first.shapeId) })
-  if (typeof second === 'string') return fail(second)
-  const [base1, tip] = [first.groupId, second.groupId]
-  let next = second.c
+  // it leans a little away from the palm, as a thumb at rest does, and is drawn just over the palm
+  const z = (shapeById(c, base.id)?.z ?? 40) + 0.02
+  const digit = addDigit(c, make, { name: 'Thumb', parent: palmGroupId, attach: anchor, spec: { cx, base: y0, length, width, overlap: width * 0.4, lean: out * 10, roundTop: true }, z, paintFrom: base.id })
+  if (typeof digit === 'string') return fail(digit)
+  const [base1, tip] = digit.joints
+  let next = digit.c
   const specs: Array<Parameters<typeof addSlider>[2]> = [
     { name: 'Thumb swing', role: 'swing-thumb', scope: base1, min: -20, max: 40, unit: '°', turns: [[base1, out * 40]], atMin: [-out * 20] },
     { name: 'Thumb curl', role: 'curl-thumb', scope: base1, min: 0, max: 100, unit: '%', turns: [[base1, -out * 20], [tip, -out * 70]] },
@@ -185,7 +248,7 @@ export function addThumb(c: ModelContent, palmGroupId: string, opts: ThumbOption
     if (!s.ok) return s
     next = s.content
   }
-  return { ...done(next), joints: [base1, tip] }
+  return { ...done(next), joints: [base1, tip], shapeId: digit.shapeId }
 }
 
 // ---- a whole hand ----
@@ -194,15 +257,16 @@ export interface HandMade { palm: string; fingers: string[][]; thumb: string[]; 
 
 // Everything the hand tool puts in the model counts against its limits, twice when the arm is twinned.
 function handFits(c: ModelContent, twinned: boolean): string | null {
+  // a palm, and two joint groups, one object and one shape for each finger and the thumb
   const k = twinned ? 2 : 1
-  if (c.groups.length + 15 * k > LIMITS.groupsMax) return `A hand takes ${15 * k} groups and a model may have at most ${LIMITS.groupsMax}.`
-  if (c.objects.length + 15 * k > LIMITS.objectsMax) return `A hand takes ${15 * k} objects and a model may have at most ${LIMITS.objectsMax}.`
-  if (c.shapes.length + 15 * k > LIMITS.shapesMax) return `A hand takes ${15 * k} shapes and a model may have at most ${LIMITS.shapesMax}.`
+  if (c.groups.length + 11 * k > LIMITS.groupsMax) return `A hand takes ${11 * k} groups and a model may have at most ${LIMITS.groupsMax}.`
+  if (c.objects.length + 6 * k > LIMITS.objectsMax) return `A hand takes ${6 * k} objects and a model may have at most ${LIMITS.objectsMax}.`
+  if (c.shapes.length + 6 * k > LIMITS.shapesMax) return `A hand takes ${6 * k} shapes and a model may have at most ${LIMITS.shapesMax}.`
   if (c.ranges.length + 8 * k > LIMITS.rangesMax) return `A hand takes ${8 * k} sliders and a model may have at most ${LIMITS.rangesMax}.`
   return null
 }
 
-// A palm with four fingers (three joints each), a thumb, and the sliders that bend them (a Curl for each finger and the thumb, the thumb's Swing and Across and
+// A palm with four fingers and a thumb (each one shape over two joints), and the sliders that bend them (a Curl for each finger and the thumb, the thumb's Swing and Across and
 // a Spread for the fingers), hung from the bottom of the lowest shape of a group (the forearm). When the group has a twin, the twin gets a hand too and the
 // sliders are made apart, so each hand is posed on its own.
 export function addHand(c: ModelContent, forearmGroupId: string, opts: { side?: ThumbSide } = {}, make: MakeId = randomId): Edit & { hand?: HandMade } {
@@ -212,7 +276,7 @@ export function addHand(c: ModelContent, forearmGroupId: string, opts: { side?: 
   const twinForearm = twinGroupOf(c, forearmGroupId)
   const tight = handFits(c, !!twinForearm)
   if (tight) return fail(tight)
-  if (chainDepth(c, forearmGroupId) + 4 > LIMITS.chainMax) return fail(`That would make a pivot chain ${chainDepth(c, forearmGroupId) + 4} groups long; the most is ${LIMITS.chainMax}.`)
+  if (chainDepth(c, forearmGroupId) + 3 > LIMITS.chainMax) return fail(`That would make a pivot chain ${chainDepth(c, forearmGroupId) + 3} groups long; the most is ${LIMITS.chainMax}.`)
   const rest = solveAtRest(c), wrist = lowestShape(c, rest, forearmGroupId)
   if (!wrist) return fail('Draw an outline in this group first: the hand hangs from the bottom of its lowest shape.')
   const cx = wrist.box.x + wrist.box.w / 2, side = opts.side ?? thumbSideAt(cx, c.axis ?? 100)
@@ -230,7 +294,7 @@ export function addHand(c: ModelContent, forearmGroupId: string, opts: { side?: 
   const bases: Record<string, string> = {}
   for (let i = 0; i < order.length; i++) {
     const f = order[i]
-    const e = addFinger(next, palm, { name: f.name, role: f.role, width: fw, length: ph * f.length, at: (i + 0.5) / order.length, joints: 3, curlSign: sign }, make)
+    const e = addFinger(next, palm, { name: f.name, role: f.role, width: fw, length: ph * f.length, at: (i + 0.5) / order.length, curlSign: sign }, make)
     if (!e.ok) return e
     next = e.content
     fingers.push(e.finger!.joints)
@@ -285,8 +349,8 @@ export function apartHand(c: ModelContent, palmGroupId: string, make: MakeId = r
 
 // ---- the starter hand poses ----
 
-// Each pose as the amount of each role, in percent of full curl (the thumb's swing in degrees).
-const POSES: Array<{ name: string; values: Partial<Record<HandRole, number>> }> = [
+// Each pose as the amount of each role, in percent of full curl (the thumb's swing in degrees). The seed model makes its own hand presets from these.
+export const HAND_POSES: Array<{ name: string; values: Partial<Record<HandRole, number>> }> = [
   { name: 'Open', values: { spread: 70, 'swing-thumb': 30 } },
   { name: 'Fist', values: { 'curl-index': 100, 'curl-middle': 100, 'curl-ring': 100, 'curl-little': 100, 'curl-thumb': 80, 'oppose-thumb': 70 } },
   { name: 'Point', values: { 'curl-middle': 100, 'curl-ring': 100, 'curl-little': 100, 'curl-thumb': 60, 'oppose-thumb': 50 } },
@@ -326,7 +390,7 @@ export function addHandPoses(c: ModelContent, palmGroupId?: string, make: MakeId
   const have = (kind: string, name: string) => (next.presets ?? []).some(p => p.kind.toLowerCase() === kind.toLowerCase() && p.name.toLowerCase() === name.toLowerCase())
   for (const side of sides) {
     if (!bends(side.ids)) continue
-    for (const pose of POSES) {
+    for (const pose of HAND_POSES) {
       if (have(side.kind, pose.name)) continue
       if ((next.presets ?? []).length >= LIMITS.presetsMax) return fail(`A model may have at most ${LIMITS.presetsMax} presets.`)
       const values: Record<string, number> = {}

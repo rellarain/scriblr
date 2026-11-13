@@ -198,7 +198,7 @@ function riggedFigure(): ModelContent {
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
   c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
   // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)
-  // a hand on the forearm: a palm, four fingers of three joints and a thumb on the side of the palm, with their sliders (a Curl for each finger and the thumb,
+  // a hand on the forearm: a palm, four fingers and a thumb on the side of the palm (each one shape bent over two joints), with their sliders (a Curl for each finger and the thumb,
   // the Spread of the fingers, the thumb's Swing and Across)
   let nh = 0
   const hand = addHand(c, 'g_fore', {}, prefix => `${prefix}_hand${++nh}`)

@@ -69,7 +69,8 @@ export const LIMITS = {
   cutsMax: 8,
   looksMax: 72,
   // proportions and frames: bones per model, frames per model, what a frame may hide (the stops are the server's max_lengths)
-  bonesWarn: 12,
+  // (a body with bones along each finger, for the curl, has sixteen)
+  bonesWarn: 20,
   bonesMax: 24,
   framesWarn: 8,
   framesMax: 16,

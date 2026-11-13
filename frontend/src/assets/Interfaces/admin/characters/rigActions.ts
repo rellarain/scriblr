@@ -50,7 +50,7 @@ export interface RigActions {
 // Phase 5c: hands. Fingers, a thumb or a whole hand hung from the bottom of a group, the other hand posed on its own, the starter hand poses, and the grip points
 // where a held item is taken (with the one a pose holds shown on the canvas).
 export interface HandActions {
-  addFinger: (groupId: string, joints: 2 | 3) => void
+  addFinger: (groupId: string) => void
   addThumb: (groupId: string) => void
   addHand: (groupId: string) => void
   apartHand: (groupId: string) => void
