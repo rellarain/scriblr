@@ -6,7 +6,7 @@ import { addPoint, cycleMode, deletePoint, moveHandle, movePoint, moveShape, nud
 import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/frames'
 import { apply, boxOf, build, flatten, inverse, nearestEdge, type Box } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
-import { alignTo, guideTargets, type GuideTargets } from './engine/guides'
+import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
@@ -88,6 +88,16 @@ export interface PickGroup { id: string; name: string; x: number; y: number }
 // The lock at a crossing of two outlines. `enabled` is false when none can be made (a slider is away from rest, the back view, a form is being edited); `stageOf` says how
 // far the lock at a crossing has got; `onAdvance` is a click on it.
 export interface LockTool { enabled: boolean; stageOf: (c: Crossing) => LockStage; onAdvance: (c: Crossing) => void }
+// The taper tool (phase O3): clicks lay the line a ribbon runs along (canvas space), Enter or a double-click makes it; the ribbon is shown as it will be while the line is laid.
+export interface TaperCanvas {
+  spine: Array<[number, number]>
+  // the ribbon's outline as path text, once the line has two points
+  preview: string | null
+  onAdd: (x: number, y: number) => void
+  onFinish: () => void
+  // take back the last point (Backspace)
+  onBack: () => void
+}
 // How much of each edge of the canvas a toolbar covers, in pixels: the view is fitted and centred in what is left.
 export interface Insets { left: number; right: number; bottom: number; top?: number }
 const NO_INSETS: Insets = { left: 0, right: 0, bottom: 0, top: 0 }
@@ -138,6 +148,7 @@ export interface CanvasProps {
   through?: ThroughFrame | null
   weights?: WeightTool | null
   skin?: SkinTool | null
+  taper?: TaperCanvas | null
   lock?: LockTool | null
   onPivot?: (x: number, y: number) => void
   onPivotNudge?: (dx: number, dy: number) => void
@@ -258,7 +269,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
   const lockOn = !!p.lock?.enabled && overlay && !p.weights && !p.skin
-  const hoverOk = !p.pose && !p.pick && !through && !p.frames
+  const hoverOk = !p.pose && !p.pick && !through && !p.frames && !p.taper
 
   function rect() {
     const r = svgRef.current?.getBoundingClientRect()
@@ -442,6 +453,12 @@ export function DesignerCanvas(p: CanvasProps) {
 
   // ---- pressing ----
 
+  // The taper tool: a click lays the next point of the ribbon's line (on the grid with Snap to grid, on half units with Snap).
+  function addTaper(e: { clientX: number; clientY: number }) {
+    let [x, y] = toWorld(e)
+    if (onGrid) { x = snapTo(x, unit); y = snapTo(y, unit) } else if (snap) { x = Math.round(x * 2) / 2; y = Math.round(y * 2) / 2 }
+    p.taper?.onAdd(x, y)
+  }
   function onDown(e: ReactPointerEvent<SVGSVGElement>) {
     if (e.button === 2) {
       dragRef.current = { kind: 'pan', startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y, target: { kind: 'grid' }, moved: false }
@@ -449,6 +466,7 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (e.button !== 0) return
+    if (p.taper) { addTaper(e); return }
     if (hoverDown(e)) return
     // a click on the empty grid unselects everything (not while a tool is waiting for a click of its own)
     if (!p.pick && !p.pose && !p.frames && !p.weights && !p.skin && !through && sel.kind !== 'none') p.onSelect(NONE)
@@ -461,6 +479,7 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (e.button !== 0) return
+    if (p.taper) { addTaper(e); return }
     if (p.pose) { if (p.pose.onDown({ kind: 'part', shapeId: id }, toWorld(e), e.altKey)) { dragRef.current = { kind: 'pose' }; capture(e) } return }
     if (p.pick) {
       if (picking.has(id)) { const [x, y] = toWorld(e); p.onPick?.(id, x, y) }
@@ -641,6 +660,7 @@ export function DesignerCanvas(p: CanvasProps) {
   }
   function onDouble(e: ReactMouseEvent, s: ModelShape) {
     e.stopPropagation()
+    if (p.taper) { p.taper.onFinish(); return }
     if (!editable || p.pick) return
     const [x, y] = toLocal(e)
     const hit = nearestEdge(s.pts, x, y)
@@ -654,6 +674,11 @@ export function DesignerCanvas(p: CanvasProps) {
     if (e.key === 'Escape') {
       if (dragRef.current?.kind === 'pose') { dragRef.current = null; p.pose?.onCancel() }
       else p.onEscape()
+      return
+    }
+    if (p.taper) {
+      if (e.key === 'Enter') { e.preventDefault(); p.taper.onFinish() }
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); p.taper.onBack() }
       return
     }
     if (shape && p.skin) {
@@ -702,7 +727,7 @@ export function DesignerCanvas(p: CanvasProps) {
   }
 
   const cur = built[selPoint]
-  const nudgeHint = p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : mode === 'move' ? 'Arrow keys move the shape' : 'Arrow keys move the point; Delete removes it'
+  const nudgeHint = p.taper ? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : mode === 'move' ? 'Arrow keys move the shape' : 'Arrow keys move the point; Delete removes it'
   const hoverShapeId = hover ? (hover.kind === 'edge' ? hover.shapeId : shape?.id ?? null) : null
   const hoveredPoint = hover?.kind === 'point' ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
@@ -734,8 +759,28 @@ export function DesignerCanvas(p: CanvasProps) {
     </>
   )
 
+  // The head units: a line every head from the crown down, numbered, and the canon's landmarks as ticks at the left (see engine/guides.ts).
+  const heads = shown.has('heads') ? headGuide(content, solved) : null
   const layerNodes: Record<LayerId, ReactNode> = {
     gridlines: gridLines.length ? <g className="cmLayer" data-layer="gridlines">{gridLines}</g> : null,
+    heads: heads ? (
+      <g className="cmLayer cmHeads" data-layer="heads" aria-hidden="true">
+        {heads.lines.map(l => (
+          <Fragment key={l.n}>
+            <line x1={heads.x0} y1={l.y} x2={heads.x1} y2={l.y} className={`cmHeadLine${l.n === 0 ? ' cmHeadLine--crown' : ''}`} data-head={l.n} />
+            <text x={heads.x1 + 2 * u} y={l.y + 3 * u} className="cmHeadText" style={{ fontSize: 9 * u }}>{l.n}</text>
+          </Fragment>
+        ))}
+        {heads.marks.map(m => (
+          <Fragment key={m.name}>
+            <line x1={heads.x0 - 6 * u} y1={m.y} x2={heads.x0 + 8 * u} y2={m.y} className="cmHeadMark" data-mark={m.name} />
+            <text x={heads.x0 - 8 * u} y={m.y + 3 * u} className="cmHeadText cmHeadText--mark" style={{ fontSize: 9 * u }}>{m.name}</text>
+          </Fragment>
+        ))}
+        <line x1={heads.x0} y1={heads.bottom} x2={heads.x1} y2={heads.bottom} className="cmHeadLine cmHeadLine--soles" data-heads={heads.heads} />
+        <text x={heads.x1 + 2 * u} y={heads.bottom + 12 * u} className="cmHeadText cmHeadText--total" style={{ fontSize: 9 * u }}>{`${heads.heads} heads`}</text>
+      </g>
+    ) : null,
     figure,
     ghost: (
       <>
@@ -857,9 +902,10 @@ export function DesignerCanvas(p: CanvasProps) {
 
   return (
     <svg
-      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}${p.skin ? ' cmCanvas--skin' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
+      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}${p.skin ? ' cmCanvas--skin' : ''}${p.taper ? ' cmCanvas--taper' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
       aria-label={`Designer canvas. ${nudgeHint}. Click the empty grid to unselect everything, or right-click it.`}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => { setHover(null); setBrush(null) }} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
+      onDoubleClick={e => { if (p.taper) { e.preventDefault(); p.taper.onFinish() } }}
     >
       <rect x={vb.x - 1} y={vb.y - 1} width={vb.w + 2} height={vb.h + 2} className="cmCanvasBg" />
       {p.layers.map(id => <Fragment key={id}>{layerNodes[id]}</Fragment>)}
@@ -892,6 +938,13 @@ export function DesignerCanvas(p: CanvasProps) {
         </g>
       ))}
       {hoverLayer()}
+      {p.taper && (
+        <g className="cmTaper" aria-hidden="true">
+          {p.taper.preview && <path d={p.taper.preview} className="cmTaperRibbon" data-taper-preview="" />}
+          {p.taper.spine.length > 1 && <polyline points={p.taper.spine.map(q => q.join(',')).join(' ')} className="cmTaperSpine" />}
+          {p.taper.spine.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={3 * u} className="cmTaperDot" data-taper-point={i} />)}
+        </g>
+      )}
       {p.skin && brush && overlay && <circle cx={brush[0]} cy={brush[1]} r={p.skin.radius} className="cmSkinBrush" data-brush="" aria-hidden="true" />}
     </svg>
   )

@@ -5,7 +5,7 @@ import { beginPointerDrag, dragJustEnded, zoneRef, type DropZone } from '../../.
 import type { AutosaveMode } from '../../../../theme/types'
 import SideResizer from '../../writer/levels/SideResizer'
 import {
-  BackIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon, WrenchIcon,
+  BackIcon, BodyIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon, WrenchIcon,
   type IconProps,
 } from '../../../icons'
 import { isShown, layerInfo, moveLayer, nudgeLayer, toggleLayer, type LayerId, type LayerState } from './layerStack'
@@ -53,7 +53,7 @@ export function ConsoleBar(p: ConsoleBarProps) {
 // ---- the view toolbar ----
 
 const LAYER_ICONS: Record<LayerId, ComponentType<IconProps>> = {
-  weights: WeightIcon, points: PolygonIcon, outlines: PathIcon, pivots: FocusIcon, guides: RulerIcon, mirror: SwapIcon, ghost: StampIcon, figure: MannequinIcon, gridlines: GridLinesIcon,
+  weights: WeightIcon, points: PolygonIcon, outlines: PathIcon, pivots: FocusIcon, guides: RulerIcon, mirror: SwapIcon, ghost: StampIcon, figure: MannequinIcon, gridlines: GridLinesIcon, heads: BodyIcon,
 }
 
 // Reordering a row of toggles by dragging them sideways: the pointer's place in the row says which toggle the dragged one goes before (null: last).
@@ -105,6 +105,8 @@ export interface ViewBarProps {
   drawerOpen: boolean
   onDrawer: () => void
   checks: number
+  // A word about a layer that cannot draw yet (the head units with no head bone), added to its toggle's title.
+  layerNotes?: Partial<Record<LayerId, string>>
 }
 
 export function ViewBar(p: ViewBarProps) {
@@ -133,7 +135,7 @@ export function ViewBar(p: ViewBarProps) {
               key={id} type="button" data-layer-id={id}
               className={`cmIconBtn dzLayer${on ? ' cmIconBtn--on' : ''}${drag.dragId === id ? ' dzLayer--lifted' : ''}${drag.before === id ? ' dzLayer--before' : ''}${drag.before === null && drag.dragId !== null && last === id ? ' dzLayer--after' : ''}${info.fixed ? ' dzLayer--fixed' : ''}`}
               aria-label={info.name} aria-pressed={on}
-              title={`${info.name}: ${info.hint}. ${info.fixed ? 'Drag to move it' : 'Click to hide or show it; drag to move it'} (the leftmost is drawn on top; Alt+Left and Alt+Right move it too).`}
+              title={`${info.name}: ${info.hint}. ${p.layerNotes?.[id] ? `${p.layerNotes[id]} ` : ''}${info.fixed ? 'Drag to move it' : 'Click to hide or show it; drag to move it'} (the leftmost is drawn on top; Alt+Left and Alt+Right move it too).`}
               onPointerDown={drag.press(id)}
               onClick={() => { if (dragJustEnded()) return; p.onLayers(toggleLayer(p.layers, id)) }}
               onKeyDown={e => {

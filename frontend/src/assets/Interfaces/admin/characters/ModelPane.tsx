@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
+  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -24,6 +24,7 @@ import { StatusBadge, modelLabel } from './StatusBadge'
 import type { PaintActions } from './PaintSection'
 import { PoseBar } from './PoseBar'
 import { SkinPanel } from './SkinPanel'
+import { TaperPanel } from './TaperPanel'
 import { ProportionsTab } from './ProportionsTab'
 import { PresetsTab, type PresetActions } from './PresetsTab'
 import { PreviewStrip } from './PreviewStrip'
@@ -50,7 +51,8 @@ import { alignSkins, weightsOf } from './engine/skin'
 import { autoSkin, bendSlider, clearSkin, copySkin, defaultPartner, mirrorSkin, paintSkin, partnersOf, skinBlocked, smoothSkin, stepPointSkin } from './engine/skinEdit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisRoll, setInitialForm, toggleAxisGenre, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
-import { apply, inverse, type Box } from './engine/geometry'
+import { IDENTITY, apply, build, flatten, inverse, mul, pathText, type Box } from './engine/geometry'
+import { TAPER_DEFAULT, taperOutline, type SpinePoint, type TaperSpec } from './engine/taper'
 import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt, gripGrab, gripsOf, mirrorGrip, moveGrip, removeGrip, renameGrip, setPresetGrip, stepGripAngle } from './engine/hands'
 import { growthRefusal, writerFaults } from './engine/writerLimits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
@@ -233,6 +235,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [skinStrength, setSkinStrength] = useState(1)
   const [skinRadius, setSkinRadius] = useState(10)
   const [skinPick, setSkinPick] = useState(false)
+  // the taper tool (phase O3): the line being laid on the canvas (in the canvas's space) and the ribbon's widths
+  const [tapering, setTapering] = useState(false)
+  const [taperSpine, setTaperSpine] = useState<SpinePoint[]>([])
+  const [taperSpec, setTaperSpec] = useState<TaperSpec>(TAPER_DEFAULT)
   const [frameSel, setFrameSel] = useState<string | null>(null)
   const [throughId, setThroughId] = useState<string | null>(null)
   const [tileTest, setTileTest] = useState<string | null>(null)
@@ -1070,6 +1076,49 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     addShapeTo(r.objectId, templateId, r.content)
   }
 
+  // ---- the taper tool ----
+
+  // Where a new ribbon goes: into the selected object (or the selected shape's), else into a new body object.
+  const taperObject = contextObject(content, sel)
+  const taperInto = taperObject ? objectById(content, taperObject)?.name.trim() || 'the selected object' : 'a new object'
+  const taperPreview = (() => {
+    if (taperSpine.length < 2) return null
+    const pts = taperOutline(taperSpine, taperSpec)
+    return pts ? pathText(build(pts, true), true) : null
+  })()
+  // The ribbon made from the line laid on the canvas. The line is in the canvas's space; a shape keeps its points in its group's own space, so the line is read back through the
+  // group's matrix as it is drawn now (it lands where it was laid, whatever the sliders are doing).
+  function makeTaper() {
+    if (taperSpine.length < 2) { setNote('Lay at least two points of the line first.'); return }
+    const base = taperObject ? { content, objectId: taperObject } : addObjectOn('body')
+    const obj = objectById(base.content, base.objectId)
+    if (obj && obj.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
+    const g = groupOfObject(base.content, base.objectId)
+    const back = inverse(mul(solved.global, (g && solved.mats[g.id]) || IDENTITY))
+    const pts = taperOutline(taperSpine.map(([x, y]) => apply(back, x, y)), taperSpec)
+    if (!pts) { setNote('The line needs two points that are apart.'); return }
+    const id = freshId(base.content, 's', makeId)
+    const shape: ModelShape = { ...newShape(id, 'Ribbon', 'path', { x: 0, y: 0, w: 10, h: 10 }), pts, template: null }
+    if (commit(addShape(base.content, base.objectId, shape), true)) { choose({ kind: 'shape', id }); setTaperSpine([]) }
+  }
+  // Turning the selected open line into a ribbon along its own path (its curve, not only its points).
+  const taperLine = selShape && !selShape.closed ? {
+    name: selShape.name.trim() || 'the line',
+    blocked: !editable ? 'This line is shown, not edited here (a twin, a shape a slider moves, or one hidden in this form)' : view !== 'front' ? 'Taper a line in the front view' : selShape.pts.length < 2 ? 'The line needs two points' : null,
+  } : null
+  function taperSelected() {
+    const cs = selShape ? shapeById(canvasContent, selShape.id) : undefined
+    if (!cs || !taperLine || taperLine.blocked) return
+    const pts = taperOutline(flatten(build(cs.pts, false), false), taperSpec)
+    if (!pts) { setNote('The line needs two points that are apart.'); return }
+    editShape(cs.id, { ...cs, closed: true, pts, half: 0, skin: [] }, 0)
+  }
+  const taperCanvas = tapering && !recording && !poseMode ? {
+    spine: taperSpine, preview: taperPreview, onFinish: makeTaper,
+    onAdd: (x: number, y: number) => setTaperSpine(list => (list.length >= 200 ? list : [...list, [x, y]])),
+    onBack: () => setTaperSpine(list => list.slice(0, -1)),
+  } : null
+
   // ---- the pivot and the anchor on the canvas ----
 
   const atRest = away === 0 && !recording
@@ -1248,7 +1297,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} layers={drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
-            frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} lock={lock} onNote={setNote}
+            frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
             onSelect={choose} onSelectPoint={setSelPoint}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -1258,7 +1307,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
               setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
             }}
-            onEscape={() => { if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+            onEscape={() => { if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
           <div className="dzNotes">
@@ -1302,9 +1351,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
               <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles; click a point to step its handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setSkinPick(false); setMode('points'); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setTapering(false); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setTapering(false); setSkinPick(false); setMode('points'); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
+              <button
+                type="button" className={`cmIconBtn${tapering ? ' cmIconBtn--on' : ''}`} aria-label="Taper" aria-pressed={tapering} disabled={!!recording || poseMode}
+                title="Taper: lay a line on the canvas and make a ribbon along it, wider in the middle and pointed at the ends (brows, lashes, folds, collarbones)"
+                onClick={() => { setTapering(t => !t); setTaperSpine([]); setWeighing(false); setSkinning(false); setSkinPick(false); setBridgeSpots(null) }}
+              ><HighlighterIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setTapering(false); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units, the mirror line and the alignment guides" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
@@ -1342,6 +1396,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 onCopy={() => setSkinPick(k => !k)}
                 onClear={() => { if (selShape && skinWith) applyEdit(clearSkin(content, selShape.id, skinWith)) }}
                 canClear={!!selShape && (selShape.skin ?? []).some(k => k.g === skinWith)}
+              />
+            )}
+            {tapering && !recording && !poseMode && (
+              <TaperPanel
+                spec={taperSpec} onSpec={setTaperSpec} points={taperSpine.length} into={taperInto} onMake={makeTaper}
+                onBack={() => setTaperSpine(list => list.slice(0, -1))} onClear={() => setTaperSpine([])} line={taperLine} onTaperLine={taperSelected}
               />
             )}
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
@@ -1384,6 +1444,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 setFitAll(!same); setZoom(1); setViewMoved(false); setViewNonce(n => n + 1)
               }}
               zoom={zoom} onZoom={setZoom} drawerOpen={drawer} onDrawer={() => setDrawer(d => !d)} checks={faults.length}
+              layerNotes={{ heads: content.headBone && boneById(content, content.headBone) ? undefined : 'There is no head bone yet: add a bone in the Proportions tab and press Use as the head.' }}
             />
           </div>
         </div>

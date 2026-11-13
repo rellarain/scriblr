@@ -2,7 +2,7 @@
 // says whether a layer is shown. The painted figure is one of the layers, so the gridlines can sit above it or below it, but it cannot be hidden. Pure, so it is tested without
 // the page; the page keeps the state on this computer.
 
-export type LayerId = 'figure' | 'gridlines' | 'guides' | 'outlines' | 'points' | 'mirror' | 'pivots' | 'ghost' | 'weights'
+export type LayerId = 'figure' | 'gridlines' | 'guides' | 'outlines' | 'points' | 'mirror' | 'pivots' | 'ghost' | 'weights' | 'heads'
 
 export interface LayerInfo { id: LayerId; name: string; hint: string; fixed?: boolean }
 export const LAYERS: LayerInfo[] = [
@@ -11,6 +11,7 @@ export const LAYERS: LayerInfo[] = [
   { id: 'outlines', name: 'Shape outlines', hint: 'the outline of what is selected, and of the shape the pointer is over' },
   { id: 'pivots', name: 'Pivots, anchors and links', hint: 'the pivot of the selected group, where it is fixed, and the points that are linked' },
   { id: 'guides', name: 'Alignment guides', hint: 'lines that show where a dragged point, shape or pivot lines up with others (and snap to them when Snap is on)' },
+  { id: 'heads', name: 'Head units', hint: 'lines one head apart from the crown down, and where a figure 7.5 heads tall has its chin, nipples, navel, crotch, knees and soles (it reads the head bone, set in the Proportions tab)' },
   { id: 'mirror', name: 'Mirror line', hint: 'the line twins and mirror editing reflect about' },
   { id: 'ghost', name: 'Pattern ghost and frames', hint: 'the dashed outline of a class pattern behind a member, and the frames of the model' },
   { id: 'figure', name: 'The figure', hint: 'the painted shapes (it cannot be hidden)', fixed: true },
@@ -24,18 +25,22 @@ export interface LayerState {
   order: LayerId[]
   hidden: LayerId[]
 }
-export const DEFAULT_LAYERS: LayerState = { order: LAYER_IDS, hidden: [] }
+// The head units are hidden until asked for.
+export const DEFAULT_LAYERS: LayerState = { order: LAYER_IDS, hidden: ['heads'] }
 
 const known = (v: unknown): v is LayerId => typeof v === 'string' && (LAYER_IDS as string[]).includes(v)
 
-// Whatever was stored, made into a state that has every layer once (a layer added since is put at the end; one that is gone is dropped).
+// Whatever was stored, made into a state that has every layer once (a layer added since is put at the end, shown or hidden as it is by default; one that is gone is dropped).
 export function normalizeLayers(raw: unknown): LayerState {
   const o = raw && typeof raw === 'object' ? (raw as { order?: unknown; hidden?: unknown }) : {}
   const order: LayerId[] = []
   for (const id of Array.isArray(o.order) ? o.order : []) if (known(id) && !order.includes(id)) order.push(id)
-  for (const id of LAYER_IDS) if (!order.includes(id)) order.push(id)
-  const hidden: LayerId[] = Array.isArray(o.hidden) ? [...new Set(o.hidden.filter(known))].filter(id => !layerInfo(id).fixed) : DEFAULT_LAYERS.hidden
-  return { order, hidden }
+  const added = LAYER_IDS.filter(id => !order.includes(id))
+  order.push(...added)
+  if (!Array.isArray(o.hidden)) return { order, hidden: DEFAULT_LAYERS.hidden }
+  const hidden = new Set<LayerId>(o.hidden.filter(known))
+  for (const id of added) if (DEFAULT_LAYERS.hidden.includes(id)) hidden.add(id)
+  return { order, hidden: [...hidden].filter(id => !layerInfo(id).fixed) }
 }
 
 export const isShown = (s: LayerState, id: LayerId): boolean => !s.hidden.includes(id)

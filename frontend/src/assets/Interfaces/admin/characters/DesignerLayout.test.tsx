@@ -118,10 +118,12 @@ describe('a narrow console', () => {
 describe('the view toolbar', () => {
   it('has a toggle for each layer of the canvas, the leftmost drawn on top', async () => {
     await open()
-    expect(layers()).toEqual(['weights', 'points', 'outlines', 'pivots', 'guides', 'mirror', 'ghost', 'figure', 'gridlines'])
+    expect(layers()).toEqual(['weights', 'points', 'outlines', 'pivots', 'guides', 'heads', 'mirror', 'ghost', 'figure', 'gridlines'])
     for (const name of ['Gridlines', 'Alignment guides', 'Shape outlines', 'Shape points', 'Mirror line', 'Pivots, anchors and links', 'Pattern ghost and frames', 'Weights and curve handles', 'The figure']) {
       expect(layerBtn(name)).toHaveAttribute('aria-pressed', 'true')
     }
+    // the head units are hidden until asked for
+    expect(layerBtn('Head units')).toHaveAttribute('aria-pressed', 'false')
     // the gridlines are the lowest layer, under the painted figure
     const grid = canvas().querySelector('[data-layer="gridlines"]')!, shape = canvas().querySelector('path[data-shape]')!
     expect(follows(grid, shape)).toBe(true)
@@ -174,14 +176,14 @@ describe('the view toolbar', () => {
       rects[b.dataset.layerId!] = { x: i * 30, y: 0, left: i * 30, top: 0, right: i * 30 + 28, bottom: 28, width: 28, height: 28, toJSON: () => ({}) } as DOMRect
       vi.spyOn(b, 'getBoundingClientRect').mockReturnValue(rects[b.dataset.layerId!])
     }
-    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 270, bottom: 28, width: 270, height: 28, toJSON: () => ({}) } as DOMRect)
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 300, bottom: 28, width: 300, height: 28, toJSON: () => ({}) } as DOMRect)
     const gridlines = layerBtn('Gridlines')
-    fireEvent(gridlines, new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 8 * 30 + 10, clientY: 10 }))
-    act(() => { window.dispatchEvent(new MouseEvent('pointermove', { clientX: 8 * 30 - 20, clientY: 10 })) })
+    fireEvent(gridlines, new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 9 * 30 + 10, clientY: 10 }))
+    act(() => { window.dispatchEvent(new MouseEvent('pointermove', { clientX: 9 * 30 - 20, clientY: 10 })) })
     act(() => { window.dispatchEvent(new MouseEvent('pointermove', { clientX: 8, clientY: 10 })) })
     act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 8, clientY: 10 })) })
     expect(layers()[0]).toBe('gridlines')
-    expect(layers()).toHaveLength(9)
+    expect(layers()).toHaveLength(10)
   })
 })
 

@@ -8,6 +8,9 @@ describe('the canvas layers', () => {
     expect(DEFAULT_LAYERS.order).toContain('figure')
     expect(isShown(DEFAULT_LAYERS, 'ghost')).toBe(true)
     expect(isShown(DEFAULT_LAYERS, 'points')).toBe(true)
+    // the head units are there, hidden until asked for
+    expect(DEFAULT_LAYERS.order).toContain('heads')
+    expect(isShown(DEFAULT_LAYERS, 'heads')).toBe(false)
   })
   it('draw the leftmost on top: the shown layers, bottom first', () => {
     const order = drawOrder({ order: [...LAYER_IDS], hidden: [] })
@@ -43,7 +46,9 @@ describe('the canvas layers', () => {
     const fixed = normalizeLayers({ order: ['points', 'nonsense', 'points', 'figure'], hidden: ['figure', 'mirror', 'nonsense'] })
     expect(fixed.order.slice(0, 2)).toEqual(['points', 'figure'])
     expect(new Set(fixed.order).size).toBe(LAYER_IDS.length)
-    expect(fixed.hidden).toEqual(['mirror'])
+    // a layer added since (the head units) is hidden as it is by default; one that was stored keeps what was stored
+    expect(fixed.hidden).toEqual(['mirror', 'heads'])
+    expect(normalizeLayers({ order: [...LAYER_IDS], hidden: [] }).hidden).toEqual([])
     expect(normalizeLayers(null)).toEqual({ order: DEFAULT_LAYERS.order, hidden: DEFAULT_LAYERS.hidden })
     expect(normalizeLayers('x').order).toHaveLength(LAYER_IDS.length)
   })
