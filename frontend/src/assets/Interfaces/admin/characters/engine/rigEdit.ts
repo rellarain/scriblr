@@ -3,7 +3,7 @@ import { withoutRanges } from '../modelContent'
 import { boxOf, build, clamp, flatten, inverse, apply, r2 } from './geometry'
 import { LIMITS } from './limits'
 import { PROPS, type PropKey } from './props'
-import { anchorFrom, chainDepth, chainOf, defaultValues, descendantsOf, restPivot, solveAtRest, subtreeHeight, type Solved } from './rig'
+import { DEPTH_MAX, anchorFrom, chainDepth, chainOf, defaultValues, descendantsOf, restPivot, solveAtRest, subtreeHeight, type Solved } from './rig'
 
 // The pure operations the Rig and Ranges tabs make on a model's content: hanging groups from each other, fixing them to a shape, setting pivots, and
 // making sliders and what they drive. Each returns new content (or why it cannot), and leaves the content it was given alone.
@@ -117,10 +117,10 @@ export function setAxis(c: ModelContent, x: number): ModelContent {
 
 // ---- sliders ----
 
-export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
+export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'depth'
 // A new slider with a sensible span for the first thing it will drive.
 export function newRange(id: string, name: string, kind: DriveKindPreset, scope: string | null = null): ModelRange {
-  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : kind === 'fall' ? { min: 0, rest: 0, max: 100, unit: '%' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
+  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : kind === 'fall' ? { min: 0, rest: 0, max: 100, unit: '%' as const } : kind === 'depth' ? { min: -60, rest: 0, max: 60, unit: '°' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
   return { id, name, scope, ...span, show: true, rand: null, drives: [] }
 }
 
@@ -229,6 +229,18 @@ export function addLength(c: ModelContent, rangeId: string, boneId: string): Edi
   return addDrive(ensurePivot(c, b.start), rangeId, { ...blankDrive('length'), id: boneId, atMin: 80, atMax: 120 })
 }
 
+// The slider turns a bone toward the viewer (+) or away (-) (phase O2): the group it starts at is drawn shorter along it and a little wider toward the viewer, and what hangs
+// from it is carried to the shortened end, keeping its length. -60 degrees at the slider's minimum and 60 at its maximum to begin with. A twin of the bone's group follows it
+// until the two sides are posed apart.
+export function addDepth(c: ModelContent, rangeId: string, boneId: string): Edit {
+  const b = (c.bones ?? []).find(x => x.id === boneId)
+  if (!b) return fail('There is no such bone.')
+  const g = c.groups.find(x => x.id === b.start)
+  if (!g) return fail('The bone starts at a group that is not there.')
+  if (g.mirrorOf) return fail('The bone starts at a twin group; turn the original instead.')
+  return addDrive(ensurePivot(c, b.start), rangeId, { ...blankDrive('depth'), id: boneId, atMin: -60, atMax: 60 })
+}
+
 const shapeBox = (s: ModelShape) => (s.pts.length >= 3 ? boxOf(flatten(build(s.pts, s.closed), s.closed)) : null)
 
 // The slider bends a shape smoothly along a length: from its middle down to near its end, 30 degrees each way to begin with.
@@ -251,7 +263,7 @@ export function stepDrive(c: ModelContent, rangeId: string, index: number, field
   return mapDrive(c, rangeId, index, d => {
     const next = d[field] + dir * (big ? 5 : 1)
     const prop = d.kind === 'prop' && d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey] : undefined
-    return { ...d, [field]: prop ? clamp(next, prop.lo, prop.hi) : percentOf(d.kind) ? clamp(next, 5, 1000) : fallOf(d.kind) ? clamp(next, 0, 100) : clamp(next, -360, 360) }
+    return { ...d, [field]: prop ? clamp(next, prop.lo, prop.hi) : percentOf(d.kind) ? clamp(next, 5, 1000) : fallOf(d.kind) ? clamp(next, 0, 100) : d.kind === 'depth' ? clamp(next, -DEPTH_MAX, DEPTH_MAX) : clamp(next, -360, 360) }
   })
 }
 // A Length drive lengthens another bone.
@@ -259,7 +271,7 @@ export function setDriveBone(c: ModelContent, rangeId: string, index: number, bo
   const b = (c.bones ?? []).find(x => x.id === boneId)
   if (!b) return fail('There is no such bone.')
   if (c.groups.find(g => g.id === b.start)?.mirrorOf) return fail('The bone starts at a twin group; lengthen the original instead.')
-  return done(mapDrive(c, rangeId, index, d => (d.kind === 'length' ? { ...d, id: boneId } : d)))
+  return done(mapDrive(c, rangeId, index, d => (d.kind === 'length' || d.kind === 'depth' ? { ...d, id: boneId, group: null } : d)))
 }
 export const setDriveAxis = (c: ModelContent, rangeId: string, index: number, axis: ModelScaleAxis): ModelContent => mapDrive(c, rangeId, index, d => ({ ...d, axis }))
 export const setDriveMirror = (c: ModelContent, rangeId: string, index: number, mirror: boolean): ModelContent => mapDrive(c, rangeId, index, d => ({ ...d, mirror }))

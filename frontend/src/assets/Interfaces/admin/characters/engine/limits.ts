@@ -53,6 +53,8 @@ export const LIMITS = {
   underMax: 24,
   // skin weights (phase O1): the groups one shape follows besides its own (the stop is the server's max_length)
   skinMax: 3,
+  // phase O2: the other objects a shading shape lies on (the stop is the server's max_length)
+  overMax: 8,
   // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
   genresWarn: 8,
   genresMax: 12,

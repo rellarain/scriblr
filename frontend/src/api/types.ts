@@ -652,10 +652,12 @@ export type ModelBlend = 'multiply' | 'screen' | 'overlay'
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; skin?: ModelSkin[] }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; skin?: ModelSkin[]; over?: string[] }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }
+// over (phase O2, on a shading shape): the other objects it lies on besides its own; it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis.
+// A twin takes its original's, each object swapped for its twin. At most MODEL_OVER_MAX (8).
 // What one form does to one shape of its object: the outline the shape has in that form (an empty list hides the shape in the form).
 export interface ModelOverride { shape: string; pts: ModelPoint[] }
 // One form of an axis (round eyes, almond eyes): the shapes it changes with their outlines. A form with no overrides is the base outline.
@@ -688,7 +690,9 @@ export interface ModelGroup { id: string; name: string; parent: string | null; o
 export type ModelRangeUnit = '' | '°' | '%'
 // A grip point (phase 5c): the spot of a hand where a held item is taken, in the model's space at rest, carried by the group `group`; angle is the way the held item points, in degrees (0 = straight down, positive toward the picture's right).
 export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }
-export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop'
+// depth (phase O2): a bone points toward the viewer (+) or away (-), atMin/atMax in degrees (at most 89 either way); `group` set to the twin of the bone's group poses that
+// twin instead (the two sides posed apart).
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop' | 'depth'
 // Authored fields (phase D3c). A 'prop' drive changes one property of a feature: a whole shape, one point or one edge of a shape, or a whole object.
 export type ModelFeatureKind = 'shape' | 'point' | 'edge' | 'object'
 export type ModelOwnerKind = 'object' | 'group' | 'preset'

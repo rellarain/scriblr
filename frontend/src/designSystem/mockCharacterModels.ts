@@ -3,7 +3,7 @@ import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addGrip, addHand, addHandPoses, apartHand, mirrorGrip, renameGrip, setPresetGrip } from '../assets/Interfaces/admin/characters/engine/hands'
 import { apartSlider } from '../assets/Interfaces/admin/characters/engine/sidesEdit'
-import { addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPoints, renameRange, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
+import { addDepth, addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPoints, renameRange, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
 import { addBone, setHeadBone } from '../assets/Interfaces/admin/characters/engine/bones'
 import { addField, addFieldset, type FeatureRef, type OwnerRef } from '../assets/Interfaces/admin/characters/engine/fields'
 import type { PropKey } from '../assets/Interfaces/admin/characters/engine/props'
@@ -17,7 +17,7 @@ import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/
 import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engine/classEdit'
 import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
-import { setBlend, setGradient, toggleCut } from '../assets/Interfaces/admin/characters/engine/paintEdit'
+import { setBlend, setGradient, toggleCut, toggleOver } from '../assets/Interfaces/admin/characters/engine/paintEdit'
 import { addPattern } from '../assets/Interfaces/admin/characters/engine/patterns'
 import { toggleUnder } from '../assets/Interfaces/admin/characters/engine/wear'
 import { addShading } from '../assets/Interfaces/admin/characters/engine/shadeEdit'
@@ -168,6 +168,7 @@ function riggedFigure(): ModelContent {
   const shirtShade = addShading(c, 's_shirt', 'shadow', 'right', mkPaint)
   c = must(shirtShade)
   c = must(setBlend(c, shirtShade.shapeId!, 'multiply'))
+  // the shadow lies on the undershirt too (phase O2), so where the undershirt shows below the shirt the shadow runs on across it
   c = must(addShading(c, 's_head', 'highlight', 'left', mkPaint))
   // corners and a fill pattern (phase D4): a pocket whose square corners are rounded, and two stripes, drawn as ordinary shapes, kept inside the shirt as a pattern that can be
   // switched off
@@ -181,6 +182,7 @@ function riggedFigure(): ModelContent {
   c = addShape(c, 'o_under', { ...newShape('s_under', 'Undershirt', 'rounded', box(60, 92, 80, 46)), slot: 'k_cloth', tone: 1 })
   c = { ...c, groups: c.groups.map(g => (g.id === 'g_shirt' ? { ...g, objects: ['o_under', ...g.objects.filter(id => id !== 'o_under')] } : g)) }
   c = must(toggleUnder(c, 'o_under', 'o_shirt'))
+  c = must(toggleOver(c, shirtShade.shapeId!, 'o_under'))
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
   c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
   // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)
@@ -333,6 +335,12 @@ function riggedFigure(): ModelContent {
     c = must(addLength(c, id, bone))
     c = { ...c, ranges: c.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => ({ ...d, atMin: 85, atMax: 120 })) } : r)) }
   }
+  // foreshortening (phase O2): the upper arm turns toward the viewer or away; it is drawn shorter and the forearm hangs from its shortened end at its own length, and turned away
+  // the arm goes behind the body (a depth order field on the arm)
+  // (the admin's sample only: not offered to writers, so the writer's sheets keep the sliders they had)
+  c = must(addRange(c, { ...newRange('r_arm_depth', 'Upper arm depth', 'depth', 'g_arm'), show: false }))
+  c = must(addDepth(c, 'r_arm_depth', upperBone))
+  c = { ...c, ranges: c.ranges.map(r => (r.id === 'r_arm_depth' ? { ...r, drives: [...r.drives, { ...r.drives[0], kind: 'prop' as const, id: 'o_arm', feature: 'object' as const, prop: 'z', atMin: -12, atMax: 0, i: 0 }] } : r)) }
   const limits: Record<string, [number, number]> = { r_height: [80, 105], r_head: [90, 115], r_shoulders: [90, 118], r_arm_len: [90, 115], r_fore_len: [90, 115] }
   c = { ...c, ranges: c.ranges.map(r => (limits[r.id] ? { ...r, limit: limits[r.id] } : r)) }
   preset('Infant', 'Age', { r_height: 80, r_head: 115, r_arm_len: 90, r_fore_len: 90, r_shoulders: 90 })

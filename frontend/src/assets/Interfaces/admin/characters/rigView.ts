@@ -28,13 +28,13 @@ export function related(c: ModelContent, sel: Selection): Set<string> {
 export function rangesForSelection(c: ModelContent, sel: Selection): ModelRange[] {
   if (sel.kind === 'none') return []
   const ids = related(c, sel)
-  const lengthens = (d: ModelDrive) => d.kind === 'length' && (c.bones ?? []).some(b => b.id === d.id && ids.has(b.start))
+  const lengthens = (d: ModelDrive) => (d.kind === 'length' || d.kind === 'depth') && (c.bones ?? []).some(b => b.id === d.id && ids.has(b.start))
   return c.ranges.filter(r => (r.scope !== null && ids.has(r.scope)) || r.drives.some(d => [d.group, d.id, d.shape].some(x => x !== null && ids.has(x)) || lengthens(d)) || c.shapes.some(s => ids.has(s.id) && s.opBy?.slider === r.id))
 }
 
 // The sliders that turn, scale, lengthen or anchor a group.
 export function rangesMovingGroup(c: ModelContent, groupId: string): ModelRange[] {
-  const lengthens = (d: ModelDrive) => d.kind === 'length' && (c.bones ?? []).some(b => b.id === d.id && b.start === groupId)
+  const lengthens = (d: ModelDrive) => ((d.kind === 'length' || (d.kind === 'depth' && !d.group)) && (c.bones ?? []).some(b => b.id === d.id && b.start === groupId)) || (d.kind === 'depth' && d.group === groupId)
   return c.ranges.filter(r => r.drives.some(d => (d.kind === 'turn' && d.group === groupId) || (d.kind === 'scale' && d.target === 'group' && d.id === groupId) || lengthens(d)) || c.groups.some(g => g.id === groupId && g.attach?.kind === 'range' && g.attach.slider === r.id))
 }
 
@@ -56,6 +56,11 @@ export function driveText(c: ModelContent, d: ModelDrive): string {
     return `Sets ${(spec?.label ?? 'a property').toLowerCase()} of ${what} to ${d.atMin}${u} at the minimum and ${d.atMax}${u} at the maximum`
   }
   if (d.kind === 'length') return `Lengthens ${named((c.bones ?? []).find(b => b.id === d.id)?.name, d.id)} to ${d.atMin}% of its length at the minimum and ${d.atMax}% at the maximum`
+  if (d.kind === 'depth') {
+    const bone = named((c.bones ?? []).find(b => b.id === d.id)?.name, d.id)
+    const what = d.group ? `the twin of ${bone} (${named(groupById(c, d.group)?.name, d.group)})` : bone
+    return `Turns ${what} toward the viewer by ${sign(d.atMin)}° at the minimum and ${sign(d.atMax)}° at the maximum (shorter as it turns; less than none points away)`
+  }
   const shape = named(c.shapes.find(s => s.id === d.shape)?.name, d.shape)
   if (d.kind === 'points') return `Moves ${d.moves.length} point${d.moves.length === 1 ? '' : 's'} of ${shape}`
   if (d.kind === 'fall') return `Lets ${shape} hang ${d.atMin}% of the way at the minimum and ${d.atMax}% at the maximum`

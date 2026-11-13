@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE, FIGURE_MAX_ON } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { PROPS, PROP_KEYS } from './engine/props'
+import { DEPTH_MAX } from './engine/rig'
 import { WRITER_LIMIT_ROWS } from './engine/writerLimits'
 import { AXIS_RANGE, DESCRIPTION_MAX, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
 
@@ -150,6 +151,8 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.patternMarksMax).toBe(number('MODEL_PATTERN_MARKS_MAX'))
     expect(LIMITS.underMax).toBe(number('MODEL_UNDER_MAX'))
     expect(LIMITS.skinMax).toBe(number('MODEL_SKIN_MAX'))
+    expect(LIMITS.overMax).toBe(number('MODEL_OVER_MAX'))
+    expect(DEPTH_MAX).toBe(number('MODEL_DEPTH_MAX'))
   })
   it('for colour: genres, slots, default colours and the starter palette', () => {
     expect(LIMITS.genresWarn).toBe(number('MODEL_GENRES_WARN'))

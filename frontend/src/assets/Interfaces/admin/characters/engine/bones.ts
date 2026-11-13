@@ -135,9 +135,9 @@ export function setBoneEnd(c: ModelContent, id: string, end: ModelBoneEnd): Edit
 export function removeBone(c: ModelContent, id: string): { content: ModelContent; sliders: string[] } {
   const sliders: string[] = []
   const ranges = c.ranges.map(r => {
-    if (!r.drives.some(d => d.kind === 'length' && d.id === id)) return r
+    if (!r.drives.some(d => (d.kind === 'length' || d.kind === 'depth') && d.id === id)) return r
     sliders.push(r.name || r.id)
-    return { ...r, drives: r.drives.filter(d => !(d.kind === 'length' && d.id === id)) }
+    return { ...r, drives: r.drives.filter(d => !((d.kind === 'length' || d.kind === 'depth') && d.id === id)) }
   })
   return { content: { ...c, bones: bonesOf(c).filter(b => b.id !== id), headBone: c.headBone === id ? null : c.headBone ?? null, ranges: sliders.length ? ranges : c.ranges }, sliders }
 }

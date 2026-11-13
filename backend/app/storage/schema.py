@@ -1232,6 +1232,8 @@ MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
 MODEL_UNDER_MAX = 24           # the garments or families one object is worn under
 MODEL_SKIN_MAX = 3             # skin weights (phase O1): the groups one shape follows besides its own
+MODEL_OVER_MAX = 8             # phase O2: the other objects a shading shape lies on (a shadow down the chest and the pelvis)
+MODEL_DEPTH_MAX = 89.0         # phase O2: the most a bone may point toward or away from the viewer, in degrees (a depth drive)
 MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 24
@@ -1260,7 +1262,7 @@ ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
 ModelAnchorKind = Literal["point", "edge", "range", "inside"]
 ModelRangeUnit = Literal["", "°", "%"]
-ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop", "depth"]
 # Authored fields (phase D3c): a `prop` drive changes one property of a feature (a whole shape, one point or one edge of a shape, a whole object). For each property: the features
 # that have it, the amount at the slider's rest, and the least and the most it may be. Positions and offsets are in the model's units, sizes/opacity/reach/blend in percent
 # (100 at rest), rotation and direction in degrees, colour shifts in degrees of hue and points of saturation and lightness (0 at rest).
@@ -1278,6 +1280,7 @@ MODEL_PROPS: dict[str, tuple[tuple[str, ...], float, float, float]] = {
     "texture": (_SHAPE_OR_OBJECT, 0.0, 0.0, 100.0),
     "opacity": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
     "roundness": (_SHAPE_OR_OBJECT, 0.0, -20.0, 20.0),
+    "z": (_SHAPE_OR_OBJECT, 0.0, -60.0, 60.0),
     "offset": (("edge",), 0.0, -200.0, 200.0),
     "fillHue": (_SHAPE_OR_OBJECT, 0.0, -180.0, 180.0),
     "fillSat": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
@@ -1541,6 +1544,9 @@ class ModelShape(BaseModel):
     round: int = 0
     # Phase O1: skin weights, the groups the shape's points also follow (at most MODEL_SKIN_MAX, one weight per point each). A twin is skinned as its original is.
     skin: list[ModelSkin] = Field(default_factory=list, max_length=MODEL_SKIN_MAX)
+    # Phase O2: the other objects a shading shape lies on besides its own (it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis). A twin
+    # takes its original's, each object swapped for its twin.
+    over: list[str] = Field(default_factory=list, max_length=MODEL_OVER_MAX)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1602,6 +1608,18 @@ class ModelShape(BaseModel):
     @classmethod
     def _blend(cls, value: Any) -> Any:
         return value if value in ("multiply", "screen", "overlay") else None
+
+    @field_validator("over", mode="before")
+    @classmethod
+    def _over(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out[:MODEL_OVER_MAX]
 
     @field_validator("cut", mode="before")
     @classmethod
@@ -1795,8 +1813,8 @@ class ModelDrive(BaseModel):
             raise ValueError("a scale drive needs a target")
         if self.kind in ("points", "bend", "fall") and not self.shape:
             raise ValueError("this drive needs a shape")
-        if self.kind == "length" and not self.id:
-            raise ValueError("a length drive needs a bone")
+        if self.kind in ("length", "depth") and not self.id:
+            raise ValueError("a length or depth drive needs a bone")
         if self.kind == "prop":
             spec = MODEL_PROPS.get(self.prop or "")
             if spec is None or self.feature not in spec[0]:
@@ -1813,6 +1831,10 @@ class ModelDrive(BaseModel):
             # a percentage: 100 is the size at rest
             for name in ("atMin", "atMax"):
                 setattr(self, name, 100.0 if name not in self.model_fields_set else _finite(getattr(self, name), 100.0, 5.0, 1000.0))
+        elif self.kind == "depth":
+            # how far the bone points toward the viewer (+) or away (-), in degrees: none at rest
+            self.atMin = _finite(self.atMin, 0.0, -MODEL_DEPTH_MAX, MODEL_DEPTH_MAX)
+            self.atMax = _finite(self.atMax, 0.0, -MODEL_DEPTH_MAX, MODEL_DEPTH_MAX)
         elif self.kind == "fall":
             # how much of the way to hanging, in percent: none at rest, all of it at the maximum unless the drive says otherwise
             self.atMin = 0.0 if "atMin" not in self.model_fields_set else _finite(self.atMin, 0.0, 0.0, 100.0)

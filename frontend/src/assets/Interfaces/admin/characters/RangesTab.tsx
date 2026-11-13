@@ -18,7 +18,7 @@ import { driveText, offRest, rangesForSelection, valueText } from './rigView'
 // The Ranges tab: the model's sliders. Each has a Try it slider (the test value is only for looking: it is never saved), its minimum, rest and maximum,
 // and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape, lengthen a bone, let a shape fall), each with steppers for how much. A slider that
 // is offered to writers also has the span a writer may choose within.
-const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone', fall: 'Let the shape fall' }
+const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone', depth: 'Turn a bone toward the viewer', fall: 'Let the shape fall' }
 const AXES: Array<{ id: ModelScaleAxis; name: string }> = [{ id: 'xy', name: 'Both ways' }, { id: 'x', name: 'Across' }, { id: 'y', name: 'Up and down' }]
 
 export interface RangesTabProps {
@@ -47,10 +47,10 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   const can = (kind: NewSliderKind): string | null =>
     kind === 'turn' ? (group ? null : 'Select a group first')
       : kind === 'scale' ? null
-      : kind === 'length' ? ((content.bones ?? []).length > 0 ? null : 'Add a bone in the Proportions tab first')
+      : kind === 'length' || kind === 'depth' ? ((content.bones ?? []).length > 0 ? null : 'Add a bone in the Proportions tab first')
       : kind === 'fall' ? (!shapeSel ? 'Select a shape first' : selected && hangs(selected.pts, selected.closed) ? null : 'Mark points with the Weights tool first')
       : shapeSel ? null : 'Select a shape first'
-  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend', 'length', 'fall']
+  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend', 'length', 'depth', 'fall']
   const recShape = recording ? content.shapes.find(s => s.id === recording.shapeId) : undefined
   const recRange = recording ? content.ranges.find(r => r.id === recording.rangeId) : undefined
 
@@ -190,10 +190,10 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
             <Stepper label={`At the maximum (drive ${i + 1} of ${r.name.trim() || 'the slider'})`} value={`${d.atMax}${unit}`} onStep={(dir, big) => actions.stepDrive(r.id, i, 'atMax', dir, big)} />
           </div>
         )}
-        {d.kind === 'length' && (
+        {(d.kind === 'length' || (d.kind === 'depth' && !d.group)) && (
           <label className="cmField">
             <span>Bone</span>
-            <select value={d.id ?? ''} aria-label={`Bone that drive ${i + 1} of ${r.name.trim() || 'the slider'} lengthens`} disabled={locked} onChange={e => actions.setDriveBone(r.id, i, e.target.value)}>
+            <select value={d.id ?? ''} aria-label={`Bone that drive ${i + 1} of ${r.name.trim() || 'the slider'} ${d.kind === 'depth' ? 'turns toward the viewer' : 'lengthens'}`} disabled={locked} onChange={e => actions.setDriveBone(r.id, i, e.target.value)}>
               {!(content.bones ?? []).some(b => b.id === d.id) && <option value="">(gone)</option>}
               {(content.bones ?? []).map(b => <option key={b.id} value={b.id}>{b.name.trim() || b.id}</option>)}
             </select>

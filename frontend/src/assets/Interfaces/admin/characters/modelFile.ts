@@ -95,6 +95,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     blend: (['multiply', 'screen', 'overlay'].includes(v.blend as string) ? v.blend : null) as ModelBlend | null, clip: idOrNull(v.clip),
     cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy), round: roundOf(typeof v.round === 'number' ? v.round : 0),
     skin: skins(v.skin, list(v.pts).length),
+    over: [...new Set(list(v.over).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.overMax),
   }
 }
 
@@ -118,7 +119,7 @@ function move(v: unknown): ModelMove {
 
 // A drive the server would accept, or null (the server drops the same ones).
 function drive(v: unknown): ModelDrive | null {
-  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop'].includes(v.kind as string)) return null
+  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop', 'depth'].includes(v.kind as string)) return null
   const kind = v.kind as ModelDrive['kind']
   const group = idOf(v.group), id = idOf(v.id), shapeId = idOf(v.shape)
   if (kind === 'prop') {
@@ -136,9 +137,9 @@ function drive(v: unknown): ModelDrive | null {
   if (kind === 'turn' && !group) return null
   if (kind === 'scale' && (!target || (target !== 'model' && !id))) return null
   if ((kind === 'points' || kind === 'bend' || kind === 'fall') && !shapeId) return null
-  if (kind === 'length' && !id) return null
+  if ((kind === 'length' || kind === 'depth') && !id) return null
   const scale = kind === 'scale' || kind === 'length'
-  const at = (x: unknown, rest = 0) => (scale ? num(x, 100, 5, 1000) : kind === 'fall' ? num(x, rest, 0, 100) : num(x, 0, -360, 360))
+  const at = (x: unknown, rest = 0) => (scale ? num(x, 100, 5, 1000) : kind === 'fall' ? num(x, rest, 0, 100) : kind === 'depth' ? num(x, 0, -89, 89) : num(x, 0, -360, 360))
   const y0 = num(v.y0, 0, -50, 450), y1 = num(v.y1, 0, -50, 450)
   return {
     kind, group, target, id, axis: v.axis === 'x' || v.axis === 'y' ? v.axis : 'xy', shape: shapeId,

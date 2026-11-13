@@ -44,7 +44,7 @@ export function ProportionsTab({ content, solved, picking, actions, limits }: {
   function boneCard(b: ModelBone) {
     const name = label(b.name, 'Bone')
     const target = b.end.kind === 'point' ? content.shapes.find(s => s.id === b.end.id) : undefined
-    const sliders = content.ranges.filter(r => r.drives.some(d => d.kind === 'length' && d.id === b.id))
+    const sliders = content.ranges.filter(r => r.drives.some(d => (d.kind === 'length' || d.kind === 'depth') && d.id === b.id))
     return (
       <section key={b.id} className="cmSlider" aria-label={`Bone ${name}`}>
         <div className="cmSliderHead">
@@ -98,6 +98,7 @@ export function ProportionsTab({ content, solved, picking, actions, limits }: {
         {sliders.length > 0 && <ul className="cmPlain">{sliders.map((r: ModelRange) => <li key={r.id}><button type="button" className="cmLink" onClick={() => actions.openSlider(r.id)}>{label(r.name, r.id)}</button></li>)}</ul>}
         <div className="cmInline">
           <button type="button" className="cmBtn cmBtn--small" disabled={content.ranges.length >= max.sliders} onClick={() => actions.lengthSlider(b.id)}><PlusIcon size={12} /> Add a Length slider</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={content.ranges.length >= max.sliders} title="A slider that turns the bone toward the viewer or away: it is drawn shorter (foreshortened), and what hangs from it keeps its length" onClick={() => actions.depthSlider(b.id)}><PlusIcon size={12} /> Add a Depth slider</button>
         </div>
       </section>
     )

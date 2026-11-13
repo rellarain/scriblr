@@ -17,8 +17,27 @@ export const twinGroupOf = (c: ModelContent, groupId: string): string | undefine
 // The group a turn or a scale drive of a group moves.
 const groupOfDrive = (d: ModelDrive): string | undefined => (d.kind === 'turn' ? d.group ?? undefined : d.kind === 'scale' && d.target === 'group' ? d.id ?? undefined : undefined)
 
-// The drives of a slider that a twin could be posed apart from: a turn or a scale of a group that has a twin group.
-const poseable = (c: ModelContent, d: ModelDrive): boolean => { const g = groupOfDrive(d); return !!g && !!twinGroupOf(c, g) }
+// What a drive poses (phase O2 adds two): the group it turns or scales, the group a Depth drive's bone starts at (or the twin it poses, when it names one), or the object or
+// shape whose depth order a `z` field sets.
+function targetOf(c: ModelContent, d: ModelDrive): string | undefined {
+  if (d.kind === 'depth') return d.group ?? (c.bones ?? []).find(b => b.id === d.id)?.start
+  if (d.kind === 'prop' && d.prop === 'z') return (d.feature === 'object' ? d.id : d.shape) ?? undefined
+  return groupOfDrive(d)
+}
+// The twin of what a drive poses (a group, an object or a shape that mirrors it).
+function twinOfTarget(c: ModelContent, d: ModelDrive, id: string): string | undefined {
+  if (d.kind === 'prop') return d.feature === 'object' ? c.objects.find(o => o.mirrorOf === id)?.id : c.shapes.find(x => x.mirrorOf === id)?.id
+  return twinGroupOf(c, id)
+}
+// The drive for the other side: the same, on the twin.
+function onTwin(d: ModelDrive, twin: string): ModelDrive {
+  if (d.kind === 'turn' || d.kind === 'depth') return { ...d, group: twin, mirror: true }
+  if (d.kind === 'prop') return d.feature === 'object' ? { ...d, id: twin, mirror: true } : { ...d, shape: twin, mirror: true }
+  return { ...d, id: twin, mirror: true }
+}
+
+// The drives of a slider that a twin could be posed apart from: a turn, a scale or a foreshortening of a group that has a twin group, or the depth order of a part that has one.
+const poseable = (c: ModelContent, d: ModelDrive): boolean => { const t = targetOf(c, d); return !!t && !!twinOfTarget(c, d, t) }
 
 // A drive of the original side that its twin does not follow.
 const keepsApart = (c: ModelContent, d: ModelDrive): boolean => d.mirror === false && poseable(c, d)
@@ -35,10 +54,10 @@ const pairings = new WeakMap<ModelContent, Map<string, string>>()
 function pairsOf(c: ModelContent): Map<string, string> {
   const known = pairings.get(c)
   if (known) return known
-  const keysOf = (r: ModelRange): Set<string> => new Set(r.drives.flatMap(d => { const g = groupOfDrive(d); return g ? [`${d.kind}:${g}`] : [] }))
+  const keysOf = (r: ModelRange): Set<string> => new Set(r.drives.flatMap(d => { const g = targetOf(c, d); return g ? [`${d.kind}:${g}`] : [] }))
   const out = new Map<string, string>(), claimed = new Set<string>()
   for (const r of c.ranges) {
-    const wanted = new Set(r.drives.filter(d => keepsApart(c, d)).map(d => `${d.kind}:${twinGroupOf(c, groupOfDrive(d)!)}`))
+    const wanted = new Set(r.drives.filter(d => keepsApart(c, d)).map(d => `${d.kind}:${twinOfTarget(c, d, targetOf(c, d)!)}`))
     if (wanted.size === 0) continue
     const named = `${r.name.trim().slice(0, 40 - OTHER.length)}${OTHER}`
     let best: ModelRange | undefined, bestScore = Infinity
@@ -73,7 +92,7 @@ export const oneSided = (c: ModelContent, r: ModelRange): boolean => movesOneSid
 // Why a slider cannot be posed apart (null when it can).
 export function whyNotApart(c: ModelContent, r: ModelRange): string | null {
   if (isApart(c, r)) return 'This slider is already posed apart: the other side has a slider of its own.'
-  if (!r.drives.some(d => poseable(c, d))) return 'None of its drives turns or scales a group that has a twin.'
+  if (!r.drives.some(d => poseable(c, d))) return 'None of its drives turns, scales or foreshortens a group that has a twin, or sets the depth order of a part that has one.'
   if (c.ranges.length >= LIMITS.rangesMax) return `A model may have at most ${LIMITS.rangesMax} sliders.`
   return null
 }
@@ -88,8 +107,7 @@ export function apartSlider(c: ModelContent, rangeId: string, make: MakeId = ran
   const copies: ModelDrive[] = []
   const drives = r.drives.map(d => {
     if (!poseable(c, d) || (asked && d.mirror !== false)) return d
-    const twin = twinGroupOf(c, groupOfDrive(d)!)!
-    copies.push(d.kind === 'turn' ? { ...d, group: twin, mirror: true } : { ...d, id: twin, mirror: true })
+    copies.push(onTwin(d, twinOfTarget(c, d, targetOf(c, d)!)!))
     return { ...d, mirror: false }
   })
   const id = freshId(c, 'r', make)

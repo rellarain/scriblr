@@ -65,6 +65,15 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     wears.set(o.id, made)
     return made
   }
+  // The other objects a shading shape lies on: its own list, else (a twin) its original's with each object swapped for its twin (an object with none stays).
+  const overOf = (shapeId: string): string[] => {
+    const s = shapes.get(shapeId)
+    if (!s) return []
+    if ((s.over ?? []).length) return s.over!
+    const orig = s.mirrorOf ? shapes.get(s.mirrorOf) : undefined
+    if (!orig || orig.mirrorOf || !(orig.over ?? []).length) return []
+    return orig.over!.map(oid => c.objects.find(o => o.mirrorOf === oid)?.id ?? objects.get(oid)?.mirrorOf ?? oid)
+  }
   const items: PaintItem[] = []
   for (const id of ids) {
     const r = solved.shapes[id], layer = layerOf(id)
@@ -72,8 +81,10 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     const clipD = layer.clip ? outline(layer.clip) : ''
     let compDs: string[] = []
     if (layer.shading) {
+      // the base shapes of its own object, and of the other objects it lies on (phase O2: one shadow down the chest and the pelvis)
       const home = c.objects.find(o => o.shapes.includes(id))
-      compDs = (home?.shapes ?? []).filter(sid => {
+      const lying = [home, ...overOf(id).map(oid => objects.get(oid))].filter((o, k, all): o is NonNullable<typeof o> => !!o && all.indexOf(o) === k)
+      compDs = lying.flatMap(o => o.shapes).filter(sid => {
         const b = layerOf(sid)
         return sid !== id && !!b && !b.shading && !b.helper && !!solved.shapes[sid]?.visible && !!solved.shapes[sid]?.d
       }).map(sid => solved.shapes[sid].d)

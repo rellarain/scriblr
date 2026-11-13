@@ -311,6 +311,13 @@ function mixSkin(a: PointSkin, b: PointSkin, t: number): PointSkin {
   for (const [g, w] of b.inf) m.set(g, (m.get(g) ?? 0) + w * t)
   return { base: a.base, inf: [...m.entries()].filter(([, w]) => w > 0) }
 }
+// Foreshortening (phase O2): a bone that points `deg` degrees toward the viewer (+) or away (-) is drawn shorter along itself by the cosine of the angle and a little wider
+// across (narrower when it points away), about the joint it turns at. The most is 89 degrees either way.
+export const DEPTH_MAX = 89
+export function foreshorten(deg: number, ux: number, uy: number, px: number, py: number): Mat {
+  const a = (clamp(deg, -DEPTH_MAX, DEPTH_MAX) * Math.PI) / 180
+  return mul(scaleAlong(Math.cos(a), ux, uy, px, py), scaleAlong(1 + 0.12 * Math.sin(a), -uy, ux, px, py))
+}
 const plainRests = new WeakMap<ModelContent, Solved>()
 function plainRest(c: ModelContent): Solved {
   let s = plainRests.get(c)
@@ -393,6 +400,9 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G, turns: {} }
   const turns = out.turns!
+  // A group's matrix without its own foreshortening (phase O2), only for a group that has some: what hangs from it stands in this one, moved to where the shortened group puts
+  // its joint, so a forearm hangs from the end of an upper arm that points at the viewer and keeps its own length (see carryFor).
+  const bares: Record<string, Mat> = {}
   // Groups and shapes are solved when something asks for them (an anchor asks for a shape, a shape for its group, a link for another shape); a thing that
   // is being solved is not asked for again, so a circle of anchors or links cannot loop: it is cut where it closes.
   const busyGroups = new Set<string>(), busyShapes = new Set<string>()
@@ -758,6 +768,20 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return keep
   }
 
+  // How far authored fields move a shape in the drawing order (phase O2, the `z` property of the shape or its object): an arm that points away from the viewer drops behind the
+  // body. A twin goes with the shape or object it mirrors unless that drive keeps to its own side (`mirror: false`, the two sides posed apart).
+  const zDrives = ranges.flatMap(r => r.drives.filter(d => d.kind === 'prop' && d.prop === 'z').map(d => ({ r, d })))
+  function zShift(sh: ModelShape): number {
+    if (zDrives.length === 0) return 0
+    const oid = objectOfShape.get(sh.id), o = oid ? objectMap.get(oid) : undefined
+    let shift = 0
+    for (const { r, d } of zDrives) {
+      const mine = d.feature === 'object' ? !!d.id && (d.id === oid || (d.mirror !== false && d.id === o?.mirrorOf)) : !!d.shape && (d.shape === sh.id || (d.mirror !== false && d.shape === sh.mirrorOf))
+      if (mine) shift += propAmount(r, d, val(r))
+    }
+    return shift
+  }
+
   // Whether any corner of the model is rounded (a shape's own radius, a form's, or a field that adds to it): a model with none pays nothing.
   const anyRound = roundUse(c)
   // The radius the sharp corners of a shape are rounded to (phase D4): its own, or the radius a chosen form gives it, plus what authored fields add (0..ROUND_MAX). A twin
@@ -837,7 +861,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
       d: ok ? pathText(fin, closed) : '', poly, box: poly.length ? boxOf(poly) : NO_BOX,
-      visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, fade: fadeOf(sh), z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
+      visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, fade: fadeOf(sh), z: (view === 'back' && sh.zBack != null ? sh.zBack : sh.z) + zShift(sh),
       ...(skin ? { skin } : {}),
     }
   }
@@ -856,10 +880,19 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // What a group does on top of where its parent and its anchor put it: its matrix and its pivot (in the parent's frame, before the group's own movement), with
   // `forTwin` leaving out the drives that a twin does not follow (a drive with `mirror: false`: the two sides are posed apart).
-  function movement(g: ModelGroup, forTwin: boolean): { Mg: Mat; pw2: [number, number]; an: [number, number] | null; angle: number } {
+  // The matrix a group hangs from: its parent's, or for a parent that is foreshortened the parent's matrix without that, moved so that the group's joint `pv` is where the
+  // shortened parent puts it (the group is carried, not squashed).
+  function carryFor(parentId: string, pv: [number, number]): Mat {
+    const D = groupMat(parentId), B = bares[parentId]
+    if (!B) return D
+    const [dx, dy] = apply(D, pv[0], pv[1]), [bx, by] = apply(B, pv[0], pv[1])
+    return mul(translate(dx - bx, dy - by), B)
+  }
+
+  function movement(g: ModelGroup, forTwin: boolean): { Mg: Mat; bare: Mat | null; pw2: [number, number]; an: [number, number] | null; angle: number } {
     const id = g.id
-    const pm = (g.parent ? groupMat(g.parent) : undefined) ?? IDENTITY
     const pv = g.pivot ?? restPivot(c, g)
+    const pm = g.parent ? carryFor(g.parent, pv) : IDENTITY
     let bm = pm
     let an: [number, number] | null = null
     if (g.attach) {
@@ -872,6 +905,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     // a bone starting at this group is stretched along its own rest direction (as the parent holds it now), about the pivot; all the groups that hang from
     // this one follow, since they stand in this group's matrix
     let lengthen = bm
+    let depth: Mat | null = null
     for (const r of ranges) for (const d of r.drives) {
       if (forTwin && d.mirror === false) continue
       if (d.kind === 'turn' && d.group === id) angle += amount(r, d, val(r))
@@ -886,12 +920,23 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         const vx = rest.b[0] - rest.a[0], vy = rest.b[1] - rest.a[1]
         const ux = bm[0] * vx + bm[2] * vy, uy = bm[1] * vx + bm[3] * vy, len = Math.hypot(ux, uy)
         if (len > 1e-6) lengthen = mul(scaleAlong(factorOf(r, d, val(r)), ux / len, uy / len, pw2[0], pw2[1]), lengthen)
+      } else if (d.kind === 'depth' && d.id && !d.group) {
+        // the bone points toward the viewer or away: the group is drawn shorter along the bone (as the parent holds it now) and a little wider or narrower across it,
+        // about its joint; what hangs from it is carried to the shortened end, not squashed (a drive with a group of its own poses the twin of the bone's group)
+        const bone = boneMap.get(d.id)
+        const rest = bone && bone.start === id ? boneAtRest(c, bone) : null
+        if (!rest) continue
+        const vx = rest.b[0] - rest.a[0], vy = rest.b[1] - rest.a[1]
+        const ux = bm[0] * vx + bm[2] * vy, uy = bm[1] * vx + bm[3] * vy, len = Math.hypot(ux, uy)
+        if (len > 1e-6) depth = mul(foreshorten(amount(r, d, val(r)), ux / len, uy / len, pw2[0], pw2[1]), depth ?? IDENTITY)
       }
     }
-    return { Mg: mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), lengthen)), pw2, an, angle }
+    const R = rotate(angle, pw2[0], pw2[1]), S = scale(sx, sy, pw2[0], pw2[1])
+    if (!depth) return { Mg: mul(R, mul(S, lengthen)), bare: null, pw2, an, angle }
+    return { Mg: mul(R, mul(S, mul(depth, lengthen))), bare: mul(R, mul(S, lengthen)), pw2, an, angle }
   }
   // Whether a group has drives that its twin does not follow.
-  const apartFrom = (id: string): boolean => ranges.some(r => r.drives.some(d => d.mirror === false && ((d.kind === 'turn' && d.group === id) || (d.kind === 'scale' && d.target === 'group' && d.id === id) || d.kind === 'length')))
+  const apartFrom = (id: string): boolean => ranges.some(r => r.drives.some(d => d.mirror === false && ((d.kind === 'turn' && d.group === id) || (d.kind === 'scale' && d.target === 'group' && d.id === id) || d.kind === 'length' || (d.kind === 'depth' && !d.group))))
 
   function groupMat(id: string): Mat {
     const done = out.mats[id]
@@ -907,11 +952,16 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       // the torso carries both arms alike; with twin parents (left arm and forearm) it is the plain reflection of the original. The drives of the original that
       // do not mirror are left out, and the twin may have drives of its own (phase 5c): what the same slider would do to the original, as a mirror image
       // (a turn the other way round about the twin's own pivot), so the two sides are posed apart while the drawing stays mirrored.
-      const Mpo = original.parent ? groupMat(original.parent) : IDENTITY
-      const Mpt = g.parent ? groupMat(g.parent) : IDENTITY
+      const pvo = original.pivot ?? restPivot(c, original), pvt: [number, number] = [2 * axis - pvo[0], pvo[1]]
+      const Mpo = original.parent ? carryFor(original.parent, pvo) : IDENTITY
+      const Mpt = g.parent ? carryFor(g.parent, pvt) : IDENTITY
       const apart = apartFrom(original.id) ? movement(original, true) : null
       const Mo = apart ? apart.Mg : groupMat(original.id)
-      Mg = mul(Mpt, mul(RF, mul(inverse(Mpo), mul(Mo, RF))))
+      const mirrorIn = (m: Mat): Mat => mul(Mpt, mul(RF, mul(inverse(Mpo), mul(m, RF))))
+      Mg = mirrorIn(Mo)
+      // without the foreshortening: the original's, mirrored, for what hangs from the twin
+      const Bo = apart ? apart.bare : bares[original.id] ?? null
+      let B: Mat | null = Bo ? mirrorIn(Bo) : null
       // the whole turn: the twin's parent's, less the original's own turn (a mirror turns the other way round)
       const Tpo = original.parent ? turns[original.parent] ?? 0 : 0, Tpt = g.parent ? turns[g.parent] ?? 0 : 0
       const To = apart ? Tpo + apart.angle : turns[original.id] ?? Tpo
@@ -921,19 +971,35 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       out.pivots[id] = [pw[0], pw[1]]
       out.anchors[id] = null
       let angle = 0, sx = 1, sy = 1
+      let depth: Mat | null = null
       for (const r of ranges) for (const d of r.drives) {
         if (d.kind === 'turn' && d.group === id) angle += amount(r, d, val(r))
         else if (d.kind === 'scale' && d.target === 'group' && d.id === id) {
           const f = factorOf(r, d, val(r))
           if (d.axis !== 'y') sx *= f
           if (d.axis !== 'x') sy *= f
+        } else if (d.kind === 'depth' && d.group === id && d.id) {
+          // the twin's own foreshortening (the two sides posed apart): along the mirror image of the bone, as the twin is held now
+          const bone = boneMap.get(d.id)
+          const rest = bone && bone.start === original.id ? boneAtRest(c, bone) : null
+          if (!rest) continue
+          const vx = -(rest.b[0] - rest.a[0]), vy = rest.b[1] - rest.a[1]
+          const ux = Mg[0] * vx + Mg[2] * vy, uy = Mg[1] * vx + Mg[3] * vy, len = Math.hypot(ux, uy)
+          if (len > 1e-6) depth = mul(foreshorten(amount(r, d, val(r)), ux / len, uy / len, pw[0], pw[1]), depth ?? IDENTITY)
         }
       }
-      if (angle !== 0 || sx !== 1 || sy !== 1) Mg = mul(rotate(-angle, pw[0], pw[1]), mul(scale(sx, sy, pw[0], pw[1]), Mg))
+      if (depth) { B = B ?? Mg; Mg = mul(depth, Mg) }
+      if (angle !== 0 || sx !== 1 || sy !== 1) {
+        const R = rotate(-angle, pw[0], pw[1]), S = scale(sx, sy, pw[0], pw[1])
+        Mg = mul(R, mul(S, Mg))
+        if (B) B = mul(R, mul(S, B))
+      }
+      if (B && finiteMat(B)) bares[id] = B
       turns[id] -= angle
     } else {
       const m = movement(g, false)
       Mg = m.Mg
+      if (m.bare && finiteMat(m.bare)) bares[id] = m.bare
       out.pivots[id] = [m.pw2[0], m.pw2[1]]
       out.anchors[id] = g.attach ? m.an : null
       turns[id] = (g.parent ? turns[g.parent] ?? 0 : 0) + m.angle

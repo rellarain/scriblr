@@ -6,7 +6,7 @@ import type { ModelFeatureKind } from '../../../../../api/types'
 // MODEL_PROPS (schemaParity.test.ts keeps them the same).
 
 export type PropKey =
-  | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'curve' | 'length' | 'texture' | 'opacity' | 'roundness' | 'offset'
+  | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'curve' | 'length' | 'texture' | 'opacity' | 'roundness' | 'z' | 'offset'
   | 'fillHue' | 'fillSat' | 'fillLight'
   | 'gradReach' | 'gradBlend' | 'gradDir' | 'gradHue' | 'gradSat' | 'gradLight'
 
@@ -43,6 +43,7 @@ export const PROPS: Record<PropKey, PropSpec> = Object.fromEntries([
   spec({ key: 'texture', label: 'Texture', group: 'look', features: WHOLE, rest: 0, lo: 0, hi: 100, unit: '', slider: [0, 0, 99], amounts: [0, 99], hint: 'Waves the free ends of it sideways: 0 is straight, then wavy, curly and coily.' }),
   spec({ key: 'opacity', label: 'Opacity', group: 'look', features: WHOLE, rest: 100, lo: 0, hi: 100, unit: '%', slider: [0, 100, 100], amounts: [0, 100], hint: 'How much of its own opacity it keeps.' }),
   spec({ key: 'roundness', label: 'Corner roundness', group: 'look', features: WHOLE, rest: 0, lo: -20, hi: 20, unit: '', slider: [0, 0, 20], amounts: [0, 20], hint: 'Adds to the radius its sharp corners are rounded to (less than none is none).' }),
+  spec({ key: 'z', label: 'Depth order', group: 'place', features: WHOLE, rest: 0, lo: -60, hi: 60, unit: '', slider: [-20, 0, 20], amounts: [-20, 20], hint: 'Adds to its depth, so it is drawn in front of more (+) or fewer (-) of the shapes around it: an arm that points away goes behind the body.' }),
   spec({ key: 'offset', label: 'Push the edge', group: 'place', features: ['edge'], rest: 0, lo: -200, hi: 200, unit: '', slider: [-20, 0, 20], amounts: [-20, 20], hint: 'Pushes the edge outward (or inward) by moving both of its points.' }),
   spec({ key: 'fillHue', label: 'Fill hue', group: 'colour', features: WHOLE, rest: 0, lo: -180, hi: 180, unit: '°', slider: [-90, 0, 90], amounts: [-90, 90], hint: 'Turns the hue of the colour it is painted with.' }),
   spec({ key: 'fillSat', label: 'Fill saturation', group: 'colour', features: WHOLE, rest: 0, lo: -100, hi: 100, unit: '%', slider: [-50, 0, 50], amounts: [-50, 50], hint: 'Makes the colour it is painted with more or less saturated.' }),
@@ -70,5 +71,5 @@ export const GROUP_LABELS: Record<PropGroup, string> = { place: 'Place', size: '
 // The properties that change how a shape is painted rather than where it is: the paint reads these and the solver does not.
 export const PAINT_PROPS: readonly PropKey[] = ['fillHue', 'fillSat', 'fillLight', 'gradReach', 'gradBlend', 'gradDir', 'gradHue', 'gradSat', 'gradLight']
 export const isPaintProp = (k: string | null | undefined): boolean => !!k && (PAINT_PROPS as readonly string[]).includes(k)
-// The properties that change how a shape is drawn without moving its points: its opacity and the rounding of its corners (the points stay where they were drawn).
-export const isDrawingProp = (k: string | null | undefined): boolean => k === 'opacity' || k === 'roundness'
+// The properties that change how a shape is drawn without moving its points: its opacity, the rounding of its corners and its depth order (the points stay where they were drawn).
+export const isDrawingProp = (k: string | null | undefined): boolean => k === 'opacity' || k === 'roundness' || k === 'z'

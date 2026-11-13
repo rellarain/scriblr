@@ -66,7 +66,7 @@ import * as patternOps from './engine/patterns'
 import { addShading } from './engine/shadeEdit'
 import { apartSlider, joinSides, oneSideEach, poseSides } from './engine/sidesEdit'
 import {
-  addBend, addLength, addRange, addScale, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
+  addBend, addDepth, addLength, addRange, addScale, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { templateBox, templateById } from './engine/templates'
@@ -458,11 +458,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function newSlider(kind: NewSliderKind) {
     const id = freshId(content, 'r', makeId)
     const gName = group?.name.trim() || 'the group'
-    if (kind === 'length') {
+    if (kind === 'length' || kind === 'depth') {
       const b = lengthBone()
-      if (!b) { setNote('Add a bone first (Proportions tab): a Length slider lengthens a bone.'); return }
-      const start = addRange(content, newRange(id, sliderName(content, `${b.name.trim() || 'Bone'} length`), 'length', b.start))
-      if (start.ok && applyEdit(addLength(start.content, id, b.id))) { setTab('ranges'); setRangeFilter('selection') }
+      if (!b) { setNote(`Add a bone first (Proportions tab): a ${kind === 'depth' ? 'Depth slider turns' : 'Length slider lengthens'} a bone.`); return }
+      const start = addRange(content, newRange(id, sliderName(content, `${b.name.trim() || 'Bone'} ${kind === 'depth' ? 'depth' : 'length'}`), kind, b.start))
+      if (start.ok && applyEdit(kind === 'depth' ? addDepth(start.content, id, b.id) : addLength(start.content, id, b.id))) { setTab('ranges'); setRangeFilter('selection') }
       else if (!start.ok) setNote(start.reason)
       return
     }
@@ -491,6 +491,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   function addDrive(rangeId: string, kind: NewSliderKind) {
     if (kind === 'length') { const b = lengthBone(); if (!b) setNote('Add a bone first (Proportions tab): a Length slider lengthens a bone.'); else applyEdit(addLength(content, rangeId, b.id)); return }
+    if (kind === 'depth') { const b = lengthBone(); if (!b) setNote('Add a bone first (Proportions tab): a Depth slider turns a bone toward the viewer.'); else applyEdit(addDepth(content, rangeId, b.id)); return }
     if (kind === 'turn') { if (!group) setNote('Select a group first.'); else applyEdit(addTurn(content, rangeId, group.id)); return }
     if (kind === 'scale') { const t = scaleTarget(); applyEdit(addScale(content, rangeId, t.target, t.id)); return }
     if (!selShape) { setNote('Select a shape first.'); return }
@@ -625,6 +626,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const start = addRange(content, newRange(id, sliderName(content, `${b.name.trim() || 'Bone'} length`), 'length', b.start))
       if (!start.ok) { setNote(start.reason); return }
       applyEdit(addLength(start.content, id, boneId))
+    },
+    depthSlider: boneId => {
+      const b = boneById(content, boneId)
+      if (!b) return
+      const id = freshId(content, 'r', makeId)
+      const start = addRange(content, newRange(id, sliderName(content, `${b.name.trim() || 'Bone'} depth`), 'depth', b.start))
+      if (!start.ok) { setNote(start.reason); return }
+      applyEdit(addDepth(start.content, id, boneId))
     },
     openSlider: () => { setTab('ranges'); setRangeFilter('all') },
   }
@@ -875,6 +884,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     setBlend: (id, blend) => { applyEdit(paintOps.setBlend(content, id, blend)) },
     setClip: (id, target) => { applyEdit(paintOps.setClip(content, id, target)) },
     toggleCut: (id, target) => { applyEdit(paintOps.toggleCut(content, id, target)) },
+    toggleOver: (id, objectId) => { applyEdit(paintOps.toggleOver(content, id, objectId)) },
     setHelper: (id, on) => { applyEdit(paintOps.setHelper(content, id, on)) },
     addShading: (id, kind, side) => {
       const e = addShading(content, id, kind, side, makeId)

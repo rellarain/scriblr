@@ -97,6 +97,21 @@ export function toggleCut(c: ModelContent, id: string, target: string): Edit {
   })
 }
 
+// Let a shading shape lie on another object as well as its own, or stop it (phase O2): it is then kept inside that object's base shapes too, so one shadow runs down the chest
+// and the pelvis. At most LIMITS.overMax objects; never its own.
+export function toggleOver(c: ModelContent, id: string, objectId: string): Edit {
+  const o = c.objects.find(x => x.id === objectId)
+  if (!o) return fail('There is no such part.')
+  if (o.shapes.includes(id)) return fail('A shading shape always lies on the shapes of its own object.')
+  return change(c, id, s => {
+    if (!s.shade) return 'Only a shading shape lies on other parts: make it one first (Add shading).'
+    const over = s.over ?? []
+    if (over.includes(objectId)) return { over: over.filter(x => x !== objectId) }
+    if (over.length >= LIMITS.overMax) return `A shading shape may lie on at most ${LIMITS.overMax} other parts.`
+    return { over: [...over, objectId] }
+  })
+}
+
 // A helper is never drawn in the previews: it only serves to clip or cut other shapes.
 export const setHelper = (c: ModelContent, id: string, helper: boolean): Edit => change(c, id, () => ({ helper }))
 

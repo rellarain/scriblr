@@ -247,8 +247,12 @@ function twinBones(before: ModelContent, into: ModelContent, originalId: string,
     next = {
       ...next,
       bones: [...(next.bones ?? []), { id: nid, name: twinName(b.name), start: groupId, end }],
-      ranges: next.ranges.map(r => {
-        const extra = r.drives.filter(d => d.kind === 'length' && d.id === b.id).map(d => ({ ...d, id: nid }))
+      ranges: next.ranges.map(r0 => {
+        let r = r0
+        // a Length or Depth drive of the bone gets one for the twin's own bone (a Depth drive that posed the twin apart becomes that bone's own)
+        const extra = r.drives.filter(d => (d.kind === 'length' || d.kind === 'depth') && d.id === b.id && !d.group && d.mirror !== false).map(d => ({ ...d, id: nid }))
+        const own = r.drives.map(d => (d.kind === 'depth' && d.id === b.id && d.group === groupId ? { ...d, id: nid, group: null } : d))
+        if (own.some((d, k) => d !== r.drives[k])) r = { ...r, drives: own }
         return extra.length && r.drives.length + extra.length <= LIMITS.drivesMax ? { ...r, drives: [...r.drives, ...extra] } : r
       }),
     }

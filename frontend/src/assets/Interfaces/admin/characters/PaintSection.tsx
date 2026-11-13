@@ -22,6 +22,8 @@ export interface PaintActions {
   setBlend: (id: string, blend: ModelBlend | null) => void
   setClip: (id: string, target: string | null) => void
   toggleCut: (id: string, target: string) => void
+  // A shading shape lies on another object too, or stops (phase O2)
+  toggleOver: (id: string, objectId: string) => void
   setHelper: (id: string, on: boolean) => void
   // Show the shape with a slider (null: always shown), and move the two places that hide and show it one step (phase 5b)
   setFade: (id: string, sliderId: string | null) => void
@@ -105,6 +107,22 @@ export function PaintSection({ content, shape, picking, actions, hidden = [] }: 
             {KINDS.map(k => <button key={k.id} type="button" className={`cmChip cmChip--wide${shape.shade?.kind === k.id ? ' cmChip--on' : ''}`} aria-pressed={shape.shade?.kind === k.id} onClick={() => actions.setShadeKind(id, k.id)}>{k.name}</button>)}
           </ChipRow>
           <Stepper label="Amount" value={shape.shade.t.toFixed(2)} lowerOff={shape.shade.t <= 0.02} raiseOff={shape.shade.t >= 0.8} onStep={(dir, big) => actions.stepTint(id, 'shade', dir, big)} />
+          <ChipRow label="Lies on">
+            {(shape.over ?? []).map(oid => {
+              const o = content.objects.find(x => x.id === oid)
+              return <button key={oid} type="button" className="cmChip cmChip--wide cmChip--on" aria-pressed="true" title={`Stop ${name} lying on ${label(o?.name ?? '', 'that part')}`} onClick={() => actions.toggleOver(id, oid)}>{label(o?.name ?? '', 'Gone')}</button>
+            })}
+          </ChipRow>
+          {(shape.over ?? []).length < LIMITS.overMax && (
+            <label className="cmField">
+              <span>Lie on another part</span>
+              <select value="" aria-label={`Another part ${name} lies on`} onChange={e => { if (e.target.value) actions.toggleOver(id, e.target.value) }}>
+                <option value="">Choose a part…</option>
+                {content.objects.filter(o => o.id !== home?.id && !(shape.over ?? []).includes(o.id)).map(o => <option key={o.id} value={o.id}>{label(o.name, 'Untitled part')}</option>)}
+              </select>
+            </label>
+          )}
+          <p className="cmInsText">{(shape.over ?? []).length ? `It is kept inside the base shapes of ${label(home?.name ?? '', 'its object')} and of the parts it lies on, so one shadow runs across them.` : `It is kept inside the base shapes of ${label(home?.name ?? '', 'its object')}; let it lie on other parts to run one shadow across them (down the chest and the pelvis).`} {(shape.over ?? []).length} of {LIMITS.overMax}.</p>
         </>
       ) : (
         <>

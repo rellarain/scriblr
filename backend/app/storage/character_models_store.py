@@ -518,13 +518,13 @@ def _field_faults(content: ModelContent) -> list[str]:
             if d.feature == "object":
                 if d.id not in objects:
                     faults.append(f"Slider {name} changes a property of an object that does not exist.")
-                elif objects[d.id or ""].mirrorOf:
+                elif objects[d.id or ""].mirrorOf and d.prop != "z":
                     faults.append(f"Slider {name} changes a property of a twin object; change the original instead.")
                 continue
             shape = shapes.get(d.shape or "")
             if shape is None:
                 faults.append(f"Slider {name} changes a property of a shape that does not exist.")
-            elif shape.mirrorOf:
+            elif shape.mirrorOf and d.prop != "z":
                 faults.append(f"Slider {name} changes a property of a twin; change the original instead.")
             elif d.feature in ("point", "edge") and d.i >= len(shape.pts):
                 faults.append(f"Slider {name} changes {'a point' if d.feature == 'point' else 'an edge'} of {_label(shape.name, shape.id)} that is no longer there.")
@@ -623,6 +623,7 @@ def _paint_faults(content: ModelContent) -> list[str]:
     shapes = {s.id: s for s in content.shapes}
     slot_ids = {sl.id for sl in content.slots}
     range_ids = {r.id for r in content.ranges}
+    object_ids = {o.id for o in content.objects}
     for s in content.shapes:
         name = _label(s.name, s.id)
         if s.opBy is not None and s.opBy.slider not in range_ids:
@@ -639,6 +640,11 @@ def _paint_faults(content: ModelContent) -> list[str]:
                 faults.append(f"Shape {name} is cut by a shape that does not exist.")
         if s.grad is not None and s.grad.to is not None and s.grad.to not in slot_ids:
             faults.append(f"Shape {name} has a gradient to a colour slot that does not exist.")
+        if s.over:
+            if s.shade is None and not s.mirrorOf:
+                faults.append(f"Shape {name} lies on other parts but is not a shading shape.")
+            if any(o not in object_ids for o in s.over):
+                faults.append(f"Shape {name} lies on a part that does not exist.")
     for o in content.objects:
         obj = _label(o.name, o.id)
         own = set(o.shapes)
@@ -698,6 +704,12 @@ def _proportion_faults(content: ModelContent) -> list[str]:
         for d in r.drives:
             if d.kind == "length" and d.id not in bones:
                 faults.append(f"Slider {_label(r.name, r.id)} changes the length of a bone that does not exist.")
+            elif d.kind == "depth":
+                bone = bones.get(d.id or "")
+                if bone is None:
+                    faults.append(f"Slider {_label(r.name, r.id)} turns a bone toward the viewer that does not exist.")
+                elif d.group is not None and not any(g.id == d.group and g.mirrorOf == bone.start for g in content.groups):
+                    faults.append(f"Slider {_label(r.name, r.id)} turns the twin of a bone toward the viewer, but {d.group} is not the twin of the group the bone starts at.")
     if content.headBone is not None and content.headBone not in bones:
         faults.append("The head bone does not exist.")
     for o in content.objects:

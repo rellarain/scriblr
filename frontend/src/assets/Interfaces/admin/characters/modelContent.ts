@@ -1,7 +1,7 @@
 import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
-import { chainOf } from './engine/rig'
+import { DEPTH_MAX, chainOf } from './engine/rig'
 import { roundWeight, skinFaults } from './engine/skin'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 
@@ -74,7 +74,7 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), skin: skinOf(s),
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
   }
 }
 // Skin weights as the server keeps them (phase O1): one entry per group, at most LIMITS.skinMax, each with one weight per point (0..1 in hundredths; a short list is filled with 0,
@@ -166,8 +166,11 @@ function repairRange(r: ModelRange): ModelRange {
 // A drive as the server keeps it: a prop drive (phase D3c) must change a property its feature has on a shape or object it names, its amounts are held to what the property
 // allows (the amount at rest when it has none) and only a point or an edge has a number; anything else of a drive is left alone.
 const FEATURES: ModelFeatureKind[] = ['shape', 'point', 'edge', 'object']
+// How far a bone points toward the viewer, as the server keeps it (phase O2): degrees, at most 89 either way.
+const depthAt = (v: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(DEPTH_MAX, Math.max(-DEPTH_MAX, v)) : 0)
 function repairDrive(d: ModelDrive): ModelDrive[] {
   // the other kinds carry the three fields of an authored field empty, as the server writes them (so a draft and its published copy compare equal)
+  if (d.kind === 'depth') return d.id ? [{ ...d, atMin: depthAt(d.atMin), atMax: depthAt(d.atMax), feature: d.feature ?? null, prop: d.prop ?? null, i: d.i ?? 0 }] : []
   if (d.kind !== 'prop') return [{ ...d, feature: d.feature ?? null, prop: d.prop ?? null, i: d.i ?? 0 }]
   const spec = d.prop && hasProp(d.feature ?? 'shape', d.prop) ? PROPS[d.prop as keyof typeof PROPS] : undefined
   if (!spec || !d.feature || !FEATURES.includes(d.feature) || (d.feature === 'object' ? !d.id : !d.shape)) return []
@@ -436,6 +439,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       if ((s.cut ?? []).some(t => gone.shapes.has(t))) out = { ...out, cut: (s.cut ?? []).filter(t => !gone.shapes.has(t)) }
       // a group that is gone takes the weights of the shapes that followed it
       if ((s.skin ?? []).some(k => gone.groups.has(k.g))) out = { ...out, skin: (s.skin ?? []).filter(k => !gone.groups.has(k.g)) }
+      if ((s.over ?? []).some(o => gone.objects.has(o))) out = { ...out, over: (s.over ?? []).filter(o => !gone.objects.has(o)) }
       return out
     }),
     objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
@@ -749,12 +753,12 @@ function fieldFaults(c: ModelContent): string[] {
       if (d.feature === 'object') {
         const o = d.id ? objects.get(d.id) : undefined
         if (!o) faults.push(`Slider ${name} changes a property of an object that does not exist.`)
-        else if (o.mirrorOf) faults.push(`Slider ${name} changes a property of a twin object; change the original instead.`)
+        else if (o.mirrorOf && d.prop !== 'z') faults.push(`Slider ${name} changes a property of a twin object; change the original instead.`)
         continue
       }
       const shape = d.shape ? shapes.get(d.shape) : undefined
       if (!shape) faults.push(`Slider ${name} changes a property of a shape that does not exist.`)
-      else if (shape.mirrorOf) faults.push(`Slider ${name} changes a property of a twin; change the original instead.`)
+      else if (shape.mirrorOf && d.prop !== 'z') faults.push(`Slider ${name} changes a property of a twin; change the original instead.`)
       else if ((d.feature === 'point' || d.feature === 'edge') && (d.i ?? 0) >= shape.pts.length) faults.push(`Slider ${name} changes ${d.feature === 'point' ? 'a point' : 'an edge'} of ${label(shape.name, shape.id)} that is no longer there.`)
     }
   }
@@ -800,7 +804,7 @@ function colourFaults(c: ModelContent): string[] {
 // slot that is not there, a form that changes the paint of a shape it should not, and too many shading shapes in an object.
 function paintFaults(c: ModelContent): string[] {
   const faults: string[] = []
-  const shapes = new Map(c.shapes.map(s => [s.id, s])), slotIds = new Set((c.slots ?? []).map(sl => sl.id)), rangeIds = new Set(c.ranges.map(r => r.id))
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), slotIds = new Set((c.slots ?? []).map(sl => sl.id)), rangeIds = new Set(c.ranges.map(r => r.id)), objectIds = new Set(c.objects.map(o => o.id))
   for (const s of c.shapes) {
     const name = label(s.name, s.id)
     if (s.opBy && !rangeIds.has(s.opBy.slider)) faults.push(`Shape ${name} fades with a slider that does not exist.`)
@@ -813,6 +817,10 @@ function paintFaults(c: ModelContent): string[] {
       else if (!shapes.has(t)) faults.push(`Shape ${name} is cut by a shape that does not exist.`)
     }
     if (s.grad?.to && !slotIds.has(s.grad.to)) faults.push(`Shape ${name} has a gradient to a colour slot that does not exist.`)
+    if ((s.over ?? []).length > 0) {
+      if (!s.shade && !s.mirrorOf) faults.push(`Shape ${name} lies on other parts but is not a shading shape.`)
+      if ((s.over ?? []).some(o => !objectIds.has(o))) faults.push(`Shape ${name} lies on a part that does not exist.`)
+    }
   }
   for (const o of c.objects) {
     const obj = label(o.name, o.id), own = new Set(o.shapes)
@@ -855,7 +863,14 @@ function proportionFaults(c: ModelContent): string[] {
     else if (!shapes.has(b.end.id)) faults.push(`Bone ${name} ends at a shape that does not exist.`)
     else if (b.end.i >= outlineSize(c, shapes.get(b.end.id)!)) faults.push(`Bone ${name} ends at a point that does not exist.`)
   }
-  for (const r of c.ranges) for (const d of r.drives) if (d.kind === 'length' && !(d.id && bones.has(d.id))) faults.push(`Slider ${label(r.name, r.id)} changes the length of a bone that does not exist.`)
+  for (const r of c.ranges) for (const d of r.drives) {
+    if (d.kind === 'length' && !(d.id && bones.has(d.id))) faults.push(`Slider ${label(r.name, r.id)} changes the length of a bone that does not exist.`)
+    else if (d.kind === 'depth') {
+      const bone = d.id ? bones.get(d.id) : undefined
+      if (!bone) faults.push(`Slider ${label(r.name, r.id)} turns a bone toward the viewer that does not exist.`)
+      else if (d.group != null && !c.groups.some(g => g.id === d.group && g.mirrorOf === bone.start)) faults.push(`Slider ${label(r.name, r.id)} turns the twin of a bone toward the viewer, but ${d.group} is not the twin of the group the bone starts at.`)
+    }
+  }
   if (c.headBone && !bones.has(c.headBone)) faults.push('The head bone does not exist.')
   for (const o of c.objects) {
     if (o.fit !== 'stretch') continue

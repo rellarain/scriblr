@@ -2,7 +2,7 @@ import type { ModelAttach, ModelScaleAxis } from '../../../../api/types'
 import type { Selection } from './designerState'
 
 // What the Rig and Ranges tabs ask the page to do. The page (ModelPane) applies them to the content, keeps the undo stack and says why when one is refused.
-export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
+export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'depth'
 export interface Recording { rangeId: string; shapeId: string; end: 'max' | 'min' }
 
 export interface RigActions {
@@ -108,6 +108,8 @@ export interface ProportionActions {
   setHeadBone: (id: string | null) => void
   // A new slider that lengthens a bone (and lists in the Ranges tab).
   lengthSlider: (boneId: string) => void
+  // a slider that turns the bone toward the viewer or away (phase O2)
+  depthSlider: (boneId: string) => void
   openSlider: (rangeId: string) => void
 }
 
