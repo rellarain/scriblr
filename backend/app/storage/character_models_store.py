@@ -30,6 +30,7 @@ from .schema import (
     PublishedModel,
     PublishedModelList,
     PublishedModelOut,
+    WriterModelLimits,
     utcnow,
 )
 
@@ -60,6 +61,10 @@ class InvalidModelIdError(ValueError):
     """A model of the writer's library has an id that does not start with MY_ID_PREFIX."""
 
 
+class LibraryFullError(ValueError):
+    """The writer's library would hold more models than the admin allows."""
+
+
 # Two libraries share one shape. The admin's catalog holds the models Scriblr ships and the ones the admin designs; the writer's library holds the models a writer designs
 # for themselves (the Characters console's Models section). Both are published as numbered versions and a character copies a published model into its project, so a
 # model id must say which library it is from: the writer's ids all start with MY_ID_PREFIX, and the catalog's never do.
@@ -70,6 +75,30 @@ MY_ID_PREFIX = "my-"
 
 def _models_path(root: Path, library: str = ADMIN_LIBRARY) -> Path:
     return root / library
+
+
+# ---- the limits the admin sets for the writer's own models (phase 7b) ----
+
+WRITER_LIMITS_FILE = "my-models-limits.json"
+
+
+def load_writer_limits(root: Path) -> WriterModelLimits:
+    """The limits for the writer's own models: every limit at its ceiling (the admin's own limit) until the admin sets one. A file that cannot be read is put aside and the
+    ceilings apply, so a writer is never locked out of the designer by it."""
+    with _lock:
+        path = root / WRITER_LIMITS_FILE
+        if not path.exists():
+            return WriterModelLimits()
+        try:
+            return project_store._read_shard(path, WriterModelLimits)
+        except project_store.ShardCorruptError:
+            return WriterModelLimits()
+
+
+def save_writer_limits(root: Path, limits: WriterModelLimits) -> WriterModelLimits:
+    with _lock:
+        project_store._write_shard(root, root / WRITER_LIMITS_FILE, limits)
+        return limits
 
 
 def _published(version: int, content: ModelContent, at: Optional[datetime] = None) -> PublishedModel:
@@ -124,8 +153,12 @@ def save_drafts(root: Path, body: ModelDraftList, library: str = ADMIN_LIBRARY) 
         for item in body.models:
             if not item.id.startswith(MY_ID_PREFIX):
                 raise InvalidModelIdError(f"a model of the writer's library has an id that starts with {MY_ID_PREFIX!r}, not {item.id!r}")
+    most = load_writer_limits(root).models if library == MY_LIBRARY else None
 
     def change(catalog: ModelCatalog) -> None:
+        # a library over a limit the admin has lowered can still be saved, as long as it does not grow
+        if most is not None and len(body.models) > most and len(body.models) > len(catalog.models):
+            raise LibraryFullError(f"Your library is full: the admin allows at most {most} model{'' if most == 1 else 's'}. Delete one before adding another.")
         existing = {e.id: e for e in catalog.models}
         entries: list[ModelEntry] = []
         for item in body.models:
@@ -715,12 +748,38 @@ def publish_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def writer_limit_faults(content: ModelContent, limits: WriterModelLimits) -> list[str]:
+    """What stops a writer's own model from being published beyond what publish_faults says: it is over a limit the admin has set for the writer's models. The words are the
+    front end's (writerLimits.ts), line for line."""
+    faults: list[str] = []
+    mine = "the limit for a model of your own is"
+    for s in content.shapes:
+        if len(s.pts) > limits.points:
+            faults.append(f"Shape {_label(s.name, s.id)} has {len(s.pts)} points: {mine} {limits.points}.")
+    for o in content.objects:
+        if len(o.shapes) > limits.shapesPerObject:
+            faults.append(f"Object {_label(o.name, o.id)} has {len(o.shapes)} shapes: {mine} {limits.shapesPerObject}.")
+    for g in content.groups:
+        if len(g.objects) > limits.objectsPerGroup:
+            faults.append(f"Group {_label(g.name, g.id)} has {len(g.objects)} objects: {mine} {limits.objectsPerGroup}.")
+    for count, most, what in ((len(content.shapes), limits.shapes, "shapes"), (len(content.objects), limits.objects, "objects"), (len(content.groups), limits.groups, "groups"), (len(content.ranges), limits.sliders, "sliders")):
+        if count > most:
+            faults.append(f"The model has {count} {what}: {mine} {most}.")
+    size = copy_bytes(content)
+    # past the admin's own limit publish_faults has said so already
+    if limits.copyKb * 1024 < size <= MODEL_COPY_MAX_BYTES:
+        faults.append(f"A character's copy of this model would be {size // 1024} KB; {mine} {limits.copyKb} KB.")
+    return faults
+
+
 def publish_model(root: Path, model_id: str, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     """Freeze the draft as the next published version. The one published until now moves to the history."""
 
     def change(catalog: ModelCatalog) -> None:
         entry = _entry(catalog, model_id)
         faults = publish_faults(entry.draft)
+        if library == MY_LIBRARY:
+            faults.extend(writer_limit_faults(entry.draft, load_writer_limits(root)))
         if faults:
             raise PublishRefusedError(" ".join(faults))
         for other in catalog.models:

@@ -5,7 +5,7 @@ import { beginPointerDrag, dragJustEnded, zoneRef, type DropZone } from '../../.
 import type { AutosaveMode } from '../../../../theme/types'
 import SideResizer from '../../writer/levels/SideResizer'
 import {
-  BackIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon,
+  BackIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon, WrenchIcon,
   type IconProps,
 } from '../../../icons'
 import { isShown, layerInfo, moveLayer, nudgeLayer, toggleLayer, type LayerId, type LayerState } from './layerStack'
@@ -29,6 +29,8 @@ export interface ConsoleBarProps {
   // Why Publish cannot be pressed now (the checks, or nothing to publish), or null when it can.
   publishBlocked: string | null
   busy: boolean
+  // The switch for the advanced tools (Rig, Fields, Proportions, Frames), in a writer's designer; the admin's has every tool and no switch.
+  advanced?: { on: boolean; onToggle: () => void }
 }
 
 export function ConsoleBar(p: ConsoleBarProps) {
@@ -37,6 +39,12 @@ export function ConsoleBar(p: ConsoleBarProps) {
       <button type="button" className="cmIconBtn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!p.canUndo} onClick={p.onUndo}><UndoIcon size={14} /></button>
       <button type="button" className="cmIconBtn" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={!p.canRedo} onClick={p.onRedo}><RedoIcon size={14} /></button>
       <SaveCluster status={p.saveStatus} onSave={p.onSave} scope=".dzConsole" autosave={p.autosave} />
+      {p.advanced && (
+        <button
+          type="button" className={`cmIconBtn${p.advanced.on ? ' cmIconBtn--on' : ''}`} aria-label="Show advanced tools" aria-pressed={p.advanced.on}
+          title="Show advanced tools: the Rig, Fields, Proportions and Frames tabs, for models that need them" onClick={p.advanced.onToggle}
+        ><WrenchIcon size={14} /></button>
+      )}
       <button type="button" className="cmBtn cmBtn--primary" disabled={!!p.publishBlocked || p.busy} title={p.publishBlocked ?? 'Publish this draft as the next version'} onClick={p.onPublish}><CheckIcon size={12} /> Publish</button>
     </div>
   )

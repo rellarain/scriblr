@@ -14,6 +14,8 @@ export const LAYERS: Array<{ id: ModelLayer; name: string }> = [{ id: 'body', na
 
 export type MakeId = (prefix: string) => string
 export const randomId: MakeId = prefix => `${prefix}_${Math.random().toString(36).slice(2, 10)}`
+// Every id of a model in a writer's own library starts with this, which is how a character's model says which library it is from (the admin's catalog never does).
+export const MY_ID_PREFIX = 'my-'
 
 export const RANGE_NAME_MAX = 40
 export const KIND_MAX = 24

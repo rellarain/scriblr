@@ -5,11 +5,13 @@ import { MannequinIcon } from '../../../icons'
 
 // A button that opens the list of the models Scriblr ships and the admin has published (read when it opens); picking one calls onPick with a copy of its content, for the writer's
 // own library to keep as a draft of its own. The original is never touched. Escape and a click outside close it.
-export function ScriblrPicker({ onPick, button, buttonClassName = 'cmIconBtn cmIconBtn--small' }: {
+export function ScriblrPicker({ onPick, button, buttonClassName = 'cmIconBtn cmIconBtn--small', disabled = false }: {
   onPick: (content: ModelContent, from: PublishedModelOut) => void
   // What the button shows (an icon by default) and its classes.
   button?: ReactNode
   buttonClassName?: string
+  // The library cannot take another model.
+  disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [models, setModels] = useState<PublishedModelOut[] | null>(null)
@@ -33,7 +35,7 @@ export function ScriblrPicker({ onPick, button, buttonClassName = 'cmIconBtn cmI
   const label = 'Duplicate a Scriblr model'
   return (
     <span className="cmMenuAnchor" ref={root}>
-      <button type="button" className={buttonClassName} aria-label={button ? undefined : label} title="Make a copy of a model that comes with Scriblr, to change as your own" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+      <button type="button" className={buttonClassName} aria-label={button ? undefined : label} title="Make a copy of a model that comes with Scriblr, to change as your own" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(o => !o)}>
         {button ?? <MannequinIcon size={12} />}
       </button>
       {open && (

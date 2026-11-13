@@ -2,6 +2,7 @@ import type { ModelBind, ModelContent, ModelShape } from '../../../../api/types'
 import { BackIcon, BridgeIcon, ChevronDownIcon, ChevronUpIcon, FrontIcon, LinkIcon, PlusIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { Stepper } from './Stepper'
 import type { Selection } from './designerState'
+import { useDesignerPolicy } from './designerPolicy'
 import { LIMITS, linkCount } from './engine/limits'
 import { linksOf } from './engine/pairEdit'
 import type { LinkHow, PairActions, PairKind, ViewName } from './rigActions'
@@ -123,6 +124,7 @@ export function LinksPanel({ content, shape, selPoint, linkMode, bridge, actions
 
 // What a shape does in the view being edited: its depth (in front of or behind the shape next to it), its outline for the back, and the slider that loosens its links.
 export function ViewPanel({ content, shape, view, actions }: { content: ModelContent; shape: ModelShape; view: ViewName; actions: PairActions }) {
+  const { max } = useDesignerPolicy()
   const name = shape.name.trim() || 'the shape'
   const hasLinks = shape.pts.some(p => p.bind)
   return (
@@ -149,7 +151,7 @@ export function ViewPanel({ content, shape, view, actions }: { content: ModelCon
               <option value="">None: links keep their distance</option>
               {content.ranges.map(r => <option key={r.id} value={r.id}>{r.name.trim() || r.id}</option>)}
             </select>
-            <button type="button" className="cmBtn cmBtn--small" disabled={!hasLinks || content.ranges.length >= LIMITS.rangesMax} title={hasLinks ? 'Make a slider that loosens or tightens the links of this shape' : 'Link a point first'} onClick={() => actions.makeLoose(shape.id)}><PlusIcon size={12} /> Make a slider</button>
+            <button type="button" className="cmBtn cmBtn--small" disabled={!hasLinks || content.ranges.length >= max.sliders} title={hasLinks ? 'Make a slider that loosens or tightens the links of this shape' : 'Link a point first'} onClick={() => actions.makeLoose(shape.id)}><PlusIcon size={12} /> Make a slider</button>
           </span>
         </div>
       )}

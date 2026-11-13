@@ -25,6 +25,7 @@ import { restState, saveStyle, savePreset } from '../assets/Interfaces/admin/cha
 import { addOption, addState, renameOption, renameState } from '../assets/Interfaces/admin/characters/engine/states'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 import { standardGenres, standardSlots, starterPalette } from '../assets/Interfaces/admin/characters/engine/standardColours'
+import { defaultWriterLimits, libraryFull, normalizeWriterLimits, writerFaults } from '../assets/Interfaces/admin/characters/engine/writerLimits'
 
 // A pretend character models API (`/api/character-models`), shared by the design system's previews (mockBackend.ts) and the tests
 // (test/characterModelsBackend.ts): the catalog lives in memory and answers the way the server does -- drafts saved in order with their
@@ -43,15 +44,22 @@ export function liveEntry(id: string, c: ModelContent, over: Partial<ModelEntry>
 export const draftEntry = (id: string, c: ModelContent): ModelEntry => ({ id, draft: c, published: null, history: [], nextVersion: 1 })
 export const modelContent = (name: string, over: Partial<ModelContent> = {}): ModelContent => ({ ...blankContent(name), ...over })
 
-export function createMockModels(initial: ModelEntry[]) {
-  const state = { entries: structuredClone(initial) }
+// `writer` makes it the writer's own library (`/my-models`): it keeps the limits the admin sets for writers, holds the library to the number of models they allow and refuses to
+// publish a model over one of them.
+export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean } = {}) {
+  const state = { entries: structuredClone(initial), limits: defaultWriterLimits() }
   const catalog = () => ({ schemaVersion: 1, models: structuredClone(state.entries) })
 
   // `parts` is the path after `/character-models`: [], ['published'], [id, 'publish'], [id, 'restore', '2'] ...
   function route(method: string, parts: string[], body: unknown): MockAnswer {
     if (parts.length === 0 && method === 'GET') return ok(catalog())
+    if (opts.writer && parts.length === 1 && parts[0] === 'limits') {
+      if (method === 'PUT') state.limits = normalizeWriterLimits(body as Record<string, unknown>)
+      return ok(structuredClone(state.limits))
+    }
     if (parts.length === 0 && method === 'PUT') {
       const drafts = (body as { models: Array<{ id: string; draft: ModelContent }> }).models
+      if (opts.writer && drafts.length > state.limits.models && drafts.length > state.entries.length) return fail(422, `${libraryFull(state.limits.models)} Delete one before adding another.`)
       const byId = new Map(state.entries.map(e => [e.id, e]))
       state.entries = drafts.map(m => ({ ...(byId.get(m.id) ?? { id: m.id, published: null, history: [], nextVersion: 1 }), draft: normalizeContent(m.draft) }))
       return ok(catalog())
@@ -68,7 +76,7 @@ export function createMockModels(initial: ModelEntry[]) {
       const entry = state.entries.find(e => e.id === parts[0])
       if (!entry) return fail(404, 'no such model')
       if (parts[1] === 'publish') {
-        const faults = publishFaults(entry.draft)
+        const faults = [...publishFaults(entry.draft), ...(opts.writer ? writerFaults(entry.draft, state.limits) : [])]
         if (faults.length) return fail(422, faults.join(' '))
         const taken = state.entries.find(o => o.id !== entry.id && o.published && o.published.content.name.toLowerCase() === entry.draft.name.toLowerCase())
         if (taken) return fail(422, `Another model is already published as '${taken.published!.content.name}'. Rename this one first.`)

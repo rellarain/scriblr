@@ -14,6 +14,7 @@ vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resou
 vi.mock('./admin/instructor/InstructorConsole', () => ({ default: () => <div>instructor console</div> }))
 vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
 vi.mock('./admin/characters/DesignerConsole', () => ({ default: () => <div>character models console</div> }))
+vi.mock('./admin/characters/WriterLimitsConsole', () => ({ default: () => <div>writer limits console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -46,6 +47,12 @@ describe('AUI (the Admin panel as tiles)', () => {
     const plot = within(tile('configuration')).getByRole('region', { name: 'Plot' })
     expect(await within(plot).findByText('plot presets console')).toBeTruthy()
     expect(plot.querySelector('h2')).toBeNull()
+  })
+
+  it("shows Configuration > Writers' designer as the page of limits for the models writers design", async () => {
+    render(<AUI />)
+    const page = within(tile('configuration')).getByRole('region', { name: "Writers' designer" })
+    expect(await within(page).findByText('writer limits console')).toBeTruthy()
   })
 
   it('shows the Designer as a console of its own beside Configuration, with a slot in its title bar for the console tools', async () => {

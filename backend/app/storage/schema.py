@@ -2863,6 +2863,48 @@ class PublishedModelList(BaseModel):
     models: list[PublishedModelOut] = Field(default_factory=list)
 
 
+# The limits the admin sets for the models a writer designs for themselves (phase 7b): each is held between a floor that keeps a model possible and the admin's own limit above
+# (the ceiling), and starts at the ceiling, so a writer is held to nothing more than the admin until the admin says so. Kept in my-models-limits.json; a model is checked against
+# them when it is published (a draft may be over, so a writer can duplicate a big model and trim it), and the library against `models` when a model is added.
+WRITER_LIMITS: dict[str, tuple[int, int]] = {
+    "points": (3, MODEL_POINTS_MAX),                      # points in one shape
+    "shapesPerObject": (1, MODEL_SHAPES_PER_OBJECT_MAX),
+    "objectsPerGroup": (1, MODEL_OBJECTS_PER_GROUP_MAX),
+    "shapes": (1, MODEL_MAX_SHAPES),                      # in a model
+    "objects": (1, MODEL_MAX_OBJECTS),
+    "groups": (1, MODEL_MAX_GROUPS),
+    "sliders": (0, MODEL_RANGES_MAX),
+    "copyKb": (16, MODEL_COPY_MAX_BYTES // 1024),         # the size of a character's copy of a model
+    "models": (1, MODEL_MAX_MODELS),                      # models in the writer's library
+}
+
+
+class WriterModelLimits(BaseModel):
+    points: int = MODEL_POINTS_MAX
+    shapesPerObject: int = MODEL_SHAPES_PER_OBJECT_MAX
+    objectsPerGroup: int = MODEL_OBJECTS_PER_GROUP_MAX
+    shapes: int = MODEL_MAX_SHAPES
+    objects: int = MODEL_MAX_OBJECTS
+    groups: int = MODEL_MAX_GROUPS
+    sliders: int = MODEL_RANGES_MAX
+    copyKb: int = MODEL_COPY_MAX_BYTES // 1024
+    models: int = MODEL_MAX_MODELS
+
+    @model_validator(mode="before")
+    @classmethod
+    def _held(cls, data: Any) -> dict[str, int]:
+        """Never refuses: a limit that is missing, not a number, or outside its floor and ceiling is the ceiling or held to the nearest of the two."""
+        raw = data if isinstance(data, dict) else {}
+        held: dict[str, int] = {}
+        for key, (low, high) in WRITER_LIMITS.items():
+            value = raw.get(key, high)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+                held[key] = high
+            else:
+                held[key] = min(high, max(low, int(value)))
+        return held
+
+
 # ---------------------------------------------------------------------------
 # AUI Configuration: a global (not project-scoped), admin-editable outline of
 # Console -> Component -> Feature ideas for each of AUI's Configuration

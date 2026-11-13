@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FigureModel } from '../../../../../api/types'
-import { PlusIcon, SaveIcon, SwapIcon, TrashIcon } from '../../../../icons'
+import { PencilIcon, PlusIcon, SaveIcon, SwapIcon, TrashIcon } from '../../../../icons'
 import { swatchHex } from '../../../admin/characters/engine/colour'
 import { NAME_MAX, SWATCH_NAME_MAX } from '../../../admin/characters/modelContent'
 import { Colour, CommitText, Field, Slider } from '../CharFields'
@@ -9,6 +9,7 @@ import { carryOver } from './figureCarry'
 import { addSwatchTo, deleteSwatch, editSwatch, isMine, paletteFor, renameMine, deleteMine, saveMine, setTile, type ObjectPart } from './figureEditing'
 import { ensureFigureModel } from './figureModelStore'
 import { choiceLabel, getModelChoices, type ModelChoice } from './modelChoices'
+import { isOwnModel, ownCopyOf, useOpenMyModel } from './ownModel'
 import type { Ctx } from './FigureSteps'
 
 // What belongs to the character, not to the model: its palette and the colour of its card, the model it is drawn from (step 0), and the styles it keeps of its own (a part's step).
@@ -96,6 +97,40 @@ export function OtherModel({ projectId, model, ctx }: { projectId: string; model
         {models.map(m => <option key={m.id} value={m.id}>{`${choiceLabel(m)}${tag(m)}`}</option>)}
       </select>
       <button type="button" className="charChip" disabled={busy || inUse} title="Draw the character from this model: what it has under the same name is kept" onClick={() => { void use() }}><SwapIcon size={14} /> Use this model</button>
+      {problem && <p className="charHint" role="alert">{problem}</p>}
+    </div>
+  )
+}
+
+// ---- editing the model ----
+
+// Opens the model this figure is drawn from in My models, to change it. A model of the writer's own opens as it is; one of Scriblr's is copied first, as a draft of their own (the
+// character keeps drawing from its own copy until they publish the new model and choose it with Use this model).
+export function EditModel({ model }: { model: FigureModel }) {
+  const open = useOpenMyModel()
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+  if (!open) return null
+  const own = isOwnModel(model.modelId)
+  async function edit() {
+    setBusy(true)
+    setProblem('')
+    try {
+      open!(await ownCopyOf(model))
+    } catch (err) {
+      setProblem(message(err, 'The model could not be opened.'))
+    }
+    setBusy(false)
+  }
+  return (
+    <div role="group" aria-label="Edit the model">
+      <div className="charRow">
+        <button
+          type="button" className="charChip" disabled={busy}
+          title={own ? 'Open this model in My models' : 'Make a copy of this model in My models, a draft of your own to change'} onClick={() => { void edit() }}
+        ><PencilIcon size={14} /> Edit this model</button>
+      </div>
+      <p className="charHint">{own ? 'This model is one of yours: it opens in My models.' : 'Makes a copy of it in My models. Publish it there, then choose it above with Use this model.'}</p>
       {problem && <p className="charHint" role="alert">{problem}</p>}
     </div>
   )

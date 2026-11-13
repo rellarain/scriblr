@@ -1,12 +1,16 @@
+import { useMemo } from 'react'
 import type { ModelContent } from '../../../../api/types'
 import { LIMITS, copyBytes, limitNotes } from './engine/limits'
 import { formsByViews } from './engine/forms'
 import { fieldCheck, formCheck, hangCheck, paintCheck, proportionCheck, rigCheck, wearCheck } from './engine/rigCheck'
 import { publishFaults } from './modelContent'
+import { useDesignerPolicy } from './designerPolicy'
+import { writerFaults } from './engine/writerLimits'
 
 // The model's checks in plain words: what stops Publish, which limits it is at or past, the size of a character's copy of it, and what looks wrong in the rig.
 export function CheckPanel({ content }: { content: ModelContent }) {
-  const faults = publishFaults(content)
+  const { writer } = useDesignerPolicy()
+  const faults = useMemo(() => [...publishFaults(content), ...(writer ? writerFaults(content, writer) : [])], [content, writer])
   // a limit that is also a publish fault is said once, in the faults
   const notes = limitNotes(content).filter(n => !faults.some(f => ['KB', 'levels deep'].some(key => f.includes(key) && n.text.includes(key))))
   const rig = rigCheck(content)
@@ -15,7 +19,7 @@ export function CheckPanel({ content }: { content: ModelContent }) {
   const kb = Math.round(copyBytes(content) / 102.4) / 10
   return (
     <section className="cmCheck" aria-label="Checks">
-      <p className="cmInsText">A character's copy of this model: {kb} KB (warning above {LIMITS.copyWarnBytes / 1024}, stop at {LIMITS.copyMaxBytes / 1024}).</p>
+      <p className="cmInsText">A character's copy of this model: {kb} KB ({writer && writer.copyKb < LIMITS.copyMaxBytes / 1024 ? `your limit is ${writer.copyKb}, the warning starts above ${Math.min(writer.copyKb, LIMITS.copyWarnBytes / 1024)}` : `warning above ${LIMITS.copyWarnBytes / 1024}, stop at ${LIMITS.copyMaxBytes / 1024}`}).</p>
       {faults.length === 0 && notes.length === 0 && rig.length === 0 && formNotes.length === 0 && <p className="cmInsText" role="status">Nothing to fix: the model can be published.</p>}
       {faults.length > 0 && (
         <>

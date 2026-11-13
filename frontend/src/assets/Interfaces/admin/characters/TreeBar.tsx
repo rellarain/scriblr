@@ -8,6 +8,7 @@ import { classOfObject } from './engine/classEdit'
 import { patternOfMark } from './engine/patterns'
 import { isOn, type TestState } from './engine/presets'
 import { optionIsOn, statesOf } from './engine/states'
+import { useDesignerPolicy } from './designerPolicy'
 import { LIMITS } from './engine/limits'
 import type { Selection } from './designerState'
 import {
@@ -30,6 +31,8 @@ export interface ModelsNav {
   onSelect: (id: string) => void
   onNew: () => void
   onImport: () => void
+  // The library holds as many models as it may (a writer's library, whose size the admin sets): no more can be added.
+  full?: boolean
   // adds the basic adult that comes with the app (offered while the catalog does not have it; the writer's own library does not offer it)
   onAddBasic?: () => void
   // more tools for the end of the models' row (the writer's library puts its "Duplicate a Scriblr model" menu here)
@@ -174,6 +177,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
   models: ModelsNav
   actions: TreeActions
 }) {
+  const { max } = useDesignerPolicy()
   const [query, setQuery] = useState('')
   const [openAxis, setOpenAxis] = useState<string | null>(null)
   const q = query.trim()
@@ -331,7 +335,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         <section className="dzLevel" aria-label="Groups">
           <div className="dzLevelHead">
             <span className="dzLevelName">Groups <span className="cmCount">{content.groups.length}</span></span>
-            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New group" title="New group" onClick={actions.onAddGroup}><FolderPlusIcon size={12} /></button>
+            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New group" title="New group" disabled={content.groups.length >= max.groups} onClick={actions.onAddGroup}><FolderPlusIcon size={12} /></button>
           </div>
           {content.groups.length === 0 && <p className="cmInsText">No group yet. Make one with the button above.</p>}
           <ReorderList
@@ -357,7 +361,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         <section className="dzLevel" aria-label="Objects">
           <div className="dzLevelHead">
             <span className="dzLevelName">Objects <span className="cmCount">{group.objects.length}</span></span>
-            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`New object in ${label(group.name, 'the group')}`} title={`New object in ${label(group.name, 'the group')}`} disabled={group.objects.length >= LIMITS.objectsPerGroupMax} onClick={() => actions.onAddObject(group.id)}><PlusIcon size={12} /></button>
+            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`New object in ${label(group.name, 'the group')}`} title={`New object in ${label(group.name, 'the group')}`} disabled={group.objects.length >= max.objectsPerGroup} onClick={() => actions.onAddObject(group.id)}><PlusIcon size={12} /></button>
           </div>
           {group.objects.length === 0 && <p className="cmInsText">No object yet.</p>}
           <ReorderList
@@ -374,7 +378,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         <section className="dzLevel" aria-label="Shapes">
           <div className="dzLevelHead">
             <span className="dzLevelName">Shapes <span className="cmCount">{object.shapes.length}</span></span>
-            <TemplateMenu label={`Add a shape to ${label(object.name, 'the object')}`} onPick={t => actions.onAddShape(object.id, t)} disabled={object.shapes.length >= LIMITS.shapesPerObjectMax} />
+            <TemplateMenu label={`Add a shape to ${label(object.name, 'the object')}`} onPick={t => actions.onAddShape(object.id, t)} disabled={object.shapes.length >= max.shapesPerObject} />
           </div>
           {object.shapes.length === 0 && <p className="cmInsText">No shape yet: add one from a template.</p>}
           <ReorderList
@@ -395,8 +399,8 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         <div className="dzLevelHead">
           <span className="dzLevelName">Models <span className="cmCount">{models.entries.length}</span></span>
           <span className="dzLevelTools">
-            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New model" title="New model" onClick={models.onNew}><PlusIcon size={12} /></button>
-            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Import models from a file" title="Import models from a file" onClick={models.onImport}><ImportIcon size={12} /></button>
+            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New model" title={models.full ? 'Your library holds as many models as the admin allows' : 'New model'} disabled={models.full} onClick={models.onNew}><PlusIcon size={12} /></button>
+            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Import models from a file" title={models.full ? 'Your library holds as many models as the admin allows' : 'Import models from a file'} disabled={models.full} onClick={models.onImport}><ImportIcon size={12} /></button>
             {models.onAddBasic && !models.entries.some(e => e.id === 'basic') && <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr: a bare adult with a face, ages, builds and expressions, published" onClick={models.onAddBasic}><MannequinIcon size={12} /></button>}
             {models.extraTools}
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Export all the models to a file" title="Export all the models to a file" disabled={models.entries.length === 0} onClick={models.onExportAll}><ExportIcon size={12} /></button>

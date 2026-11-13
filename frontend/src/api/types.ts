@@ -748,3 +748,15 @@ export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }
 export interface ModelDraftList { models: Array<{ id: string; draft: ModelContent }> }
 export interface PublishedModelOut { id: string; version: number; publishedAt: string; content: ModelContent }
 export interface PublishedModelList { models: PublishedModelOut[] }
+// The limits the admin sets for the models a writer designs for themselves (phase 7b), each between a floor and the admin's own limit (writerLimits.ts has the table).
+export interface WriterModelLimits {
+  points: number
+  shapesPerObject: number
+  objectsPerGroup: number
+  shapes: number
+  objects: number
+  groups: number
+  sliders: number
+  copyKb: number
+  models: number
+}

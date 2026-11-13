@@ -11,7 +11,8 @@ import { addPoint, applyTemplate, deletePoint, resetHandles, setMode } from './e
 import { weightOf } from './engine/fall'
 import type { Choices } from './engine/forms'
 import { MODES, MODE_NAMES } from './engine/geometry'
-import { LIMITS, pointLevel } from './engine/limits'
+import { useDesignerPolicy } from './designerPolicy'
+import { LIMITS, level } from './engine/limits'
 import { shapeBox } from './engine/svgText'
 import { templateBox } from './engine/templates'
 import { LAYERS, NAME_MAX, groupById, groupOfObject, objectById, objectOfShape } from './modelContent'
@@ -32,10 +33,14 @@ const TABS: Array<{ id: InspectorTab; name: string; Icon: typeof PathIcon }> = [
   { id: 'frames', name: 'Frames', Icon: CardIcon },
 ]
 
+// The tabs a writer's designer leaves out until the writer turns on the advanced tools: the rig, the authored fields, the skeleton and the frames.
+export const ADVANCED_TABS: InspectorTab[] = ['rig', 'fields', 'proportions', 'frames']
+
 // The tabs that mean something for what is open: the rig is for a group and what is in it, forms belong to an object (and so to its shapes), and the rest are the model's own and
 // stay (the colour of a shape, the span a slider gives a writer, a frame round the selection). A tab that is not here is not offered, and one that was open falls back to Shape.
-export function tabsFor(kind: Selection['kind']): InspectorTab[] {
-  return TABS.map(t => t.id).filter(id => (id === 'rig' ? kind !== 'none' : id === 'forms' ? kind === 'object' || kind === 'shape' : true))
+// Without the advanced tools (a writer's designer that has them off) the tabs above are left out too.
+export function tabsFor(kind: Selection['kind'], advanced = true): InspectorTab[] {
+  return TABS.map(t => t.id).filter(id => (advanced || !ADVANCED_TABS.includes(id)) && (id === 'rig' ? kind !== 'none' : id === 'forms' ? kind === 'object' || kind === 'shape' : true))
 }
 
 export interface InspectorProps {
@@ -75,7 +80,7 @@ export interface InspectorProps {
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
 
 export function Inspector(p: InspectorProps) {
-  const offered = tabsFor(p.sel.kind)
+  const offered = tabsFor(p.sel.kind, useDesignerPolicy().advanced)
   const tabs = TABS.filter(t => offered.includes(t.id))
   const tab = offered.includes(p.tab) ? p.tab : 'shape'
   return (
@@ -104,6 +109,7 @@ export function Inspector(p: InspectorProps) {
 
 function ShapeTab(p: InspectorProps) {
   const { content, sel, selPoint, mirror } = p
+  const { max } = useDesignerPolicy()
   const shape = activeShape(content, sel)
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
   const group = sel.kind === 'group' ? groupById(content, sel.id) : object ? groupOfObject(content, object.id) : undefined
@@ -140,12 +146,12 @@ function ShapeTab(p: InspectorProps) {
               {LAYERS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </label>
-          <p className="cmInsText">{object.shapes.length} of {LIMITS.shapesPerObjectMax} shapes. The shapes of an object are drawn in the order of the tree, later ones in front.</p>
+          <p className="cmInsText">{object.shapes.length} of {max.shapesPerObject} shapes. The shapes of an object are drawn in the order of the tree, later ones in front.</p>
           <PairPanel content={content} kind="object" id={object.id} actions={p.pairs} />
           <ClassPanel content={content} object={object} choices={p.choices} actions={p.classes} />
         </>
       )}
-      {sel.kind === 'group' && group && <p className="cmInsText">{group.objects.length} of {LIMITS.objectsPerGroupMax} objects.</p>}
+      {sel.kind === 'group' && group && <p className="cmInsText">{group.objects.length} of {max.objectsPerGroup} objects.</p>}
 
       {shape && (
         <>
@@ -183,12 +189,13 @@ function ShapeTab(p: InspectorProps) {
 }
 
 function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, onWeight }: { shape: ModelShape; selPoint: number; mirror: boolean; onSelectPoint: (i: number) => void; onEditShape: InspectorProps['onEditShape']; onWeight: InspectorProps['onWeight'] }) {
-  const lv = pointLevel(shape), cur = shape.pts[selPoint]
+  const { max } = useDesignerPolicy()
+  const lv = level(shape.pts.length, Math.min(LIMITS.pointsWarn, max.points), max.points), cur = shape.pts[selPoint]
   const opts = { mirror }
-  const note = lv === 'stop' ? `The most points a shape may have (${LIMITS.pointsMax}).` : lv === 'warn' ? `More than ${LIMITS.pointsWarn} points: fewer points keep a shape easy to edit and light to store.` : ''
+  const note = lv === 'stop' ? `The most points a shape may have (${max.points}).` : lv === 'warn' ? `More than ${LIMITS.pointsWarn} points: fewer points keep a shape easy to edit and light to store.` : ''
   return (
     <div className="cmPoints">
-      <h3 className="cmInsSub">Points <span className={`cmCount${lv === 'ok' ? '' : ` cmCount--${lv}`}`}>{shape.pts.length} of {LIMITS.pointsMax}</span></h3>
+      <h3 className="cmInsSub">Points <span className={`cmCount${lv === 'ok' ? '' : ` cmCount--${lv}`}`}>{shape.pts.length} of {max.points}</span></h3>
       {note && <p className={`cmInsText cmInsText--${lv}`} role="status">{note}</p>}
       <div className="cmChips" role="group" aria-label="Points">
         {shape.pts.map((pt, i) => (
@@ -205,7 +212,7 @@ function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, on
           <Stepper label={`Weight of point ${selPoint + 1}`} value={`${Math.round(weightOf(cur) * 100)}%`} lowerOff={weightOf(cur) <= 0} raiseOff={weightOf(cur) >= 1} onStep={dir => onWeight(selPoint, dir)} />
           <p className="cmInsText">A weight says how free the point is to hang when something lets this shape fall (Ranges tab). None: it holds still.</p>
           <div className="cmInline">
-            <button type="button" className="cmBtn cmBtn--small" disabled={lv === 'stop'} onClick={() => { const r = addPoint(shape, selPoint, { ...opts, max: LIMITS.pointsMax }); if (r.index >= 0) onEditShape(shape.id, r.shape, r.index) }}>
+            <button type="button" className="cmBtn cmBtn--small" disabled={lv === 'stop'} onClick={() => { const r = addPoint(shape, selPoint, { ...opts, max: max.points }); if (r.index >= 0) onEditShape(shape.id, r.shape, r.index) }}>
               <PlusIcon size={12} /> Add a point after it
             </button>
             <button type="button" className="cmBtn cmBtn--small" disabled={shape.pts.length <= 3} onClick={() => { const r = deletePoint(shape, selPoint, opts); if (r) onEditShape(shape.id, r, Math.max(0, Math.min(selPoint, r.pts.length - 1))) }}>

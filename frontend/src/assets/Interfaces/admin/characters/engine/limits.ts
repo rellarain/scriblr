@@ -77,6 +77,8 @@ export const LIMITS = {
   shapesMax: 800,
   objectsMax: 200,
   groupsMax: 120,
+  // how many models one library holds (the admin's catalog and a writer's own, which the admin may hold to fewer: writerLimits.ts)
+  modelsMax: 100,
 } as const
 
 export type LimitLevel = 'ok' | 'warn' | 'stop'

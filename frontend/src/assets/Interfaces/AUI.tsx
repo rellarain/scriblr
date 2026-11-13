@@ -16,6 +16,8 @@ const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsol
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
 // The Designer (the character models and the canvas they are drawn on), loaded when its console is opened.
 const DesignerConsole = lazy(() => import('./admin/characters/DesignerConsole'))
+// The limits for the models writers design for themselves, loaded when Configuration > Writers' designer is opened.
+const WriterLimitsConsole = lazy(() => import('./admin/characters/WriterLimitsConsole'))
 
 // Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section (this array
 // covers 7 of them; Resources -- not in that doc -- is built separately
@@ -35,7 +37,7 @@ type AuiSubSectionKey =
   | 'allotment' | 'assignment' | 'teamSchedule' | 'managerHelp'
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department' | 'directorHelp'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
-  | 'configOverview' | 'configPlot' | 'configHelp'
+  | 'configOverview' | 'configPlot' | 'configWriterDesigner' | 'configHelp'
   | 'designerWork' | 'designerHelp'
 
 interface AuiSubSection {
@@ -134,6 +136,8 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Site-wide configuration settings will live here.' },
       { key: 'configPlot', label: 'Plot', Icon: PlotIcon,
         body: 'Set up the plot presets the Writer offers: ready-made categories with their description, keywords, fields, subcategories and clusters.' },
+      { key: 'configWriterDesigner', label: "Writers' designer", Icon: MannequinIcon,
+        body: "Set how big the models a writer designs for themselves may be: points in a shape, shapes in an object, objects in a group, the totals in a model, the size of a character's copy and the models in a writer's library." },
       { key: 'configHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Configuration console here.' },
     ],
@@ -175,6 +179,7 @@ function AUI() {
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
+        : page.key === 'configWriterDesigner' ? <Suspense fallback={null}><WriterLimitsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),
   }))

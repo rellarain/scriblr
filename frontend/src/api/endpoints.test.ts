@@ -18,7 +18,7 @@ import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
 import { discardPresetChanges, getPresets, getPublishedPresets, publishPreset, putPresets, restorePresetVersion, unpublishPreset } from './presetsApi'
-import { addBasicModel, discardModelChanges, getModels, getPublishedModels, myModelsApi, publishModel, putModels, restoreModelVersion, unpublishModel } from './characterModelsApi'
+import { addBasicModel, discardModelChanges, getModels, getPublishedModels, getWriterLimits, myModelsApi, publishModel, putModels, putWriterLimits, restoreModelVersion, unpublishModel } from './characterModelsApi'
 import { listPublications, publishChapter } from './publicationFetch'
 import { clearCompleted, enrol, getTraining, leave, recordAttempt, saveTrainingContent, setCompleted } from './trainingApi'
 
@@ -116,6 +116,8 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['myModelsApi.unpublish', () => myModelsApi.unpublish(ID), 'POST', `/api/my-models/${ESC}/unpublish`],
   ['myModelsApi.discard', () => myModelsApi.discard(ID), 'POST', `/api/my-models/${ESC}/discard`],
   ['myModelsApi.restore', () => myModelsApi.restore(ID, 3), 'POST', `/api/my-models/${ESC}/restore/3`],
+  ['getWriterLimits', () => getWriterLimits(), 'GET', '/api/my-models/limits'],
+  ['putWriterLimits', () => putWriterLimits({ points: 24, shapesPerObject: 36, objectsPerGroup: 24, shapes: 300, objects: 100, groups: 60, sliders: 60, copyKb: 600, models: 20 }), 'PUT', '/api/my-models/limits', { points: 24, shapesPerObject: 36, objectsPerGroup: 24, shapes: 300, objects: 100, groups: 60, sliders: 60, copyKb: 600, models: 20 }],
   ['putMomentDraft', () => putMomentDraft(ID, ID, ID, 'Text'), 'PUT', `/api/projects/${ESC}/draft/chapter/${ESC}/moment/${ESC}`, { outlineNodeId: ID, body: 'Text' }],
 ]
 

@@ -9,7 +9,7 @@ import {
   FALL_LABELS, NONE, chooseKind, chooseOption, groupPartsOf, isMine, layerListIn, layersIn, lockSheet, moveLayer, objectPartOf, optionalObjects, figurePartOf, pickColour, rollPart, setBrightness, setForm, setLock,
   setMember, setOpacity, setPattern, setFall, setWorn, sheetLocked, slotViewOf, type FieldsetPart, type Layers, type MovableLayer, type ObjectPart, type PresetKind, type StateChoice,
 } from './figureEditing'
-import { CardColour, MineBlock, OtherModel, PaletteEditor } from './FigureSettings'
+import { CardColour, EditModel, MineBlock, OtherModel, PaletteEditor } from './FigureSettings'
 import { cropAround, kindCrop } from './figurePictures'
 import { setValue, spanOf, valuesOf } from './figureState'
 import { PictureSelect } from './PictureSelect'
@@ -160,6 +160,7 @@ export function FigureStep({ ctx, projectId, model, describe, onForget, onRevert
         <h4 className="charLabel">Mannequin</h4>
         <p className="charHint">{describe}</p>
         <OtherModel projectId={projectId} model={model} ctx={ctx} />
+        <EditModel model={model} />
         {ctx.figure.converted && onRevert ? (
           asking ? (
             <div className="charRow" role="group" aria-label="Back to the old portrait">

@@ -46,7 +46,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'character-models', dir: 'CharacterModels', title: 'Character models: the designer', group: 'Outline', height: 900,
-    summary: 'Admin > Configuration > Characters, where the shapes characters are drawn from are designed: the list of models, a tree of groups, objects and shapes, a canvas with draggable points and curve handles, an inspector, previews at random sizes and the checks, with draft and publish like the Plot presets.',
+    summary: 'The Designer console, where the shapes characters are drawn from are designed: the list of models, a tree of groups, objects and shapes, a canvas with draggable points and curve handles, an inspector, previews at random sizes and the checks, with draft and publish like the Plot presets; and the Configuration page that sets the limits for the models writers design for themselves.',
   },
   {
     id: 'characters', dir: 'Characters', title: 'Characters: the cast builder', group: 'Outline', height: 760,

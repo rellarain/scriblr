@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
@@ -13,6 +13,7 @@ import { hasPending, usePendingOpen } from '../links/worldNav'
 import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
 import { useFigureModels } from './figure/figureModelStore'
+import { OpenMyModelContext } from './figure/ownModel'
 import { exportSheet } from './sheet'
 import { PortraitSection } from './PortraitSection'
 import { ProfileSection } from './ProfileSection'
@@ -49,6 +50,9 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
   useFigureModels(projectId)
   const { ui } = useSettings()
   const [section, setSection] = useState<Section>(initialSection)
+  // The model My models opens first: Edit this model in the figure editor asks for one.
+  const [modelToOpen, setModelToOpen] = useState<string | null>(null)
+  const openModel = useCallback((id: string) => { setModelToOpen(id); setSection('models') }, [])
   const points = useMemo(() => storyPoints(outline), [outline])
   const { doc } = c
   const store = useCast(projectId)
@@ -82,49 +86,51 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
   if (c.status === 'loading') return <p className="charNote" role="status">Loading the cast…</p>
 
   return (
-    <div className="charPage">
-      <div className="charBar">
-        <h2 className="charBarTitle">Characters</h2>
-        <div className="charTools" role="toolbar" aria-label="What to work on">
-          {(doc ? [...SECTIONS, MODELS] : [MODELS]).map(({ section: x, label, Icon }) => (
-            <button key={x} type="button" className="charIconBtn" aria-pressed={section === x} aria-label={label} title={label} onClick={() => setSection(x)}><Icon size={18} /></button>
-          ))}
+    <OpenMyModelContext.Provider value={openModel}>
+      <div className="charPage">
+        <div className="charBar">
+          <h2 className="charBarTitle">Characters</h2>
+          <div className="charTools" role="toolbar" aria-label="What to work on">
+            {(doc ? [...SECTIONS, MODELS] : [MODELS]).map(({ section: x, label, Icon }) => (
+              <button key={x} type="button" className="charIconBtn" aria-pressed={section === x} aria-label={label} title={label} onClick={() => { setModelToOpen(null); setSection(x) }}><Icon size={18} /></button>
+            ))}
+          </div>
+          {doc && !inModels && (
+            <button
+              type="button" className="charIconBtn" aria-label="Save the character sheet as an image" title="Save the character sheet as an image (a PNG with the profile in words)"
+              onClick={() => { setSheetNote(''); void exportSheet(doc).then(r => { if (r === 'unavailable') setSheetNote('The sheet could not be made.') }) }}
+            ><ImageIcon size={18} /></button>
+          )}
+          {!inModels && (
+            <SaveCluster
+              status={c.saveStatus} onSave={() => { void c.saveNow() }} scope=".charPage"
+              history={{ canUndo: c.canUndo, canRedo: c.canRedo, onUndo: c.undo, onRedo: c.redo }}
+              autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: c.saveCountdown.nextSaveAt, wait: c.saveCountdown.wait }}
+            />
+          )}
         </div>
-        {doc && !inModels && (
-          <button
-            type="button" className="charIconBtn" aria-label="Save the character sheet as an image" title="Save the character sheet as an image (a PNG with the profile in words)"
-            onClick={() => { setSheetNote(''); void exportSheet(doc).then(r => { if (r === 'unavailable') setSheetNote('The sheet could not be made.') }) }}
-          ><ImageIcon size={18} /></button>
+        {c.saveStatus.error && <p className="charNote charNote--error" role="alert">{c.saveStatus.error}</p>}
+        {sheetNote && <p className="charNote charNote--error" role="alert">{sheetNote}</p>}
+        {c.notice && <p className="charNote charNote--error" role="alert">{c.notice}</p>}
+        {inModels && (
+          <div className="charModels">
+            <Suspense fallback={<p className="charNote" role="status">Opening the designer…</p>}><ModelsDesigner library="mine" openId={modelToOpen} /></Suspense>
+          </div>
         )}
-        {!inModels && (
-          <SaveCluster
-            status={c.saveStatus} onSave={() => { void c.saveNow() }} scope=".charPage"
-            history={{ canUndo: c.canUndo, canRedo: c.canRedo, onUndo: c.undo, onRedo: c.redo }}
-            autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: c.saveCountdown.nextSaveAt, wait: c.saveCountdown.wait }}
-          />
-        )}
+        {!inModels && <div className="charSplit">
+          <CharacterList c={c} />
+          {doc && section === 'appearance' && <AppearanceSection doc={doc} edit={c.edit} rename={c.rename} />}
+          {doc && section === 'portrait' && <PortraitSection projectId={projectId} doc={doc} edit={c.edit} rename={c.rename} setFigure={c.setFigure} convert={c.convert} revert={c.revert} />}
+          {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
+          {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
+          {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
+          {doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
+          {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<><CarriedItems projectId={projectId} characterId={doc.id} outline={outline} /><WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} /></>} />}
+          {doc ? null : (
+            <p className="charNote charEmpty">{c.cast.length === 0 ? 'Make a character to start: a name, a portrait and the words about them.' : 'Pick a character in the list to open it.'}</p>
+          )}
+        </div>}
       </div>
-      {c.saveStatus.error && <p className="charNote charNote--error" role="alert">{c.saveStatus.error}</p>}
-      {sheetNote && <p className="charNote charNote--error" role="alert">{sheetNote}</p>}
-      {c.notice && <p className="charNote charNote--error" role="alert">{c.notice}</p>}
-      {inModels && (
-        <div className="charModels">
-          <Suspense fallback={<p className="charNote" role="status">Opening the designer…</p>}><ModelsDesigner library="mine" /></Suspense>
-        </div>
-      )}
-      {!inModels && <div className="charSplit">
-        <CharacterList c={c} />
-        {doc && section === 'appearance' && <AppearanceSection doc={doc} edit={c.edit} rename={c.rename} />}
-        {doc && section === 'portrait' && <PortraitSection projectId={projectId} doc={doc} edit={c.edit} rename={c.rename} setFigure={c.setFigure} convert={c.convert} revert={c.revert} />}
-        {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
-        {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
-        {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
-        {doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
-        {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<><CarriedItems projectId={projectId} characterId={doc.id} outline={outline} /><WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} /></>} />}
-        {doc ? null : (
-          <p className="charNote charEmpty">{c.cast.length === 0 ? 'Make a character to start: a name, a portrait and the words about them.' : 'Pick a character in the list to open it.'}</p>
-        )}
-      </div>}
-    </div>
+    </OpenMyModelContext.Provider>
   )
 }

@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { ModelCatalog, ModelDraftList, PublishedModelList } from './types'
+import type { ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits } from './types'
 
 // The character models come in two libraries that answer the same way: the admin's catalog (the models Scriblr ships and the ones the admin designs, /character-models) and the
 // writer's own (the models a writer designs for themselves, /my-models, whose ids start with "my-").
@@ -45,6 +45,11 @@ export const publishModel = adminModelsApi.publish
 export const unpublishModel = adminModelsApi.unpublish
 export const discardModelChanges = adminModelsApi.discard
 export const restoreModelVersion = adminModelsApi.restore
+
+// The limits the admin sets for the writer's own models (each at the admin's own limit until set), and setting them: the answer is what the server kept (held between each
+// limit's floor and the admin's own limit).
+export const getWriterLimits = (): Promise<WriterModelLimits> => api.get<WriterModelLimits>('/my-models/limits')
+export const putWriterLimits = (limits: WriterModelLimits): Promise<WriterModelLimits> => api.put<WriterModelLimits>('/my-models/limits', limits)
 
 // Adds the basic adult that comes with the app, published (409 when it is already in the catalog).
 export function addBasicModel(): Promise<ModelCatalog> {

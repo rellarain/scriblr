@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..deps import get_app_data_storage_root
 from ..storage import character_models_store as store
-from ..storage.schema import ModelCatalog, ModelDraftList, PublishedModelList
+from ..storage.schema import ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits
 
 
 def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
@@ -20,7 +20,7 @@ def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
     def put_models(body: ModelDraftList, root: Path = Depends(get_app_data_storage_root)) -> ModelCatalog:
         try:
             return store.save_drafts(root, body, library)
-        except store.InvalidModelIdError as exc:
+        except (store.InvalidModelIdError, store.LibraryFullError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.get("/published", response_model=PublishedModelList, description="What the Writer's editor offers: the published copies only.")
@@ -76,3 +76,13 @@ def add_basic_model(root: Path = Depends(get_app_data_storage_root)) -> ModelCat
 
 # The models a writer designs for themselves (the Characters console's Models section): a second catalog in my-models.json, with ids that start with "my-".
 my_router = _library_router("/api/my-models", "my-models", store.MY_LIBRARY, "the writer's")
+
+
+@my_router.get("/limits", response_model=WriterModelLimits, description="The limits for the writer's own models, as the admin has set them (each at its ceiling, the admin's own limit, until set).")
+def get_writer_limits(root: Path = Depends(get_app_data_storage_root)) -> WriterModelLimits:
+    return store.load_writer_limits(root)
+
+
+@my_router.put("/limits", response_model=WriterModelLimits, description="Set the limits for the writer's own models. Each is held between its floor and its ceiling; the answer is what was kept.")
+def put_writer_limits(body: WriterModelLimits, root: Path = Depends(get_app_data_storage_root)) -> WriterModelLimits:
+    return store.save_writer_limits(root, body)

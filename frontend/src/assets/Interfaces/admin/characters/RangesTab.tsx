@@ -3,6 +3,7 @@ import type { ModelContent, ModelDrive, ModelGroup, ModelRange, ModelScaleAxis }
 import { EyeIcon, EyeOffIcon, LinkIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon, TrashIcon } from '../../../icons'
 import { fadedBy } from './engine/fadeEdit'
 import { hangs } from './engine/fall'
+import { useDesignerPolicy } from './designerPolicy'
 import { LIMITS } from './engine/limits'
 import { PROPS, type PropKey } from './engine/props'
 import { valueOf, type Values } from './engine/rig'
@@ -33,6 +34,7 @@ export interface RangesTabProps {
 }
 
 export function RangesTab({ content, sel, group, values, recording, scrubbing, filter, onFilter, actions }: RangesTabProps) {
+  const { max } = useDesignerPolicy()
   const [menu, setMenu] = useState<string | null>(null)   // 'new' or a slider id: whose add menu is open
   const [confirm, setConfirm] = useState<string | null>(null)
   const shapeSel = sel.kind === 'shape'
@@ -67,7 +69,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
     <div className="cmTabBody">
       <div className="cmInline cmRangesBar">
         <span className="cmMenuAnchor">
-          <button type="button" className="cmBtn cmBtn--small" aria-haspopup="menu" aria-expanded={menu === 'new'} disabled={content.ranges.length >= LIMITS.rangesMax || !!recording} onClick={() => setMenu(m => (m === 'new' ? null : 'new'))}><PlusIcon size={12} /> New slider</button>
+          <button type="button" className="cmBtn cmBtn--small" aria-haspopup="menu" aria-expanded={menu === 'new'} disabled={content.ranges.length >= max.sliders || !!recording} onClick={() => setMenu(m => (m === 'new' ? null : 'new'))}><PlusIcon size={12} /> New slider</button>
           {menu === 'new' && menuFor('new', k => actions.newSlider(k))}
         </span>
         <button type="button" className="cmBtn cmBtn--small" disabled={away === 0 || !!recording} onClick={actions.resetValues} title="Put every slider back at rest"><RestoreIcon size={12} /> Reset test values{away ? ` (${away})` : ''}</button>

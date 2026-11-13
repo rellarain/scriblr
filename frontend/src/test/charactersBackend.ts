@@ -1,6 +1,7 @@
 import { vi } from 'vitest'
-import type { CharacterDoc, CharacterFigure, FigureModel, FrozenPortrait, PublishedModelOut } from '../api/types'
+import type { CharacterDoc, CharacterFigure, FigureModel, FrozenPortrait, ModelEntry, PublishedModelOut, WriterModelLimits } from '../api/types'
 import { createMockCharacters } from '../designSystem/mockCharacters'
+import { createMockModels } from '../designSystem/mockCharacterModels'
 import { createMockFigureModels } from '../designSystem/mockFigureModels'
 
 // A stand-in for the Characters API (`/api/projects/{id}/characters`) for tests: the cast is kept in memory by the same pretend API the design system uses
@@ -12,16 +13,20 @@ export interface CharactersBackend {
   readonly copies: Map<string, FigureModel>
   // The figures that Convert gave the portraits frozen in editions (character:book:edition -> figure; null once they were taken back).
   readonly editionFigures: Map<string, CharacterFigure | null>
+  // The models in the writer's own library (draft, published copy and versions), and the limits the admin set for them.
+  readonly ownEntries: ModelEntry[]
+  limits: WriterModelLimits
   calls: string[]
   of(method: string): string[]
   failNext(path: string, status: number, detail: unknown): void
 }
 
-// `copies` are the model copies the project holds, `published` the models the catalog offers to copy, `mine` the published models of the writer's own library (ids "my-..."), `basic` the
+// `copies` are the model copies the project holds, `published` the models the catalog offers to copy, `mine` the published models of the writer's own library (ids "my-..."), `own` the whole of that library (what My models lists), `basic` the
 // model that asking for the basic one publishes.
-export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; mine?: PublishedModelOut[]; basic?: PublishedModelOut; frozen?: Record<string, FrozenPortrait[]> } = {}): CharactersBackend {
+export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; mine?: PublishedModelOut[]; own?: ModelEntry[]; basic?: PublishedModelOut; frozen?: Record<string, FrozenPortrait[]> } = {}): CharactersBackend {
   const mock = createMockCharacters(initial, more.frozen)
   const figures = createMockFigureModels(() => [...(more.published ?? []), ...(more.mine ?? [])], more.copies ?? [])
+  const library = createMockModels(more.own ?? [], { writer: true })
   const failures = new Map<string, { status: number; detail: unknown }>()
   const calls: string[] = []
   const reply = (status: number, body: unknown) => ({ ok: status < 400, status, statusText: status < 400 ? 'OK' : 'Error', json: async () => body, text: async () => JSON.stringify(body ?? null) })
@@ -36,7 +41,11 @@ export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?:
     // /projects/{id}/characters[/{characterId}] and /projects/{id}/figure-models; anything else the page asks for (settings) is answered with an empty document.
     if (parts[0] === 'character-models' && parts[1] === 'published') return reply(200, { models: more.published ?? [] })
     if (parts[0] === 'my-models' && parts[1] === 'published') return reply(200, { models: more.mine ?? [] })
-    if (parts[0] === 'my-models' && parts.length === 1) return reply(200, { schemaVersion: 1, models: [] })
+    // the rest of the writer's library (its models and the limits the admin set) is kept by the same pretend API the design system uses
+    if (parts[0] === 'my-models') {
+      const answer = library.route(method, parts.slice(1), typeof init?.body === 'string' ? JSON.parse(init.body) : undefined)
+      return reply(answer.status, answer.body)
+    }
     if (parts[0] === 'character-models' && parts[1] === 'basic' && method === 'POST') {
       if (!more.basic || (more.published ?? []).some(m => m.id === more.basic!.id)) return reply(409, { detail: 'The basic model is already here.' })
       more.published = [...(more.published ?? []), more.basic]
@@ -53,6 +62,9 @@ export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?:
     fetch: fn, calls,
     get cast() { return mock.cast },
     get copies() { return figures.copies },
+    get ownEntries() { return library.state.entries },
+    get limits() { return library.state.limits },
+    set limits(next: WriterModelLimits) { library.state.limits = next },
     get editionFigures() { return mock.editionFigures },
     of: method => calls.filter(c => c.startsWith(`${method} `)),
     failNext: (path, status, detail) => { failures.set(path, { status, detail }) },

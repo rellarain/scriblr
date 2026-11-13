@@ -12,13 +12,14 @@ import { TreeBar, type ModelsNav, type TreeActions } from './TreeBar'
 import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
+import { useDesignerPolicy } from './designerPolicy'
 import { DesignerCanvas, type FrameCanvas, type GripMark, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
 import { ConsoleBar, PANEL_REST, ToolbarPanel, ViewBar, type PanelState } from './DesignerShell'
 import { DEFAULT_LAYERS, drawOrder, normalizeLayers, type LayerState } from './layerStack'
 import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
-import { Inspector, type InspectorTab } from './Inspector'
+import { ADVANCED_TABS, Inspector, type InspectorTab } from './Inspector'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import type { PaintActions } from './PaintSection'
 import { PoseBar } from './PoseBar'
@@ -48,7 +49,7 @@ import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, remove
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse, type Box } from './engine/geometry'
 import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt, gripGrab, gripsOf, mirrorGrip, moveGrip, removeGrip, renameGrip, setPresetGrip, stepGripAngle } from './engine/hands'
-import { LIMITS } from './engine/limits'
+import { growthRefusal, writerFaults } from './engine/writerLimits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
 import { beginScale, beginTurn, canScale, canTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
 import { setObjectLock, setStyleLock, type LockPart } from './engine/locks'
@@ -123,7 +124,7 @@ const VIEW_BAR = 44
 const NARROW = 640
 const DRAWER = 240
 
-export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport, barHost = null, nav }: {
+export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport, barHost = null, nav, onAdvanced }: {
   entry: ModelEntry
   models: CharacterModels
   makeId: MakeId
@@ -134,6 +135,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   barHost?: HTMLElement | null
   // The models as cards, for the top of the tree.
   nav: ModelsNav
+  // Turns the advanced tools on or off (a writer's designer: the console keeps the choice and tells the pane through the policy).
+  onAdvanced?: () => void
 }) {
   const content = entry.draft
   const [sel, setSel] = useState<Selection>(NONE)
@@ -190,11 +193,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   })
   const [drawer, setDrawer] = useState(false)
   const { ui } = useSettings()
+  // what the designer is for: the admin's own limits and every tab, or the writer's limits and the tabs the writer has turned on
+  const policy = useDesignerPolicy()
   const [history, setHistory] = useState<History<ModelContent>>(emptyHistory)
   const [versions, setVersions] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [note, setNote] = useState('')
-  const [tab, setTab] = useState<InspectorTab>('shape')
+  const [tabRaw, setTab] = useState<InspectorTab>('shape')
+  // a tab the writer has put away with the advanced tools is not the open one, whatever was open before
+  const tab: InspectorTab = !policy.advanced && ADVANCED_TABS.includes(tabRaw) ? 'shape' : tabRaw
   const test = useTestState()
   const { values, setValues } = test
   const [recording, setRecording] = useState<RecordingState | null>(null)
@@ -222,7 +229,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const poseRef = useRef<PoseDrag | null>(null)
   const historyRef = useRef(history)
   historyRef.current = history
-  const faults = publishFaults(content)
+  // what stops Publish (each count is a pass over the whole model, so it is worked out again only when the model or the limits change)
+  const faults = useMemo(() => [...publishFaults(content), ...(policy.writer ? writerFaults(content, policy.writer) : [])], [content, policy.writer])
   const busy = models.busy
   const published = !!entry.published
   const empty = content.shapes.length === 0
@@ -271,18 +279,21 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // ---- applying changes ----
 
-  // A change that is one undo step of its own.
-  function commit(next: ModelContent, immediate = false) {
-    setHistory(h => remember(h, content))
+  // A change that is one undo step of its own. In a writer's designer a change that makes a count grow past a limit the admin set is not made, and the note says so.
+  function commit(next: ModelContent, immediate = false): boolean {
     // every member has a shape for each shape of its pattern: an edit that added or took away a pattern's shape reaches them here
     const synced = reconcileClasses(next, makeId)
+    const refused = policy.writer ? growthRefusal(content, synced, policy.writer) : null
+    if (refused) { setNote(refused); return false }
+    setHistory(h => remember(h, content))
     models.edit(entry.id, () => synced, immediate)
     setNote('')
+    return true
   }
   // Apply what a rig operation returns: the new content, or why it cannot.
   function applyEdit(e: Edit): boolean {
     if (!e.ok) { setNote(e.reason); return false }
-    commit(e.content, true)
+    if (!commit(e.content, true)) return false
     if (e.note) setNote(e.note)
     return true
   }
@@ -942,11 +953,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   function addShapeTo(objectId: string, templateId: string, c: ModelContent) {
     const obj = objectById(c, objectId)
-    if (obj && obj.shapes.length >= LIMITS.shapesPerObjectMax) { setNote(`An object may have at most ${LIMITS.shapesPerObjectMax} shapes.`); return }
+    if (obj && obj.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
     const id = freshId(c, 's', makeId)
     const shape = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, templateBox(templateId, 100, 100))
-    commit(addShape(c, objectId, shape), true)
-    choose({ kind: 'shape', id })
+    if (commit(addShape(c, objectId, shape), true)) choose({ kind: 'shape', id })
   }
   // Delete what is selected, with what goes with it (a group's objects, an object's shapes, a twin).
   function deleteSelection(s: Selection) {
@@ -962,10 +972,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function copyShape(id: string) {
     if (shapeById(content, id)?.mirrorOf) { setNote('A twin has no outline of its own to copy: break the pair first, or copy the original.'); return }
     const owner = objectOfShape(content, id)
-    if (owner && owner.shapes.length >= LIMITS.shapesPerObjectMax) { setNote(`An object may have at most ${LIMITS.shapesPerObjectMax} shapes.`); return }
+    if (owner && owner.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
     const copyId = freshId(content, 's', makeId)
-    commit(duplicateShape(content, id, copyId), true)
-    choose({ kind: 'shape', id: copyId })
+    if (commit(duplicateShape(content, id, copyId), true)) choose({ kind: 'shape', id: copyId })
   }
   // A new look kept as a variant (of the model), a pose (of a group) or a style (of an object).
   function newPreset(scope: string | null) {
@@ -979,18 +988,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const actions: TreeActions = {
     onSelect: choose,
     onAddGroup: () => {
-      if (content.groups.length >= 60) { setNote('A model may have at most 60 groups.'); return }
+      if (content.groups.length >= policy.max.groups) { setNote(`A model may have at most ${policy.max.groups} groups.`); return }
       const id = freshId(content, 'g', makeId)
-      commit(addGroup(content, newGroup(id, `Group ${content.groups.length + 1}`)), true)
-      choose({ kind: 'group', id })
+      if (commit(addGroup(content, newGroup(id, `Group ${content.groups.length + 1}`)), true)) choose({ kind: 'group', id })
     },
     onAddObject: groupId => {
       const g = groupById(content, groupId)
       if (!g) return
-      if (g.objects.length >= LIMITS.objectsPerGroupMax) { setNote(`A group may have at most ${LIMITS.objectsPerGroupMax} objects.`); return }
+      if (g.objects.length >= policy.max.objectsPerGroup) { setNote(`A group may have at most ${policy.max.objectsPerGroup} objects.`); return }
       const id = freshId(content, 'o', makeId)
-      commit(addObject(content, groupId, { id, name: `Object ${content.objects.length + 1}`, layer: 'body', shapes: [] }), true)
-      choose({ kind: 'object', id })
+      if (commit(addObject(content, groupId, { id, name: `Object ${content.objects.length + 1}`, layer: 'body', shapes: [] }), true)) choose({ kind: 'object', id })
     },
     onAddShape: (objectId, t) => addShapeTo(objectId, t, content),
     onTwin: (kind, id) => { applyEdit(makeTwin(content, kind, id, makeId)) },
@@ -1173,6 +1180,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       saveStatus={models.saveStatus} onSave={() => { void models.saveNow() }}
       autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: models.saveCountdown.nextSaveAt, wait: models.saveCountdown.wait }}
       onPublish={() => void models.publish(entry.id)} publishBlocked={faults.length > 0 ? 'Fix what the checks say first' : null} busy={busy}
+      advanced={onAdvanced ? { on: policy.advanced, onToggle: onAdvanced } : undefined}
     />
   )
   // A lock at a crossing of two outlines is made in the model's own space, so it waits for the sliders at rest, the front view and the base outline.

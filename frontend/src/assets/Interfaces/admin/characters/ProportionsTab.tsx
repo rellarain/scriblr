@@ -4,6 +4,7 @@ import { PlusIcon, TrashIcon } from '../../../icons'
 import { LimitSteppers } from './LimitSteppers'
 import { Stepper } from './Stepper'
 import { headHeights, measures, type Measure } from './engine/bones'
+import { useDesignerPolicy } from './designerPolicy'
 import { LIMITS } from './engine/limits'
 import type { Solved } from './engine/rig'
 import type { ProportionActions, RigActions } from './rigActions'
@@ -31,6 +32,7 @@ export function ProportionsTab({ content, solved, picking, actions, limits }: {
   actions: ProportionActions
   limits: Pick<RigActions, 'stepLimit' | 'clearLimit'>
 }) {
+  const { max } = useDesignerPolicy()
   const [confirm, setConfirm] = useState<string | null>(null)
   const bones = content.bones ?? []
   const byId = new Map(measures(content, solved).map(m => [m.id, m]))
@@ -95,7 +97,7 @@ export function ProportionsTab({ content, solved, picking, actions, limits }: {
         <p className="cmInsText">{sliders.length === 0 ? 'No slider lengthens it yet.' : 'Lengthened by'}</p>
         {sliders.length > 0 && <ul className="cmPlain">{sliders.map((r: ModelRange) => <li key={r.id}><button type="button" className="cmLink" onClick={() => actions.openSlider(r.id)}>{label(r.name, r.id)}</button></li>)}</ul>}
         <div className="cmInline">
-          <button type="button" className="cmBtn cmBtn--small" disabled={content.ranges.length >= LIMITS.rangesMax} onClick={() => actions.lengthSlider(b.id)}><PlusIcon size={12} /> Add a Length slider</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={content.ranges.length >= max.sliders} onClick={() => actions.lengthSlider(b.id)}><PlusIcon size={12} /> Add a Length slider</button>
         </div>
       </section>
     )

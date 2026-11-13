@@ -196,7 +196,7 @@ export function createMockBackend() {
   // The character models the admin Characters page edits.
   const models = createMockModels(previewModels())
   // The writer's own models (the Characters console's Models section): another catalog, empty to begin with, whose ids start with "my-".
-  const mine = createMockModels([])
+  const mine = createMockModels([], { writer: true })
   // Training: the five placeholder curricula, with a course enrolled in so the Desk has something on it.
   const training = createMockTraining(undefined, { ...emptyProgress(), enrolled: { 'writer-c1': '2026-11-02T12:00:00.000Z' } })
   // The Maps console's maps, which its edits change in memory only.
