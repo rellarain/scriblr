@@ -1,6 +1,6 @@
-// The symbols a map can be stamped with: four sets of flat, one-colour silhouettes, each drawn from one SVG path in a 24 by 24 box (so a symbol is
-// code, never an image, and takes any colour). A map keeps only a symbol's `kind` (its id here); an id this library no longer has is drawn as a plain
-// marker, so an old map never breaks. Paths are filled with the even-odd rule, so a door or a window is a hole in the shape.
+// The silhouettes of the map markers that come with the app: what were the symbols a map was stamped with before shape libraries (four sets of flat,
+// one-colour silhouettes, each one SVG path in a 24 by 24 box, filled by the even-odd rule so a door or a window is a hole). mapShapeSeed.ts turns each into
+// a library shape of the Markers category ("marker:<id>"), and the server turns every old symbol into a copy of its marker, keeping its id.
 
 export interface MapSymbolDef { id: string; name: string; path: string }
 export interface MapSymbolSet { id: 'settlements' | 'nature' | 'interior' | 'landmarks'; name: string; symbols: MapSymbolDef[] }
@@ -64,14 +64,5 @@ export const SYMBOL_SETS: MapSymbolSet[] = [
   },
 ]
 
-const BY_ID = new Map<string, MapSymbolDef>(SYMBOL_SETS.flatMap(set => set.symbols.map(s => [s.id, s] as const)))
-
-export const symbolDef = (id: string): MapSymbolDef | undefined => BY_ID.get(id)
-export const symbolName = (id: string): string => BY_ID.get(id)?.name ?? 'Symbol'
-
-// What is drawn for a kind this library does not have: a diamond.
+// What an id the library does not have becomes: a diamond.
 export const UNKNOWN_SYMBOL_PATH = 'M12 3l9 9-9 9-9-9Z'
-export const symbolPath = (id: string): string => BY_ID.get(id)?.path ?? UNKNOWN_SYMBOL_PATH
-
-// The size of a new symbol, in cells.
-export const DEFAULT_SYMBOL_SIZE = 2

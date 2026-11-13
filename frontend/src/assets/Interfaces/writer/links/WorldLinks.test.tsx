@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CharacterDoc, MapDoc, MapPlace, PlotNode, WorldLink } from '../../../../api/types'
 import { newCharacter } from '../../../../designSystem/mockCharacters'
-import { newMap } from '../../../../designSystem/mockMaps'
+import { markerOf, newMap } from '../../../../designSystem/mockMaps'
 import { charactersBackend } from '../../../../test/charactersBackend'
 import { makeWorkspace } from '../../../../test/makeWorkspace'
 import { mapsBackend } from '../../../../test/mapsBackend'
@@ -125,7 +125,7 @@ describe('the links of a place', () => {
   const world = (): MapDoc => {
     const doc = newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6 }, 0)
     const layer = doc.layers.find(l => l.kind === 'symbols')!.id
-    return { ...doc, symbols: [{ id: 'port', layerId: layer, kind: 'town', x: 3, y: 3, size: 2, color: null, name: 'Port Veyra', mapIds: [] }] }
+    return { ...doc, shapes: [markerOf({ id: 'port', layerId: layer, kind: 'town', x: 3, y: 3, size: 2, color: null, name: 'Port Veyra', mapIds: [] })] }
   }
 
   it('opens the map and chooses the place that a link from another console asked for, and lists its links', async () => {

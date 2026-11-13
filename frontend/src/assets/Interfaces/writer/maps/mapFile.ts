@@ -10,8 +10,8 @@ import { descendantIds } from './mapModel'
 
 export const MAP_FILE_FORMAT = 'scriblr-maps'
 // Version 2 holds the versions of the maps (a map with `versionOf`); a version 1 file has none. Version 3 holds maps of levels and biome shapes, and the
-// project's own biomes they use.
-export const MAP_FILE_VERSION = 3
+// project's own biomes they use. Version 4 has no symbols: markers, holes and rough edges are shapes (an older file's symbols become markers on import).
+export const MAP_FILE_VERSION = 4
 
 export interface MapFile {
   format: typeof MAP_FILE_FORMAT
@@ -35,7 +35,6 @@ export function buildMapFile(rootId: string, all: MapDoc[], own: MapBiome[] = []
   const maps = all.filter(m => keep.has(m.id) || (m.versionOf != null && keep.has(m.versionOf))).map(m => ({
     ...m,
     parentId: m.id === rootId || m.versionOf ? null : m.parentId,
-    symbols: m.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(id => keep.has(id)) })),
     shapes: m.shapes.map(s => (s.mapIds ? { ...s, mapIds: s.mapIds.filter(id => keep.has(id)) } : s)),
   }))
   const used = new Set(maps.flatMap(m => (m.base ? usedBiomeIds(m) : [])))
@@ -59,7 +58,7 @@ export function parseMapFile(text: string): ParsedFile {
   const seen = new Set<string>()
   for (const item of raw.maps) {
     if (!isRecord(item) || typeof item.id !== 'string' || item.id === '' || seen.has(item.id) || typeof item.width !== 'number' || typeof item.height !== 'number') continue
-    const land = item.mapFormat === 2 ? isRecord(item.base) && Array.isArray(item.shapes) : Array.isArray(item.cells)
+    const land = typeof item.mapFormat === 'number' && item.mapFormat >= 2 ? isRecord(item.base) && Array.isArray(item.shapes) : Array.isArray(item.cells)
     if (!land) continue
     seen.add(item.id)
     maps.push(item as unknown as MapDoc)
@@ -135,7 +134,8 @@ export async function importMaps(file: MapFile, choices: Map<string, Choice>, ex
       const parent = own.id === root.id ? parentId : own.parentId !== null && newId.has(own.parentId) ? newId.get(own.parentId)! : parentId
       const doc: MapDoc = {
         ...own, id, level: levelOfFileMap(own), parentId: own.id === root.id && choiceOf(row) === 'replace' ? row.clash!.parentId : parent,
-        symbols: own.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) })),
+        // An older file's symbols go as they are (the server turns them into markers), with the maps they open made the new ones.
+        ...(own.symbols ? { symbols: own.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) })) } : {}),
         shapes: relinkShapes(own.shapes, newId),
         journeys: keepJourneys(own.journeys, api.characterIds),
       }
@@ -153,7 +153,7 @@ export async function importMaps(file: MapFile, choices: Map<string, Choice>, ex
         const id = overwrite ? version.id : (await api.createVersion(base, { title: version.title, appliesFrom: version.appliesFrom ?? null })).id
         await api.put({
           ...version, id, level: levelOfFileMap(version), parentId: null, versionOf: base,
-          symbols: version.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) })),
+          ...(version.symbols ? { symbols: version.symbols.map(s => ({ ...s, mapIds: s.mapIds.filter(m => newId.has(m)).map(m => newId.get(m)!) })) } : {}),
           shapes: relinkShapes(version.shapes, newId),
           journeys: keepJourneys(version.journeys, api.characterIds),
         })

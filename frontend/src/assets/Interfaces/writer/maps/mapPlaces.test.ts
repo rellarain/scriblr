@@ -2,9 +2,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MapDoc, MapSummary } from '../../../../api/types'
 import { mapsBackend } from '../../../../test/mapsBackend'
-import { newMap } from '../../../../designSystem/mockMaps'
+import { markerOf, newMap } from '../../../../designSystem/mockMaps'
 import { createMap, createMapVersion, getMap, listMaps, putMap } from '../../../../api/mapsApi'
-import { addPlaces, addSymbol, editSymbol, isPlace, placeKey } from './mapItems'
+import { addLibraryShape, addPlaces, editPlace, isPlace, placeKey } from './mapItems'
+import { starterShapes } from './mapShapeSeed'
 import { MAP_FILE_FORMAT, buildMapFile, importMaps, importRows, mapFileName, parseMapFile, type Choice } from './mapFile'
 import { MapHistory, descendantIds, draftOf, mapPath, setPace, setParent, toggleLayer } from './mapModel'
 import { EXPORT_SCALES, exportSize, imageFileName, renderMapImage, withLayers } from './mapExport'
@@ -16,41 +17,48 @@ import { measureText, pathLength, travelTime } from './mapView'
 const doc = (id: string, over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap(id, { title: id.replace('map_', 'Map '), width: 8, height: 6 }, 0), ...over })
 const sum = (m: MapDoc): MapSummary => ({ id: m.id, title: m.title, kind: m.kind, level: m.level, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt })
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }
-const symbol = (id: string, name = '', mapIds: string[] = []) => ({ id, layerId: 'symbols', kind: 'town', x: 2.5, y: 2.5, size: 2, color: null, name, mapIds })
+// A town marker (what was a stamped symbol), named or not.
+const marker = (id: string, name = '', mapIds: string[] = []) => markerOf({ id, layerId: 'symbols', kind: 'town', x: 2.5, y: 2.5, size: 2, color: null, name, mapIds })
+const TOWN = starterShapes().find(s => s.id === 'marker:town')!
+const withTown = () => addLibraryShape(draftOf(doc('map_1')), TOWN, { x0: 1, y0: 1, x1: 3, y1: 3 }, 'metric', ids('a'))!.change.draft
 
 describe('places', () => {
-  it('a symbol is a place when it has a name, and its key is its map and its id', () => {
-    expect(isPlace(symbol('a'))).toBe(false)
-    expect(isPlace(symbol('a', 'Port Veyra'))).toBe(true)
-    expect(placeKey('map_1', 'sym_a')).toBe('map_1/sym_a')
+  it('a marker or an area is a place when it has a name, and its key is its map and its id', () => {
+    expect(isPlace(marker('a'))).toBe(false)
+    expect(isPlace(marker('a', 'Port Veyra'))).toBe(true)
+    expect(isPlace({ type: 'line', name: 'Road' })).toBe(false)
+    expect(placeKey('map_1', 'mrk_a')).toBe('map_1/mrk_a')
   })
 
-  it('gives a symbol a name (trimmed, held to its length) and the maps that open from it, each once', () => {
-    const d = addSymbol(draftOf(doc('map_1')), 'town', 2, 2, 2, ids('a'))!.change.draft
-    expect(editSymbol(d, 'sym_a', { name: '  Port Veyra ' })!.draft.symbols[0].name).toBe('Port Veyra')
-    expect(editSymbol(d, 'sym_a', { name: 'x'.repeat(200) })!.draft.symbols[0].name).toHaveLength(80)
-    expect(editSymbol(d, 'sym_a', { mapIds: ['m1', 'm2', 'm1'] })!.draft.symbols[0].mapIds).toEqual(['m1', 'm2'])
-    expect(editSymbol(d, 'sym_a', { name: '' })).toBeNull()
-    expect(editSymbol(d, 'sym_a', { mapIds: [] })).toBeNull()
+  it('gives a marker a name (trimmed, held to its length) and the maps that open from it, each once', () => {
+    const d = withTown()
+    const ref = { kind: 'shape' as const, id: 'mrk_a' }
+    expect(editPlace(d, ref, { name: '  Port Veyra ' })!.draft.shapes[0].name).toBe('Port Veyra')
+    expect(editPlace(d, ref, { name: 'x'.repeat(200) })!.draft.shapes[0].name).toHaveLength(80)
+    expect(editPlace(d, ref, { mapIds: ['m1', 'm2', 'm1'] })!.draft.shapes[0].mapIds).toEqual(['m1', 'm2'])
+    expect(editPlace(d, ref, { name: '' })).toBeNull()
+    expect(editPlace(d, ref, { mapIds: [] })).toBeNull()
   })
 
   it('makes a name or a link one undo step', () => {
-    const d = addSymbol(draftOf(doc('map_1')), 'town', 2, 2, 2, ids('a'))!.change.draft
-    const r = editSymbol(d, 'sym_a', { name: 'Port Veyra', mapIds: ['m1'] })!
+    const d = withTown()
+    const r = editPlace(d, { kind: 'shape', id: 'mrk_a' }, { name: 'Port Veyra', mapIds: ['m1'] })!
     const h = new MapHistory()
     h.push(r.edit)
     const back = h.undo(r.draft)!
-    expect([back.symbols[0].name, back.symbols[0].mapIds]).toEqual(['', []])
+    expect([back.shapes[0].name, back.shapes[0].mapIds]).toEqual(['', []])
   })
 
-  it('makes named places in rows from the top left, on the symbols layer, and is not a thing when it cannot', () => {
+  it('makes named places in rows from the top left, as markers on the markers layer, and is not a thing when it cannot', () => {
     const d = draftOf(doc('map_1'))
     const r = addPlaces(d, ['Inn', ' Mill ', 'Docks', 'Keep', 'Gate'], ids('a', 'b', 'c', 'd', 'e'))!
-    const s = r.change.draft.symbols
+    const s = r.change.draft.shapes
     expect(s.map(p => p.name)).toEqual(['Inn', 'Mill', 'Docks', 'Keep', 'Gate'])
-    expect(s.every(p => p.layerId === 'symbols' && p.kind === 'interest')).toBe(true)
-    // 8 cells wide: two to a row, three cells apart.
-    expect(s.map(p => [p.x, p.y])).toEqual([[1.5, 1.5], [4.5, 1.5], [1.5, 4.5], [4.5, 4.5], [1.5, 7.5 > 6 ? 6 : 7.5]])
+    expect(s.every(p => p.layerId === 'symbols' && p.kind === 'marker:interest' && p.style === 'halo')).toBe(true)
+    // 8 cells wide: two to a row, three cells apart (the middle of each marker's square).
+    const middle = (sh: typeof s[number]) => { const xs = sh.points.map(q => q.x), ys = sh.points.map(q => q.y); return [Math.round((Math.min(...xs) + Math.max(...xs)) / 2 * 10) / 10, Math.round((Math.min(...ys) + Math.max(...ys)) / 2 * 10) / 10] }
+    expect(s.slice(0, 4).map(middle)).toEqual([[1.5, 1.5], [4.5, 1.5], [1.5, 4.5], [4.5, 4.5]])
+    expect(s[4].points.every(q => q.y <= 6)).toBe(true) // held to the map
     expect(new Set(s.map(p => p.id)).size).toBe(5)
     expect(addPlaces(d, [])).toBeNull()
     expect(addPlaces(toggleLayer(d, 'symbols', 'locked')!.draft, ['Inn'])).toBeNull()
@@ -124,20 +132,20 @@ describe('measuring', () => {
 })
 
 describe('the map file', () => {
-  const root = doc('map_a', { symbols: [symbol('s1', 'Port', ['map_b', 'map_out'])] })
-  const child = doc('map_b', { parentId: 'map_a', symbols: [symbol('s2', 'Inn', ['map_a'])] })
+  const root = doc('map_a', { shapes: [marker('s1', 'Port', ['map_b', 'map_out'])] })
+  const child = doc('map_b', { parentId: 'map_a', shapes: [marker('s2', 'Inn', ['map_a'])] })
   const sibling = doc('map_z')
   const outside = doc('map_out', { parentId: 'map_zzz' })
 
   it('holds the map and the maps inside it, and cuts what points outside', () => {
     const f = buildMapFile('map_a', [root, child, sibling, outside], [], new Date('2026-11-06T00:00:00Z'))!
-    expect(f).toMatchObject({ format: MAP_FILE_FORMAT, version: 3, rootId: 'map_a', exportedAt: '2026-11-06T00:00:00.000Z', biomes: [] })
+    expect(f).toMatchObject({ format: MAP_FILE_FORMAT, version: 4, rootId: 'map_a', exportedAt: '2026-11-06T00:00:00.000Z', biomes: [] })
     expect(f.maps.map(m => m.id)).toEqual(['map_a', 'map_b'])
-    expect(f.maps[0].symbols[0].mapIds).toEqual(['map_b'])
+    expect(f.maps[0].shapes[0].mapIds).toEqual(['map_b'])
     // The root is a map of its own in the file, and the maps of the project are not changed.
     expect(buildMapFile('map_b', [root, child])!.maps[0].parentId).toBeNull()
     expect(child.parentId).toBe('map_a')
-    expect(root.symbols[0].mapIds).toEqual(['map_b', 'map_out'])
+    expect(root.shapes[0].mapIds).toEqual(['map_b', 'map_out'])
     expect(buildMapFile('nope', [root])).toBeNull()
   })
 
@@ -212,8 +220,8 @@ describe('the map file', () => {
       expect(a2.id).not.toBe('map_a')
       expect(a2.parentId).toBe('map_here')
       expect(b2.parentId).toBe(a2.id)
-      expect(a2.symbols[0].mapIds).toEqual([b2.id])
-      expect(b2.symbols[0].mapIds).toEqual([a2.id])
+      expect(a2.shapes[0].mapIds).toEqual([b2.id])
+      expect(b2.shapes[0].mapIds).toEqual([a2.id])
       expect(r.rootId).toBe(a2.id)
       expect(backend.maps.has('map_a')).toBe(false)
     })
@@ -228,7 +236,7 @@ describe('the map file', () => {
       expect(r.made).toEqual([])
       expect(r.skipped).toEqual(['map_b'])
       expect(backend.maps.get('map_a')!).toMatchObject({ title: 'Map a', width: 8, parentId: null })
-      expect(backend.maps.get('map_a')!.symbols[0].mapIds).toEqual([]) // the map it opened was skipped
+      expect(backend.maps.get('map_a')!.shapes[0].mapIds).toEqual([]) // the map it opened was skipped
       expect(backend.maps.get('map_b')!.title).toBe('Mine too')
       const both = await importMaps(f, new Map(), await listMaps('p1'), null, api)
       expect(both.made).toHaveLength(2)

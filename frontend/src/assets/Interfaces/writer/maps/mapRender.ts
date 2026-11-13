@@ -1,8 +1,8 @@
-import { drawAreaName, drawMeasure, drawLabel, drawOverlays, drawSelection, drawSymbol, type MeasureState } from './mapDrawItems'
+import { drawAreaName, drawMeasure, drawLabel, drawOverlays, drawPlaceName, drawSelection, type MeasureState } from './mapDrawItems'
 import { drawBiomeShape, drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
 import { drawJourneys, type JourneyView } from './mapDrawJourneys'
 import type { MapShape } from '../../../../api/types'
-import { findItem, type ItemRef, type LegendEntry } from './mapItems'
+import { findItem, showsPoints, type ItemRef, type LegendEntry } from './mapItems'
 import type { MapDraft } from './mapModel'
 import { resolveBiome, type BiomeIndex } from './mapBiomes'
 import { MAX_TINT, contoursOf, heightTint, keptWithHeights, mapHeightRange, shadePixels, type ContourSegment } from './mapHeights'
@@ -12,7 +12,7 @@ import { GRID_MIN_ZOOM, type MapView } from './mapView'
 
 // Drawing a map on a canvas: the land (the base biome, then the biome shapes in their order, each in its biome's colour; then the shading of the heights
 // over it, lighter where it is higher and darker where it is lower, with relief and contour lines when the map has them on), then the layers above it in
-// their order (lines and regions, symbols, labels), the names of the areas that are places, the grid, the scale bar, compass and legend. The colours of the
+// their order (lines and regions, markers, labels), the names of the areas that are places, the grid, the scale bar, compass and legend. The colours of the
 // land are the biomes' (data); the frame round the map takes the ink colour of the page it is on.
 
 export { hexToRgb, MAX_TINT, heightTint }
@@ -43,7 +43,7 @@ export interface RenderOptions {
   showGrid: boolean
   // The page's ink colour, for the frame.
   ink: string
-  // The chosen symbol, label or shape, and the chosen point of a shape.
+  // The chosen label or shape, and the chosen point of a shape.
   selected: ItemRef | null
   selectedNode: number | null
   // The line, region or biome shape that is being drawn.
@@ -56,6 +56,8 @@ export interface RenderOptions {
   journeys?: JourneyView
   // The Nations view: the land in neutral colours and the political areas filled in their own (planetary to regional maps).
   nations?: boolean
+  // A shape about to be placed (the Place a shape tool's box), drawn over the map with a dashed outline.
+  preview?: MapShape | null
   // Where the shading image is drawn (the page's own canvas when not given).
   makeCanvas?: MakeCanvas
 }
@@ -122,6 +124,29 @@ export function drawLand(ctx: CanvasRenderingContext2D, draft: MapDraft, biomes:
   if (draft.contours) drawContours(ctx, contoursOf(draft, biomes), view, opts.theme ?? mapStyle(draft.level))
 }
 
+// A shape about to be placed: drawn as it will be (a biome area in its biome's colour), under a dashed outline.
+function drawPreview(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef, biomes: BiomeIndex) {
+  ctx.save()
+  ctx.globalAlpha = 0.8
+  if (shape.type === 'biome') drawBiomeShape(ctx, shape, view, shape.biome ? resolveBiome(biomes, shape.biome).color : '#7a8aa0')
+  else drawShape(ctx, shape, view, theme)
+  ctx.restore()
+  ctx.save()
+  ctx.beginPath()
+  for (const ring of [shape.points, ...(shape.type === 'line' ? [] : shape.holes ?? [])]) {
+    flatten({ type: ring === shape.points ? shape.type : 'region', points: ring }).forEach((p, i) => {
+      const x = view.x + p.x * view.zoom, y = view.y + p.y * view.zoom
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+    })
+    if (shape.type !== 'line') ctx.closePath()
+  }
+  ctx.setLineDash([5, 3])
+  ctx.strokeStyle = theme.ink
+  ctx.lineWidth = 1.2
+  ctx.stroke()
+  ctx.restore()
+}
+
 export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   const { width, height, dpr, view, draft } = o
   const theme = mapStyle(draft.level)
@@ -146,9 +171,7 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
         ctx.fillRect(view.x, view.y, w, h)
         ctx.restore()
       }
-    } else if (layer.kind === 'symbols' && layer.visible) {
-      for (const s of draft.symbols) if (s.layerId === layer.id) drawSymbol(ctx, s, view, theme)
-    } else if (layer.kind === 'shapes' && layer.visible) {
+    } else if ((layer.kind === 'shapes' || layer.kind === 'symbols') && layer.visible) {
       for (const sh of draft.shapes) if (sh.layerId === layer.id && sh.type !== 'biome') drawShape(ctx, sh, view, theme, o.nations)
     } else if (layer.kind === 'labels' && layer.visible) {
       for (const l of draft.labels) if (l.layerId === layer.id) drawLabel(ctx, l, view, theme)
@@ -156,7 +179,10 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   }
   // The names of the areas that are places, over everything on the map.
   for (const sh of draft.shapes) {
-    if (sh.type !== 'line' && sh.name && shownLayers.has(sh.layerId)) drawAreaName(ctx, sh.name, flatten(sh), view, theme)
+    if (sh.type === 'line' || !sh.name || !shownLayers.has(sh.layerId)) continue
+    // A marker's name is under it (its picture stays clear); an area's at its middle.
+    if (sh.style === 'halo') drawPlaceName(ctx, sh.name, sh, view, theme)
+    else drawAreaName(ctx, sh.name, flatten(sh), view, theme)
   }
   ctx.restore()
   if (o.journeys) {
@@ -204,9 +230,10 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
     const item = findItem(draft, o.selected)
     if (item) {
       drawSelection(ctx, item, o.selected, view, theme)
-      if (o.selected.kind === 'shape') drawShapeEditor(ctx, item as MapShape, view, theme, o.selectedNode)
+      if (o.selected.kind === 'shape' && showsPoints(item as MapShape, view.zoom)) drawShapeEditor(ctx, item as MapShape, view, theme, o.selectedNode)
     }
   }
   if (o.pending) drawPending(ctx, o.pending, view, theme)
+  if (o.preview) drawPreview(ctx, o.preview, view, theme, o.biomes)
   if (o.measure) drawMeasure(ctx, o.measure, view, theme, o.width)
 }

@@ -14,14 +14,20 @@ import { VersionBar } from './VersionBar'
 import { addStop, journeysOf, whereAt } from './mapJourneys'
 import type { JourneyView } from './mapDrawJourneys'
 import { MapSide } from './MapSide'
-import { addBiomeShape, addLabel, addShape, addSymbol, findItem, removeItem, replaceShape, type AreaLook, type ItemRef } from './mapItems'
+import { addBiomeShape, addLabel, addLibraryShape, addShape, addTemplateShape, combineShapes, findItem, isMarker, removeItem, replaceShape, type AreaLook, type ItemRef } from './mapItems'
 import { mapPath } from './mapModel'
+import { fitInBox, ownBox, shapeFromLibrary } from './mapLibrary'
+import { templatePoints } from './mapTemplates'
+import { cutShape, mergeShapes, splitShape, type CombineAction } from './mapCombine'
+import { newSeed } from './mapOutline'
+import { markerName } from './mapShapeSeed'
+import type { ShapeSource } from './ShapesPanel'
 import { offeredBiomes, resolveBiome, useBiomes } from './mapBiomes'
 import { heightAt, heightsOf } from './mapHeights'
 import { POLITICAL_LEVELS } from './mapLevels'
 import { formatHeight } from './mapUnits'
-import { DEFAULT_LINE_PEN, DEFAULT_REGION_PEN, hitShape, type Pen } from './mapShapes'
-import { DEFAULT_SYMBOL_SIZE, symbolName } from './mapSymbols'
+import { DEFAULT_LINE_PEN, DEFAULT_REGION_PEN, hitShape, type Pen, type Rect } from './mapShapes'
+import { levelDef } from './mapLevels'
 import { formatDistance } from './mapView'
 import { useMaps } from './useMaps'
 import './maps.scss'
@@ -29,7 +35,7 @@ import './maps.scss'
 const TOOLS: Array<{ tool: MapTool; label: string; Icon: typeof BiomeIcon }> = [
   { tool: 'select', label: 'Select and move', Icon: CursorIcon },
   { tool: 'biome', label: 'Draw a biome area', Icon: BiomeIcon },
-  { tool: 'symbol', label: 'Stamp a symbol', Icon: StampIcon },
+  { tool: 'shape', label: 'Place a shape', Icon: StampIcon },
   { tool: 'label', label: 'Place a label', Icon: TextSizeIcon },
   { tool: 'line', label: 'Draw a line', Icon: PathIcon },
   { tool: 'region', label: 'Draw a region', Icon: PolygonIcon },
@@ -50,14 +56,17 @@ function keepView(mapId: string, mode: MapViewMode) {
 }
 
 // Project > Maps: the maps of the setting, each of a level (intergalactic down to interior). A list of maps (nested ones under the map they are in), the open
-// map as a canvas to draw biome areas, lines and regions on and to stamp symbols and place labels on (pan and zoom, a pointer that picks and moves things,
-// undo), and beside it the biomes, the symbols, the pens, the layers and the map's own fields (its level, units, the scale bar, compass and legend). Edits
+// map as a canvas to draw biome areas, lines and regions on, to place shapes from templates and libraries (markers too) and labels on (pan and zoom, a pointer
+// that picks and moves things, undo), and beside it the biomes, the shapes, the pens, the layers and the map's own fields (its level, units, the scale bar,
+// compass and legend). Edits
 // save the way the Writer's do: the Save button, and autosave when the user has turned it on.
 // A scene of the project, for the places: its location is the key of a place (or old text, from before there were places).
 export interface ScenePlace { id: string; title: string; location: string }
 
-export default function MapsConsole({ projectId, scenes = [], onSetLocation, plotNodes = [], onOpenPlot, outline = [], onOpenScene }: {
+export default function MapsConsole({ projectId, projectTitle = '', scenes = [], onSetLocation, plotNodes = [], onOpenPlot, outline = [], onOpenScene }: {
   projectId: string
+  // The open project's title (kept with a shape saved to My shapes).
+  projectTitle?: string
   // The outline, for the points of the story that versions and journeys are tied to.
   outline?: OutlineNode[]
   scenes?: ScenePlace[]
@@ -84,8 +93,10 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   const [viewMode, setViewMode] = useState<MapViewMode>('biomes')
   const [grid, setGrid] = useState(true)
   const [hoverAt, setHoverAt] = useState<[number, number] | null>(null)
-  const [symbolKind, setSymbolKind] = useState('village')
-  const [symbolSize, setSymbolSize] = useState(DEFAULT_SYMBOL_SIZE)
+  // What the Place a shape tool places, and the chosen shape being combined with one picked on the map.
+  const [shapeSource, setShapeSource] = useState<ShapeSource | null>(null)
+  const [combining, setCombining] = useState<{ action: CombineAction; id: string } | null>(null)
+  const [combineNote, setCombineNote] = useState<string | null>(null)
   // What new lines and regions are drawn with, one pen for each.
   const [linePen, setLinePen] = useState<Pen>(DEFAULT_LINE_PEN)
   const [regionPen, setRegionPen] = useState<Pen>(DEFAULT_REGION_PEN)
@@ -104,12 +115,11 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
     // Only when the list has loaded (opening is not repeated after a map is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.status])
-  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })); setViewMode(m.openId ? readView(m.openId) : 'biomes') }, [m.openId])
+  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })); setViewMode(m.openId ? readView(m.openId) : 'biomes'); setCombining(null); setCombineNote(null) }, [m.openId])
   // A link from another console asked for a place: its map opens, and the place (a symbol or an area) is chosen on it.
   const wanted = useRef<{ mapId: string; placeId: string } | null>(null)
   const pickPlace = (doc: NonNullable<typeof draft>, placeId: string) => {
-    if (doc.symbols.some(s => s.id === placeId)) setPicked({ kind: 'symbol', id: placeId })
-    else if (doc.shapes.some(s => s.id === placeId)) setPicked({ kind: 'shape', id: placeId })
+    if (doc.shapes.some(s => s.id === placeId)) setPicked({ kind: 'shape', id: placeId })
   }
   usePendingOpen('place', m.status === 'ready', key => {
     const [mapId, placeId] = key.split('/')
@@ -127,6 +137,8 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   const offered = draft ? offeredBiomes(biomes.index, draft.level) : []
   const chosenBiome = offered.some(b => b.id === biome) ? biome : offered[0]?.id ?? biome
   const selected = draft && picked && findItem(draft, picked) ? picked : null
+  // Combining stops when the shape it was for is no longer the chosen one.
+  const combineNow = combining && selected?.kind === 'shape' && selected.id === combining.id ? combining : null
 
   // The journeys as the canvas draws them, and a click of the Journey tool: a stop at a cell of the chosen journey, from the point new stops are from.
   const journeyView = useMemo<JourneyView | undefined>(() => {
@@ -158,17 +170,10 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
     return { name: resolveBiome(biomes.index, id).name, height: grid ? heightAt(grid, hoverAt[0], hoverAt[1]) : null }
   })()
 
-  // Stamp a symbol, or put a label (which then takes the cursor in the side panel, ready to be given its text).
-  function place(kind: 'symbol' | 'label', x: number, y: number): boolean {
+  // Put a label (which then takes the cursor in the side panel, ready to be given its text).
+  function place(_kind: 'label', x: number, y: number): boolean {
     if (!draft) return false
     setBlocked(false)
-    if (kind === 'symbol') {
-      const r = addSymbol(draft, symbolKind, x, y, symbolSize)
-      if (!r || !m.apply(r.change)) return false
-      setPicked({ kind: 'symbol', id: r.id })
-      setFresh(null)
-      return true
-    }
     const r = addLabel(draft, 'New label', x, y, NEW_LABEL_SIZE)
     if (!r || !m.apply(r.change)) return false
     setPicked({ kind: 'label', id: r.id })
@@ -189,6 +194,56 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
     return true
   }
 
+  // What the Place a shape tool places: the chosen source, or a circle to begin with (a biome area on a map of land, else a region).
+  const biomesLevel = draft ? levelDef(draft.level).drawn === 'biomes' : false
+  const source: ShapeSource = shapeSource ?? { kind: 'template', template: 'circle', sides: 6, makeAs: biomesLevel ? 'biome' : 'region' }
+  const makeAs = source.kind === 'template' && source.makeAs === 'biome' && biomesLevel ? 'biome' : 'region'
+  // The box a template fills for a click (no box dragged): four cells, centred.
+  const clickBox = (x: number, y: number): Rect => ({ x0: x - 2, y0: y - 2, x1: x + 2, y1: y + 2 })
+  // The shape a source makes in a box (none when it cannot be made), without putting it on the map: for the preview, and what is placed.
+  function sourceShape(box: Rect | null, at: [number, number]): { lib?: ReturnType<typeof fitInBox>; points?: ReturnType<typeof templatePoints> } {
+    if (source.kind === 'library') return { lib: box ? fitInBox(source.shape, box) : ownBox(source.shape, at[0], at[1]) }
+    return { points: templatePoints(source.template, box ?? clickBox(at[0], at[1]), { sides: source.sides, seed: newSeed() }) }
+  }
+  function placeShape(box: Rect | null, at: [number, number]): boolean {
+    if (!draft) return false
+    setBlocked(false)
+    const made = sourceShape(box, at)
+    const r = source.kind === 'library'
+      ? addLibraryShape(draft, source.shape, made.lib!, draft.units)
+      : addTemplateShape(draft, makeAs, made.points!, { biome: chosenBiome, look: areaLook, pen: regionPen })
+    if (!r || !m.apply(r.change)) return false
+    setPicked({ kind: 'shape', id: r.id })
+    setFresh(null)
+    return true
+  }
+  function previewShape(box: Rect) {
+    if (!draft) return null
+    const made = sourceShape(box, [0, 0])
+    if (source.kind === 'library') return shapeFromLibrary(source.shape, made.lib!, 'preview', '', draft.units)
+    const pts = templatePoints(source.template, box, { sides: source.sides, seed: 1 })
+    return makeAs === 'biome'
+      ? { id: 'preview', layerId: '', type: 'biome' as const, points: pts, style: 'solid' as const, color: null, width: 0.25, fill: null, opacity: 1, pattern: 'solid' as const, biome: chosenBiome }
+      : { id: 'preview', layerId: '', type: 'region' as const, points: pts, style: regionPen.style, color: regionPen.color, width: regionPen.width, fill: regionPen.fill, opacity: regionPen.opacity, pattern: regionPen.pattern }
+  }
+
+  // A shape picked on the map to combine the chosen one with: merged into it, cut out of it, or the line it is split along.
+  function pickToCombine(ref: ItemRef | null) {
+    if (!draft || !combineNow) return
+    if (!ref) { setCombining(null); return }
+    const a = draft.shapes.find(s => s.id === combineNow.id)
+    const b = ref.kind === 'shape' ? draft.shapes.find(s => s.id === ref.id) : undefined
+    if (!a || !b) { setCombineNote('Pick a shape on the map.'); return }
+    const taken = new Set(draft.shapes.map(s => s.id))
+    let n = 1
+    const nextId = () => { while (taken.has(`${a.id.slice(0, 34)}_${n}`)) n += 1; const id = `${a.id.slice(0, 34)}_${n}`; taken.add(id); return id }
+    const res = combineNow.action === 'merge' ? mergeShapes(a, b) : combineNow.action === 'cut' ? cutShape(a, b) : splitShape(a, b, nextId)
+    if ('refused' in res) { setCombineNote(res.refused); return }
+    m.apply(combineShapes(draft, res.shapes, res.removed))
+    setCombining(null)
+    setCombineNote(null)
+  }
+
   function removeChosen() {
     if (!draft || !selected) return
     m.apply(removeItem(draft, selected))
@@ -202,12 +257,18 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   }
 
   const path = draft ? mapPath(m.maps, draft.id) : []
-  const hint = tool === 'line' || tool === 'region' || tool === 'biome' ? ' · click to add points, double-click or Enter to finish, Esc to cancel' : ''
-  const shapeKind = (id: string) => ({ region: 'Region', line: 'Line', biome: 'Biome area' } as const)[draft?.shapes.find(s => s.id === id)?.type ?? 'line']
+  const hint = combineNow ? ({ merge: ' · pick the shape to merge with, Esc stops', cut: ' · pick the shape to cut out, Esc stops', split: ' · pick the line to split along, Esc stops' } as const)[combineNow.action]
+    : tool === 'line' || tool === 'region' || tool === 'biome' ? ' · click to add points, double-click or Enter to finish, Esc to cancel'
+      : tool === 'shape' ? ' · drag a box to place the shape, or click to place it at its own size' : ''
+  const shapeKind = (id: string) => {
+    const sh = draft?.shapes.find(s => s.id === id)
+    if (sh && isMarker(sh)) return sh.kind ? markerName(sh.kind) : 'Marker'
+    return ({ region: 'Region', line: 'Line', biome: 'Biome area' } as const)[sh?.type ?? 'line']
+  }
   const statusText = hover
     ? `Cell ${hover[0] + 1}, ${hover[1] + 1}${under ? ` · ${under.name}${under.height !== null ? `, ${formatHeight(under.height, draft?.units)}` : ''}` : ''}`
     : selected && draft
-      ? (selected.kind === 'symbol' ? `${symbolName(draft.symbols.find(s => s.id === selected.id)?.kind ?? '')} chosen` : selected.kind === 'shape' ? `${shapeKind(selected.id)} chosen` : 'Label chosen')
+      ? (selected.kind === 'shape' ? `${shapeKind(selected.id)} chosen` : 'Label chosen')
       : `${draft?.width ?? 0} × ${draft?.height ?? 0} cells`
 
   return (
@@ -243,6 +304,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
       {m.saveStatus.error && <p className="mapNote mapNote--error" role="alert">{m.saveStatus.error}</p>}
       {m.notice && <p className="mapNote mapNote--error" role="alert">{m.notice}</p>}
       {blocked && <p className="mapNote mapNote--error" role="status">There is no shown, unlocked layer to put that on: show or unlock one in Layers.</p>}
+      {combineNote && <p className="mapNote mapNote--error" role="status">{combineNote}</p>}
       <div className="mapSplit">
         <MapList m={m} points={points} />
         {draft ? (
@@ -261,7 +323,9 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
               <VersionBar m={m} draft={draft} points={points} />
               <MapCanvas
                 draft={draft} biomes={biomes.index} biome={chosenBiome} tool={tool} showGrid={grid} pen={pen} selected={selected} onSelect={setPicked}
-                onPlace={place} onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
+                onPlace={place} onPlaceShape={(box, at) => placeShape(box, at)} previewShape={box => previewShape(box)}
+                picking={combineNow !== null} onPick={pickToCombine}
+                onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
                 onOpenPlace={id => { void m.open(id) }} onMeasure={setMeasured}
                 onHover={(cell, at) => { setHover(cell); setHoverAt(at ?? null) }} onBlocked={() => setBlocked(true)}
                 journeys={journeyView} onAddStop={addJourneyStop} nations={nationsShown}
@@ -272,7 +336,9 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
               projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft}
               biomes={biomes} biome={chosenBiome} onBiome={id => { setBiome(id); setTool('biome') }} biomeSmooth={biomeSmooth} onBiomeSmooth={setBiomeSmooth}
               areaLook={areaLook} onAreaLook={patch => setAreaLook(old => ({ ...old, ...patch }))}
-              symbolKind={symbolKind} onSymbolKind={id => { setSymbolKind(id); setTool('symbol') }} symbolSize={symbolSize} onSymbolSize={setSymbolSize}
+              shapeSource={shapeSource} onShapeSource={next => { setShapeSource(next); setTool('shape') }}
+              combining={combineNow?.action ?? null} onCombine={action => { setCombineNote(null); setCombining(action && selected?.kind === 'shape' ? { action, id: selected.id } : null) }}
+              projectTitle={projectTitle}
               pen={pen} penType={penType}
               onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}
               onPreset={(type, next) => { (type === 'region' ? setRegionPen : setLinePen)(next); setTool(type) }}

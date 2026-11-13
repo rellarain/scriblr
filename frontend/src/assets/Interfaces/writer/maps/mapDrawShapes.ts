@@ -1,5 +1,6 @@
 import type { MapLineStyle, MapShape, MapShapeType } from '../../../../api/types'
-import { flatten, isClosed, makeShape, outVector, segmentsOf, type Pen } from './mapShapes'
+import { isClosed, makeShape, outVector, segmentsOf, shapeBounds, type Pen } from './mapShapes'
+import { allRings, drawnFromRings, ringsOf } from './mapOutline'
 import type { MapThemeDef } from './mapThemes'
 import type { MapView } from './mapView'
 
@@ -8,9 +9,20 @@ import type { MapView } from './mapView'
 
 const DEFAULT_FILL = '#7a8aa0'
 
-function trace(ctx: CanvasRenderingContext2D, shape: Pick<MapShape, 'type' | 'points'>, view: MapView) {
+// The path of a shape: its curve, or, for a rough shape or one with more rings, the polylines of its drawn rings.
+function trace(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView) {
   const sx = (x: number) => view.x + x * view.zoom, sy = (y: number) => view.y + y * view.zoom
   ctx.beginPath()
+  if (drawnFromRings(shape)) {
+    const closed = isClosed(shape)
+    for (const ring of closed ? allRings(shape) : [ringsOf(shape).outer]) {
+      if (ring.length === 0) continue
+      ctx.moveTo(sx(ring[0].x), sy(ring[0].y))
+      for (let i = 1; i < ring.length; i += 1) ctx.lineTo(sx(ring[i].x), sy(ring[i].y))
+      if (closed) ctx.closePath()
+    }
+    return
+  }
   const segs = segmentsOf(shape)
   if (segs.length === 0) return
   ctx.moveTo(sx(segs[0].a[0]), sy(segs[0].a[1]))
@@ -20,6 +32,9 @@ function trace(ctx: CanvasRenderingContext2D, shape: Pick<MapShape, 'type' | 'po
   }
   if (isClosed(shape)) ctx.closePath()
 }
+
+// How a closed shape is filled: even-odd when it has more rings (a hole stays empty, a piece apart is filled).
+export const fillRule = (shape: Pick<MapShape, 'type' | 'holes'>): CanvasFillRule => (isClosed(shape) && (shape.holes?.length ?? 0) > 0 ? 'evenodd' : 'nonzero')
 
 // The path that is traced now, stroked in a style. `w` is the width in pixels of the line itself (a road and a wall are drawn wider round it).
 function strokeStyled(ctx: CanvasRenderingContext2D, style: MapLineStyle, colour: string, w: number, theme: MapThemeDef, again: () => void) {
@@ -75,14 +90,12 @@ function strokeStyled(ctx: CanvasRenderingContext2D, style: MapLineStyle, colour
 
 // A pattern over the inside of a region (the region's own outline is the clip): lines or dots in the fill colour, spaced by the zoom.
 function drawPattern(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, colour: string) {
-  const pts = flatten(shape)
-  if (pts.length === 0) return
-  const xs = pts.map(p => view.x + p.x * view.zoom), ys = pts.map(p => view.y + p.y * view.zoom)
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
+  const b = shapeBounds({ ...shape, width: 0 })
+  const x0 = view.x + b.x0 * view.zoom, x1 = view.x + b.x1 * view.zoom, y0 = view.y + b.y0 * view.zoom, y1 = view.y + b.y1 * view.zoom
   const step = Math.max(5, view.zoom * 0.7)
   ctx.save()
   trace(ctx, shape, view)
-  ctx.clip()
+  ctx.clip(fillRule(shape))
   ctx.globalAlpha = Math.min(1, shape.opacity + 0.45)
   ctx.strokeStyle = colour
   ctx.fillStyle = colour
@@ -107,16 +120,16 @@ function drawPattern(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapVi
 
 // A biome shape: its outline filled in its biome's colour (no line round it: the land meets the land). The shading by height is drawn over the whole land
 // afterwards (mapHeights.ts); `tint` (-1 to 1: white over it, or black) is for a shape shown on its own, such as one being drawn.
-export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: Pick<MapShape, 'type' | 'points'>, view: MapView, color: string, tint = 0) {
+export function drawBiomeShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, color: string, tint = 0) {
   if (shape.points.length < 3) return
   ctx.save()
   trace(ctx, shape, view)
   ctx.fillStyle = color
-  ctx.fill()
+  ctx.fill(fillRule(shape))
   if (tint !== 0) {
     ctx.globalAlpha = Math.min(1, Math.abs(tint))
     ctx.fillStyle = tint > 0 ? '#ffffff' : '#000000'
-    ctx.fill()
+    ctx.fill(fillRule(shape))
   }
   ctx.restore()
 }
@@ -135,6 +148,7 @@ export function nationFill(shape: Pick<MapShape, 'id' | 'fill' | 'color'>): stri
 // when it is filled in its own colour.
 export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef, nations = false) {
   if (shape.points.length < 2) return
+  if (shape.style === 'halo') { drawMarker(ctx, shape, view, theme); return }
   const w = Math.max(1, shape.width * view.zoom)
   const colour = shape.color ?? theme.ink
   const again = () => trace(ctx, shape, view)
@@ -143,19 +157,43 @@ export function drawShape(ctx: CanvasRenderingContext2D, shape: MapShape, view: 
     trace(ctx, shape, view)
     ctx.globalAlpha = shape.political === 'nation' ? 0.6 : 0.35
     ctx.fillStyle = nationFill(shape)
-    ctx.fill()
+    ctx.fill(fillRule(shape))
     ctx.globalAlpha = 1
   } else if (isClosed(shape) && shape.points.length >= 3 && !shape.political) {
     const fill = shape.fill ?? shape.color ?? DEFAULT_FILL
     trace(ctx, shape, view)
     ctx.globalAlpha = shape.pattern === 'solid' ? shape.opacity : shape.opacity * 0.5
     ctx.fillStyle = fill
-    ctx.fill()
+    ctx.fill(fillRule(shape))
     ctx.globalAlpha = 1
     if (shape.pattern !== 'solid') drawPattern(ctx, shape, view, fill)
   }
   trace(ctx, shape, view)
   strokeStyled(ctx, shape.style, colour, w, theme, again)
+  ctx.restore()
+}
+
+// A marker (a shape drawn with a halo: a castle, a tree, a star ...): its fill (its own colour, or the map's symbol ink) over a ring in the halo colour, so
+// it reads over any land; a dot when it is too small to read as a shape.
+function drawMarker(ctx: CanvasRenderingContext2D, shape: MapShape, view: MapView, theme: MapThemeDef) {
+  const colour = shape.fill ?? shape.color ?? theme.symbol
+  const b = shapeBounds({ ...shape, width: 0 })
+  ctx.save()
+  if (Math.max(b.x1 - b.x0, b.y1 - b.y0) * view.zoom < 4) {
+    ctx.fillStyle = colour
+    ctx.fillRect(view.x + ((b.x0 + b.x1) / 2) * view.zoom - 1.5, view.y + ((b.y0 + b.y1) / 2) * view.zoom - 1.5, 3, 3)
+    ctx.restore()
+    return
+  }
+  trace(ctx, shape, view)
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 2.6
+  ctx.strokeStyle = theme.halo
+  ctx.stroke()
+  ctx.globalAlpha = shape.opacity
+  ctx.fillStyle = colour
+  if (isClosed(shape)) ctx.fill(fillRule(shape))
+  else { ctx.lineWidth = Math.max(1, shape.width * view.zoom); ctx.strokeStyle = colour; ctx.stroke() }
   ctx.restore()
 }
 

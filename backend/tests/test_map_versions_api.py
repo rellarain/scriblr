@@ -58,7 +58,7 @@ def test_a_version_is_a_copy_of_the_map_that_is_not_in_the_tree_and_has_no_place
     assert made.status_code == 201, made.text
     version = made.json()
     assert version["id"] != base["id"] and version["versionOf"] == base["id"] and version["appliesFrom"] == "c2" and version["parentId"] is None
-    assert [s["name"] for s in version["symbols"]] == ["Port Veyra"] and version["reader"]["published"] is False
+    assert [s["name"] for s in version["shapes"]] == ["Port Veyra"] and version["reader"]["published"] is False
     summaries = {m["id"]: m for m in client.get(f"/api/projects/{pid}/maps").json()}
     assert summaries[version["id"]]["versionOf"] == base["id"] and summaries[version["id"]]["appliesFrom"] == "c2"
     places = client.get(f"/api/projects/{pid}/maps/places/all").json()

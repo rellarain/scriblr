@@ -45,11 +45,11 @@ def test_a_new_map_has_its_level_its_base_its_layers_and_no_cells(client: TestCl
     pid = _project(client)
     doc = _new(client, pid, title="The Known World", level="continental", units="metric", width=28, height=18, cellSize=25, unit="km")
     assert doc["id"].startswith("map_")
-    assert (doc["level"], doc["mapFormat"], doc["units"], doc["kind"]) == ("continental", 2, "metric", "world")
+    assert (doc["level"], doc["mapFormat"], doc["units"], doc["kind"]) == ("continental", 3, "metric", "world")
     assert doc["base"] == {"biome": "saltwater", "height": -200.0}
     assert doc["terrains"] == [] and doc["cells"] == [] and doc["shapes"] == []
     assert [(layer["kind"], layer["name"], layer["visible"], layer["locked"]) for layer in doc["layers"]] == [
-        ("terrain", "Biomes", True, False), ("shapes", "Regions and lines", True, False), ("symbols", "Symbols", True, False), ("labels", "Labels", True, False),
+        ("terrain", "Biomes", True, False), ("shapes", "Regions and lines", True, False), ("symbols", "Markers", True, False), ("labels", "Labels", True, False),
         ("notes", "Notes", True, False),
     ]
     assert (doc["cellSize"], doc["unit"], doc["parentId"], doc["order"]) == (25, "km", None, 0)
@@ -62,7 +62,7 @@ def test_each_level_starts_with_its_own_base_and_an_old_kind_still_makes_a_map(c
     imperial = _new(client, pid, level="planetary", units="imperial")
     assert imperial["base"] == {"biome": "saltwater", "height": round(-3000 / 0.3048)}
     old = _new(client, pid, kind="town", width=4, height=3)  # a client from before levels
-    assert (old["level"], old["mapFormat"], old["kind"]) == ("local", 2, "town")
+    assert (old["level"], old["mapFormat"], old["kind"]) == ("local", 3, "town")
     chosen = _new(client, pid, level="regional", base={"biome": "forest", "height": 120})
     assert chosen["base"] == {"biome": "forest", "height": 120.0}
 
@@ -160,7 +160,8 @@ def test_a_shape_with_the_id_of_a_symbol_is_given_another(client: TestClient) ->
     doc["symbols"] = [_item(id="s1")]
     doc["shapes"] = [_biome_shape(id="s1")]
     saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()
-    assert saved["symbols"][0]["id"] == "s1" and saved["shapes"][0]["id"] == "s1_1"
+    # The symbol keeps its id as a marker; the shape that had it is given another.
+    assert saved["symbols"] == [] and [s["id"] for s in saved["shapes"]] == ["s1_1", "s1"]
 
 
 def test_the_kept_cells_and_palette_of_a_traced_map_are_not_for_a_save_to_change(client: TestClient, storage_root: Path) -> None:
@@ -263,17 +264,30 @@ def test_a_new_map_has_the_scale_and_compass_on(client: TestClient) -> None:
     assert (doc["scaleBar"], doc["compass"], doc["legend"], doc["symbols"], doc["labels"]) == (True, True, False, [], [])
 
 
-def test_symbols_and_labels_round_trip(client: TestClient) -> None:
+def test_the_symbols_of_an_old_map_file_become_markers_and_labels_round_trip(client: TestClient) -> None:
     pid = _project(client)
     doc = _new(client, pid, width=10, height=8)
-    doc["symbols"] = [_item(), _item(id="s2", kind="tree", color="#336699", x=1, y=1)]
+    doc["mapFormat"] = 2  # a map file from before shape libraries
+    doc["symbols"] = [_item(), _item(id="s2", kind="tree", color="#336699", x=1, y=1), _item(id="s3", kind="gone")]
     doc["labels"] = [{"id": "l1", "layerId": "labels", "text": "Port Veyra", "x": 4, "y": 3, "size": 1.5}]
     doc.update(scaleBar=False, compass=False, legend=True)
     assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).status_code == 200
     again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
-    assert [(s["id"], s["kind"], s["color"]) for s in again["symbols"]] == [("s1", "castle", None), ("s2", "tree", "#336699")]
+    assert again["symbols"] == [] and again["mapFormat"] == 3
+    assert [(s["id"], s["layerId"], s["type"], s["kind"], s["style"], s["fill"]) for s in again["shapes"]] == [
+        ("s1", "symbols", "region", "marker:castle", "halo", None), ("s2", "symbols", "region", "marker:tree", "halo", "#336699"),
+        ("s3", "symbols", "region", "marker:place", "halo", None),
+    ]
+    # A marker fills the square the symbol was drawn in (2 cells wide, centred on it).
+    xs = [p["x"] for p in again["shapes"][0]["points"]]
+    ys = [p["y"] for p in again["shapes"][0]["points"]]
+    assert 2.5 <= min(xs) < 3 and 4 < max(xs) <= 4.5 and 1.5 <= min(ys) and max(ys) <= 3.5
+    assert [s["id"] for s in again["legacySymbols"]] == ["s1", "s2", "s3"]
     assert again["labels"] == [{"id": "l1", "layerId": "labels", "text": "Port Veyra", "x": 4.0, "y": 3.0, "size": 1.5}]
     assert (again["scaleBar"], again["compass"], again["legend"]) == (False, False, True)
+    # A later save keeps the old symbols as they were.
+    again["legacySymbols"] = []
+    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=again).json()["legacySymbols"][0]["id"] == "s1"
 
 
 def test_odd_items_are_repaired_or_dropped_not_refused(client: TestClient) -> None:
@@ -288,29 +302,29 @@ def test_odd_items_are_repaired_or_dropped_not_refused(client: TestClient) -> No
         _item(id="nan", x="far", size="big"),
     ]
     doc["labels"] = [{"id": "l", "layerId": "labels", "text": "  " + "x" * 300, "x": 1, "y": 1, "size": 0}, 5]
-    doc.update(theme="neon", scaleBar="yes", legend=None)
+    doc.update(theme="neon", scaleBar="yes", legend=None, contours="yes please", relief=3)
     resp = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
     assert resp.status_code == 200, resp.text
-    saved = resp.json()
-    by_id = {s["id"]: s for s in saved["symbols"]}
+    saved = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
+    by_id = {s["id"]: s for s in saved["shapes"]}
     assert set(by_id) == {"ok", "nan"}
-    assert (by_id["ok"]["x"], by_id["ok"]["y"], by_id["ok"]["size"], by_id["ok"]["color"]) == (10.0, 0.0, 16.0, None)
-    assert (by_id["nan"]["x"], by_id["nan"]["size"]) == (0.0, 2.0)
+    assert by_id["ok"]["fill"] is None and all(0 <= p["x"] <= 10 and 0 <= p["y"] <= 8 for p in by_id["ok"]["points"])
     assert len(saved["labels"]) == 1 and len(saved["labels"][0]["text"]) == 120 and saved["labels"][0]["size"] == 0.25
-    assert (saved["theme"], saved["scaleBar"], saved["legend"]) == ("modern", True, False)
+    assert (saved["theme"], saved["scaleBar"], saved["legend"], saved["contours"], saved["relief"]) == ("modern", True, False, False, False)
 
 
 def test_items_on_a_layer_that_is_gone_go_with_it_and_the_map_holds_at_most_so_many(client: TestClient) -> None:
-    from app.storage.schema import MAP_MAX_LABELS, MAP_MAX_SYMBOLS
+    from app.storage.schema import MAP_MAX_LABELS, MAP_MAX_MARKERS
 
     pid = _project(client)
     doc = _new(client, pid, width=4, height=4)
-    doc["symbols"] = [_item(id=f"s{i}") for i in range(MAP_MAX_SYMBOLS + 5)]
+    doc["symbols"] = [_item(id=f"s{i}", kind="fort") for i in range(MAP_MAX_MARKERS + 5)]
     doc["labels"] = [{"id": f"l{i}", "layerId": "labels", "text": "x", "x": 1, "y": 1, "size": 1} for i in range(MAP_MAX_LABELS + 5)]
-    saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()
-    assert (len(saved["symbols"]), len(saved["labels"])) == (MAP_MAX_SYMBOLS, MAP_MAX_LABELS)
+    client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
+    saved = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
+    assert (len(saved["shapes"]), len(saved["labels"])) == (MAP_MAX_MARKERS, MAP_MAX_LABELS)
     doc["layers"] = [layer for layer in doc["layers"] if layer["id"] != "symbols"]
-    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()["symbols"] == []
+    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()["shapes"] == []
 
 
 def test_a_map_saved_before_these_fields_loads_with_the_defaults(client: TestClient, storage_root: Path) -> None:
@@ -367,7 +381,7 @@ def test_odd_shapes_are_repaired_or_dropped_not_refused(client: TestClient) -> N
         _shape(id="few", points=[{"x": 1, "y": 1}]),                                                       # a line needs two points
         _shape(id="tri", type="region", points=[{"x": 1, "y": 1}, {"x": 2, "y": 2}]),                      # a region needs three
         _shape(id="gone", layerId="nope"),                                                                 # a layer that is not there
-        _shape(id="wrong", layerId="symbols"),                                                             # a layer of another kind
+        _shape(id="wrong", layerId="labels"),                                                              # a layer of another kind
         _shape(id="kindless", type=None), _shape(id="weird", type="blob"), "not a shape",
         _shape(id="far", points=[{"x": -9, "y": 99}, {"x": "x", "y": 2, "smooth": "yes", "hx": 3}]),
     ]
@@ -409,7 +423,7 @@ def test_a_map_saved_before_shapes_loads_without_them(client: TestClient, storag
     assert client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()["shapes"] == []
 
 
-# ---- places (named symbols), nesting and the pace ----
+# ---- places (named symbols, now markers), nesting and the pace ----
 
 def _place(i: str, name: str, **over) -> dict:
     return {"id": i, "layerId": "symbols", "kind": "town", "x": 2.5, "y": 2.5, "size": 2.0, "color": None, "name": name, "mapIds": [], **over}
@@ -422,7 +436,7 @@ def test_a_symbol_with_a_name_is_a_place_and_the_names_and_links_round_trip(clie
     world["symbols"] = [_place("s1", "  Port Veyra  ", mapIds=[town["id"]]), _item(id="s2")]
     world["pace"] = 24
     saved = client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()
-    assert [(s["name"], s["mapIds"]) for s in saved["symbols"]] == [("Port Veyra", [town["id"]]), ("", [])]
+    assert [(s["id"], s["name"], s["mapIds"]) for s in saved["shapes"]] == [("s1", "Port Veyra", [town["id"]]), ("s2", "", [])]
     assert saved["pace"] == 24.0
 
 
@@ -433,13 +447,13 @@ def test_odd_names_links_and_paces_are_repaired(client: TestClient) -> None:
     world["symbols"] = [_place("s1", "x" * 200, mapIds=[other["id"], other["id"], "map_nope", world["id"], 5, ""] + [other["id"]] * 3), _place("s2", 7, mapIds="x")]
     world["pace"] = -3
     saved = client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()
-    first, second = saved["symbols"]
+    first, second = saved["shapes"]
     assert len(first["name"]) == 80
     assert first["mapIds"] == [other["id"]]          # a map that is not there, this map itself and repeats are dropped
     assert (second["name"], second["mapIds"]) == ("", [])
     assert saved["pace"] is None
-    world["pace"] = "fast"
-    assert client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()["pace"] is None
+    saved["pace"] = "fast"
+    assert client.put(f"/api/projects/{pid}/maps/{world['id']}", json=saved).json()["pace"] is None
 
 
 def test_deleting_a_map_takes_it_off_the_places_that_opened_it(client: TestClient) -> None:
@@ -451,7 +465,7 @@ def test_deleting_a_map_takes_it_off_the_places_that_opened_it(client: TestClien
     client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world)
     assert client.delete(f"/api/projects/{pid}/maps/{town['id']}").status_code == 204
     again = client.get(f"/api/projects/{pid}/maps/{world['id']}").json()
-    assert again["symbols"][0]["mapIds"] == [floor["id"]]
+    assert again["shapes"][0]["mapIds"] == [floor["id"]]
 
 
 def test_the_places_of_every_map_are_listed_with_the_maps_they_are_inside(client: TestClient) -> None:
@@ -485,17 +499,16 @@ def test_there_are_no_places_without_names_or_maps(client: TestClient) -> None:
 def test_a_map_saved_before_places_loads_with_none(client: TestClient, storage_root: Path) -> None:
     pid = _project(client)
     doc = _new(client, pid, width=4, height=4)
-    doc["symbols"] = [_item()]
-    client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
     path = storage_root / pid / "project.json"
     raw = json.loads(path.read_text(encoding="utf-8"))
-    for s in raw["maps"][doc["id"]]["symbols"]:
-        s.pop("name", None)
-        s.pop("mapIds", None)
-    raw["maps"][doc["id"]].pop("pace", None)
+    stored = raw["maps"][doc["id"]]
+    # A map as an older build left it: its symbols not yet markers, without names, maps or a pace.
+    stored["mapFormat"] = 2
+    stored["symbols"] = [{k: v for k, v in _item().items() if k not in ("name", "mapIds")}]
+    stored.pop("pace", None)
     path.write_text(json.dumps(raw), encoding="utf-8")
     from app.storage import project_store
 
     project_store._cache.clear()
     again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
-    assert (again["symbols"][0]["name"], again["symbols"][0]["mapIds"], again["pace"]) == ("", [], None)
+    assert (again["shapes"][0]["id"], again["shapes"][0]["name"], again["shapes"][0]["mapIds"], again["pace"]) == ("s1", "", [], None)

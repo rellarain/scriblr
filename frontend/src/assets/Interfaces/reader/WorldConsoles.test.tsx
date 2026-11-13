@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CatalogBook } from '../../../api/reader'
 import type { BookExtras, MapDoc } from '../../../api/types'
 import { newCharacter } from '../../../designSystem/mockCharacters'
-import { newMap } from '../../../designSystem/mockMaps'
+import { markerOf, newMap } from '../../../designSystem/mockMaps'
 import type { ReaderCtx } from './readerContext'
 import { CastConsole, MapsConsole } from './WorldConsoles'
 
@@ -29,8 +29,8 @@ function serve(body: BookExtras | 'fail') {
 
 describe('the Maps console of a book', () => {
   it('asks for the extras of the book and shows the published map with its named places', async () => {
-    const symbol = { id: 's1', layerId: 'l', kind: 'town', x: 1, y: 1, size: 2, color: null, name: 'Port Veyra', mapIds: ['m2'] }
-    const fn = serve(extras({ maps: [map('m1', 'Veyra', { symbols: [symbol] })] }))
+    const marker = markerOf({ id: 's1', layerId: 'symbols', kind: 'town', x: 1, y: 1, size: 2, color: null, name: 'Port Veyra', mapIds: ['m2'] })
+    const fn = serve(extras({ maps: [map('m1', 'Veyra', { shapes: [marker] })] }))
     render(<MapsConsole ctx={ctx()} book={book} />)
     const places = within(await screen.findByRole('list', { name: 'Places on this map' }))
     expect(fn).toHaveBeenCalledWith(`/api/reader/books/${book.id}/extras`, expect.anything())
@@ -52,8 +52,8 @@ describe('the Maps console of a book', () => {
   })
 
   it('opens the map of a place from the place, when that map is one the reader can see', async () => {
-    const symbol = { id: 's1', layerId: 'l', kind: 'town', x: 1, y: 1, size: 2, color: null, name: 'Port Veyra', mapIds: ['m2'] }
-    serve(extras({ maps: [map('m1', 'Veyra', { symbols: [symbol] }), map('m2', 'The Harbour Inn', { parentId: 'm1', kind: 'interior' })] }))
+    const marker = markerOf({ id: 's1', layerId: 'symbols', kind: 'town', x: 1, y: 1, size: 2, color: null, name: 'Port Veyra', mapIds: ['m2'] })
+    serve(extras({ maps: [map('m1', 'Veyra', { shapes: [marker] }), map('m2', 'The Harbour Inn', { parentId: 'm1', kind: 'interior' })] }))
     const user = userEvent.setup()
     render(<MapsConsole ctx={ctx()} book={book} />)
     const places = within(await screen.findByRole('list', { name: 'Places on this map' }))

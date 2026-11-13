@@ -14,7 +14,7 @@ const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole')
 const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsole'))
 // The plot presets page, loaded when Configuration > Plot is opened.
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
-const MapBiomesConsole = lazy(() => import('./admin/maps/MapBiomesConsole'))
+const MapsConfigConsole = lazy(() => import('./admin/maps/MapsConfigConsole'))
 // The Designer (the character models and the canvas they are drawn on), loaded when its console is opened.
 const DesignerConsole = lazy(() => import('./admin/characters/DesignerConsole'))
 // The limits for the models writers design for themselves, loaded when Configuration > Writers' designer is opened.
@@ -182,7 +182,7 @@ function AUI() {
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
-        : page.key === 'configMaps' ? <Suspense fallback={null}><MapBiomesConsole /></Suspense>
+        : page.key === 'configMaps' ? <Suspense fallback={null}><MapsConfigConsole /></Suspense>
         : page.key === 'configWriterDesigner' ? <Suspense fallback={null}><WriterLimitsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),

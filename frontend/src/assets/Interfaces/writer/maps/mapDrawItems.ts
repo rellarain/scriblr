@@ -1,49 +1,20 @@
-import type { MapLabel, MapShape, MapSymbol } from '../../../../api/types'
+import type { MapLabel, MapShape } from '../../../../api/types'
 import { itemBounds, niceScale, type ItemRef, type LegendEntry } from './mapItems'
-import { SYMBOL_BOX, symbolPath } from './mapSymbols'
+import { allRings } from './mapOutline'
+import { shapeBounds } from './mapShapes'
 import type { MapThemeDef } from './mapThemes'
 import type { MapView } from './mapView'
 
-// Drawing what is on a map besides its terrain: symbols, labels, the selection, and the scale bar, compass and legend laid over a corner of the map.
-// The same functions draw an exported image later (the view is then just a zoom and an offset).
+// Drawing what is on a map besides its land: labels, the names of places, the selection, and the scale bar, compass and legend laid over a corner of the
+// map. The same functions draw an exported image later (the view is then just a zoom and an offset).
 
-const paths = new Map<string, Path2D>()
-function pathOf(kind: string): Path2D | null {
-  if (typeof Path2D === 'undefined') return null
-  let p = paths.get(kind)
-  if (!p) { p = new Path2D(symbolPath(kind)); paths.set(kind, p) }
-  return p
-}
-
-// A symbol is drawn in its own colour (or the theme's) over a halo that keeps it apart from any terrain.
-export function drawSymbol(ctx: CanvasRenderingContext2D, s: MapSymbol, view: MapView, theme: MapThemeDef) {
-  const px = s.size * view.zoom
-  const left = view.x + s.x * view.zoom - px / 2, top = view.y + s.y * view.zoom - px / 2
-  const colour = s.color ?? theme.symbol
-  const path = pathOf(s.kind)
-  if (px < 4 || !path) {
-    // Too small to read as a shape (or no path support): a dot.
-    ctx.fillStyle = colour
-    ctx.fillRect(left + px / 2 - 1.5, top + px / 2 - 1.5, 3, 3)
-    return
-  }
-  ctx.save()
-  ctx.translate(left, top)
-  ctx.scale(px / SYMBOL_BOX, px / SYMBOL_BOX)
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = Math.max(1.2, (2.6 * SYMBOL_BOX) / px)
-  ctx.strokeStyle = theme.halo
-  ctx.stroke(path)
-  ctx.fillStyle = colour
-  ctx.fill(path, 'evenodd')
-  ctx.restore()
-  if (s.name) drawPlaceName(ctx, s.name, left + px / 2, top + px, px, theme)
-}
-
-// A place's name under its symbol (left out when the symbol is too small for a name to be legible beside it).
-function drawPlaceName(ctx: CanvasRenderingContext2D, name: string, cx: number, y: number, px: number, theme: MapThemeDef) {
+// A place's name under its marker (left out when the marker is too small for a name to be legible beside it).
+export function drawPlaceName(ctx: CanvasRenderingContext2D, name: string, shape: MapShape, view: MapView, theme: MapThemeDef) {
+  const b = shapeBounds({ ...shape, width: 0 })
+  const px = Math.max(b.x1 - b.x0, b.y1 - b.y0) * view.zoom
+  if (!name || px < 14) return
   const size = Math.min(14, Math.max(9, px * 0.42))
-  if (px < 14) return
+  const cx = view.x + ((b.x0 + b.x1) / 2) * view.zoom, y = view.y + b.y1 * view.zoom
   ctx.save()
   ctx.font = `600 ${size}px ${theme.font}`
   ctx.textAlign = 'center'
@@ -107,7 +78,7 @@ export function drawLabel(ctx: CanvasRenderingContext2D, l: MapLabel, view: MapV
 }
 
 // The chosen item's outline: a dashed box in the ink over a halo of its own, so it shows on any terrain.
-export function drawSelection(ctx: CanvasRenderingContext2D, item: MapSymbol | MapLabel | MapShape, ref: ItemRef, view: MapView, theme: MapThemeDef) {
+export function drawSelection(ctx: CanvasRenderingContext2D, item: MapLabel | MapShape, ref: ItemRef, view: MapView, theme: MapThemeDef) {
   const b = itemBounds(item, ref.kind)
   const x = view.x + b.x0 * view.zoom, y = view.y + b.y0 * view.zoom, w = (b.x1 - b.x0) * view.zoom, h = (b.y1 - b.y0) * view.zoom
   ctx.save()
@@ -233,22 +204,29 @@ export function drawOverlays(ctx: CanvasRenderingContext2D, o: OverlayOptions) {
         ctx.fillRect(px + 8, ry - 6, 14, 12)
         ctx.strokeStyle = theme.ink; ctx.lineWidth = 1
         ctx.strokeRect(px + 8.5, ry - 5.5, 13, 11)
-      } else if (e.type === 'symbol') {
-        const p = pathOf(e.kind)
-        if (p) {
-          ctx.save()
-          ctx.translate(px + 7, ry - 8)
-          ctx.scale(16 / SYMBOL_BOX, 16 / SYMBOL_BOX)
-          ctx.fillStyle = theme.symbol
-          ctx.fill(p, 'evenodd')
-          ctx.restore()
-        }
-      }
+      } else if (e.type === 'marker') drawMarkerIcon(ctx, e.shape, px + 7, ry - 8, 16, theme)
       ctx.fillStyle = theme.ink
       ctx.fillText(e.name, px + 28, ry)
     })
     if (more > 0) { ctx.fillStyle = theme.ink; ctx.fillText(`+ ${more} more`, px + 28, py + 6 + rows.length * 18 + 9) }
   }
+  ctx.restore()
+}
+
+// A marker drawn small in a box (the legend's row): its rings scaled into the box, keeping their proportions, filled by the even-odd rule.
+function drawMarkerIcon(ctx: CanvasRenderingContext2D, shape: MapShape, x: number, y: number, size: number, theme: MapThemeDef) {
+  const rings = allRings(shape)
+  const b = shapeBounds({ ...shape, width: 0 })
+  const k = size / Math.max(b.x1 - b.x0, b.y1 - b.y0, 1e-6)
+  const ox = x + (size - (b.x1 - b.x0) * k) / 2, oy = y + (size - (b.y1 - b.y0) * k) / 2
+  ctx.save()
+  ctx.beginPath()
+  for (const ring of rings) {
+    ring.forEach((p, i) => { const sx = ox + (p.x - b.x0) * k, sy = oy + (p.y - b.y0) * k; if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy) })
+    ctx.closePath()
+  }
+  ctx.fillStyle = shape.fill ?? shape.color ?? theme.symbol
+  ctx.fill('evenodd')
   ctx.restore()
 }
 

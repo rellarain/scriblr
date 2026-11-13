@@ -53,9 +53,9 @@ def test_an_old_project_is_traced_once_and_written_back(client: TestClient, stor
     rows = client.get(f"/api/projects/{pid}/maps").json()
     assert {r["id"]: r["level"] for r in rows} == {"map_w": "planetary", "map_t": "local"}
     raw = json.loads(path.read_text(encoding="utf-8"))
-    assert raw["schemaVersion"] == 7 and (storage_root / pid / "project.json.v6.bak").exists()
+    assert raw["schemaVersion"] == 8 and (storage_root / pid / "project.json.v6.bak").exists()
     world = raw["maps"]["map_w"]
-    assert (world["mapFormat"], world["units"], world["unit"], world["legacyGrid"]) == (2, "imperial", "mi", [6, 4])
+    assert (world["mapFormat"], world["units"], world["unit"], world["legacyGrid"]) == (3, "imperial", "mi", [6, 4])
     assert world["theme"] == "parchment" and world["kind"] == "world" and world["cells"] == _old_map("map_w", "world", ISLAND)["cells"]  # kept as it was
     assert [s["biome"] for s in world["shapes"]] and world["shapes"][0]["biome"].startswith("own_")  # Crystal became a project biome
     assert [b["name"] for b in raw["mapBiomes"]] == ["Crystal"]
@@ -73,7 +73,7 @@ def test_editions_are_traced_and_freeze_their_biomes(client: TestClient, storage
     client.get(f"/api/projects/{pid}/maps")
     raw = json.loads(path.read_text(encoding="utf-8"))
     frozen = raw["bookListings"]["b1"]["editions"][0]
-    assert frozen["maps"][0]["doc"]["mapFormat"] == 2
+    assert frozen["maps"][0]["doc"]["mapFormat"] == 3
     assert set(frozen["biomes"]) == {"saltwater", "plain"} and frozen["biomes"]["plain"]["color"] == "#a4c34a"
 
 
@@ -86,7 +86,7 @@ def test_an_old_map_file_put_is_traced(client: TestClient) -> None:
     saved = client.put(f"/api/projects/{pid}/maps/{made['id']}", json=old)
     assert saved.status_code == 200, saved.text
     doc = saved.json()
-    assert doc["mapFormat"] == 2 and doc["shapes"][0]["type"] == "biome"
+    assert doc["mapFormat"] == 3 and doc["shapes"][0]["type"] == "biome"
     assert [b["name"] for b in client.get(f"/api/projects/{pid}/map-biomes").json()["biomes"]] == ["Glass"]
 
 

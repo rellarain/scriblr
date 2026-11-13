@@ -1,7 +1,7 @@
 import type { MapBiomeGroup, MapDoc, MapProfile, MapShape } from '../../../../api/types'
 import { resolveBiome, type BiomeIndex } from './mapBiomes'
 import { heightRangeOf, levelDef } from './mapLevels'
-import { flatten } from './mapShapes'
+import { allRings, type XY } from './mapOutline'
 
 // Heights of the land. The base has a height (the sea floor of a planet, the plain of a region); each biome shape, drawn in order, changes the height of
 // what is under it: it sets it, raises it or lowers it by its height, or keeps it, spread over the shape by its profile. Land does not lie under the sea
@@ -57,12 +57,13 @@ export function samplesPerCell(width: number, height: number): number {
   return Math.max(1, Math.min(4, Math.floor(Math.sqrt(MAX_SAMPLES / Math.max(1, width * height)))))
 }
 
-// The samples inside a closed outline (even-odd), in the box of samples it covers.
+// The samples inside the rings of a shape (even-odd: a hole is out, another piece in), in the box of samples they cover.
 interface Mask { x0: number; y0: number; w: number; h: number; inside: Uint8Array }
-function maskOf(poly: Array<{ x: number; y: number }>, s: number, gw: number, gh: number): Mask | null {
-  if (poly.length < 3) return null
+function maskOf(rings: XY[][], s: number, gw: number, gh: number): Mask | null {
+  const shown = rings.filter(r => r.length >= 3)
+  if (shown.length === 0) return null
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const p of poly) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y) }
+  for (const ring of shown) for (const p of ring) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y) }
   const x0 = Math.max(0, Math.floor(minX * s - 0.5)), x1 = Math.min(gw - 1, Math.ceil(maxX * s - 0.5))
   const y0 = Math.max(0, Math.floor(minY * s - 0.5)), y1 = Math.min(gh - 1, Math.ceil(maxY * s - 0.5))
   if (x1 < x0 || y1 < y0) return null
@@ -72,9 +73,11 @@ function maskOf(poly: Array<{ x: number; y: number }>, s: number, gw: number, gh
   for (let j = 0; j < h; j += 1) {
     const y = (y0 + j + 0.5) / s
     xs.length = 0
-    for (let k = 0, n = poly.length; k < n; k += 1) {
-      const a = poly[k], b = poly[(k + 1) % n]
-      if ((a.y <= y) !== (b.y <= y)) xs.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x))
+    for (const poly of shown) {
+      for (let k = 0, n = poly.length; k < n; k += 1) {
+        const a = poly[k], b = poly[(k + 1) % n]
+        if ((a.y <= y) !== (b.y <= y)) xs.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x))
+      }
     }
     xs.sort((p, q) => p - q)
     for (let k = 0; k + 1 < xs.length; k += 2) {
@@ -119,7 +122,7 @@ export function buildHeights(draft: Pick<MapDoc, 'width' | 'height' | 'base' | '
   const land = new Set(draft.layers.filter(l => l.kind === 'terrain').map(l => l.id))
   for (const shape of draft.shapes) {
     if (shape.type !== 'biome' || !land.has(shape.layerId)) continue
-    const m = maskOf(flatten(shape), s, W, H)
+    const m = maskOf(allRings(shape), s, W, H)
     if (!m) continue
     const group = shape.biome ? resolveBiome(biomes, shape.biome).group : null
     const mode = shape.heightMode ?? 'none'

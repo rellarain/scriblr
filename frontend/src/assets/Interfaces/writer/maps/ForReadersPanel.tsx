@@ -6,7 +6,7 @@ import type { ItemRef } from './mapItems'
 import { setShare, type MapDraft } from './mapModel'
 import type { Maps } from './useMaps'
 
-// The map for readers: whether it is published (shown in the Reader's book page once the book is published), from which chapter, from which chapter the chosen symbol, label
+// The map for readers: whether it is published (shown in the Reader's book page once the book is published), from which chapter, from which chapter the chosen shape, label
 // or line is shown, and a preview as a reader who has reached a chapter. Chapters are numbered as in the published edition.
 export function ForReadersPanel({ projectId, m, draft, selected }: { projectId: string; m: Maps; draft: MapDraft; selected: ItemRef | null }) {
   const share = shareOf(draft)
@@ -27,7 +27,7 @@ export function ForReadersPanel({ projectId, m, draft, selected }: { projectId: 
     m.apply(setShare(draft, { ...share, reveals }))
   }
   const chosen = selected
-    ? { id: selected.id, name: selected.kind === 'symbol' ? draft.symbols.find(s => s.id === selected.id)?.name || 'this symbol' : selected.kind === 'label' ? 'this label' : draft.shapes.find(s => s.id === selected.id)?.name || 'this shape' }
+    ? { id: selected.id, name: selected.kind === 'label' ? 'this label' : draft.shapes.find(s => s.id === selected.id)?.name || 'this shape' }
     : null
 
   return (

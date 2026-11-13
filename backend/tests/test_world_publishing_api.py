@@ -114,10 +114,10 @@ def test_a_published_map_is_shown_from_its_chapter_and_a_symbol_from_its_own(cli
     _read_to(client, w, 1)
     first = _extras(client, w)
     assert first["reach"] == 1 and [m["title"] for m in first["maps"]] == ["Veyra"]
-    assert [s["name"] for s in first["maps"][0]["symbols"]] == ["Port Veyra"]
+    assert [s["name"] for s in first["maps"][0]["shapes"]] == ["Port Veyra"]
 
     _read_to(client, w, 2)
-    assert [s["name"] for s in _extras(client, w)["maps"][0]["symbols"]] == ["Port Veyra", "The Vault"]
+    assert [s["name"] for s in _extras(client, w)["maps"][0]["shapes"]] == ["Port Veyra", "The Vault"]
 
 
 def test_a_map_revealed_later_is_counted_but_not_sent(client: TestClient) -> None:

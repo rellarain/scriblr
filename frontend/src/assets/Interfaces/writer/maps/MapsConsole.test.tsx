@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MapDoc } from '../../../../api/types'
+import type { MapDoc, MapShape } from '../../../../api/types'
 import { newMap } from '../../../../designSystem/mockMaps'
 import { mapsBackend } from '../../../../test/mapsBackend'
 import MapsConsole from './MapsConsole'
+import { starterShapes } from './mapShapeSeed'
 
 // jsdom has no canvas: the canvas draws nothing here (painting itself is covered by mapModel.test.ts).
 beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
@@ -22,6 +23,16 @@ const save = () => screen.getByRole('button', { name: 'Save' })
 // The saves of maps (the project's own biomes are saved on their own route).
 const puts = (b: ReturnType<typeof mapsBackend>) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit | undefined)?.method === 'PUT' && String(c[0]).includes('/maps/'))
 const lastPut = (b: ReturnType<typeof mapsBackend>) => JSON.parse((puts(b).at(-1)![1] as RequestInit).body as string) as MapDoc
+// The middle and the size of a shape's outline (its points; a marker's holes lie inside it).
+const box = (sh: MapShape) => {
+  const xs = sh.points.map(q => q.x), ys = sh.points.map(q => q.y)
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
+  return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0, x0, x1, y0, y1 }
+}
+// Where the middle of a two-cell castle marker's outline lies from the middle of its square (its silhouette does not fill the square evenly).
+const CASTLE = (() => { const lib = starterShapes().find(s => s.id === 'marker:castle')!; const b = box(lib as unknown as MapShape); return { x: (b.cx - 0.5) * 2, y: (b.cy - 0.5) * 2 } })()
+// The middle of a castle marker's square.
+const square = (sh: MapShape) => ({ x: box(sh).cx - CASTLE.x, y: box(sh).cy - CASTLE.y })
 
 describe('the Maps console', () => {
   it('lists the maps with their levels, nested ones under their map, and opens the first with its biomes and layers', async () => {
@@ -163,16 +174,16 @@ describe('the Maps console', () => {
     const backend = await open()
     await screen.findByRole('img', { name: /Known World/ })
     const layers = () => within(screen.getByRole('region', { name: 'Layers' }))
-    await user.click(layers().getByRole('button', { name: 'Lock Symbols' }))
-    await user.click(layers().getByRole('button', { name: 'Move Symbols up' }))
+    await user.click(layers().getByRole('button', { name: 'Lock Markers' }))
+    await user.click(layers().getByRole('button', { name: 'Move Markers up' }))
     await user.click(layers().getByRole('button', { name: 'Add a layer' }))
     await user.click(layers().getByRole('button', { name: 'Delete Notes' }))
     expect(layers().getByRole('button', { name: 'Delete Biomes' })).toBeDisabled()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     const doc = lastPut(backend)
-    expect(doc.layers.map(l => l.name)).toEqual(['Biomes', 'Regions and lines', 'Labels', 'Symbols', 'Regions and lines 2'])
-    expect(doc.layers.find(l => l.name === 'Symbols')!.locked).toBe(true)
+    expect(doc.layers.map(l => l.name)).toEqual(['Biomes', 'Regions and lines', 'Labels', 'Markers', 'Regions and lines 2'])
+    expect(doc.layers.find(l => l.name === 'Markers')!.locked).toBe(true)
   })
 
   it('undoes and redoes a change, and Undo is offered only when there is one', async () => {
@@ -270,97 +281,222 @@ describe('the Maps console', () => {
   const at = (x: number, y: number, init: MouseEventInit = {}) => ({ clientX: 144 + 64 * x, clientY: 68 + 64 * y, button: 0, ...init })
   const pointer = (el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup', init: MouseEventInit) => fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, ...init }))
 
-  it('stamps the chosen symbol at the middle of the cell that is clicked, and saves it', async () => {
+  // Picks a shape of the default library: its kind, then the shape (which picks the Place a shape tool).
+  async function pickShape(user: ReturnType<typeof userEvent.setup>, kind: string, name: string) {
+    const panel = within(screen.getByRole('region', { name: 'Shapes' }))
+    await user.click(within(panel.getByRole('group', { name: 'Kinds of shape' })).getByRole('button', { name: kind }))
+    await user.click(panel.getByRole('button', { name: `Place ${name}` }))
+  }
+  const click = (canvas: Element, x: number, y: number, init: MouseEventInit = {}) => { pointer(canvas, 'pointerdown', at(x, y, init)); pointer(canvas, 'pointerup', at(x, y, init)) }
+
+  it('places a marker at its own size at the middle of the cell that is clicked, on the markers layer, and saves it', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Stamp Castle' })) // the Settlements set is open, and picking a symbol picks the stamp tool
-    expect(screen.getByRole('button', { name: 'Stamp a symbol' })).toHaveAttribute('aria-pressed', 'true')
-    pointer(canvas, 'pointerdown', at(3.2, 2.1))
-    pointer(canvas, 'pointerup', at(3.2, 2.1))
-    const panel = within(await screen.findByRole('region', { name: 'Chosen symbol' }))
+    await pickShape(user, 'Markers', 'Castle')
+    expect(screen.getByRole('button', { name: 'Place a shape' })).toHaveAttribute('aria-pressed', 'true')
+    click(canvas, 3.2, 2.1)
+    const panel = within(await screen.findByRole('region', { name: 'Chosen marker' }))
     expect(panel.getByRole('heading', { name: 'Castle' })).toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols).toMatchObject([{ kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null, layerId: 'symbols' }])
+    const [m] = lastPut(backend).shapes
+    expect(m).toMatchObject({ kind: 'marker:castle', style: 'halo', type: 'region', layerId: 'symbols', fill: null })
+    expect(m.id).toMatch(/^mrk_/)
+    expect(square(m).x).toBeCloseTo(3.5, 2)
+    expect(square(m).y).toBeCloseTo(2.5, 2)
+    expect(Math.max(box(m).w, box(m).h)).toBeLessThanOrEqual(2)
   })
 
-  it('stamps where the pointer is, without snapping, while Alt is held', async () => {
+  it('places a marker where the pointer is, without snapping, while Alt is held', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Nature' }))
-    await user.click(screen.getByRole('button', { name: 'Stamp Tree' }))
-    pointer(canvas, 'pointerdown', at(3.25, 2.75, { altKey: true }))
+    await pickShape(user, 'Markers', 'Tree')
+    click(canvas, 3.25, 2.75, { altKey: true })
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    const [s] = lastPut(backend).symbols
-    expect(s.kind).toBe('tree')
-    expect(s.x).toBeCloseTo(3.25, 1)
-    expect(s.y).toBeCloseTo(2.75, 1)
+    const [m] = lastPut(backend).shapes
+    expect(m.kind).toBe('marker:tree')
+    expect(box(m).cx).toBeCloseTo(3.25, 0)
+    expect(box(m).cy).toBeCloseTo(2.75, 0)
+    expect(box(m).cx % 0.5).not.toBeCloseTo(0, 2) // not snapped to a cell
   })
 
-  it('changes the size and the colour of the chosen symbol, and takes the colour back to the ink', async () => {
+  it('places a land form in the box that is dragged, keeping its proportions, as a biome area', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Stamp Castle' }))
-    pointer(canvas, 'pointerdown', at(3.5, 2.5))
-    const panel = () => within(screen.getByRole('region', { name: 'Chosen symbol' }))
-    const width = panel().getByRole('spinbutton', { name: 'Width of the symbol in cells' })
-    await user.clear(width)
-    await user.type(width, '4')
+    await pickShape(user, 'Land forms', 'Island')
+    pointer(canvas, 'pointerdown', at(1, 1))
+    pointer(canvas, 'pointermove', at(7, 5))
+    pointer(canvas, 'pointerup', at(7, 5))
+    expect(await screen.findByRole('region', { name: 'Chosen biome area' })).toBeInTheDocument()
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    const [isle] = lastPut(backend).shapes
+    expect(isle).toMatchObject({ type: 'biome', layerId: 'terrain', biome: 'plain', kind: 'land:island', rough: 35 })
+    expect(typeof isle.seed).toBe('number')
+    // 12 by 8 in a box 6 by 4: all of it.
+    expect(box(isle).x0).toBeGreaterThanOrEqual(0.9)
+    expect(box(isle).x1).toBeLessThanOrEqual(7.1)
+    expect(box(isle).w / box(isle).h).toBeGreaterThan(1.3)
+  })
+
+  it('places a template: a circle as a biome area in the chosen biome, a polygon of so many sides as a region', async () => {
+    const user = userEvent.setup()
+    const backend = await open()
+    const canvas = await screen.findByRole('img', { name: /Known World/ })
+    const panel = () => within(screen.getByRole('region', { name: 'Shapes' }))
+    await user.click(within(panel().getByRole('group', { name: 'Templates' })).getByRole('button', { name: 'Circle' }))
+    pointer(canvas, 'pointerdown', at(1, 1))
+    pointer(canvas, 'pointermove', at(5, 5))
+    pointer(canvas, 'pointerup', at(5, 5))
+    await user.click(within(panel().getByRole('group', { name: 'Templates make' })).getByRole('button', { name: 'Regions' }))
+    await user.click(within(panel().getByRole('group', { name: 'Templates' })).getByRole('button', { name: 'Polygon' }))
+    const sides = panel().getByRole('spinbutton', { name: 'Sides of the polygon' })
+    await user.clear(sides)
+    await user.type(sides, '5')
     await user.tab()
-    fireEvent.change(panel().getByLabelText('Colour of the symbol'), { target: { value: '#aa0000' } })
-    fireEvent.blur(panel().getByLabelText('Colour of the symbol'))
+    click(canvas, 5.6, 3.6)
+    expect(await screen.findByRole('region', { name: 'Chosen region' })).toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols[0]).toMatchObject({ size: 4, color: '#aa0000' })
+    const [circle, five] = lastPut(backend).shapes
+    expect(circle).toMatchObject({ type: 'biome', biome: 'forest', layerId: 'terrain' })
+    expect(box(circle).w).toBeCloseTo(4, 0)
+    expect(five).toMatchObject({ type: 'region', layerId: 'shapes' })
+    expect(five.points).toHaveLength(5)
+  })
+
+  it('changes the size and the colour of the chosen marker, and takes the colour back to the ink', async () => {
+    const user = userEvent.setup()
+    const backend = await open()
+    const canvas = await screen.findByRole('img', { name: /Known World/ })
+    await pickShape(user, 'Markers', 'Castle')
+    click(canvas, 3.5, 2.5)
+    const panel = () => within(screen.getByRole('region', { name: 'Chosen marker' }))
+    const width = panel().getByRole('spinbutton', { name: 'Width of the marker in cells' })
+    await user.clear(width)
+    await user.type(width, '3')
+    await user.tab()
+    fireEvent.change(panel().getByLabelText('Colour of the marker'), { target: { value: '#aa0000' } })
+    fireEvent.blur(panel().getByLabelText('Colour of the marker'))
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    const [m] = lastPut(backend).shapes
+    expect(m.fill).toBe('#aa0000')
+    expect(Math.max(box(m).w, box(m).h)).toBeCloseTo(3, 1)
     await user.click(panel().getByRole('button', { name: 'Use the ink colour' }))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(2))
-    expect(lastPut(backend).symbols[0].color).toBeNull()
+    expect(lastPut(backend).shapes[0].fill).toBeNull()
   })
 
-  it('picks a symbol with the Select tool, moves it with a drag as one undo step, and deletes it with the Delete key', async () => {
+  it('picks a marker with the Select tool, moves it with a drag as one undo step, and deletes it with the Delete key', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Stamp Castle' }))
-    pointer(canvas, 'pointerdown', at(3.5, 2.5))
+    await pickShape(user, 'Markers', 'Castle')
+    click(canvas, 3.5, 2.5)
     await user.click(screen.getByRole('button', { name: 'Select and move' }))
-    pointer(canvas, 'pointerdown', at(3.6, 2.4))
-    pointer(canvas, 'pointermove', at(5.6, 4.4))
-    pointer(canvas, 'pointerup', at(5.6, 4.4))
+    pointer(canvas, 'pointerdown', at(3.5, 2.5))
+    pointer(canvas, 'pointermove', at(5.5, 4.5))
+    pointer(canvas, 'pointerup', at(5.5, 4.5))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols[0]).toMatchObject({ x: 5.5, y: 4.5 })
-    // The stamp and the move are two steps; one Undo takes back the move only.
+    expect(square(lastPut(backend).shapes[0]).x).toBeCloseTo(5.5, 2)
+    expect(square(lastPut(backend).shapes[0]).y).toBeCloseTo(4.5, 2)
+    // The placing and the move are two steps; one Undo takes back the move only.
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(2))
-    expect(lastPut(backend).symbols[0]).toMatchObject({ x: 3.5, y: 2.5 })
+    expect(square(lastPut(backend).shapes[0]).x).toBeCloseTo(3.5, 2)
     pointer(canvas, 'pointerdown', at(3.5, 2.5))
+    pointer(canvas, 'pointerup', at(3.5, 2.5))
     fireEvent.keyDown(canvas, { key: 'Delete' })
-    expect(screen.queryByRole('region', { name: 'Chosen symbol' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Chosen marker' })).not.toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(3))
-    expect(lastPut(backend).symbols).toEqual([])
+    expect(lastPut(backend).shapes).toEqual([])
   })
 
-  it('moves the chosen symbol a cell with the arrow keys and lets go of it with Escape', async () => {
+  it('moves the chosen marker a cell with the arrow keys and lets go of it with Escape', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Stamp Castle' }))
-    pointer(canvas, 'pointerdown', at(3.5, 2.5))
+    await pickShape(user, 'Markers', 'Castle')
+    click(canvas, 3.5, 2.5)
     fireEvent.keyDown(canvas, { key: 'ArrowRight' })
     fireEvent.keyDown(canvas, { key: 'ArrowDown', shiftKey: true })
     fireEvent.keyDown(canvas, { key: 'Escape' })
-    expect(screen.queryByRole('region', { name: 'Chosen symbol' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Chosen marker' })).not.toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols[0]).toMatchObject({ x: 4.5, y: 2.75 })
+    expect(square(lastPut(backend).shapes[0]).x).toBeCloseTo(4.5, 2)
+    expect(square(lastPut(backend).shapes[0]).y).toBeCloseTo(2.75, 2)
+  })
+
+  it('merges the chosen shape with one picked on the map, as one undo step', async () => {
+    const user = userEvent.setup()
+    const backend = await open()
+    const canvas = await screen.findByRole('img', { name: /Known World/ })
+    await user.click(screen.getByRole('button', { name: 'Place a shape' }))
+    click(canvas, 2.2, 2.2) // a circle four cells wide round (2.5, 2.5)
+    click(canvas, 4.2, 2.2) // and round (4.5, 2.5), chosen
+    const chosen = within(await screen.findByRole('region', { name: 'Chosen biome area' }))
+    await user.click(within(chosen.getByRole('group', { name: 'Combine with another shape' })).getByRole('button', { name: 'Merge with…' }))
+    expect(screen.getByText(/pick the shape to merge with, Esc stops/)).toBeInTheDocument()
+    click(canvas, 1.2, 2.5)
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    const { shapes } = lastPut(backend)
+    expect(shapes).toHaveLength(1)
+    expect(box(shapes[0]).x0).toBeCloseTo(0.5, 0)
+    expect(box(shapes[0]).x1).toBeCloseTo(6.5, 0)
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(2))
+    expect(lastPut(backend).shapes).toHaveLength(2)
+  })
+
+  it('gives the chosen shape a rough edge with its own seed', async () => {
+    const user = userEvent.setup()
+    const backend = await open()
+    const canvas = await screen.findByRole('img', { name: /Known World/ })
+    await user.click(screen.getByRole('button', { name: 'Place a shape' }))
+    click(canvas, 3.2, 2.2)
+    const rough = within(await screen.findByRole('region', { name: 'Chosen biome area' })).getByRole('spinbutton', { name: 'How rough the edge is (0 to 100)' })
+    await user.clear(rough)
+    await user.type(rough, '40')
+    await user.tab()
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    expect(lastPut(backend).shapes[0]).toMatchObject({ rough: 40 })
+    expect(typeof lastPut(backend).shapes[0].seed).toBe('number')
+  })
+
+  it('saves the chosen shape to My shapes, offers it to place, and deletes it from My shapes after asking', async () => {
+    const user = userEvent.setup()
+    const backend = await open()
+    const canvas = await screen.findByRole('img', { name: /Known World/ })
+    await user.click(screen.getByRole('button', { name: 'Place a shape' }))
+    click(canvas, 3.2, 2.2)
+    const chosen = within(await screen.findByRole('region', { name: 'Chosen biome area' }))
+    await user.click(chosen.getByRole('button', { name: /Save to My shapes/ }))
+    const form = within(chosen.getByRole('group', { name: 'Save to My shapes' }))
+    await user.type(form.getByRole('textbox', { name: 'Name of the shape in My shapes' }), 'Round wood')
+    await user.tab()
+    await user.click(form.getByRole('button', { name: 'Save it to My shapes' }))
+    await waitFor(() => expect(backend.shapes.mine).toHaveLength(1))
+    expect(backend.shapes.mine[0]).toMatchObject({ name: 'Round wood', category: 'land', type: 'biome', biome: 'forest' })
+    expect(backend.shapes.mine[0].levels).toContain('planetary')
+    const mine = within(await screen.findByRole('group', { name: 'My shapes' }))
+    expect(mine.getByRole('button', { name: 'Place Round wood' })).toBeInTheDocument()
+    await user.click(mine.getByRole('button', { name: 'Delete Round wood from My shapes' }))
+    await user.click(mine.getByRole('button', { name: 'Yes, delete Round wood' }))
+    await waitFor(() => expect(backend.shapes.mine).toHaveLength(0))
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'My shapes' })).not.toBeInTheDocument())
   })
 
   it('places a label, which takes the cursor so it can be given its text', async () => {
@@ -380,47 +516,51 @@ describe('the Maps console', () => {
     expect(lastPut(backend).labels).toMatchObject([{ text: 'Port Veyra', x: 4.5, y: 3.5, size: 1.5, layerId: 'labels' }])
   })
 
-  it('says there is nowhere to put a symbol when its layer is hidden or locked, and puts nothing', async () => {
+  it('says there is nowhere to put a marker when its layer is hidden or locked, and puts nothing', async () => {
     const user = userEvent.setup()
     await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Lock Symbols' }))
-    await user.click(screen.getByRole('button', { name: 'Stamp Castle' }))
-    pointer(canvas, 'pointerdown', at(3.5, 2.5))
+    await user.click(screen.getByRole('button', { name: 'Lock Markers' }))
+    await pickShape(user, 'Markers', 'Castle')
+    click(canvas, 3.5, 2.5)
     expect(await screen.findByText(/no shown, unlocked layer/)).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Chosen symbol' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Chosen marker' })).not.toBeInTheDocument()
   })
 
   it('takes the things on a layer away with the layer, and back with an undo', async () => {
     const user = userEvent.setup()
     const backend = await open()
     const canvas = await screen.findByRole('img', { name: /Known World/ })
-    await user.click(screen.getByRole('button', { name: 'Stamp Castle' }))
-    pointer(canvas, 'pointerdown', at(3.5, 2.5))
-    await user.click(screen.getByRole('button', { name: 'Delete Symbols' }))
-    expect(screen.queryByRole('region', { name: 'Chosen symbol' })).not.toBeInTheDocument()
+    await pickShape(user, 'Markers', 'Castle')
+    click(canvas, 3.5, 2.5)
+    await user.click(screen.getByRole('button', { name: 'Delete Markers' }))
+    expect(screen.queryByRole('region', { name: 'Chosen marker' })).not.toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols).toEqual([])
+    expect(lastPut(backend).shapes).toEqual([])
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(2))
-    expect(lastPut(backend).symbols).toHaveLength(1)
+    expect(lastPut(backend).shapes).toHaveLength(1)
   })
 
-  it('offers the four sets of symbols, and picking one picks the stamp tool', async () => {
+  it('offers the templates and the default shapes of the level of the map by kind, and picking one picks the Place a shape tool', async () => {
     const user = userEvent.setup()
     await open()
     await screen.findByRole('img', { name: /Known World/ })
-    const panel = () => within(screen.getByRole('region', { name: 'Symbols' }))
-    expect(panel().getAllByRole('button', { name: /^Stamp / })).toHaveLength(8)
-    for (const [set, one] of [['Nature', 'Stamp Pine'], ['Interior', 'Stamp Door'], ['Landmarks and travel', 'Stamp Temple'], ['Settlements', 'Stamp Village']] as const) {
-      await user.click(panel().getByRole('button', { name: set }))
-      expect(panel().getByRole('button', { name: one })).toBeInTheDocument()
-    }
+    const panel = () => within(screen.getByRole('region', { name: 'Shapes' }))
+    expect(within(panel().getByRole('group', { name: 'Templates' })).getAllByRole('button').map(b => b.textContent)).toEqual(['Circle', 'Ellipse', 'Rectangle', 'Polygon', 'Blob', 'Ridge'])
+    const kinds = within(panel().getByRole('group', { name: 'Kinds of shape' }))
+    // A planetary map: land forms and markers, no space objects or building parts.
+    expect(kinds.getAllByRole('button').map(b => b.textContent)).toEqual(['Land forms', 'Markers'])
+    expect(panel().getByRole('button', { name: 'Place Island' })).toBeInTheDocument()
+    await user.click(kinds.getByRole('button', { name: 'Markers' }))
+    expect(panel().getByRole('button', { name: 'Place Village' })).toBeInTheDocument()
+    expect(panel().queryByRole('button', { name: 'Place Door' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Move the view' }))
-    await user.click(panel().getByRole('button', { name: 'Stamp Village' }))
-    expect(screen.getByRole('button', { name: 'Stamp a symbol' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(panel().getByRole('button', { name: 'Place Village' }))
+    expect(screen.getByRole('button', { name: 'Place a shape' })).toHaveAttribute('aria-pressed', 'true')
+    expect(panel().getByRole('button', { name: 'Place Village' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('changes the level and turns the scale bar, compass and legend on and off, and saves them', async () => {

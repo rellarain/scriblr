@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MapDoc, MapShape } from '../../../../api/types'
-import { addLabel, addSymbol } from './mapItems'
+import { addLabel, addLibraryShape } from './mapItems'
+import { starterShapes } from './mapShapeSeed'
 import { MAX_TINT, NATIONS_LAND, NATIONS_WATER, drawMap, heightTint, type MakeCanvas } from './mapRender'
 import { LINE_PRESETS, makeBiomeShape } from './mapShapes'
 import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
@@ -54,10 +55,10 @@ const doc = (): MapDoc => ({
   parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
   layers: [
     { id: 'terrain', name: 'Biomes', kind: 'terrain', visible: true, locked: false },
-    { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
+    { id: 'symbols', name: 'Markers', kind: 'symbols', visible: true, locked: false },
     { id: 'labels', name: 'Labels', kind: 'labels', visible: true, locked: false },
   ],
-  symbols: [], labels: [], shapes: [], scaleBar: false, compass: false, legend: false, updatedAt: 'x',
+  labels: [], shapes: [], scaleBar: false, compass: false, legend: false, updatedAt: 'x',
 })
 const base = (draft: MapDraft, over: Partial<Parameters<typeof drawMap>[1]> = {}): Parameters<typeof drawMap>[1] => ({
   width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, biomes: INDEX, showGrid: false, ink: '#000', selected: null, selectedNode: null, pending: null, measure: null, legend: null, ...over,
@@ -65,7 +66,8 @@ const base = (draft: MapDraft, over: Partial<Parameters<typeof drawMap>[1]> = {}
 const INDEX = biomeIndex(STARTER_BIOMES)
 const withItems = (): MapDraft => {
   let d = draftOf(doc())
-  d = addSymbol(d, 'castle', 5.5, 5.5, 2, () => 'a')!.change.draft
+  const castle = starterShapes().find(s => s.id === 'marker:castle')!
+  d = addLibraryShape(d, castle, { x0: 4.5, y0: 4.5, x1: 6.5, y1: 6.5 }, 'metric', () => 'a')!.change.draft
   d = addLabel(d, 'Port Veyra', 10, 3, 1, () => 'b')!.change.draft
   return d
 }
@@ -171,12 +173,12 @@ describe('the land', () => {
 })
 
 describe('drawing a map', () => {
-  it('draws the label text and a symbol for each item on a shown layer', () => {
-    vi.stubGlobal('Path2D', FakePath)
+  it('draws the label text and a marker for each item on a shown layer', () => {
     const r = recorder()
     drawMap(r.ctx, base(withItems()))
     expect(r.texts()).toContain('Port Veyra')
     expect(r.count('fill')).toBe(1) // the castle
+    expect(r.count('stroke')).toBe(1) // its halo
     expect(r.count('strokeText')).toBe(1) // the label's halo
   })
 
@@ -190,7 +192,7 @@ describe('drawing a map', () => {
     expect(r.count('fill')).toBe(0)
   })
 
-  it('draws a very small symbol as a dot, and leaves out text too small to read', () => {
+  it('draws a very small marker as a dot, and leaves out text too small to read', () => {
     vi.stubGlobal('Path2D', FakePath)
     const r = recorder()
     drawMap(r.ctx, base(withItems(), { view: { zoom: 1.5, x: 10, y: 10 } }))
@@ -199,11 +201,17 @@ describe('drawing a map', () => {
     expect(r.texts()).not.toContain('Port Veyra')
   })
 
-  it('draws a symbol as a dot when there is no path support', () => {
+  it('draws a marker with its holes cut out (even-odd), traced point by point, with no path support needed', () => {
     const r = recorder()
-    drawMap(r.ctx, base(withItems()))
-    expect(r.count('fill')).toBe(0)
-    expect(r.count('fillRect')).toBeGreaterThan(0)
+    const town = starterShapes().find(s => s.id === 'marker:town')!
+    drawMap(r.ctx, base(addLibraryShape(draftOf(doc()), town, { x0: 2, y0: 2, x1: 4, y1: 4 }, 'metric', () => 't')!.change.draft))
+    const fill = r.calls.find(([n]) => n === 'fill')!
+    expect(fill[1]).toEqual(['evenodd'])
+    const castle = recorder()
+    drawMap(castle.ctx, base(withItems()))
+    expect(castle.calls.find(([n]) => n === 'fill')![1]).toEqual(['nonzero'])
+    expect(r.count('moveTo')).toBe(2) // the outline and its hole
+    expect(r.count('lineTo') + r.count('bezierCurveTo')).toBeGreaterThan(4)
   })
 
   it('draws the scale bar with a round length, the compass and the legend over the map when they are on', () => {
@@ -211,7 +219,7 @@ describe('drawing a map', () => {
     const r = recorder()
     let d = withItems()
     for (const f of ['scaleBar', 'compass', 'legend'] as const) d = setOverlay(d, f, true)!.draft
-    drawMap(r.ctx, base(d, { legend: [{ type: 'terrain', name: 'Sea', color: '#3b6ea5' }, { type: 'symbol', kind: 'castle', name: 'Castle' }] }))
+    drawMap(r.ctx, base(d, { legend: [{ type: 'terrain', name: 'Sea', color: '#3b6ea5' }, { type: 'marker', kind: 'marker:castle', name: 'Castle', shape: d.shapes[0] }] }))
     const texts = r.texts()
     expect(texts).toContain('N')
     expect(texts).toContain('Sea')
@@ -231,13 +239,19 @@ describe('drawing a map', () => {
     expect(small.texts()).toEqual([])
   })
 
-  it('outlines the chosen item', () => {
-    vi.stubGlobal('Path2D', FakePath)
+  it('outlines the chosen item, and shows the points of a chosen marker', () => {
     const r = recorder()
     const d = withItems()
-    drawMap(r.ctx, base(d, { selected: { kind: 'symbol', id: 'sym_a' } }))
+    drawMap(r.ctx, base(d, { selected: { kind: 'label', id: 'lbl_b' } }))
     // the frame, and the selection twice (halo and ink)
     expect(r.count('strokeRect')).toBe(1 + 2)
+    // A marker's points show only once it is big enough on screen: 2 cells at 30 px is too small, at 200 px it is not.
+    const small = recorder()
+    drawMap(small.ctx, base(d, { selected: { kind: 'shape', id: 'mrk_a' } }))
+    expect(small.count('strokeRect')).toBe(1 + 2)
+    const m = recorder()
+    drawMap(m.ctx, base(d, { selected: { kind: 'shape', id: 'mrk_a' }, view: { zoom: 200, x: 0, y: 0 } }))
+    expect(m.count('strokeRect')).toBe(1 + 2 + d.shapes[0].points.length)
   })
 
   it('draws the grid only when a cell is big enough', () => {
@@ -248,8 +262,7 @@ describe('drawing a map', () => {
     expect(tiny.count('lineTo')).toBe(0)
   })
 
-  it('draws the layers in their order: a symbol on a layer below the labels comes first', () => {
-    vi.stubGlobal('Path2D', FakePath)
+  it('draws the layers in their order: a marker on a layer below the labels comes first', () => {
     const r = recorder()
     drawMap(r.ctx, base(withItems()))
     const names = r.calls.map(([n]) => n)

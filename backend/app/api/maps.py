@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import get_storage_root
-from ..storage import map_trace
+from ..storage import map_markers, map_trace
 from ..storage import project_store as store
 from ..storage.schema import (
     LEVEL_OF_KIND,
@@ -163,13 +163,19 @@ def put_map(project_id: str, map_id: str, body: MapDoc, root: Path = Depends(get
         if map_id not in parents:
             raise store.MapNotFoundError(project_id, map_id)
         before = store.load_map(root, project_id, map_id)
-        if body.mapFormat < MAP_FORMAT:
+        if body.mapFormat < map_trace.TRACED_FORMAT:
             own: dict[str, MapBiome] = {b.id: b for b in store.list_project_biomes(root, project_id)}
             known = set(own)
             map_trace.upgrade_map(body, own)
             store.add_project_biomes(root, project_id, [b for bid, b in sorted(own.items()) if bid not in known])
-        elif before.mapFormat >= MAP_FORMAT:
+        elif before.mapFormat >= map_trace.TRACED_FORMAT:
             body.cells, body.terrains, body.legacyGrid, body.kind, body.theme = before.cells, before.terrains, before.legacyGrid, before.kind, before.theme
+        # Symbols (an old map file) become marker shapes; the symbols a map kept from before are not for a save to change.
+        if body.mapFormat < map_markers.MARKER_FORMAT or body.symbols:
+            body.mapFormat = min(body.mapFormat, map_markers.MARKER_FORMAT - 1)
+            map_markers.upgrade_map(body)
+        else:
+            body.legacySymbols = before.legacySymbols
         # Whether a map is a version, and of which, is not for a save to change; a version is not in the tree.
         body.versionOf = before.versionOf
         if body.versionOf:

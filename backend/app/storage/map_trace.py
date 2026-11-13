@@ -16,9 +16,10 @@ Everything here is pure and deterministic (the same map gives the same shapes an
 import hashlib
 from typing import Optional
 
+from . import map_markers
+
 from .schema import (
     LEVEL_OF_KIND,
-    MAP_FORMAT,
     MAP_LEVEL_DEFAULTS,
     MAP_MAX_BIOME_SHAPES,
     MAP_MAX_PROJECT_BIOMES,
@@ -267,10 +268,14 @@ def _height_unit_factor(units: str) -> float:
     return 1 / METRES_PER_FOOT if units == "imperial" else 1.0
 
 
+# The format a map has once its painted cells are biome shapes (its symbols are turned into marker shapes after: map_markers).
+TRACED_FORMAT = 2
+
+
 def upgrade_map(doc: MapDoc, own: dict[str, MapBiome]) -> bool:
     """Make a map of format 1 one of format 2, in place: its level from its kind, its unit system from its unit, and its painted cells traced into biome
     shapes over a base. The author's own terrains become project biomes, added to `own` (id -> biome). Returns whether it changed anything."""
-    if doc.mapFormat >= MAP_FORMAT:
+    if doc.mapFormat >= TRACED_FORMAT:
         return False
     level = doc.level if doc.level else LEVEL_OF_KIND.get(doc.kind, "planetary")
     doc.level = level
@@ -378,7 +383,7 @@ def upgrade_map(doc: MapDoc, own: dict[str, MapBiome]) -> bool:
             heightMode="raise" if lift > 0 else "none", height=float(lift), profile=profiles[areas[n][0]] if lift > 0 else "plateau",
         ))
     doc.shapes = traced + list(doc.shapes)
-    doc.mapFormat = MAP_FORMAT
+    doc.mapFormat = TRACED_FORMAT
     doc.legacyGrid = [width, height]
     return True
 
@@ -396,6 +401,7 @@ def upgrade_project(pf: ProjectFile) -> bool:
     own: dict[str, MapBiome] = {b.id: b for b in pf.mapBiomes}
     for doc in pf.maps.values():
         changed = upgrade_map(doc, own) or changed
+        changed = map_markers.upgrade_map(doc) or changed
     if changed:
         known = {b.id for b in pf.mapBiomes}
         for bid in sorted(own):
@@ -413,10 +419,13 @@ def upgrade_project(pf: ProjectFile) -> bool:
 def _upgrade_edition(edition: BookEdition, own: dict[str, MapBiome], seed: dict[str, MapBiome]) -> bool:
     mine: dict[str, MapBiome] = dict(own)
     changed = False
+    traced = False
     for frozen in edition.maps:
-        changed = upgrade_map(frozen.doc, mine) or changed
-    if not changed:
-        return False
+        traced = upgrade_map(frozen.doc, mine) or traced
+        changed = map_markers.upgrade_map(frozen.doc) or changed
+    changed = changed or traced
+    if not traced:
+        return changed
     for frozen in edition.maps:
         for bid in sorted(_used_biomes(frozen.doc)):
             if bid in edition.biomes:

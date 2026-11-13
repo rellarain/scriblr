@@ -13,7 +13,8 @@ SCHEMA_VERSION = 2
 # 5: a book's paragraph indent in spaces (PreviewFormat.paragraphIndentSpaces) instead of em.
 # 6: the Schedule console: faceted activity (events, daily and monthly totals, a 28-day slot profile), revision flags and the planner.
 # 7: maps by level with biome shapes (MapDoc.mapFormat 2); the painted cells of older maps traced into biome shapes once (map_trace).
-PROJECT_FILE_VERSION = 7
+# 8: symbols turned into marker shapes once (MapDoc.mapFormat 3, map_markers); shapes may have more rings (holes), a rough edge and a library kind.
+PROJECT_FILE_VERSION = 8
 
 
 def utcnow() -> datetime:
@@ -3456,7 +3457,7 @@ MAP_TERRAIN_SETS: dict[str, list[tuple[str, str, str]]] = {
 }
 # The layers a new map starts with, bottom to top. The layer of the kind `terrain` holds the biome shapes (it was the painted cells before maps had levels).
 MAP_DEFAULT_LAYERS: list[tuple[str, str, str]] = [
-    ("terrain", "Biomes", "terrain"), ("shapes", "Regions and lines", "shapes"), ("symbols", "Symbols", "symbols"), ("labels", "Labels", "labels"), ("notes", "Notes", "notes"),
+    ("terrain", "Biomes", "terrain"), ("shapes", "Regions and lines", "shapes"), ("symbols", "Markers", "symbols"), ("labels", "Labels", "labels"), ("notes", "Notes", "notes"),
 ]
 
 # The levels of a map, from the largest to the smallest: what a map holds (a star system holds planets, a nation its states ...). A place's child map is the
@@ -3811,9 +3812,15 @@ class MapLabel(BaseModel):
 
 MAP_MAX_SHAPES = 2000
 MAP_MAX_BIOME_SHAPES = 2000
+# Markers (regions drawn with a halo: the castles, trees and stars that were symbols) have a count of their own.
+MAP_MAX_MARKERS = 5000
 MAP_MAX_SHAPE_POINTS = 500
+MAP_MAX_HOLES = 64
+MAP_MAX_ROUGH = 100
 MapShapeType = Literal["line", "region", "biome"]
-MapLineStyle = Literal["solid", "dashed", "dotted", "road", "wall", "fence"]
+# `halo` draws no line: a ring in the map's halo colour round the shape, so a marker reads over any land.
+MapLineStyle = Literal["solid", "dashed", "dotted", "road", "wall", "fence", "halo"]
+MAP_LINE_STYLES = ("solid", "dashed", "dotted", "road", "wall", "fence", "halo")
 MapPattern = Literal["solid", "hatch", "cross", "dots"]
 MapHeightMode = Literal["none", "raise", "lower", "set"]
 # How a biome shape's height change spreads over it: plateau (flat, a ramp `slope` cells wide at its edge), hill (a smooth rise over `slope` cells, or
@@ -3889,11 +3896,45 @@ class MapShape(BaseModel):
     # A region or biome shape with a name is a place: a scene's location can be it, and `mapIds` are the maps that open from it.
     name: str = Field(default="", max_length=80)
     mapIds: list[str] = Field(default_factory=list)
+    # More rings of a closed shape, filled with its outline by the even-odd rule: a ring inside is a hole, a ring apart another piece.
+    holes: list[list[MapShapePoint]] = Field(default_factory=list)
+    # How rough its edge is drawn (0-100: a seeded wobble of the outline), and the seed.
+    rough: int = 0
+    seed: int = 0
+    # The library shape it was placed from ("marker:castle", "land:island" ...; none = drawn by hand).
+    kind: Optional[str] = None
 
     @field_validator("biome", mode="before")
     @classmethod
     def _biome_or_none(cls, value: Any) -> Any:
         return biome_id_or_none(value)
+
+    @field_validator("holes", mode="before")
+    @classmethod
+    def _holes(cls, value: Any) -> Any:
+        out: list[list[MapShapePoint]] = []
+        for ring in value if isinstance(value, list) else []:
+            points = _valid_items(ring, MapShapePoint)[:MAP_MAX_SHAPE_POINTS]
+            if len(points) >= 3:
+                out.append(points)
+            if len(out) >= MAP_MAX_HOLES:
+                break
+        return out
+
+    @field_validator("rough", mode="before")
+    @classmethod
+    def _rough(cls, value: Any) -> Any:
+        return int(round(_finite(value, 0.0, 0.0, float(MAP_MAX_ROUGH))))
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def _seed(cls, value: Any) -> Any:
+        return int(_finite(value, 0.0, 0.0, 2147483647.0))
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value.strip()[:60] or None if isinstance(value, str) else None
 
     @field_validator("heightMode", mode="before")
     @classmethod
@@ -3942,6 +3983,8 @@ class MapShape(BaseModel):
             self.biome, self.heightMode, self.height, self.profile, self.slope = None, "none", 0.0, "plateau", 0.0
         if self.type != "region":
             self.political = None
+        if self.type == "line":
+            self.holes = []
         return self
 
     @field_validator("points", mode="before")
@@ -3952,7 +3995,7 @@ class MapShape(BaseModel):
     @field_validator("style", mode="before")
     @classmethod
     def _style_or_solid(cls, value: Any) -> Any:
-        return value if value in ("solid", "dashed", "dotted", "road", "wall", "fence") else "solid"
+        return value if value in MAP_LINE_STYLES else "solid"
 
     @field_validator("pattern", mode="before")
     @classmethod
@@ -4093,7 +4136,8 @@ class MapJourney(BaseModel):
         return out[:MAP_MAX_STOPS]
 
 
-MAP_FORMAT = 2
+# 1: painted cells; 2: biome shapes over a base (map_trace); 3: no symbols, they are marker shapes (map_markers).
+MAP_FORMAT = 3
 
 
 class MapDoc(BaseModel):
@@ -4127,6 +4171,8 @@ class MapDoc(BaseModel):
     cells: list[int] = Field(default_factory=list)
     # The stamps and the text on the map, each on a layer of the matching kind (symbols, labels).
     symbols: list[MapSymbol] = Field(default_factory=list)
+    # The symbols of a map from before shape libraries, kept as they were (unused) once they are marker shapes.
+    legacySymbols: list[MapSymbol] = Field(default_factory=list)
     labels: list[MapLabel] = Field(default_factory=list)
     # The lines and regions drawn over the terrain, each on a layer of the kind `shapes`.
     shapes: list[MapShape] = Field(default_factory=list)
@@ -4186,7 +4232,7 @@ class MapDoc(BaseModel):
 
     @field_validator("contours", "relief", mode="before")
     @classmethod
-    def _flag(cls, value: Any) -> Any:
+    def _overlay_flag(cls, value: Any) -> Any:
         return value if isinstance(value, bool) else False
 
     @field_validator("legacyGrid", mode="before")
@@ -4301,18 +4347,20 @@ class MapDoc(BaseModel):
         """The shapes that sit on a layer of their kind (lines and regions on a shapes layer, biome shapes on the biomes layer) and have enough points
         (2 for a line, 3 otherwise), each id once and never the id of a symbol (a shape that has one is given a new one: ids name places), at most
         MAP_MAX_SHAPES lines and regions and MAP_MAX_BIOME_SHAPES biome shapes, held to the map."""
-        shape_layers = {layer.id for layer in self.layers if layer.kind == "shapes"}
+        # Lines and regions sit on a shapes layer or a markers layer (kind "symbols": the castles, trees and doors, above the regions).
+        shape_layers = {layer.id for layer in self.layers if layer.kind in ("shapes", "symbols")}
         biome_layers = {layer.id for layer in self.layers if layer.kind == "terrain"}
         taken: set[str] = {s.id for s in self.symbols}
         seen: set[str] = set()
         out: list[MapShape] = []
-        counts = {"shapes": 0, "biomes": 0}
+        counts = {"shapes": 0, "biomes": 0, "markers": 0}
+        limits = {"shapes": MAP_MAX_SHAPES, "biomes": MAP_MAX_BIOME_SHAPES, "markers": MAP_MAX_MARKERS}
         for shape in self.shapes:
-            group = "biomes" if shape.type == "biome" else "shapes"
+            group = "biomes" if shape.type == "biome" else "markers" if shape.style == "halo" else "shapes"
             layers = biome_layers if group == "biomes" else shape_layers
             if shape.layerId not in layers or shape.id in seen or len(shape.points) < _SHAPE_MIN_POINTS[shape.type]:
                 continue
-            if counts[group] >= (MAP_MAX_BIOME_SHAPES if group == "biomes" else MAP_MAX_SHAPES):
+            if counts[group] >= limits[group]:
                 continue
             if shape.id in taken:
                 n = 1
@@ -4321,7 +4369,7 @@ class MapDoc(BaseModel):
                 shape.id = f"{shape.id[:34]}_{n}"
             seen.add(shape.id)
             counts[group] += 1
-            for p in shape.points:
+            for p in [*shape.points, *(q for ring in shape.holes for q in ring)]:
                 p.x = min(float(self.width), max(0.0, p.x))
                 p.y = min(float(self.height), max(0.0, p.y))
             out.append(shape)
@@ -4353,11 +4401,251 @@ class NamedPlace(BaseModel):
     mapIds: list[str] = Field(default_factory=list)
 
 
+def place_kind(shape: MapShape) -> str:
+    """The kind of place a shape is: a marker's kind ("castle" for "marker:castle"), or "area"."""
+    if shape.kind and shape.kind.startswith("marker:"):
+        return shape.kind[len("marker:"):] or "area"
+    return "area"
+
+
 def named_places(doc: MapDoc) -> list[NamedPlace]:
-    """The places of a map: its named symbols, then its named regions and biome shapes (ids are unique across both, see MapDoc._kept_shapes)."""
+    """The places of a map: its named symbols (only a map not yet turned into marker shapes has any), then its named regions, markers and biome
+    shapes (ids are unique across both, see MapDoc._kept_shapes)."""
     out = [NamedPlace(id=s.id, name=s.name, kind=s.kind, mapIds=list(s.mapIds)) for s in doc.symbols if s.name]
-    out.extend(NamedPlace(id=sh.id, name=sh.name, kind="area", mapIds=list(sh.mapIds)) for sh in doc.shapes if sh.name and sh.type != "line")
+    out.extend(NamedPlace(id=sh.id, name=sh.name, kind=place_kind(sh), mapIds=list(sh.mapIds)) for sh in doc.shapes if sh.name and sh.type != "line")
     return out
+
+
+# ---------------------------------------------------------------------------
+# Map shape libraries: the admin's default shapes (app data, map-shapes.json: a draft published as a whole, like the biome list) and a writer's own
+# ("My shapes", my-map-shapes.json, offered in every project and grouped by the project each came from). A library shape is a shape in a box of 1 by 1,
+# with the size it was in cells and what it is drawn with (heights in metres); placing one on a map copies it (nothing links back to the library).
+# ---------------------------------------------------------------------------
+
+MapShapeCategory = Literal["land", "space", "building", "marker"]
+MAP_MAX_LIBRARY_SHAPES = 300
+MAP_MAX_MY_SHAPES = 300
+MAP_SHAPE_HISTORY_MAX = 20
+_LIBRARY_ID = re.compile(r"^[A-Za-z0-9_:.-]{1,60}$")
+
+
+class MapLibraryShape(BaseModel):
+    id: str
+    name: str = Field(default="Shape", max_length=60)
+    category: MapShapeCategory = "land"
+    # The levels it is offered on (none = every level).
+    levels: list[MapLevel] = Field(default_factory=list)
+    type: MapShapeType = "region"
+    # Its own size, in cells (what it is placed at with a click).
+    w: float = 4.0
+    h: float = 4.0
+    points: list[MapShapePoint] = Field(default_factory=list)
+    holes: list[list[MapShapePoint]] = Field(default_factory=list)
+    style: MapLineStyle = "solid"
+    color: Optional[str] = None
+    width: float = 0.25
+    fill: Optional[str] = None
+    opacity: float = 1.0
+    pattern: MapPattern = "solid"
+    biome: Optional[str] = None
+    heightMode: MapHeightMode = "none"
+    height: float = 0.0
+    profile: MapProfile = "plateau"
+    slope: float = 0.0
+    rough: int = 0
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _id(cls, value: Any) -> Any:
+        if not isinstance(value, str) or not _LIBRARY_ID.match(value):
+            raise ValueError("a library shape needs an id of letters, digits and _ : . -")
+        return value
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> Any:
+        return (value.strip()[:60] or "Shape") if isinstance(value, str) else "Shape"
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _category(cls, value: Any) -> Any:
+        return value if value in ("land", "space", "building", "marker") else "land"
+
+    @field_validator("levels", mode="before")
+    @classmethod
+    def _levels(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            if item in MAP_LEVELS and item not in out:
+                out.append(item)
+        return out
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def _type(cls, value: Any) -> Any:
+        return value if value in ("line", "region", "biome") else "region"
+
+    @field_validator("w", "h", mode="before")
+    @classmethod
+    def _size(cls, value: Any) -> Any:
+        return _finite(value, 4.0, 0.05, float(MAP_MAX_SIDE))
+
+    @field_validator("points", mode="before")
+    @classmethod
+    def _points(cls, value: Any) -> Any:
+        return _valid_items(value, MapShapePoint)[:MAP_MAX_SHAPE_POINTS]
+
+    @field_validator("holes", mode="before")
+    @classmethod
+    def _holes(cls, value: Any) -> Any:
+        return MapShape._holes(value)
+
+    @field_validator("style", mode="before")
+    @classmethod
+    def _style(cls, value: Any) -> Any:
+        return value if value in MAP_LINE_STYLES else "solid"
+
+    @field_validator("pattern", mode="before")
+    @classmethod
+    def _pattern(cls, value: Any) -> Any:
+        return value if value in ("solid", "hatch", "cross", "dots") else "solid"
+
+    @field_validator("color", "fill", mode="before")
+    @classmethod
+    def _color(cls, value: Any) -> Any:
+        return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else None
+
+    @field_validator("width", mode="before")
+    @classmethod
+    def _width(cls, value: Any) -> Any:
+        return _finite(value, 0.25, 0.05, 4.0)
+
+    @field_validator("opacity", mode="before")
+    @classmethod
+    def _opacity(cls, value: Any) -> Any:
+        return _finite(value, 1.0, 0.0, 1.0)
+
+    @field_validator("biome", mode="before")
+    @classmethod
+    def _biome(cls, value: Any) -> Any:
+        return biome_id_or_none(value)
+
+    @field_validator("heightMode", mode="before")
+    @classmethod
+    def _height_mode(cls, value: Any) -> Any:
+        return value if value in ("none", "raise", "lower", "set") else "none"
+
+    @field_validator("height", mode="before")
+    @classmethod
+    def _height(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -100000.0, 100000.0)
+
+    @field_validator("profile", mode="before")
+    @classmethod
+    def _profile(cls, value: Any) -> Any:
+        return value if value in MAP_PROFILES else "plateau"
+
+    @field_validator("slope", mode="before")
+    @classmethod
+    def _slope(cls, value: Any) -> Any:
+        return _finite(value, 0.0, 0.0, MAP_MAX_SLOPE)
+
+    @field_validator("rough", mode="before")
+    @classmethod
+    def _rough(cls, value: Any) -> Any:
+        return MapShape._rough(value)
+
+    @model_validator(mode="after")
+    def _fit(self) -> "MapLibraryShape":
+        for q in [*self.points, *(r for ring in self.holes for r in ring)]:
+            q.x = min(1.0, max(0.0, q.x))
+            q.y = min(1.0, max(0.0, q.y))
+        if self.type == "line":
+            self.holes = []
+        if self.type != "biome":
+            self.biome, self.heightMode, self.height, self.profile, self.slope = None, "none", 0.0, "plateau", 0.0
+        if len(self.points) < _SHAPE_MIN_POINTS[self.type]:
+            raise ValueError("a library shape has too few points")
+        return self
+
+
+def library_list(value: Any, limit: int, model: Any = None) -> list[Any]:
+    """The library shapes of a list that read, each id once, at most `limit`."""
+    out: list[Any] = []
+    seen: set[str] = set()
+    for item in _valid_items(value, model or MapLibraryShape):
+        if item.id in seen:
+            continue
+        seen.add(item.id)
+        out.append(item)
+        if len(out) >= limit:
+            break
+    return out
+
+
+class PublishedMapShapes(BaseModel):
+    version: int
+    publishedAt: datetime
+    shapes: list[MapLibraryShape] = Field(default_factory=list)
+
+    @field_validator("shapes", mode="before")
+    @classmethod
+    def _shapes(cls, value: Any) -> Any:
+        return library_list(value, MAP_MAX_LIBRARY_SHAPES)
+
+
+class MapShapeCatalog(BaseModel):
+    """The admin's default shapes (app data, map-shapes.json): a draft edited on Configuration > Maps and the published list every project offers, with
+    its earlier versions. `seedVersion` is how much of the starter list has been merged in."""
+
+    schemaVersion: int = 1
+    seedVersion: int = 1
+    draft: list[MapLibraryShape] = Field(default_factory=list)
+    published: Optional[PublishedMapShapes] = None
+    history: list[PublishedMapShapes] = Field(default_factory=list)
+    nextVersion: int = 1
+
+    @field_validator("draft", mode="before")
+    @classmethod
+    def _draft(cls, value: Any) -> Any:
+        return library_list(value, MAP_MAX_LIBRARY_SHAPES)
+
+
+class MapShapeDraft(BaseModel):
+    shapes: list[MapLibraryShape] = Field(default_factory=list)
+
+    @field_validator("shapes", mode="before")
+    @classmethod
+    def _shapes(cls, value: Any) -> Any:
+        return library_list(value, MAP_MAX_LIBRARY_SHAPES)
+
+
+class MyMapShape(MapLibraryShape):
+    """One of a writer's own shapes: a library shape and the project it was saved from (its id and title as they were)."""
+
+    projectId: str = Field(default="", max_length=80)
+    projectTitle: str = Field(default="", max_length=200)
+    savedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("projectId", mode="before")
+    @classmethod
+    def _project_id(cls, value: Any) -> Any:
+        return value[:80] if isinstance(value, str) else ""
+
+    @field_validator("projectTitle", mode="before")
+    @classmethod
+    def _project_title(cls, value: Any) -> Any:
+        return value.strip()[:200] if isinstance(value, str) else ""
+
+
+class MyMapShapes(BaseModel):
+    schemaVersion: int = 1
+    shapes: list[MyMapShape] = Field(default_factory=list)
+
+    @field_validator("shapes", mode="before")
+    @classmethod
+    def _shapes(cls, value: Any) -> Any:
+        return library_list(value, MAP_MAX_MY_SHAPES, MyMapShape)
 
 
 # ---------------------------------------------------------------------------

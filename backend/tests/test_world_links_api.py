@@ -68,7 +68,7 @@ def test_a_link_whose_end_is_gone_is_not_shown(client: TestClient) -> None:
     client.delete(f"/api/projects/{w['pid']}/characters/{w['adaId']}")
     assert [(x["a"], x["b"]) for x in client.get(_url(w)).json()] == [tuple(sorted((w["line"], w["bram"])))]
     doc = client.get(f"/api/projects/{w['pid']}/maps/{w['mapId']}").json()
-    doc["symbols"][0]["name"] = ""  # the place loses its name
+    doc["shapes"][0]["name"] = ""  # the place loses its name
     client.put(f"/api/projects/{w['pid']}/maps/{w['mapId']}", json=doc)
     client.post(_url(w), json={"a": w["line"], "b": w["bram"]})  # a change drops what is dangling for good
     assert len(client.get(_url(w)).json()) == 1

@@ -8,6 +8,7 @@ import { __resetCastForTests } from '../assets/Interfaces/writer/characters/cast
 import { __resetItemsForTests } from '../assets/Interfaces/writer/items/itemStore'
 import { __resetPlacesForTests } from '../assets/Interfaces/writer/maps/placesStore'
 import { __resetBiomesForTests } from '../assets/Interfaces/writer/maps/mapBiomes'
+import { __resetShapeLibraryForTests } from '../assets/Interfaces/writer/maps/mapShapeStore'
 import { __resetWorldLinksForTests } from '../assets/Interfaces/writer/links/linkStore'
 import { __resetWorldNavForTests } from '../assets/Interfaces/writer/links/worldNav'
 
@@ -23,6 +24,7 @@ afterEach(() => {
   __resetTrainingForTests()
   __resetPlacesForTests()
   __resetBiomesForTests()
+  __resetShapeLibraryForTests()
   __resetCastForTests()
   __resetItemsForTests()
   __resetWorldLinksForTests()

@@ -457,8 +457,7 @@ export const MAP_MAX_BIOMES = 128
 export interface MapBase { biome: string; height: number }
 // The look of a map from before levels (kept as stored, no longer used).
 export type MapThemeName = 'parchment' | 'modern' | 'night' | 'blueprint'
-// A stamp (`kind` is a symbol of the library, mapSymbols.ts): its centre in cells, how many cells wide, its own colour (null = the theme's).
-// A symbol with a name is a place (a scene can happen there); `mapIds` are the maps that open from it.
+// A stamp from before shape libraries (only in old map files: the server turns each into a marker shape with the same id).
 export interface MapSymbol { id: string; layerId: string; kind: string; x: number; y: number; size: number; color: string | null; name: string; mapIds: string[] }
 // A place as the project lists it: `key` is what a scene stores (`mapId/placeId`), `path` the maps it is inside and its name.
 export interface MapPlace { key: string; mapId: string; placeId: string; name: string; path: string; kind: string; mapTitle: string; mapIds: string[] }
@@ -468,7 +467,8 @@ export interface MapLabel { id: string; layerId: string; text: string; x: number
 // the point (it arrives on the other side), or null for the handle the neighbouring points make.
 export interface MapShapePoint { x: number; y: number; smooth: boolean; hx: number | null; hy: number | null }
 export type MapShapeType = 'line' | 'region' | 'biome'
-export type MapLineStyle = 'solid' | 'dashed' | 'dotted' | 'road' | 'wall' | 'fence'
+// `halo` draws no line: a ring in the map's halo colour round the shape, so a marker reads over any land.
+export type MapLineStyle = 'solid' | 'dashed' | 'dotted' | 'road' | 'wall' | 'fence' | 'halo'
 export type MapPattern = 'solid' | 'hatch' | 'cross' | 'dots'
 export type MapHeightMode = 'none' | 'raise' | 'lower' | 'set'
 // How a biome shape's height change spreads over it (see mapHeights.ts), and the political areas a region can be.
@@ -476,6 +476,8 @@ export type MapProfile = 'plateau' | 'hill' | 'peak' | 'basin'
 export type MapPolitical = 'nation' | 'state' | 'municipality'
 export const MAP_MAX_SLOPE = 64
 export const MAP_MAX_HEIGHT_RANGE = 100000
+export const MAP_MAX_ROUGH = 100
+export const MAP_MAX_HOLES = 64
 // A line (a river, a road, a border, a wall, a fence), a region (a closed outline, filled over the land) or a biome shape (a closed outline on the biomes
 // layer: the land itself, in its biome's colour, lifted or sunk by its height). `color` is the line's (null = the ink), `width` is in cells; a region's
 // `fill` is null for the line colour, with how solid it is and a pattern over it. A region or biome shape with a `name` is a place; `mapIds` open from it.
@@ -490,7 +492,28 @@ export interface MapShape {
   // A region that is a nation, a state or province, or a municipality (null or absent = an ordinary region).
   political?: MapPolitical | null
   name?: string; mapIds?: string[]
+  // More rings of a closed shape, filled with its outline by the even-odd rule: a ring inside is a hole, a ring apart is another piece.
+  holes?: MapShapePoint[][]
+  // How rough its edge is drawn (0-100: a seeded wobble of the outline, the same for the fill, the heights and picking), and the seed.
+  rough?: number; seed?: number
+  // The library shape it was placed from ("marker:castle", "land:island" ...), so the legend can name markers.
+  kind?: string | null
 }
+// A shape of a library: a line, region or biome shape in a box of 1 by 1 (`w` by `h` cells when placed at its own size), with what it is drawn with
+// (heights in metres). The admin's default shapes are offered to every project by level (none = every level); "My shapes" are a writer's own.
+export type MapShapeCategory = 'land' | 'space' | 'building' | 'marker'
+export interface MapLibraryShape {
+  id: string; name: string; category: MapShapeCategory; levels: MapLevel[]; type: MapShapeType
+  w: number; h: number; points: MapShapePoint[]; holes: MapShapePoint[][]
+  style: MapLineStyle; color: string | null; width: number; fill: string | null; opacity: number; pattern: MapPattern
+  biome: string | null; heightMode: MapHeightMode; height: number; profile: MapProfile; slope: number; rough: number
+}
+export interface PublishedMapShapes { version: number; publishedAt: string; shapes: MapLibraryShape[] }
+export interface MapShapeCatalog { schemaVersion: number; seedVersion: number; draft: MapLibraryShape[]; published: PublishedMapShapes | null; history: PublishedMapShapes[]; nextVersion: number }
+export const MAP_MAX_LIBRARY_SHAPES = 300
+// One of a writer's own shapes, kept in the app for every project, with the project it came from.
+export interface MyMapShape extends MapLibraryShape { projectId: string; projectTitle: string; savedAt: string }
+export const MAP_MAX_MY_SHAPES = 300
 export interface MapDoc {
   schemaVersion: number
   id: string
@@ -510,9 +533,10 @@ export interface MapDoc {
   // How far a traveller goes in a day, in `unit` (null = not set).
   pace: number | null
   layers: MapLayer[]
-  symbols: MapSymbol[]
   labels: MapLabel[]
   shapes: MapShape[]
+  // Stamps from before shape libraries: only in old map files (the server turns them into marker shapes).
+  symbols?: MapSymbol[]
   // From before levels, kept as stored by the server (a save leaves them as they were): the old kind, look, palette and painted cells.
   kind?: MapKind
   theme?: MapThemeName

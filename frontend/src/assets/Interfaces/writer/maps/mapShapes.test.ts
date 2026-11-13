@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MapDoc, MapShape, MapShapePoint } from '../../../../api/types'
+import { markerOf } from '../../../../designSystem/mockMaps'
 import { MAX_SHAPES, addShape, editShape, hitItem, itemBounds, removeItem, replaceShape, withShape } from './mapItems'
 import { MapHistory, draftOf, removeLayer, toggleLayer, type MapDraft } from './mapModel'
 import {
@@ -310,9 +311,9 @@ describe('shapes on the map', () => {
     expect(hitItem(d, 5, 8)).toBeNull()
     expect(hitItem(toggleLayer(d, 'shapes', 'locked')!.draft, 5, 5.2)).toBeNull()
     expect(hitItem(toggleLayer(d, 'shapes', 'visible')!.draft, 5, 5.2)).toBeNull()
-    // A symbol on the layer above wins where they overlap.
-    d = { ...d, symbols: [{ id: 'sym_1', layerId: 'symbols', kind: 'tree', x: 5, y: 5, size: 2, color: null, name: '', mapIds: [] }] }
-    expect(hitItem(d, 5, 5.2)).toEqual({ kind: 'symbol', id: 'sym_1' })
+    // A marker on the layer above wins where they overlap.
+    d = { ...d, shapes: [...d.shapes, markerOf({ id: 'mrk_1', layerId: 'symbols', kind: 'tree', x: 5, y: 5, size: 2, color: null, name: '', mapIds: [] })] }
+    expect(hitItem(d, 5, 5.2)).toEqual({ kind: 'shape', id: 'mrk_1' })
   })
 
   it('makes political areas from the Nation, State and Municipality pens, picked only by their border', () => {

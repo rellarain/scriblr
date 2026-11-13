@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MapDoc, MapSymbol } from '../../../../api/types'
-import { newMap } from '../../../../designSystem/mockMaps'
+import type { MapDoc, MapShape, MapSymbol } from '../../../../api/types'
+import { markerOf, newMap } from '../../../../designSystem/mockMaps'
 import { mapsBackend } from '../../../../test/mapsBackend'
 import { mapFileName } from './mapFile'
 import MapsConsole, { type ScenePlace } from './MapsConsole'
@@ -13,7 +13,8 @@ vi.mock('./mapExport', async importOriginal => ({ ...(await importOriginal<typeo
 // jsdom has no canvas: the canvas draws nothing here.
 beforeEach(() => { saved.mockClear(); vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
 
-const symbol = (over: Partial<MapSymbol> = {}): MapSymbol => ({ id: 'sym_1', kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null, layerId: 'symbols', name: '', mapIds: [], ...over })
+// A castle marker (what a stamped symbol is now), two cells wide round (3.5, 2.5).
+const marker = (over: Partial<MapSymbol> = {}): MapShape => markerOf({ id: 'sym_1', kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null, layerId: 'symbols', name: '', mapIds: [], ...over })
 const world = (over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap('map_a', { title: 'Known World', level: 'planetary', width: 8, height: 6, cellSize: 10, unit: 'miles' }, 0), ...over })
 const town = (): MapDoc => newMap('map_b', { title: 'Port Veyra', level: 'local', width: 4, height: 4, parentId: 'map_a' }, 0)
 
@@ -31,16 +32,16 @@ const lastPut = (b: Backend) => JSON.parse((puts(b).at(-1)![1] as RequestInit).b
 // jsdom has no layout: the 8 x 6 map is fitted at 64 px a cell from (144, 68).
 const at = (x: number, y: number, init: MouseEventInit = {}) => ({ clientX: 144 + 64 * x, clientY: 68 + 64 * y, button: 0, ...init })
 const pointer = (el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup', init: MouseEventInit) => fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, ...init }))
-// Choose the symbol at a cell with the Select tool.
+// Choose the marker at a cell with the Select tool.
 async function choose(user: ReturnType<typeof userEvent.setup>, canvas: Element, x = 3.5, y = 2.5) {
   await user.click(screen.getByRole('button', { name: 'Select and move' }))
   pointer(canvas, 'pointerdown', at(x, y))
 }
-const chosen = () => within(screen.getByRole('region', { name: 'Chosen symbol' }))
+const chosen = () => within(screen.getByRole('region', { name: 'Chosen marker' }))
 
 describe('places on a map', () => {
-  it('turns a symbol into a place when it is given a name, and saves the name', async () => {
-    const { backend, user } = await open([world({ symbols: [symbol()] })])
+  it('turns a marker into a place when it is given a name, and saves the name', async () => {
+    const { backend, user } = await open([world({ shapes: [marker()] })])
     const canvas = await screen.findByRole('img', { name: /Known World/ })
     await choose(user, canvas)
     expect(chosen().getByText(/Give it a name to make it a place/)).toBeInTheDocument()
@@ -49,11 +50,11 @@ describe('places on a map', () => {
     expect(await screen.findByRole('group', { name: 'Maps from this place' })).toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols[0]).toMatchObject({ name: 'Castle Dran', mapIds: [] })
+    expect(lastPut(backend).shapes[0]).toMatchObject({ name: 'Castle Dran', mapIds: [] })
   })
 
   it('makes a map for a place inside the open map, keeps the open map open, and links it', async () => {
-    const { backend, user } = await open([world({ symbols: [symbol({ name: 'Castle Dran' })] })])
+    const { backend, user } = await open([world({ shapes: [marker({ name: 'Castle Dran' })] })])
     const canvas = await screen.findByRole('img', { name: /Known World/ })
     await choose(user, canvas)
     await user.click(chosen().getByRole('button', { name: 'Make a map for this place' }))
@@ -64,11 +65,11 @@ describe('places on a map', () => {
     expect(await chosen().findByRole('button', { name: 'Open Castle Dran' })).toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols[0].mapIds).toHaveLength(1)
+    expect(lastPut(backend).shapes[0].mapIds).toHaveLength(1)
   })
 
   it('links a map that exists, opens it from the place, and stops opening it', async () => {
-    const { backend, user } = await open([world({ symbols: [symbol({ name: 'Port' })] }), { ...town(), parentId: null }])
+    const { backend, user } = await open([world({ shapes: [marker({ name: 'Port' })] }), { ...town(), parentId: null }])
     const canvas = await screen.findByRole('img', { name: /Known World/ })
     await choose(user, canvas)
     await user.selectOptions(chosen().getByRole('combobox', { name: 'Another map to open from here' }), 'map_b')
@@ -78,11 +79,11 @@ describe('places on a map', () => {
     expect(chosen().queryByRole('button', { name: 'Open Port Veyra' })).not.toBeInTheDocument()
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).symbols[0].mapIds).toEqual([])
+    expect(lastPut(backend).shapes[0].mapIds).toEqual([])
   })
 
   it('opens the first linked map on a double-click on the place, and shows where it is', async () => {
-    const { user } = await open([world({ symbols: [symbol({ name: 'Port', mapIds: ['map_b'] })] }), town()])
+    const { user } = await open([world({ shapes: [marker({ name: 'Port', mapIds: ['map_b'] })] }), town()])
     const canvas = await screen.findByRole('img', { name: /Known World/ })
     await user.click(screen.getByRole('button', { name: 'Select and move' }))
     expect(screen.queryByRole('navigation', { name: 'Where this map is' })).not.toBeInTheDocument()
@@ -96,7 +97,7 @@ describe('places on a map', () => {
   })
 
   it('lists the scenes that happen at a place', async () => {
-    const { user } = await open([world({ symbols: [symbol({ name: 'Port' })] })], [
+    const { user } = await open([world({ shapes: [marker({ name: 'Port' })] })], [
       { id: 's1', title: 'Arrival', location: 'map_a/sym_1' }, { id: 's2', title: 'Elsewhere', location: 'map_a/other' },
     ])
     await choose(user, await screen.findByRole('img', { name: /Known World/ }))
@@ -181,7 +182,8 @@ describe('the old locations', () => {
     expect(onSetLocation.mock.calls.map(c => c[0]).sort()).toEqual(['s1', 's2'])
     expect(onSetLocation.mock.calls[0][1]).toMatch(/^map_a\/./)
     expect(puts(backend)).toHaveLength(1)
-    expect(lastPut(backend).symbols.map(s => s.name)).toEqual(['The Inn'])
+    expect(lastPut(backend).shapes.map(s => s.name)).toEqual(['The Inn'])
+    expect(lastPut(backend).shapes[0]).toMatchObject({ kind: 'marker:interest', style: 'halo' })
   })
 
   it('drops the texts that are left, after a confirmation, and leaves places alone', async () => {
@@ -215,7 +217,7 @@ describe('the image', () => {
 
 describe('map files', () => {
   it('exports a map and the maps inside it as a file', async () => {
-    const { user } = await open([world({ symbols: [symbol({ name: 'Port', mapIds: ['map_b'] })] }), town()])
+    const { user } = await open([world({ shapes: [marker({ name: 'Port', mapIds: ['map_b'] })] }), town()])
     await screen.findByRole('img', { name: /Known World/ })
     await user.click(within(screen.getByRole('navigation', { name: 'Maps' })).getByRole('button', { name: 'Export Known World to a file' }))
     await waitFor(() => expect(saved).toHaveBeenCalledTimes(1))

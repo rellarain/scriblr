@@ -7,9 +7,10 @@ import {
   STARTER_BIOMES, UNKNOWN_BIOME_COLOR, biomeCounts, biomeIndex, levelsOfBiome, offeredBiomes, ownBiomeId, resolveBiome, usedBiomeIds,
 } from './mapBiomes'
 import { landHeight } from './mapHeights'
-import { HEIGHT_LIMIT, addBiomeShape, addSymbol, editPlace, editShape, hitItem, moveShapeOrder, placeOf, placesOf } from './mapItems'
+import { HEIGHT_LIMIT, addBiomeShape, addLibraryShape, editPlace, editShape, hitItem, moveShapeOrder, placeOf, placesOf } from './mapItems'
 import { FEET_PER_METRE, LEVELS, MAP_LEVELS, defaultsFor, heightRangeOf, levelDef, levelsBelow, nextLevelDown } from './mapLevels'
 import { draftOf, toggleLayer, type MapDraft } from './mapModel'
+import { starterShapes } from './mapShapeSeed'
 import { UNITS, changeUnits, formatHeight, heightUnit, roundNice, unitsOf } from './mapUnits'
 
 const doc = (over: Partial<MapDoc> = {}): MapDoc => ({
@@ -18,9 +19,9 @@ const doc = (over: Partial<MapDoc> = {}): MapDoc => ({
   layers: [
     { id: 'terrain', name: 'Biomes', kind: 'terrain', visible: true, locked: false },
     { id: 'shapes', name: 'Regions and lines', kind: 'shapes', visible: true, locked: false },
-    { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
+    { id: 'symbols', name: 'Markers', kind: 'symbols', visible: true, locked: false },
   ],
-  symbols: [], labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: 'x', ...over,
+  labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: 'x', ...over,
 })
 const draft = (over: Partial<MapDoc> = {}): MapDraft => draftOf(doc(over))
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }
@@ -160,9 +161,10 @@ describe('biome areas', () => {
     expect(addBiomeShape(toggleLayer(draft(), 'terrain', 'locked')!.draft, TRI, 'forest', false)).toBeNull()
   })
 
-  it('take an id no symbol has', () => {
-    const d = addSymbol(draft(), 'castle', 2, 2, 2, ids('a'))!.change.draft
-    const clash = addBiomeShape({ ...d, symbols: [{ ...d.symbols[0], id: 'bio_a' }] }, TRI, 'forest', false, ids('a', 'b'))!
+  it('take an id no other shape has (a marker, say)', () => {
+    const castle = starterShapes().find(s => s.id === 'marker:castle')!
+    const d = addLibraryShape(draft(), castle, { x0: 1, y0: 1, x1: 3, y1: 3 }, 'metric', ids('a'))!.change.draft
+    const clash = addBiomeShape({ ...d, shapes: [{ ...d.shapes[0], id: 'bio_a' }] }, TRI, 'forest', false, ids('a', 'b'))!
     expect(clash.id).toBe('bio_b')
   })
 

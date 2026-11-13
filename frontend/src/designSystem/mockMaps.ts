@@ -1,6 +1,8 @@
-import type { MapBase, MapCreate, MapDoc, MapKind, MapLevel, MapPlace, MapShape, MapSummary, MapUnits } from '../api/types'
+import type { MapBase, MapCreate, MapDoc, MapKind, MapLevel, MapPlace, MapShape, MapSummary, MapSymbol, MapUnits } from '../api/types'
 import { MAP_MAX_SIDE } from '../api/types'
 import { defaultsFor } from '../assets/Interfaces/writer/maps/mapLevels'
+import { shapeFromLibrary } from '../assets/Interfaces/writer/maps/mapLibrary'
+import { starterShapes } from '../assets/Interfaces/writer/maps/mapShapeSeed'
 import type { MockAnswer } from './mockPresets'
 
 // A pretend Maps API (`/api/projects/{id}/maps`), shared by the design system's previews (mockBackend.ts) and the tests (test/mapsBackend.ts): the
@@ -11,7 +13,16 @@ const ok = (body: unknown, status = 200): MockAnswer => ({ status, body })
 const fail = (status: number, detail: string): MockAnswer => ({ status, body: { detail } })
 const AT = '2026-11-02T12:00:00.000Z'
 
-const LAYERS: Array<[string, string]> = [['terrain', 'Biomes'], ['shapes', 'Regions and lines'], ['symbols', 'Symbols'], ['labels', 'Labels'], ['notes', 'Notes']]
+const LAYERS: Array<[string, string]> = [['terrain', 'Biomes'], ['shapes', 'Regions and lines'], ['symbols', 'Markers'], ['labels', 'Labels'], ['notes', 'Notes']]
+
+// A symbol of an old map file as the marker the server turns it into (the starter marker of its kind, in its square, with its id, colour, name and maps).
+let markers: Map<string, ReturnType<typeof starterShapes>[number]> | null = null
+export function markerOf(sym: Pick<MapSymbol, 'id' | 'layerId' | 'kind' | 'x' | 'y' | 'size' | 'color' | 'name' | 'mapIds'>): MapShape {
+  markers ??= new Map(starterShapes().filter(s => s.category === 'marker').map(s => [s.id, s]))
+  const lib = markers.get(`marker:${sym.kind}`) ?? markers.get('marker:place')!
+  const half = sym.size / 2
+  return { ...shapeFromLibrary(lib, { x0: sym.x - half, y0: sym.y - half, x1: sym.x + half, y1: sym.y + half }, sym.id, sym.layerId, 'metric'), fill: sym.color, name: sym.name ?? '', mapIds: [...(sym.mapIds ?? [])] }
+}
 // The level of a map from before levels (the server's LEVEL_OF_KIND).
 const LEVEL_OF_KIND: Record<string, MapLevel> = { world: 'planetary', town: 'local', interior: 'interior' }
 // The kind a level's map is stored with (for a client from before levels), as the server's MAP_LEVEL_DEFAULTS.
@@ -31,15 +42,16 @@ export function newMap(id: string, body: MapCreate, order: number): MapDoc {
   const width = side(body.width, 32), height = side(body.height, 24)
   const base: MapBase = body.base ?? defaultsFor(level, units === 'imperial' ? 'imperial' : 'metric').base
   return {
-    schemaVersion: 2, id, title: body.title?.trim() || 'Untitled map', level, mapFormat: 2, base, units, kind: KIND_OF[level], parentId: body.parentId ?? null, order, width, height,
+    schemaVersion: 2, id, title: body.title?.trim() || 'Untitled map', level, mapFormat: 3, base, units, kind: KIND_OF[level], parentId: body.parentId ?? null, order, width, height,
     cellSize: body.cellSize ?? 1, unit: body.unit?.trim() || 'cells', pace: null,
     layers: LAYERS.map(([lid, name]) => ({ id: lid, name, kind: lid as MapDoc['layers'][number]['kind'], visible: true, locked: false })),
-    symbols: [], labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: AT,
+    labels: [], shapes: [], scaleBar: true, compass: true, legend: false, updatedAt: AT,
   }
 }
 
-// The places of a map: its named symbols, then its named regions and biome areas (as the server's named_places).
+// The places of a map: its named regions, markers and biome areas (as the server's named_places; a marker's kind is its marker's).
 const namedShapes = (m: MapDoc) => m.shapes.filter(s => s.type !== 'line' && s.name)
+const placeKind = (s: MapShape) => (s.kind?.startsWith('marker:') ? s.kind.slice('marker:'.length) : 'area')
 
 export function createMockMaps(initial: MapDoc[] = []) {
   const maps = new Map<string, MapDoc>(initial.map(m => [m.id, m]))
@@ -53,10 +65,7 @@ export function createMockMaps(initial: MapDoc[] = []) {
       return out
     }
     return [...maps.values()].filter(m => !m.versionOf)
-      .flatMap(m => [
-        ...m.symbols.filter(sy => sy.name).map(sy => ({ id: sy.id, name: sy.name, kind: sy.kind, mapIds: sy.mapIds })),
-        ...namedShapes(m).map(sh => ({ id: sh.id, name: sh.name ?? '', kind: 'area', mapIds: sh.mapIds ?? [] })),
-      ].map(p => ({ key: `${m.id}/${p.id}`, mapId: m.id, placeId: p.id, name: p.name, path: [...titles(m.id), p.name].join(' > '), kind: p.kind, mapTitle: m.title, mapIds: [...p.mapIds] })))
+      .flatMap(m => namedShapes(m).map(sh => ({ id: sh.id, name: sh.name ?? '', kind: placeKind(sh), mapIds: sh.mapIds ?? [] })).map(p => ({ key: `${m.id}/${p.id}`, mapId: m.id, placeId: p.id, name: p.name, path: [...titles(m.id), p.name].join(' > '), kind: p.kind, mapTitle: m.title, mapIds: [...p.mapIds] })))
       .sort((a, b) => a.path.toLowerCase().localeCompare(b.path.toLowerCase()) || a.key.localeCompare(b.key))
   }
 
@@ -94,16 +103,18 @@ export function createMockMaps(initial: MapDoc[] = []) {
       const b = body as MapDoc
       if (b.id !== id) return fail(422, 'The id does not match.')
       const keepLink = (x: string) => maps.has(x) && x !== id
-      const symbols = (b.symbols ?? []).map(sy => ({ ...sy, name: sy.name ?? '', mapIds: (sy.mapIds ?? []).filter(keepLink) }))
-      const shapes = (b.shapes ?? []).map(sh => (sh.type === 'line' ? sh : { ...sh, mapIds: (sh.mapIds ?? []).filter(keepLink) }))
+      // The symbols of an old map file become markers, as the server makes them.
+      const fromSymbols = (b.symbols ?? []).map(sy => markerOf(sy))
+      const shapes = [...(b.shapes ?? []), ...fromSymbols].map(sh => (sh.type === 'line' ? sh : { ...sh, mapIds: (sh.mapIds ?? []).filter(keepLink) }))
       // A map of painted cells (an old map file) becomes a map of levels (the server traces its cells into biome shapes; this pretend one keeps them aside).
       // Otherwise the old painted cells, palette, kind and look of a traced map stay as they were stored.
       const level: MapLevel = b.level ?? LEVEL_OF_KIND[b.kind ?? 'world'] ?? found.level
-      const old = b.mapFormat !== 2
+      const old = (b.mapFormat ?? 1) < 2
       const legacy = old
         ? { kind: b.kind, theme: b.theme, terrains: b.terrains, cells: b.cells, legacyGrid: [b.width, b.height], base: b.base ?? defaultsFor(level, b.units === 'imperial' ? 'imperial' : 'metric').base, units: b.units ?? 'custom' as MapUnits }
         : { kind: found.kind, theme: found.theme, terrains: found.terrains, cells: found.cells, legacyGrid: found.legacyGrid }
-      const saved: MapDoc = { ...b, ...legacy, level, mapFormat: 2, symbols, shapes, title: b.title.trim() || 'Untitled map', updatedAt: AT }
+      const saved: MapDoc = { ...b, ...legacy, level, mapFormat: 3, shapes, title: b.title.trim() || 'Untitled map', updatedAt: AT }
+      delete saved.symbols
       maps.set(id, saved)
       return ok(saved)
     }
@@ -113,7 +124,6 @@ export function createMockMaps(initial: MapDoc[] = []) {
       for (const v of [...maps.values()]) if (v.versionOf === id) maps.delete(v.id)
       for (const m of maps.values()) {
         if (m.parentId === id) m.parentId = found.parentId
-        for (const sym of m.symbols) sym.mapIds = (sym.mapIds ?? []).filter(x => x !== id)
         for (const sh of m.shapes) if (sh.mapIds) sh.mapIds = sh.mapIds.filter(x => x !== id)
       }
       return { status: 204, body: undefined }
@@ -147,8 +157,8 @@ export function seedMaps(): MapDoc[] {
   world.relief = true
   world.contours = true
   world.pace = 25
-  const stamp = (id: string, kind: string, x: number, y: number, size = 2, name = '', mapIds: string[] = []) => ({ id, layerId: 'symbols', kind, x, y, size, color: null, name, mapIds })
-  world.symbols = [
+  const stamp = (id: string, kind: string, x: number, y: number, size = 2, name = '', mapIds: string[] = []) => markerOf({ id, layerId: 'symbols', kind, x, y, size, color: null, name, mapIds })
+  const placed = [
     stamp('sym_a', 'city', 11.5, 8.5, 2.5, 'Port Veyra', ['map_town']), stamp('sym_b', 'castle', 7.5, 6.5), stamp('sym_g', 'harbour', 4.5, 9.5), stamp('sym_h', 'ship', 3.5, 13.5, 1.5),
   ]
   world.labels = [
@@ -176,7 +186,11 @@ export function seedMaps(): MapDoc[] {
     shape('shp_b', 'line', [pt(22, 5), pt(19.5, 7.5), pt(17, 8), pt(14, 7.5), pt(11.5, 9.5), pt(9, 9)], { color: '#3b6ea5', width: 0.35 }),
     shape('shp_c', 'line', [pt(11.5, 8.5), pt(13, 10), pt(15, 10.5), pt(17.5, 9)], { style: 'road', color: '#6b4a2b', width: 0.3 }),
     shape('shp_d', 'line', [pt(3, 2, false), pt(8, 4.5, false), pt(6.5, 8, false)], { style: 'dashed', width: 0.16 }),
+    // The markers: a city, a castle, a harbour and a ship.
+    ...placed,
   ]
+  // The Spine's crags: a rough edge.
+  world.shapes = world.shapes.map(s => (s.id === 'bio_spine' ? { ...s, rough: 45, seed: 7 } : s))
   const town = newMap('map_town', { title: 'Port Veyra', level: 'local', units: 'imperial', width: 24, height: 16, cellSize: 30, unit: 'ft', parentId: 'map_world' }, 0)
   town.shapes = [
     biomeArea('bio_harbour', [[0, 9], [8, 10], [12, 16], [0, 16]], 'saltwater'),

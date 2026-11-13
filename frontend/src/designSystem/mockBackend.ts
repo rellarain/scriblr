@@ -15,6 +15,7 @@ import { copyOf, createMockFigureModels } from './mockFigureModels'
 import { createMockItems, seedItems } from './mockItems'
 import { createMockMaps, seedMaps } from './mockMaps'
 import { createMockMapBiomes } from './mockMapBiomes'
+import { createMockMapShapes } from './mockMapShapes'
 import { createMockTraining, emptyProgress } from './mockTraining'
 import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
 import type { Planner } from '../lib/facets'
@@ -204,6 +205,7 @@ export function createMockBackend() {
   const maps = createMockMaps(seedMaps())
   // The admin's biome list (Configuration > Maps) and each project's own biomes.
   const biomes = createMockMapBiomes()
+  const libraryShapes = createMockMapShapes()
   // The Characters console's cast, which its edits change in memory only.
   const cast = createMockCharacters(seedCharacters())
   // The copies of published models the cast's figures are drawn from (a model is copied from the catalog above when a character is given a figure).
@@ -250,6 +252,8 @@ export function createMockBackend() {
     if (parts[0] === 'training') { const answer = training.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'map-biomes') { const answer = biomes.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
+    if (parts[0] === 'map-shapes') { const answer = libraryShapes.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
+    if (parts[0] === 'my-map-shapes') { const answer = libraryShapes.myRoute(method, parts.slice(1), body); return answer.status === 204 ? new Response(null, { status: 204 }) : json(answer.body, answer.status) }
     if (parts[0] === 'character-models' && method === 'GET' && parts[1] === 'published' && parts.length === 2) return json({ models: publishedModels() })
     if (parts[0] === 'character-models') { const answer = models.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'my-models') { const answer = mine.route(method, parts.slice(1), body); return json(answer.body, answer.status) }

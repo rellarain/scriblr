@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MapShape } from '../../../../api/types'
 import { FitIcon, ZoomInIcon, ZoomOutIcon } from '../../../icons'
-import { findItem, hitItem, legendEntries, movedItem, placeOf as placeOfItem, snapPoint, withShape, type ItemRef } from './mapItems'
+import { findItem, hitItem, legendEntries, movedItem, placeOf as placeOfItem, showsPoints, snapPoint, withShape, type ItemRef } from './mapItems'
 import type { MapDraft } from './mapModel'
 import type { JourneyView } from './mapDrawJourneys'
 import { drawMap } from './mapRender'
 import { resolveBiome, type BiomeIndex } from './mapBiomes'
-import { MIN_POINTS, insertPoint, movePoint, nearestOnShape, outVector, removePoint, setHandle, snapVertex, toggleSmooth, translateShape, type Pen } from './mapShapes'
+import { MIN_POINTS, insertPoint, movePoint, nearestOnShape, outVector, removePoint, setHandle, snapVertex, toggleSmooth, translateShape, type Pen, type Rect } from './mapShapes'
+import { boxFrom } from './mapTemplates'
 import { cellAt, fitView, measureText, panBy, pathLength, zoomAt, type MapView } from './mapView'
 import { moveStop, stopNear } from './mapJourneys'
 
-export type MapTool = 'select' | 'biome' | 'symbol' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
+export type MapTool = 'select' | 'biome' | 'shape' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
 type DrawTool = 'line' | 'region' | 'biome'
 const drawsShape = (tool: MapTool): tool is DrawTool => tool === 'line' || tool === 'region' || tool === 'biome'
 
@@ -23,11 +24,18 @@ export interface MapCanvasProps {
   showGrid: boolean
   // What new lines and regions are drawn with (and whether the points of a new biome area are curves).
   pen: Pen
-  // The chosen symbol, label or shape (the Select tool picks one, and moves it).
+  // The chosen label or shape (the Select tool picks one, and moves it).
   selected: ItemRef | null
   onSelect: (ref: ItemRef | null) => void
-  // Stamp a symbol or put a label at a point (in cells); false when there is no layer to put it on (hidden or locked).
-  onPlace: (kind: 'symbol' | 'label', x: number, y: number) => boolean
+  // Put a label at a point (in cells); false when there is no layer to put it on (hidden or locked).
+  onPlace: (kind: 'label', x: number, y: number) => boolean
+  // The Place a shape tool: a box was dragged (in cells; `square` while Shift is held), or (box null) a click at a point; false when nothing can be put there.
+  onPlaceShape?: (box: Rect | null, at: [number, number], square: boolean) => boolean
+  // What a box would place, drawn while it is dragged.
+  previewShape?: (box: Rect, square: boolean) => MapShape | null
+  // Picking a shape for something (combining the chosen shape with another): a click hands over what is under it (null: Esc, nothing picked).
+  picking?: boolean
+  onPick?: (ref: ItemRef | null) => void
   // A line, region or biome area was drawn (its points, in cells); false when there is no layer to put it on.
   onFinishShape: (type: DrawTool, points: Array<[number, number]>) => boolean
   // A drag of an item is shown as it goes (a draft with the item moved) and is handed over, before and after, when it ends: one undo step.
@@ -63,6 +71,7 @@ type Drag =
   | { kind: 'node'; id: string; i: number; before: MapDraft; current: MapDraft }
   | { kind: 'handle'; id: string; i: number; sign: 1 | -1; before: MapDraft; current: MapDraft }
   | { kind: 'stop'; journeyId: string; stopId: string; before: MapDraft; current: MapDraft }
+  | { kind: 'box'; from: [number, number] }
   | null
 
 const clampTo = (draft: Pick<MapDraft, 'width' | 'height'>, x: number, y: number): [number, number] => [Math.min(draft.width, Math.max(0, x)), Math.min(draft.height, Math.max(0, y))]
@@ -87,6 +96,10 @@ export default function MapCanvas(p: MapCanvasProps) {
   // The Measure tool's path, and where the pointer is on it.
   const [measure, setMeasure] = useState<Array<[number, number]>>([])
   const [measureCursor, setMeasureCursor] = useState<[number, number] | null>(null)
+  // The box the Place a shape tool is dragging (its corners in cells, and whether Shift is held).
+  const [placing, setPlacing] = useState<{ from: [number, number]; to: [number, number]; square: boolean } | null>(null)
+  const placingRef = useRef(placing)
+  placingRef.current = placing
   const drag = useRef<Drag>(null)
   const latest = useRef(p)
   latest.current = p
@@ -130,7 +143,7 @@ export default function MapCanvas(p: MapCanvasProps) {
   // Another thing chosen, another tool, or another map: the chosen point and the line that was being drawn are let go.
   const selectedId = p.selected?.kind === 'shape' ? p.selected.id : null
   useEffect(() => { setNode(null) }, [selectedId, draft.id])
-  useEffect(() => { setPending([]); setCursor(null); setMeasure([]); setMeasureCursor(null) }, [p.tool, draft.id])
+  useEffect(() => { setPending([]); setCursor(null); setMeasure([]); setMeasureCursor(null); setPlacing(null) }, [p.tool, draft.id])
 
   // What the Measure tool says: the length of the path and the pointer's piece on to it, and how long that takes.
   const measured = measure.length > 0 ? measureText(pathLength(measureCursor ? [...measure, measureCursor] : measure), draft.cellSize, draft.unit, draft.pace) : null
@@ -162,10 +175,11 @@ export default function MapCanvas(p: MapCanvasProps) {
           ? { type: pendingType, points: pendingRef.current.points, cursor: pendingRef.current.cursor, pen: d.pen, color: resolveBiome(d.biomes, d.biome).color }
           : null,
         legend: d.draft.legend ? legendEntries(d.draft, d.biomes, d.nations) : null, nations: d.nations,
+        preview: d.tool === 'shape' && placingRef.current && d.previewShape ? d.previewShape(boxFrom(placingRef.current.from, placingRef.current.to, placingRef.current.square), placingRef.current.square) : null,
       })
     })
   }, [])
-  useEffect(() => { draw() }, [draw, size, p.nations, view, draft, p.biomes, p.biome, p.showGrid, p.tool, p.selected, p.pen, p.journeys, hover, node, pending, cursor, measure, measureCursor])
+  useEffect(() => { draw() }, [draw, size, p.nations, view, draft, p.biomes, p.biome, p.showGrid, p.tool, p.selected, p.pen, p.journeys, hover, node, pending, cursor, measure, measureCursor, placing])
   useEffect(() => () => { if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0 } }, [])
 
   // The wheel zooms at the pointer (a listener of its own: React's wheel handler cannot stop the page scrolling).
@@ -202,6 +216,7 @@ export default function MapCanvas(p: MapCanvasProps) {
 
   // The point or handle of the chosen shape under a canvas point, if any.
   function grabbed(shape: MapShape, px: number, py: number): { kind: 'node'; i: number } | { kind: 'handle'; i: number; sign: 1 | -1 } | null {
+    if (!showsPoints(shape, view.zoom)) return null
     const closed = shape.type !== 'line'
     for (let i = 0; i < shape.points.length; i += 1) {
       const [sx, sy] = screenOf(shape.points[i].x, shape.points[i].y)
@@ -240,6 +255,16 @@ export default function MapCanvas(p: MapCanvasProps) {
     if (e.button !== 0) return
     const cell = cellAt(view, px, py, draft.width, draft.height)
     const [fx, fy] = placeOf(px, py)
+    // Picking a shape for something: a click hands over what is under it, and does nothing else.
+    if (p.picking) { p.onPick?.(hitItem(draft, fx, fy)); return }
+    if (p.tool === 'shape') {
+      if (!cell) return
+      const at = shapePoint(fx, fy, e.altKey)
+      drag.current = { kind: 'box', from: at }
+      setPlacing({ from: at, to: at, square: e.shiftKey })
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      return
+    }
     if (p.tool === 'select') {
       const shape = chosenShape()
       const grab = shape ? grabbed(shape, px, py) : null
@@ -299,9 +324,9 @@ export default function MapCanvas(p: MapCanvasProps) {
       if (!p.onAddStop?.(cell[0] + 0.5, cell[1] + 0.5)) p.onBlocked()
       return
     }
-    if (p.tool === 'symbol' || p.tool === 'label') {
+    if (p.tool === 'label') {
       const [sx, sy] = snapPoint(fx, fy, e.altKey)
-      if (!p.onPlace(p.tool, sx, sy)) p.onBlocked()
+      if (!p.onPlace('label', sx, sy)) p.onBlocked()
     }
   }
 
@@ -320,6 +345,11 @@ export default function MapCanvas(p: MapCanvasProps) {
       const [sx, sy] = snapPoint(fx - d.dx, fy - d.dy, e.altKey)
       d.current = movedItem(d.before, d.ref, sx, sy)
       p.onPreview(d.current)
+      return
+    }
+    if (d?.kind === 'box') {
+      const [fx, fy] = placeOf(px, py)
+      setPlacing({ from: d.from, to: shapePoint(fx, fy, e.altKey), square: e.shiftKey })
       return
     }
     if (d?.kind === 'stop') {
@@ -366,6 +396,17 @@ export default function MapCanvas(p: MapCanvasProps) {
     const d = drag.current
     drag.current = null
     e.currentTarget.releasePointerCapture?.(e.pointerId)
+    if (d?.kind === 'box') {
+      const b = placingRef.current
+      setPlacing(null)
+      if (!b || e.type === 'pointercancel') return
+      const r = boxFrom(b.from, b.to, b.square)
+      // A click (or a box too small to hold anything) places the shape at its own size, at the middle of the cell (Alt: where it is).
+      const small = r.x1 - r.x0 < 0.25 && r.y1 - r.y0 < 0.25
+      const [fx, fy] = placeOf(point(e).px, point(e).py)
+      if (!p.onPlaceShape?.(small ? null : r, snapPoint(fx, fy, e.altKey), b.square)) p.onBlocked()
+      return
+    }
     if (d && d.kind !== 'pan' && d.current !== d.before) p.onCommitMove(d.before, d.current)
   }
 
@@ -386,7 +427,7 @@ export default function MapCanvas(p: MapCanvasProps) {
     if (shape) {
       const grab = grabbed(shape, px, py)
       if (grab?.kind === 'node') { p.onChangeShape(toggleSmooth(shape, grab.i)); setNode(grab.i); return }
-      const near = nearestOnShape(shape, fx, fy)
+      const near = showsPoints(shape, view.zoom) ? nearestOnShape(shape, fx, fy) : null
       if (near && near.dist * view.zoom <= GRAB_PX + (shape.type === 'line' ? (shape.width * view.zoom) / 2 : 0)) {
         const more = insertPoint(shape, near.seg, near.t)
         if (more) { p.onChangeShape(more); setNode(near.seg + 1) }
@@ -399,6 +440,8 @@ export default function MapCanvas(p: MapCanvasProps) {
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>) {
+    if (p.picking && e.key === 'Escape') { p.onPick?.(null); return }
+    if (p.tool === 'shape' && e.key === 'Escape' && placing) { drag.current = null; setPlacing(null); return }
     if (p.tool === 'measure') {
       if (e.key === 'Escape') { setMeasure([]); setMeasureCursor(null) }
       else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setMeasure(list => list.slice(0, -1)) }
@@ -452,7 +495,7 @@ export default function MapCanvas(p: MapCanvasProps) {
     if (size) setView(v => zoomAt(v, factor, size.width / 2, size.height / 2))
   }
 
-  const cursorStyle = p.tool === 'hand' ? (drag.current?.kind === 'pan' ? 'grabbing' : 'grab') : p.tool === 'select' ? 'default' : 'crosshair'
+  const cursorStyle = p.picking ? 'copy' : p.tool === 'hand' ? (drag.current?.kind === 'pan' ? 'grabbing' : 'grab') : p.tool === 'select' ? 'default' : 'crosshair'
 
   return (
     <div className="mapBox" ref={box}>

@@ -7,13 +7,15 @@ import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, Ey
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
 import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
 import {
-  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, SYMBOL_SIZE_RANGE, addPlaces, editLabel, editPlace, editShape, editSymbol, findItem, moveShapeOrder, placeKey, type AreaLook,
-  placeOf, removeItem, replaceShape, type ItemRef,
+  HEIGHT_LIMIT, LABEL_SIZE_RANGE, MARKER_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, addPlaces, editLabel, editPlace, editShape, findItem, isMarker, moveShapeOrder, placeKey, type AreaLook,
+  placeOf, removeItem, replaceShape, resizeShape, shapeWidth, type ItemRef,
 } from './mapItems'
+import { ShapeTools, ShapesPanel, type ShapeSource } from './ShapesPanel'
+import type { CombineAction } from './mapCombine'
+import { markerName } from './mapShapeSeed'
 import { looksLikePlaceKey } from './placesStore'
 import type { ScenePlace } from './MapsConsole'
 import { LINE_PRESETS, LINE_STYLES, PATTERNS, REGION_PRESETS, SHAPE_WIDTH_RANGE, setAllSmooth, type Pen } from './mapShapes'
-import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { biomeCounts, offeredBiomes, ownBiomeId, resolveBiome, saveOwnBiomes, type BiomesView } from './mapBiomes'
 import { LEVELS, defaultsFor, heightRangeOf, levelDef, levelsBelow, nextLevelDown } from './mapLevels'
 import { heightUnit, roundNice, unitsOf, type ConvertMode } from './mapUnits'
@@ -70,11 +72,13 @@ export interface MapSideProps {
   // What a new biome area does to the height.
   areaLook: AreaLook
   onAreaLook: (patch: AreaLook) => void
-  // The symbol that the Symbol tool stamps, and how wide a new one is.
-  symbolKind: string
-  onSymbolKind: (id: string) => void
-  symbolSize: number
-  onSymbolSize: (size: number) => void
+  // What the Place a shape tool places (a template or a library shape), and choosing one (it picks the tool).
+  shapeSource: ShapeSource | null
+  onShapeSource: (source: ShapeSource) => void
+  // Combining the chosen shape with another that is picked on the map (null = not combining), and the open project's title (for My shapes).
+  combining: CombineAction | null
+  onCombine: (action: CombineAction | null) => void
+  projectTitle: string
   // What new lines and regions are drawn with (the pen of the line tool or the region tool, whichever is in use), a change to it, and a preset (it picks the tool).
   pen: Pen
   penType: MapShapeType
@@ -89,16 +93,17 @@ export interface MapSideProps {
   onSetLocation?: (sceneId: string, location: string) => void
 }
 
-// The right-hand side of the Maps console: what is chosen on the map, the biomes to draw with, the symbols to stamp, the layers, and the map's own fields.
+// The right-hand side of the Maps console: what is chosen on the map, the biomes to draw with, the shapes to place, the layers, and the map's own fields.
 export function MapSide(p: MapSideProps) {
-  const { projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, symbolKind, onSymbolKind, symbolSize, onSymbolSize } = p
+  const { projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, outline, onOpenScene, m, draft } = p
   const { pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation } = p
+  const tools = { projectId, projectTitle: p.projectTitle, combining: p.combining, onCombine: p.onCombine }
   return (
     <aside className="mapSide" aria-label="Map details">
-      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} biomes={p.biomes} />}
+      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} biomes={p.biomes} tools={tools} />}
       <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
       <BiomesPanel projectId={projectId} m={m} draft={draft} biomes={p.biomes} biome={p.biome} onBiome={p.onBiome} smooth={p.biomeSmooth} onSmooth={p.onBiomeSmooth} look={p.areaLook} onLook={p.onAreaLook} />
-      <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
+      <ShapesPanel draft={draft} source={p.shapeSource} onSource={p.onShapeSource} />
       <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
       <LayerPanel m={m} draft={draft} />
       <JourneysPanel m={m} draft={draft} points={points} cast={cast} state={journey} onState={onJourney} onTool={onJourneyTool} />
@@ -364,43 +369,18 @@ function ExportPanel({ draft, biomes }: { draft: MapDraft; biomes: BiomesView })
   )
 }
 
-// The symbols: four sets, and the one the Symbol tool stamps.
-function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id: string) => void; size: number; onSize: (size: number) => void }) {
-  const [setId, setSetId] = useState(() => SYMBOL_SETS.find(s => s.symbols.some(y => y.id === kind))?.id ?? SYMBOL_SETS[0].id)
-  const set = SYMBOL_SETS.find(s => s.id === setId) ?? SYMBOL_SETS[0]
-  return (
-    <section className="mapPanel" aria-label="Symbols">
-      <header className="mapPanelHead"><h3 className="mapPanelTitle">Symbols</h3></header>
-      <div className="mapSizes" role="group" aria-label="Sets of symbols">
-        {SYMBOL_SETS.map(s => <button key={s.id} type="button" className="mapChip" aria-pressed={s.id === set.id} onClick={() => setSetId(s.id)}>{s.name}</button>)}
-      </div>
-      <ul className="mapSymbols">
-        {set.symbols.map(def => (
-          <li key={def.id}>
-            <button
-              type="button" className={`mapSymbolBtn${def.id === kind ? ' mapSymbolBtn--on' : ''}`} aria-pressed={def.id === kind} aria-label={`Stamp ${def.name}`} title={`Stamp ${def.name}`}
-              onClick={() => onKind(def.id)}
-            ><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d={def.path} fill="currentColor" fillRule="evenodd" /></svg></button>
-          </li>
-        ))}
-      </ul>
-      <div className="mapRow">
-        <Field label="New symbols are" short><CommitNumber label="Width of a new symbol in cells" value={size} min={SYMBOL_SIZE_RANGE.min} max={SYMBOL_SIZE_RANGE.max} step={0.25} onCommit={onSize} /></Field>
-        <span className="mapHint">cells wide. Alt while placing: no snapping.</span>
-      </div>
-    </section>
-  )
-}
+type ToolProps = { projectId: string; projectTitle: string; combining: CombineAction | null; onCombine: (action: CombineAction | null) => void }
 
-// What is chosen on the map: a biome area (its biome and height), a symbol (its width and colour), a label (its text and height) or a line or region (how it
-// is drawn), and a delete. An area or a symbol can be named, which makes it a place.
-function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, selected, fresh, onDeleted, scenes, biomes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[]; biomes: BiomesView }) {
+// What is chosen on the map: a biome area (its biome and height), a marker (its width and colour), a label (its text and height) or a line or region (how it
+// is drawn), with its rough edge, combining it with another and saving it to My shapes, and a delete. An area or a marker can be named, which makes it a place.
+function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, selected, fresh, onDeleted, scenes, biomes, tools }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[]; biomes: BiomesView; tools: ToolProps }) {
   const item = findItem(draft, selected)
   if (!item) return null
   const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
   const place = <PlaceFields projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} item={selected} scenes={scenes} />
   if (selected.kind === 'shape') {
     const sh = draft.shapes.find(y => y.id === selected.id)!
+    const shapeTools = <ShapeTools draft={draft} shape={sh} {...tools} onRough={rough => m.apply(editShape(draft, sh.id, { rough }))} />
     const order = (
       <div className="mapSizes" role="group" aria-label="Order">
         <button type="button" className="mapChip" onClick={() => m.apply(moveShapeOrder(draft, sh.id, 'front'))}>Bring to front</button>
@@ -450,8 +430,36 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
           </div>
           {order}
           {curves}
+          {shapeTools}
           {place}
           <p className="mapHint">Higher land is drawn lighter, lower land darker. Drag the area, a point (square) or a handle (circle); double-click the outline to put a point in.</p>
+        </section>
+      )
+    }
+    if (isMarker(sh)) {
+      const title = sh.kind ? markerName(sh.kind) : 'Marker'
+      return (
+        <section className="mapPanel" aria-label="Chosen marker">
+          <header className="mapPanelHead">
+            <h3 className="mapPanelTitle">{sh.name || title}</h3>
+            <button type="button" className="mapIconBtn" aria-label={`Delete ${sh.name || title}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
+          </header>
+          <div className="mapRow">
+            <Field label="Cells wide" short><CommitNumber label="Width of the marker in cells" value={shapeWidth(sh)} min={MARKER_SIZE_RANGE.min} max={MARKER_SIZE_RANGE.max} step={0.25} onCommit={w => m.apply(resizeShape(draft, sh.id, w))} /></Field>
+            <Field label="Colour" short>
+              <span className="mapRow">
+                <ColourInput label="Colour of the marker" value={sh.fill ?? sh.color ?? '#22262c'} onCommit={fill => m.apply(editShape(draft, sh.id, { fill }))} />
+                <button
+                  type="button" className="mapIconBtn" aria-label="Use the ink colour" title="Use the ink colour" disabled={sh.fill === null && sh.color === null}
+                  onClick={() => m.apply(editShape(draft, sh.id, { fill: null, color: null }))}
+                ><RestoreIcon size={16} /></button>
+              </span>
+            </Field>
+          </div>
+          {order}
+          {shapeTools}
+          {place}
+          <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
         </section>
       )
     }
@@ -466,33 +474,9 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene
         {sh.type === 'region' && <PoliticalField value={sh.political ?? null} onChange={political => m.apply(editShape(draft, sh.id, { political }))} />}
         {order}
         {curves}
+        {shapeTools}
         {sh.type === 'region' && place}
         <p className="mapHint">Drag the shape, a point (square) or a handle (circle). Double-click a point to curve or straighten it, the line to put a point in. With a point chosen, Delete takes it away.</p>
-      </section>
-    )
-  }
-  if (selected.kind === 'symbol') {
-    const s = draft.symbols.find(y => y.id === selected.id)!
-    return (
-      <section className="mapPanel" aria-label="Chosen symbol">
-        <header className="mapPanelHead">
-          <h3 className="mapPanelTitle">{symbolName(s.kind)}</h3>
-          <button type="button" className="mapIconBtn" aria-label={`Delete ${symbolName(s.kind)}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
-        </header>
-        <div className="mapRow">
-          <Field label="Cells wide" short><CommitNumber label="Width of the symbol in cells" value={s.size} min={SYMBOL_SIZE_RANGE.min} max={SYMBOL_SIZE_RANGE.max} step={0.25} onCommit={size => m.apply(editSymbol(draft, s.id, { size }))} /></Field>
-          <Field label="Colour" short>
-            <span className="mapRow">
-              <ColourInput label="Colour of the symbol" value={s.color ?? '#22262c'} onCommit={color => m.apply(editSymbol(draft, s.id, { color }))} />
-              <button
-                type="button" className="mapIconBtn" aria-label="Use the ink colour" title="Use the ink colour" disabled={s.color === null}
-                onClick={() => m.apply(editSymbol(draft, s.id, { color: null }))}
-              ><RestoreIcon size={16} /></button>
-            </span>
-          </Field>
-        </div>
-        {place}
-        <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
       </section>
     )
   }

@@ -1,4 +1,5 @@
 import type { MapLineStyle, MapPattern, MapPolitical, MapShape, MapShapePoint, MapShapeType } from '../../../../api/types'
+import { allRings, distanceToEdge, insideShape, newSeed, ringsOf } from './mapOutline'
 
 // Lines and regions on a map, as geometry: pure functions on a shape. A shape is a list of points in cells; a line is open and a region is closed (its last
 // point joins its first). A point is a corner, or smooth: the curve passes through it with a handle, a cubic Bezier between each pair of points whose
@@ -14,6 +15,7 @@ export const MAX_POINTS = 500
 export const SHAPE_WIDTH_RANGE = { min: 0.05, max: 4 } as const
 export const LINE_STYLES: Array<{ id: MapLineStyle; name: string }> = [
   { id: 'solid', name: 'Solid' }, { id: 'dashed', name: 'Dashed' }, { id: 'dotted', name: 'Dotted' }, { id: 'road', name: 'Double road' }, { id: 'wall', name: 'Wall' }, { id: 'fence', name: 'Fence' },
+  { id: 'halo', name: 'Halo (a marker)' },
 ]
 export const PATTERNS: Array<{ id: MapPattern; name: string }> = [
   { id: 'solid', name: 'Solid' }, { id: 'hatch', name: 'Hatched' }, { id: 'cross', name: 'Cross-hatched' }, { id: 'dots', name: 'Dotted' },
@@ -126,20 +128,25 @@ export function nearestOnShape(shape: Pick<MapShape, 'type' | 'points'>, x: numb
   return best
 }
 
-export function shapeBounds(shape: Pick<MapShape, 'type' | 'points' | 'width'>): Rect {
-  const s = flatten(shape)
+// The box round a shape as it is drawn (its rough edge and its other rings too), and half its line's width.
+export function shapeBounds(shape: Pick<MapShape, 'type' | 'points' | 'width'> & Partial<Pick<MapShape, 'holes' | 'rough' | 'seed'>>): Rect {
+  const rings = 'id' in shape ? allRings(shape as MapShape) : [flatten(shape)]
   const half = shape.width / 2
-  const xs = s.map(p => p.x), ys = s.map(p => p.y)
-  return { x0: Math.min(...xs) - half, y0: Math.min(...ys) - half, x1: Math.max(...xs) + half, y1: Math.max(...ys) + half }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const ring of rings) for (const p of ring) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
+  if (x0 === Infinity) return { x0: 0, y0: 0, x1: 0, y1: 0 }
+  return { x0: x0 - half, y0: y0 - half, x1: x1 + half, y1: y1 + half }
 }
 
-// Whether a point is on a shape: near its line (within half its width and `slack`), or, for a region, inside it.
+// Whether a point is on a shape: near its line (within half its width and `slack`), or, for a closed shape, inside it (not in a hole).
 export function hitShape(shape: MapShape, x: number, y: number, slack = 0.3): boolean {
   if (shape.points.length < MIN_POINTS[shape.type]) return false
-  if (isClosed(shape) && pointInPolygon(flatten(shape), x, y)) return true
-  const near = nearestOnShape(shape, x, y)
-  return near !== null && near.dist <= shape.width / 2 + slack
+  if (isClosed(shape) && insideShape(shape, x, y)) return true
+  return distanceToEdge(shape, x, y) <= shape.width / 2 + slack
 }
+
+// The drawn outline of a shape as one polyline (the rough edge, without the other rings).
+export const drawnOutline = (shape: MapShape) => ringsOf(shape).outer
 
 // The nearest corner or cell centre of the grid to a point (the snap for the points of a shape).
 export function snapVertex(x: number, y: number): [number, number] {
@@ -189,10 +196,15 @@ export function removePoint(shape: MapShape, i: number): MapShape | null {
 }
 
 export function translateShape(shape: MapShape, dx: number, dy: number, width: number, height: number): MapShape {
-  // Held as a whole: it stops at the edge of the map instead of squashing against it.
-  const b = shapeBounds({ ...shape, width: 0 })
+  // Held as a whole: it stops at the edge of the map instead of squashing against it (its points and other rings, not its rough edge).
+  const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity }
+  for (const ring of [shape.points, ...(shape.holes ?? [])]) {
+    const r = shapeBounds({ type: ring === shape.points ? shape.type : 'region', points: ring, width: 0 })
+    b.x0 = Math.min(b.x0, r.x0); b.y0 = Math.min(b.y0, r.y0); b.x1 = Math.max(b.x1, r.x1); b.y1 = Math.max(b.y1, r.y1)
+  }
   const mx = Math.min(width - b.x1, Math.max(-b.x0, dx)), my = Math.min(height - b.y1, Math.max(-b.y0, dy))
-  return withPoints(shape, shape.points.map(p => ({ ...p, x: p.x + mx, y: p.y + my })))
+  const move = (p: MapShapePoint) => ({ ...p, x: p.x + mx, y: p.y + my })
+  return { ...withPoints(shape, shape.points.map(move)), ...(shape.holes ? { holes: shape.holes.map(h => h.map(move)) } : {}) }
 }
 
 // ---- what a new shape is drawn with ----
@@ -208,6 +220,8 @@ export interface Pen {
   pattern: MapPattern
   // A region drawn as a political area (a nation, a state or province, a municipality): its border and name over the land.
   political?: MapPolitical | null
+  // How rough the edge of a new region is (0-100).
+  rough?: number
 }
 
 const linePen = (style: MapLineStyle, color: string | null, width: number, smooth: boolean): Pen => ({ style, color, width, smooth, fill: null, opacity: 0.35, pattern: 'solid' })
@@ -242,6 +256,7 @@ export function makeShape(id: string, layerId: string, type: MapShapeType, point
     id, layerId, type, style: pen.style, color: pen.color, width: pen.width, fill: type === 'region' ? pen.fill : null, opacity: pen.opacity, pattern: type === 'region' ? pen.pattern : 'solid',
     points: points.map(([x, y]) => ({ x, y, smooth: pen.smooth, hx: null, hy: null })),
     ...(type === 'region' && pen.political ? { political: pen.political } : {}),
+    ...(pen.rough && pen.rough > 0 ? { rough: Math.round(pen.rough), seed: newSeed() } : {}),
   }
 }
 

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { MapDoc, MapShape } from '../../../../api/types'
-import { SYMBOL_SETS, UNKNOWN_SYMBOL_PATH, symbolDef, symbolName, symbolPath } from './mapSymbols'
+import { SYMBOL_SETS } from './mapMarkerArt'
+import { markerName, starterShapes } from './mapShapeSeed'
 import { LAND_STYLE, SPACE_STYLE, hexToRgb, mapStyle } from './mapThemes'
 import { STARTER_BIOMES, biomeIndex } from './mapBiomes'
 import { makeBiomeShape } from './mapShapes'
 import {
-  MAX_LABELS, MAX_SYMBOLS, activeLayerId, addLabel, addSymbol, editLabel, editSymbol, findItem, hitItem, itemBounds, labelExtent, legendEntries, movedItem,
-  niceScale, removeItem, snapPoint,
+  MAX_LABELS, MAX_MARKERS, activeLayerId, addLabel, addLibraryShape, editLabel, editShape, findItem, hitItem, itemBounds, labelExtent, legendEntries, movedItem,
+  niceScale, removeItem, resizeShape, shapeWidth, snapPoint,
 } from './mapItems'
 import { MapHistory, draftOf, metaEdit, removeLayer, toggleLayer, type MapDraft } from './mapModel'
 
@@ -22,9 +23,13 @@ const doc = (): MapDoc => ({
 })
 const draft = (): MapDraft => draftOf(doc())
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }
+// A marker of the starter library placed in a square `size` cells wide, centred on (x, y).
+const MARKERS = new Map(starterShapes().filter(s => s.category === 'marker').map(s => [s.id.slice('marker:'.length), s]))
+const addMarker = (d: MapDraft, kind: string, x: number, y: number, size: number, makeId?: () => string) =>
+  addLibraryShape(d, MARKERS.get(kind)!, { x0: x - size / 2, y0: y - size / 2, x1: x + size / 2, y1: y + size / 2 }, 'metric', makeId)
 
-describe('the symbol library', () => {
-  it('has the four sets, each with a handful of symbols', () => {
+describe('the marker art (the old symbols)', () => {
+  it('has the four sets, each with a handful of silhouettes', () => {
     expect(SYMBOL_SETS.map(s => s.id)).toEqual(['settlements', 'nature', 'interior', 'landmarks'])
     for (const set of SYMBOL_SETS) expect(set.symbols.length).toBeGreaterThanOrEqual(8)
   })
@@ -50,12 +55,11 @@ describe('the symbol library', () => {
     }
   })
 
-  it('looks a symbol up, and draws a diamond for a kind it does not have', () => {
-    expect(symbolDef('castle')?.name).toBe('Castle')
-    expect(symbolName('castle')).toBe('Castle')
-    expect(symbolDef('nope')).toBeUndefined()
-    expect(symbolPath('nope')).toBe(UNKNOWN_SYMBOL_PATH)
-    expect(symbolName('nope')).toBe('Symbol')
+  it('names a marker from its kind, and plainly one a writer made', () => {
+    expect(markerName('marker:castle')).toBe('Castle')
+    expect(markerName('marker:interest')).toBe('Point of interest')
+    expect(markerName('marker:old_mill')).toBe('Old mill')
+    expect(markerName('my_ab12')).toBe('Marker')
   })
 })
 
@@ -83,43 +87,46 @@ describe('the map styles', () => {
   })
 })
 
-describe('placing symbols and labels', () => {
+describe('placing markers and labels', () => {
   it('snaps to the middle of a cell, or stays where it is', () => {
     expect(snapPoint(3.2, 4.9, false)).toEqual([3.5, 4.5])
     expect(snapPoint(3.2, 4.9, true)).toEqual([3.2, 4.9])
     expect(snapPoint(0, 0, false)).toEqual([0.5, 0.5])
   })
 
-  it('puts a symbol on the topmost shown, unlocked symbols layer, and holds it to the map', () => {
+  it('puts a marker on the topmost shown, unlocked markers layer, in its square, and holds it to the map', () => {
     const d = draft()
-    const r = addSymbol(d, 'castle', 3.5, 2.5, 2, ids('a'))!
-    expect(r.change.draft.symbols).toEqual([{ id: 'sym_a', layerId: 'symbols', kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null, name: '', mapIds: [] }])
-    const far = addSymbol(d, 'tree', 99, -4, 99, ids('b'))!.change.draft.symbols[0]
-    expect([far.x, far.y, far.size]).toEqual([20, 0, 16])
+    const r = addMarker(d, 'castle', 3.5, 2.5, 2, ids('a'))!
+    const [m] = r.change.draft.shapes
+    expect(m).toMatchObject({ id: 'mrk_a', layerId: 'symbols', type: 'region', style: 'halo', kind: 'marker:castle', fill: null })
+    expect(m.points.every(p => p.x >= 2.5 && p.x <= 4.5 && p.y >= 1.5 && p.y <= 3.5)).toBe(true)
+    const far = addMarker(d, 'tree', 19.5, 9.5, 4, ids('b'))!.change.draft.shapes[0]
+    expect(far.points.every(p => p.x <= 20 && p.y <= 10)).toBe(true)
   })
 
   it('does not place on a hidden or locked layer, or past the most', () => {
     const d = draft()
-    expect(addSymbol(toggleLayer(d, 'symbols', 'locked')!.draft, 'castle', 1, 1, 2)).toBeNull()
-    expect(addSymbol(toggleLayer(d, 'symbols', 'visible')!.draft, 'castle', 1, 1, 2)).toBeNull()
+    expect(addMarker(toggleLayer(d, 'symbols', 'locked')!.draft, 'castle', 1, 1, 2)).toBeNull()
+    expect(addMarker(toggleLayer(d, 'symbols', 'visible')!.draft, 'castle', 1, 1, 2)).toBeNull()
     expect(addLabel(toggleLayer(d, 'labels', 'locked')!.draft, 'x', 1, 1, 1)).toBeNull()
-    const full: MapDraft = { ...d, symbols: Array.from({ length: MAX_SYMBOLS }, (_, i) => ({ id: `s${i}`, layerId: 'symbols', kind: 'tree', x: 1, y: 1, size: 1, color: null, name: '', mapIds: [] })) }
-    expect(addSymbol(full, 'tree', 1, 1, 1)).toBeNull()
+    const one = addMarker(d, 'tree', 1, 1, 1)!.change.draft.shapes[0]
+    const full: MapDraft = { ...d, shapes: Array.from({ length: MAX_MARKERS }, (_, i) => ({ ...one, id: `m${i}` })) }
+    expect(addMarker(full, 'tree', 1, 1, 1)).toBeNull()
     const lots: MapDraft = { ...d, labels: Array.from({ length: MAX_LABELS }, (_, i) => ({ id: `l${i}`, layerId: 'labels', text: 'x', x: 1, y: 1, size: 1 })) }
     expect(addLabel(lots, 'x', 1, 1, 1)).toBeNull()
   })
 
   it('picks the topmost of two layers of one kind', () => {
     const d = draft()
-    d.layers = [...d.layers, { id: 'symbols2', name: 'Symbols 2', kind: 'symbols', visible: true, locked: false }]
+    d.layers = [...d.layers, { id: 'symbols2', name: 'Markers 2', kind: 'symbols', visible: true, locked: false }]
     expect(activeLayerId(d, 'symbols')).toBe('symbols2')
     d.layers = d.layers.map(l => (l.id === 'symbols2' ? { ...l, locked: true } : l))
     expect(activeLayerId(d, 'symbols')).toBe('symbols')
   })
 
   it('does not reuse an id', () => {
-    const d = addSymbol(draft(), 'tree', 1, 1, 1, ids('a'))!.change.draft
-    expect(addSymbol(d, 'tree', 2, 2, 1, ids('a', 'b'))!.id).toBe('sym_b')
+    const d = addMarker(draft(), 'tree', 1, 1, 1, ids('a'))!.change.draft
+    expect(addMarker(d, 'tree', 2, 2, 1, ids('a', 'b'))!.id).toBe('mrk_b')
   })
 
   it('makes a label with its text trimmed, and "Label" when it is blank', () => {
@@ -132,21 +139,21 @@ describe('placing symbols and labels', () => {
 
 describe('editing, moving and removing', () => {
   const withItems = (): MapDraft => {
-    let d = addSymbol(draft(), 'castle', 5.5, 5.5, 2, ids('s'))!.change.draft
+    let d = addMarker(draft(), 'castle', 5.5, 5.5, 2, ids('s'))!.change.draft
     d = addLabel(d, 'Keep', 8, 3, 1, ids('l'))!.change.draft
     return d
   }
 
-  it('changes a symbol\'s size, colour and kind, and holds the size to its range', () => {
+  it('makes a marker another width about its middle, held to its range, and gives it a colour of its own', () => {
     const d = withItems()
-    expect(editSymbol(d, 'sym_s', { size: 4 })!.draft.symbols[0].size).toBe(4)
-    expect(editSymbol(d, 'sym_s', { size: 999 })!.draft.symbols[0].size).toBe(16)
-    expect(editSymbol(d, 'sym_s', { size: 0 })!.draft.symbols[0].size).toBe(0.25)
-    expect(editSymbol(d, 'sym_s', { color: '#aa0000' })!.draft.symbols[0].color).toBe('#aa0000')
-    expect(editSymbol(d, 'sym_s', { kind: 'tree' })!.draft.symbols[0].kind).toBe('tree')
-    expect(editSymbol(d, 'sym_s', { size: 2 })).toBeNull()
-    expect(editSymbol(d, 'sym_s', { size: NaN })).toBeNull()
-    expect(editSymbol(d, 'nope', { size: 3 })).toBeNull()
+    const w = shapeWidth(d.shapes[0])
+    expect(shapeWidth(resizeShape(d, 'mrk_s', 4)!.draft.shapes[0])).toBeCloseTo(4, 2)
+    expect(shapeWidth(resizeShape(d, 'mrk_s', 999)!.draft.shapes[0])).toBeLessThanOrEqual(16) // and held to the map
+    expect(shapeWidth(resizeShape(d, 'mrk_s', 0)!.draft.shapes[0])).toBeCloseTo(0.25, 2)
+    expect(resizeShape(d, 'mrk_s', w)).toBeNull()
+    expect(resizeShape(d, 'mrk_s', NaN)).toBeNull()
+    expect(resizeShape(d, 'nope', 3)).toBeNull()
+    expect(editShape(d, 'mrk_s', { fill: '#aa0000' })!.draft.shapes[0].fill).toBe('#aa0000')
   })
 
   it('changes a label\'s text and size, and never makes its text blank', () => {
@@ -160,48 +167,47 @@ describe('editing, moving and removing', () => {
 
   it('removes an item, and finds it by its reference', () => {
     const d = withItems()
-    expect(findItem(d, { kind: 'symbol', id: 'sym_s' })?.id).toBe('sym_s')
-    expect(findItem(d, { kind: 'label', id: 'sym_s' })).toBeUndefined()
-    expect(removeItem(d, { kind: 'symbol', id: 'sym_s' })!.draft.symbols).toEqual([])
+    expect(findItem(d, { kind: 'shape', id: 'mrk_s' })?.id).toBe('mrk_s')
+    expect(findItem(d, { kind: 'label', id: 'mrk_s' })).toBeUndefined()
+    expect(removeItem(d, { kind: 'shape', id: 'mrk_s' })!.draft.shapes).toEqual([])
     expect(removeItem(d, { kind: 'label', id: 'lbl_l' })!.draft.labels).toEqual([])
     expect(removeItem(d, { kind: 'label', id: 'nope' })).toBeNull()
   })
 
-  it('moves an item, held to the map, and the move is one undo step', () => {
+  it('moves a label, held to the map, and the move is one undo step', () => {
     const d = withItems()
-    const moved = movedItem(movedItem(d, { kind: 'symbol', id: 'sym_s' }, 7.5, 2.5), { kind: 'symbol', id: 'sym_s' }, 99, 99)
-    expect([moved.symbols[0].x, moved.symbols[0].y]).toEqual([20, 10])
-    expect([d.symbols[0].x, d.symbols[0].y]).toEqual([5.5, 5.5])
+    const moved = movedItem(movedItem(d, { kind: 'label', id: 'lbl_l' }, 7.5, 2.5), { kind: 'label', id: 'lbl_l' }, 99, 99)
+    expect([moved.labels[0].x, moved.labels[0].y]).toEqual([20, 10])
+    expect([d.labels[0].x, d.labels[0].y]).toEqual([8, 3])
     const h = new MapHistory()
     h.push(metaEdit(d, moved))
     const back = h.undo(moved)!
-    expect([back.symbols[0].x, back.symbols[0].y]).toEqual([5.5, 5.5])
-    expect(h.redo(back)!.symbols[0].x).toBe(20)
+    expect([back.labels[0].x, back.labels[0].y]).toEqual([8, 3])
+    expect(h.redo(back)!.labels[0].x).toBe(20)
   })
 
   it('takes an item\'s undo with it, a removed layer\'s items included', () => {
     const d = withItems()
     const r = removeLayer(d, 'symbols')!
-    expect(r.draft.symbols).toEqual([])
+    expect(r.draft.shapes).toEqual([])
     expect(r.draft.labels).toHaveLength(1)
     const h = new MapHistory()
     h.push(r.edit)
-    expect(h.undo(r.draft)!.symbols).toHaveLength(1)
+    expect(h.undo(r.draft)!.shapes).toHaveLength(1)
   })
 })
 
 describe('picking an item with the pointer', () => {
-  it('hits a symbol inside its square, with a little room, and nothing elsewhere', () => {
-    const d = addSymbol(draft(), 'castle', 5.5, 5.5, 2, ids('s'))!.change.draft
-    expect(hitItem(d, 5.5, 5.5)).toEqual({ kind: 'symbol', id: 'sym_s' })
-    expect(hitItem(d, 6.4, 4.7)).toEqual({ kind: 'symbol', id: 'sym_s' })
-    expect(hitItem(d, 6.7, 5.5)).toEqual({ kind: 'symbol', id: 'sym_s' }) // the slack
+  it('hits a marker inside its outline, with a little room, and nothing elsewhere', () => {
+    const d = addMarker(draft(), 'castle', 5.5, 5.5, 2, ids('s'))!.change.draft
+    expect(hitItem(d, 5.5, 5.5)).toEqual({ kind: 'shape', id: 'mrk_s' })
+    expect(hitItem(d, 6.6, 5.5)).toEqual({ kind: 'shape', id: 'mrk_s' }) // the room round it
     expect(hitItem(d, 7.5, 5.5)).toBeNull()
   })
 
-  it('gives a tiny symbol room to be hit', () => {
-    const d = addSymbol(draft(), 'tree', 5.5, 5.5, 0.25, ids('s'))!.change.draft
-    expect(hitItem(d, 5.9, 5.5)?.id).toBe('sym_s')
+  it('gives a tiny marker room to be hit', () => {
+    const d = addMarker(draft(), 'tree', 5.5, 5.5, 0.25, ids('s'))!.change.draft
+    expect(hitItem(d, 5.9, 5.5)?.id).toBe('mrk_s')
   })
 
   it('hits a label inside the box its text takes', () => {
@@ -212,22 +218,24 @@ describe('picking an item with the pointer', () => {
   })
 
   it('takes the later item of a layer, and the item on the higher layer', () => {
-    let d = addSymbol(draft(), 'tree', 5.5, 5.5, 2, ids('a'))!.change.draft
-    d = addSymbol(d, 'pine', 5.5, 5.5, 2, ids('b'))!.change.draft
-    expect(hitItem(d, 5.5, 5.5)?.id).toBe('sym_b')
+    let d = addMarker(draft(), 'tree', 5.5, 5.5, 2, ids('a'))!.change.draft
+    d = addMarker(d, 'pine', 5.5, 5.5, 2, ids('b'))!.change.draft
+    expect(hitItem(d, 5.5, 5.5)?.id).toBe('mrk_b')
     d = addLabel(d, 'on top', 5.5, 5.5, 1, ids('l'))!.change.draft
-    expect(hitItem(d, 5.5, 5.5)).toEqual({ kind: 'label', id: 'lbl_l' }) // the labels layer is above the symbols layer
+    expect(hitItem(d, 5.5, 5.5)).toEqual({ kind: 'label', id: 'lbl_l' }) // the labels layer is above the markers layer
   })
 
   it('cannot pick from a hidden or locked layer', () => {
-    const d = addSymbol(draft(), 'tree', 5.5, 5.5, 2, ids('a'))!.change.draft
+    const d = addMarker(draft(), 'tree', 5.5, 5.5, 2, ids('a'))!.change.draft
     expect(hitItem(toggleLayer(d, 'symbols', 'locked')!.draft, 5.5, 5.5)).toBeNull()
     expect(hitItem(toggleLayer(d, 'symbols', 'visible')!.draft, 5.5, 5.5)).toBeNull()
   })
 
   it('knows the bounds of what it draws', () => {
-    const d = addSymbol(draft(), 'tree', 5, 5, 4, ids('a'))!.change.draft
-    expect(itemBounds(d.symbols[0], 'symbol')).toEqual({ x0: 3, y0: 3, x1: 7, y1: 7 })
+    const d = addMarker(draft(), 'tree', 5, 5, 4, ids('a'))!.change.draft
+    const b0 = itemBounds(d.shapes[0], 'shape')
+    expect(b0.x0).toBeGreaterThanOrEqual(3 - 0.03)
+    expect(b0.x1).toBeLessThanOrEqual(7 + 0.03)
     const l = addLabel(draft(), 'Hi', 5, 5, 2, ids('l'))!.change.draft.labels[0]
     const b = itemBounds(l, 'label')
     expect([(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]).toEqual([5, 5])
@@ -240,18 +248,18 @@ describe('the legend', () => {
 
   it('lists the biomes that are used, in the list order, and the kinds of symbol on the map, once each', () => {
     let d: MapDraft = { ...draft(), shapes: [makeBiomeShape('f', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false), makeBiomeShape('g', 'terrain', [[1, 1], [3, 1], [2, 3]], 'forest', false), makeBiomeShape('h', 'terrain', [[1, 1], [3, 1], [2, 3]], 'desert', false)] }
-    d = addSymbol(d, 'castle', 2, 2, 2, ids('a'))!.change.draft
-    d = addSymbol(d, 'castle', 4, 2, 2, ids('b'))!.change.draft
-    d = addSymbol(d, 'tree', 6, 2, 2, ids('c'))!.change.draft
-    d = addSymbol(d, 'mystery', 8, 2, 2, ids('d'))!.change.draft
-    expect(noScale(d)).toEqual([
-      { type: 'terrain', name: 'Saltwater', color: '#2f62b0' }, { type: 'terrain', name: 'Desert', color: '#d2b48c' }, { type: 'terrain', name: 'Forest', color: '#3f8f3a' },
-      { type: 'symbol', kind: 'castle', name: 'Castle' }, { type: 'symbol', kind: 'tree', name: 'Tree' }, { type: 'symbol', kind: 'mystery', name: 'Symbol' },
+    d = addMarker(d, 'castle', 2, 2, 2, ids('a'))!.change.draft
+    d = addMarker(d, 'castle', 4, 2, 2, ids('b'))!.change.draft
+    d = addMarker(d, 'tree', 6, 2, 2, ids('c'))!.change.draft
+    d = { ...d, shapes: [...d.shapes, { ...d.shapes[d.shapes.length - 1], id: 'own', kind: 'my_x1' }] }
+    expect(noScale(d).map(e => (e.type === 'marker' ? [e.type, e.kind, e.name] : [e.type, e.name]))).toEqual([
+      ['terrain', 'Saltwater'], ['terrain', 'Desert'], ['terrain', 'Forest'],
+      ['marker', 'marker:castle', 'Castle'], ['marker', 'marker:tree', 'Tree'], ['marker', 'my_x1', 'Marker'],
     ])
   })
 
-  it('leaves out the symbols of a hidden layer', () => {
-    const d = toggleLayer(addSymbol(draft(), 'castle', 2, 2, 2, ids('a'))!.change.draft, 'symbols', 'visible')!.draft
+  it('leaves out the markers of a hidden layer', () => {
+    const d = toggleLayer(addMarker(draft(), 'castle', 2, 2, 2, ids('a'))!.change.draft, 'symbols', 'visible')!.draft
     expect(noScale(d)).toEqual([{ type: 'terrain', name: 'Saltwater', color: '#2f62b0' }])
   })
 

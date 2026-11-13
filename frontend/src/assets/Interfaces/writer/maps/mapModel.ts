@@ -22,7 +22,7 @@ export const inside = (draft: Pick<MapDraft, 'width' | 'height'>, x: number, y: 
 
 // ---- the undo log ----
 
-// A change to the map's fields (its shapes, symbols, labels and layers are fields too): the fields before and after.
+// A change to the map's fields (its shapes, labels and layers are fields too): the fields before and after.
 export type MapEdit = { kind: 'meta'; before: MapMeta; after: MapMeta }
 
 // One map's undo and redo. A drag is one entry; so is a change of a field. A new change takes the redo away.
@@ -142,7 +142,7 @@ const randomId: MakeId = () => Math.random().toString(36).slice(2, 8)
 
 // ---- layers ----
 
-export const LAYER_NAMES: Record<MapLayerKind, string> = { terrain: 'Biomes', shapes: 'Regions and lines', symbols: 'Symbols', labels: 'Labels', notes: 'Notes' }
+export const LAYER_NAMES: Record<MapLayerKind, string> = { terrain: 'Biomes', shapes: 'Regions and lines', symbols: 'Markers', labels: 'Labels', notes: 'Notes' }
 
 export function toggleLayer(draft: MapDraft, id: string, field: 'visible' | 'locked'): Change {
   if (!draft.layers.some(l => l.id === id)) return null
@@ -181,7 +181,7 @@ export function addLayer(draft: MapDraft, kind: Exclude<MapLayerKind, 'terrain'>
 export function removeLayer(draft: MapDraft, id: string): Change {
   const layer = draft.layers.find(l => l.id === id)
   if (!layer || layer.kind === 'terrain') return null
-  return change(draft, { layers: draft.layers.filter(l => l.id !== id), symbols: draft.symbols.filter(i => i.layerId !== id), labels: draft.labels.filter(i => i.layerId !== id), shapes: draft.shapes.filter(i => i.layerId !== id) })
+  return change(draft, { layers: draft.layers.filter(l => l.id !== id), labels: draft.labels.filter(i => i.layerId !== id), shapes: draft.shapes.filter(i => i.layerId !== id) })
 }
 
 // The biomes layer, when biome shapes can be drawn on it now (it is shown and not locked).
