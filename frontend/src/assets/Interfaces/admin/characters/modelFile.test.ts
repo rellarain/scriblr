@@ -76,6 +76,16 @@ describe('writing and reading a model file', () => {
     const tooMany = JSON.stringify({ [FILE_MARKER]: 1, models: [{ ...normalizeContent(c), palette: Array.from({ length: 11 }, (_, i) => ({ id: `p${i}`, name: '', h: i, s: 10 })) }] })
     expect(parseModelFile(tooMany).skipped).toEqual(['The model at position 1 has more than 10 swatches in the palette.'])
   })
+  it('keeps the outline of a shape (shape editor S3), held to its range, and none for a shape saved before it', () => {
+    const c = rigged()
+    const outlined = { ...c, shapes: c.shapes.map((sh, i) => (i === 0 ? { ...sh, outline: 2.5 } : sh)) }
+    const back = parseModelFile(serializeModels([outlined])).models[0]
+    expect(back.shapes.map(sh => sh.outline)).toEqual([2.5, null])
+    const raw = JSON.parse(serializeModels([outlined]))
+    raw.models[0].shapes[0].outline = 99
+    expect(parseModelFile(JSON.stringify(raw)).models[0].shapes[0].outline).toBe(20)
+  })
+
   it('marks the file with its kind and version, and names it after a single model', () => {
     const parsed = JSON.parse(serializeModels([rigged()], new Date('2026-11-08T10:00:00Z')))
     expect(parsed[FILE_MARKER]).toBe(1); expect(parsed.exportedAt).toBe('2026-11-08T10:00:00.000Z')

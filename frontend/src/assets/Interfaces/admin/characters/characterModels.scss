@@ -73,6 +73,9 @@
   &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
 }
 .cmTplThumb { width: 44px; height: 44px; path { fill: var(--ink); } }
+// the polygon and the star of the shape editor (S3): the template and the stepper for its count, on a row of their own
+// (the template already says its count, so the stepper's own label is left to screen readers)
+.cmTplCount { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); .cmTpl { flex-direction: row; } .cmStepLabel { display: none; } }
 
 // ---- the tree ----
 .cmTree { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); padding: var(--space-3); overflow-y: auto; }
@@ -102,6 +105,8 @@
 // only round the selected shape, as a ring in the accent colour with an edge in the ink that is readable on the accent (the pair the audit already holds at 4.5:1), so it reads on a
 // fill of any colour whatever accent the user picks. The selection never recolours the fill.
 .cmShape { fill: var(--shape-fill, var(--ink-muted)); stroke: none; vector-effect: non-scaling-stroke; cursor: pointer; &--dim { opacity: 0.35; } }
+// a shape's outline (shape editor S3): its own path over the fill, in the model's units, never picked
+.cmShapeLine { pointer-events: none; &--dim { opacity: 0.35; } }
 .cmRing { fill: none; pointer-events: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; &--under { stroke: var(--on-accent); stroke-width: 4; } &--over { stroke: var(--accent); stroke-width: 2; } }
 .cmHandles { pointer-events: none; .cmHandle { pointer-events: auto; } }
 .cmHandleLine { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.7; }

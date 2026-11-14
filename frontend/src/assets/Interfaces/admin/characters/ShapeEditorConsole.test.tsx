@@ -71,11 +71,13 @@ describe('the shape editor', () => {
     expect(tree.queryByRole('button', { name: /Make a twin/ })).toBeNull()
   })
 
-  it('edits a shape with its name, opacity and points', async () => {
+  it('edits a shape with its name, its look (outline and opacity) and points', async () => {
     const { user } = await open()
     await pick(user, 'Skull', 'shape')
     expect(screen.getByRole('textbox', { name: 'Shape name' })).toHaveValue('Skull')
-    expect(screen.getByRole('slider', { name: 'Opacity of the shape' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Opacity of the shape' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Outline' })).toBeInTheDocument()
+    expect(screen.queryByRole('slider', { name: 'Opacity of the shape' })).toBeNull()
     expect(screen.getByRole('group', { name: 'Points' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Which view shows the shape' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Put a template on the shape' })).toBeNull()

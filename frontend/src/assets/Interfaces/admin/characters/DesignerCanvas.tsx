@@ -819,6 +819,7 @@ export function DesignerCanvas(p: CanvasProps) {
           return (
             <PaintedPath
               key={id} item={item} prefix={prefix} data-shape={id}
+              lineClass={`cmShapeLine${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShapeLine--dim' : ''}`}
               className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${selected ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}${item.helper ? ' cmShape--helper' : ''}`}
               onPointerDown={e => onShapeDown(e, id)} onDoubleClick={onDouble}
             />

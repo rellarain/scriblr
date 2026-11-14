@@ -17,6 +17,16 @@ const star = (): Raw => {
   }
   return o
 }
+// A regular figure (shape editor S3): `n` corners on the circle of radius 1, the first at the top, going round clockwise (y grows downward); for a star, every other one of
+// 2n corners is pulled in to `inner`. Placed in a square box, so it stays regular.
+function regular(n: number, inner = 1): Raw {
+  const k = inner < 1 ? n * 2 : n, o: Raw = []
+  for (let i = 0; i < k; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / k, r = inner < 1 && i % 2 ? inner : 1
+    o.push([Math.round(Math.cos(a) * r * 10000) / 10000, Math.round(Math.sin(a) * r * 10000) / 10000, 's'])
+  }
+  return o
+}
 const wave = (): Raw => {
   // a strip whose top edge undulates: curve points along both edges
   const top: Raw = [], bottom: Raw = []
@@ -31,12 +41,16 @@ const wave = (): Raw => {
 export const TEMPLATES: Template[] = [
   { id: 'circle', name: 'Circle', aspect: 1, pts: [[0, -1], [1, 0], [0, 1], [-1, 0]] },
   { id: 'oval', name: 'Oval', aspect: 1, pts: [[0, -1], [0.78, 0], [0, 1], [-0.78, 0]] },
+  { id: 'ellipse', name: 'Ellipse', aspect: 0.6, pts: [[0, -1], [1, 0], [0, 1], [-1, 0]] },
   { id: 'square', name: 'Square', aspect: 1, pts: [[-1, -1, 's'], [1, -1, 's'], [1, 1, 's'], [-1, 1, 's']] },
   { id: 'rectangle', name: 'Rectangle', aspect: 0.5, pts: [[-1, -1, 's'], [1, -1, 's'], [1, 1, 's'], [-1, 1, 's']] },
   { id: 'rounded', name: 'Rounded rectangle', aspect: 1, pts: [[-0.55, -1, 'cs'], [0.55, -1, 'sc'], [1, -0.55, 'cs'], [1, 0.55, 'sc'], [0.55, 1, 'cs'], [-0.55, 1, 'sc'], [-1, 0.55, 'cs'], [-1, -0.55, 'sc']] },
-  { id: 'hexagon', name: 'Hexagon', aspect: 1, pts: [[0, -1, 's'], [0.87, -0.5, 's'], [0.87, 0.5, 's'], [0, 1, 's'], [-0.87, 0.5, 's'], [-0.87, -0.5, 's']] },
+  { id: 'hexagon', name: 'Hexagon', aspect: 1, pts: regular(6) },
   { id: 'trapezoid', name: 'Trapezoid', aspect: 1, pts: [[-0.55, -1, 's'], [0.55, -1, 's'], [1, 1, 's'], [-1, 1, 's']] },
   { id: 'triangle', name: 'Triangle', aspect: 1, pts: [[0, -1, 's'], [1, 0.9, 's'], [-1, 0.9, 's']] },
+  { id: 'triangle-eq', name: 'Equilateral triangle', aspect: 1, pts: regular(3) },
+  { id: 'triangle-right', name: 'Right triangle', aspect: 1, pts: [[-1, -1, 's'], [1, 1, 's'], [-1, 1, 's']] },
+  { id: 'pentagon', name: 'Pentagon', aspect: 1, pts: regular(5) },
   { id: 'diamond', name: 'Diamond', aspect: 1, pts: [[0, -1, 's'], [0.8, 0, 's'], [0, 1, 's'], [-0.8, 0, 's']] },
   { id: 'teardrop', name: 'Teardrop', aspect: 1, pts: [[0, -1, 's'], [0.8, 0.3], [0, 1], [-0.8, 0.3]] },
   { id: 'leaf', name: 'Leaf', aspect: 1, pts: [[0, -1, 's'], [0.7, 0], [0, 1, 's'], [-0.7, 0]] },
@@ -53,8 +67,25 @@ export const TEMPLATES: Template[] = [
 
 export const TEMPLATE_IDS = TEMPLATES.map(t => t.id)
 
+// The shape editor's own list (S3): the basics, offered directly, then a polygon and a star with a count (`polygon-7`, `star-5`), which are made when asked for.
+export const SHAPE_BASICS = ['square', 'rectangle', 'circle', 'ellipse', 'triangle-eq', 'triangle-right', 'pentagon', 'hexagon']
+export const POLYGON_SIDES = { min: 3, max: 12, start: 7 } as const
+export const STAR_POINTS = { min: 4, max: 12, start: 5 } as const
+// how far in a star's inner corners are, as a share of its outer ones
+export const STAR_INNER = 0.45
+export const polygonId = (sides: number): string => `polygon-${sides}`
+export const starId = (points: number): string => `star-${points}`
+
+function counted(id: string): Template | undefined {
+  const m = /^(polygon|star)-(\d{1,2})$/.exec(id)
+  if (!m) return undefined
+  const n = Number(m[2])
+  if (m[1] === 'polygon') return n >= POLYGON_SIDES.min && n <= POLYGON_SIDES.max ? { id, name: `Polygon, ${n} sides`, aspect: 1, pts: regular(n) } : undefined
+  return n >= STAR_POINTS.min && n <= STAR_POINTS.max ? { id, name: `Star, ${n} points`, aspect: 1, pts: regular(n, STAR_INNER) } : undefined
+}
+
 export function templateById(id: string): Template | undefined {
-  return TEMPLATES.find(t => t.id === id)
+  return TEMPLATES.find(t => t.id === id) ?? counted(id)
 }
 
 // The points of a template stretched to fill a box (a box smaller than six units is widened, so a template is never a dot).

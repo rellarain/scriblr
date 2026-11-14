@@ -76,6 +76,7 @@ import {
   addBend, addDepth, addLength, addRange, addScale, addSpin, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
+import { LIMITS } from './engine/limits'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
 import type { DrapeActions, FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName, WearActions } from './rigActions'
@@ -1098,7 +1099,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const obj = objectById(c, objectId)
     if (obj && obj.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
     const id = freshId(c, 's', makeId)
-    const shape = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, templateBox(templateId, 100, 100))
+    const made = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, templateBox(templateId, 100, 100))
+    // the shape editor's shapes start with a thin outline (S3)
+    const shape = shapesOnly ? { ...made, outline: LIMITS.outlineNew } : made
     if (commit(addShape(c, objectId, shape), true)) choose({ kind: 'shape', id })
   }
   // Delete what is selected, with what goes with it (a group's objects, an object's shapes, a twin).

@@ -1,5 +1,5 @@
 import { useId, type CSSProperties, type ReactElement, type SVGProps } from 'react'
-import { MASK_BOX, gradientAxis, gradientStops, paintAttrs, type PaintDef, type PaintItem } from './engine/paint'
+import { MASK_BOX, OUTLINE_INK, gradientAxis, gradientStops, paintAttrs, type PaintDef, type PaintItem } from './engine/paint'
 
 // The SVG side of painting (phase 4b): the definitions an effect needs and one path drawn with all of them. The canvas, the preview tiles and the pictures of
 // forms use these, so a gradient, a clip or a cut-out looks the same everywhere.
@@ -37,7 +37,9 @@ type PathProps = Omit<SVGProps<SVGPathElement>, 'd' | 'style' | 'fillOpacity' | 
 // One shape, painted. Its fill is the colour (or the gradient) in the `--shape-fill` variable, like the portrait's own colours, so the stylesheet can still dim or
 // ring it; a shading shape sits in a group that keeps it inside the base shapes, and a garment worn under others in one that keeps it inside theirs. A thing with nothing to be kept inside
 // is invisible but still there to be picked.
-export function PaintedPath({ item, prefix, ...rest }: { item: PaintItem; prefix: string } & PathProps): ReactElement {
+// A shape with an outline (shape editor S3) gets a second path over its fill: the outline alone, in the one ink, kept inside the same clip and mask and never picked
+// (`lineClass` styles it, e.g. dimmed with its shape).
+export function PaintedPath({ item, prefix, lineClass, ...rest }: { item: PaintItem; prefix: string; lineClass?: string } & PathProps): ReactElement {
   const a = paintAttrs(item, prefix)
   const path = (
     <path
@@ -45,7 +47,11 @@ export function PaintedPath({ item, prefix, ...rest }: { item: PaintItem; prefix
       clipPath={a.clip} mask={a.mask} {...rest}
     />
   )
-  const inner = a.comp ? <g clipPath={a.comp}>{path}</g> : path
+  const line = item.line && !item.blank
+    ? <path d={item.d} className={lineClass} fill="none" stroke={OUTLINE_INK} strokeWidth={item.line.w} strokeOpacity={item.line.alpha} strokeLinejoin="round" pointerEvents="none" clipPath={a.clip} mask={a.mask} aria-hidden="true" data-line={item.id} />
+    : null
+  const both = line ? <>{path}{line}</> : path
+  const inner = a.comp ? <g clipPath={a.comp}>{both}</g> : both
   // a garment worn under others is drawn only inside their outlines
   return a.wear ? <g clipPath={a.wear}>{inner}</g> : inner
 }

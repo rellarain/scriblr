@@ -146,6 +146,11 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.fieldsWarn).toBe(number('MODEL_FIELDS_WARN'))
     expect(LIMITS.fieldsMax).toBe(number('MODEL_FIELDS_MAX'))
     expect(LIMITS.roundMax).toBe(number('MODEL_ROUND_MAX'))
+    // a shape's outline (shape editor S3): widths with decimals
+    const decimal = (name: string) => Number(new RegExp(`^${name}\\s*=\\s*([\\d.]+)`, 'm').exec(schema)?.[1])
+    expect(LIMITS.outlineMin).toBe(decimal('MODEL_OUTLINE_MIN'))
+    expect(LIMITS.outlineMax).toBe(decimal('MODEL_OUTLINE_MAX'))
+    expect(LIMITS.outlineNew).toBe(decimal('MODEL_OUTLINE_NEW'))
     expect(LIMITS.patternsWarn).toBe(number('MODEL_PATTERNS_WARN'))
     expect(LIMITS.patternsMax).toBe(number('MODEL_PATTERNS_MAX'))
     expect(LIMITS.patternMarksMax).toBe(number('MODEL_PATTERN_MARKS_MAX'))

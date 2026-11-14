@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CharacterFigure, ModelContent } from '../../../../../api/types'
+import { OUTLINE_INK } from '../../../admin/characters/engine/paint'
 import { readableInk } from '../portrait/colour'
 import { cardFileName, cardPng, cardSvg, downloadCard, type CardOptions } from './figureExport'
 import { blankFigure, drawFigure } from './figureState'
@@ -27,6 +28,20 @@ describe('cardSvg', () => {
       expect(Math.max(width, height)).toBe(1024)
       expect(width / height).toBeCloseTo(box.w / box.h, 2)
     }
+  })
+
+  it('draws each outlined shape with its outline over it, in the one ink, and nothing of the kind for a model without outlines (shape editor S3)', () => {
+    const outlined: ModelContent = { ...content, shapes: content.shapes.map(sh => ({ ...sh, outline: 1 })) }
+    const { svg } = cardSvg(outlined, figure, 'figure', 'front', plain)
+    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    const lines = [...doc.querySelectorAll('path[stroke]')]
+    expect(lines.length).toBeGreaterThan(10)
+    for (const line of lines) {
+      expect(line.getAttribute('fill')).toBe('none')
+      expect(line.getAttribute('stroke')).toBe(OUTLINE_INK)
+      expect(Number(line.getAttribute('stroke-width'))).toBeGreaterThan(0)
+    }
+    expect(cardSvg(content, figure, 'figure', 'front', plain).svg).not.toContain(OUTLINE_INK)
   })
 
   it('is well-formed SVG with every number finite and no stylesheet to depend on', () => {

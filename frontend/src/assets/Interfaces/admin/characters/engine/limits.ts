@@ -46,6 +46,10 @@ export const LIMITS = {
   fieldsMax: 12,
   // corner roundness (phase D4): the most a radius may be; patterns per model and marks per pattern (the stops are the server's max_lengths)
   roundMax: 20,
+  // a shape's outline (shape editor S3): the thinnest and thickest width in the model's units, and the width a shape made in the shape editor starts with
+  outlineMin: 0.25,
+  outlineMax: 20,
+  outlineNew: 0.75,
   patternsWarn: 12,
   patternsMax: 24,
   patternMarksMax: 72,

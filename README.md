@@ -441,6 +441,12 @@ described, now stale, in `docs/data-model.md`).
   pattern keeps its marks inside its base and switches them off together, by its id in a preset's or an option's
   `hidden`; at most 24 patterns, a twin is neither a base nor a mark and no shape is both). Nothing about an outline
   is stored: the canvas outline is the selection ring.
+  Shape editor S3 (2026-11-14) adds, with a default: on a shape `outline` (a width in the model's units, 0.25..20 to two
+  decimals, or null for none; repaired, never refused): drawn over the fill in one dark ink by every renderer, not faded
+  by the shape's opacity, scaled as the shape is; a twin and a member take it from the shape they copy, and a helper or a
+  shading shape has none. A shape made in the shape editor starts at 0.75. The templates gain an ellipse, an equilateral
+  and a right triangle, a pentagon, and polygons (`polygon-3`..`polygon-12`) and stars (`star-4`..`star-12`) made from
+  their id.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

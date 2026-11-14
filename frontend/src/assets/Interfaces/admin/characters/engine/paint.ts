@@ -1,6 +1,7 @@
 import type { ModelBlend, ModelContent, ModelGradDir } from '../../../../../api/types'
 import { mix } from '../../../writer/characters/portrait/colour'
 import { paintLayer, type Colouring, type PaintLayer } from './colour'
+import type { Mat } from './geometry'
 import type { Solved } from './rig'
 import { coveringObjects } from './wear'
 
@@ -23,12 +24,21 @@ export interface PaintItem {
   cutDs: string[]
   helper: boolean
   shading: boolean
+  // its outline (shape editor S3): the width in canvas units (the model's width scaled as the shape is) and how much of it shows (a shape faded by a slider fades its
+  // outline too; the shape's own opacity fades only the fill). Absent or null: no outline.
+  line?: { w: number; alpha: number } | null
   // what the object it belongs to is worn under (phase 6b): the outlines of the garments over it that are shown, which it is trimmed to; `key` is the object, so its shapes share one
   // clip. Null when the object is worn under nothing or none of it is shown.
   wear: { key: string; ds: string[] } | null
   // something it must be kept inside is not there (a clip to a shape a form hides, a shading shape with no base shape to lie on): nothing is drawn
   blank: boolean
 }
+
+// The one ink every outline is drawn in (shape editor S3): a dark neutral gray, part of the model's picture like its fills.
+export const OUTLINE_INK = '#2b2b2b'
+
+// How much a matrix scales a length (the square root of the area it scales by).
+const scaleOf = (m: Mat): number => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]))
 
 // The items for these shapes (default: the visible ones, in draw order). A shape with no outline is left out.
 export function paintShapes(c: ModelContent, solved: Solved, colouring: Colouring, ids: readonly string[] = solved.order): PaintItem[] {
@@ -93,6 +103,7 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     items.push({
       id, d: r.d, fill: layer.fill, opacity: layer.opacity * (r.fade ?? 1), gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading, wear: anyWear && !layer.helper ? wearOf(id) : null,
       blank: (!!layer.clip && !clipD) || (layer.shading && compDs.length === 0),
+      line: layer.line ? { w: Math.round(layer.line * scaleOf(r.matrix) * 1000) / 1000, alpha: r.fade ?? 1 } : null,
     })
   }
   return items

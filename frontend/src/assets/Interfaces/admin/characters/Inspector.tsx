@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } from '../../../../api/types'
-import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
+import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, PolygonIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { Stepper } from './Stepper'
@@ -174,10 +174,7 @@ function ShapeTab(p: InspectorProps) {
 
       {shape && simple && (
         <>
-          <label className="cmField">
-            <span>Opacity</span>
-            <span className="cmRange"><input type="range" min={0} max={100} step={5} value={Math.round(shape.op * 100)} aria-label="Opacity of the shape" onChange={e => p.onEditShape(shape.id, { ...shape, op: Number(e.target.value) / 100 })} /><output>{Math.round(shape.op * 100)}%</output></span>
-          </label>
+          <LookSection shape={shape} onEditShape={p.onEditShape} />
           {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} simple />}
         </>
       )}
@@ -213,6 +210,24 @@ function ShapeTab(p: InspectorProps) {
           {p.turnSection}
         </>
       )}
+    </div>
+  )
+}
+
+// The look of a shape in the shape editor (S3): its outline (on or off, and its width in the model's units) and its opacity, which fades the fill only. Each step is one undo step.
+function LookSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: InspectorProps['onEditShape'] }) {
+  const on = typeof shape.outline === 'number', width = shape.outline ?? LIMITS.outlineNew, op = Math.round(shape.op * 100)
+  const set = (patch: Partial<ModelShape>) => onEditShape(shape.id, { ...shape, ...patch })
+  const stepWidth = (dir: -1 | 1, big: boolean) => set({ outline: Math.round(Math.min(LIMITS.outlineMax, Math.max(LIMITS.outlineMin, width + dir * (big ? 1 : 0.25))) * 100) / 100 })
+  const stepOpacity = (dir: -1 | 1, big: boolean) => set({ op: Math.min(100, Math.max(0, op + dir * (big ? 25 : 5))) / 100 })
+  return (
+    <div className="cmLook" role="group" aria-label="Look of the shape">
+      <h3 className="cmInsSub">Look</h3>
+      <div className="cmInline">
+        <button type="button" className={`cmIconBtn${on ? ' cmIconBtn--on' : ''}`} aria-pressed={on} aria-label="Outline" title="Outline" onClick={() => set({ outline: on ? null : width })}><PolygonIcon size={14} /></button>
+        <Stepper label="Outline width" value={on ? String(width) : 'None'} lowerOff={!on || width <= LIMITS.outlineMin} raiseOff={!on || width >= LIMITS.outlineMax} bigBy={1} onStep={stepWidth} />
+      </div>
+      <Stepper label="Opacity of the shape" value={`${op}%`} lowerOff={op <= 0} raiseOff={op >= 100} bigBy={25} onStep={stepOpacity} />
     </div>
   )
 }

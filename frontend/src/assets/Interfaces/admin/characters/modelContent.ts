@@ -77,7 +77,7 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
     turn: repairTurn(s.turn, s.pts.length, p => p as ModelShape['pts'][number]),
   }
 }
@@ -93,6 +93,8 @@ function skinOf(s: ModelShape): ModelSkin[] {
 }
 // A radius as the server keeps it: a whole number from 0 to the most, 0 when it is not a number.
 export const roundOf = (v: number | null | undefined): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(LIMITS.roundMax, Math.max(0, v))) : 0)
+// A shape's outline as the server keeps it (shape editor S3): no outline unless it is a number, held to its range, to two decimals.
+export const outlineOf = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(LIMITS.outlineMax, Math.max(LIMITS.outlineMin, v)) * 100) / 100 : null)
 // The sides things may fall to, and a shape's fade as the server keeps it (phase 5b): the places are held to the span a slider may have.
 // A grip point as the server keeps it (phase 5c): the name cut, the place inside the model's space, the angle held to a half turn each way.
 export const ROLE_MAX = 40

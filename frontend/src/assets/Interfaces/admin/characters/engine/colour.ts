@@ -37,6 +37,8 @@ export interface PaintLayer extends Paint {
   cuts: string[]
   shading: boolean
   helper: boolean
+  // the width of its outline in the model's units (shape editor S3), or null: none (a helper and a shading shape never have one)
+  line: number | null
 }
 
 export const NEUTRAL_GRAY = 50
@@ -295,7 +297,7 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
   // a mark of a pattern (phase D4) is kept inside the pattern's base unless it is clipped to something of its own
   const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : ix.marks.has(o.id) ? mapRef(ix, origin.hops, ix.marks.get(o.id)!) : null
   const cuts = [...new Set((o.cut ?? []).map(t => mapRef(ix, origin.hops, t)))].filter(t => t !== shape.id)
-  return { fill, opacity: slot ? round2(shape.op * alpha) : shape.op, gradient, blend: o.blend ?? null, clip: clip === shape.id ? null : clip, cuts, shading, helper: o.helper === true }
+  return { fill, opacity: slot ? round2(shape.op * alpha) : shape.op, gradient, blend: o.blend ?? null, clip: clip === shape.id ? null : clip, cuts, shading, helper: o.helper === true, line: shading || o.helper ? null : o.outline ?? null }
 }
 
 // The fill and opacity a shape is drawn with: its shape's own opacity times the opacity the colour has.

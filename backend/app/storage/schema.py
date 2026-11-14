@@ -1232,6 +1232,9 @@ MODEL_FIELDSETS_MAX = 24
 MODEL_FIELDS_WARN = 6
 MODEL_FIELDS_MAX = 12
 MODEL_ROUND_MAX = 20     # corner roundness (phase D4): the radius, in the model's units, that a sharp corner of a shape is drawn rounded to
+MODEL_OUTLINE_MIN = 0.25   # a shape's outline (shape editor S3): the thinnest and thickest width, in the model's units, and the width a new shape starts with
+MODEL_OUTLINE_MAX = 20
+MODEL_OUTLINE_NEW = 0.75
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
@@ -1645,6 +1648,9 @@ class ModelShape(BaseModel):
     opBy: Optional[ModelFade] = None
     # Phase D4: the radius a sharp corner of the drawn outline is rounded to (0 = left sharp). A twin and a shape that follows a template take it from the shape they copy.
     round: int = 0
+    # Shape editor S3: the width of the shape's outline in the model's units (None: no outline). It is drawn in one dark ink, and the shape's opacity fades only its
+    # fill. A twin and a shape that follows a template take it from the shape they copy.
+    outline: Optional[float] = None
     # Phase O1: skin weights, the groups the shape's points also follow (at most MODEL_SKIN_MAX, one weight per point each). A twin is skinned as its original is.
     skin: list[ModelSkin] = Field(default_factory=list, max_length=MODEL_SKIN_MAX)
     # Phase O2: the other objects a shading shape lies on besides its own (it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis). A twin
@@ -1759,6 +1765,14 @@ class ModelShape(BaseModel):
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return 0
         return int(round(_finite(value, 0.0, 0.0, float(MODEL_ROUND_MAX))))
+
+    @field_validator("outline", mode="before")
+    @classmethod
+    def _outline(cls, value: Any) -> Optional[float]:
+        # repaired, never refused: a width that is not a number is no outline, one out of range is held to it
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return round(_finite(value, MODEL_OUTLINE_NEW, MODEL_OUTLINE_MIN, MODEL_OUTLINE_MAX), 2)
 
     @field_validator("back", mode="before")
     @classmethod
