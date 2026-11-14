@@ -1,5 +1,5 @@
 import type { ModelAngleOutline, ModelContent, ModelLayer, ModelPoint, ModelTurn } from '../../../../../api/types'
-import type { Box, BuiltPoint, Mat } from './geometry'
+import { apply, bezierAt, build, inverse, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
 
 // Turning a figure (phase A1). The model is solved as it always was, in the front view; then every outline is turned about the model's axis (the up and down line through its
 // middle) by the angle it is seen from. A point that stands `d` toward the viewer comes out at
@@ -149,6 +149,119 @@ export function spinSilhouette(a: BuiltPoint[], cx: number, cy: number, dc: numb
 // The angle a turning stands for, in degrees.
 export const angleOfTurning = (t: Turning): number => (Math.atan2(t.sin, t.cos) * 180) / Math.PI
 
+// ---- outlines drawn at key angles (phase A3) ----
+
+// A shape's outline drawn at a key angle: the angle the figure (or its group) is turned to, the nod of a pitch key, and the outline in the group's own space, drawn about
+// the shape's place at the front.
+export interface Key { at: number; tilt: number; pts: ModelPoint[] }
+
+// The gap between two angles going round from a to b (0..360).
+const ahead = (a: number, b: number): number => (((b - a) % 360) + 360) % 360
+const ease = (w: number): number => { const k = Math.max(0, Math.min(1, w)); return k * k * (3 - 2 * k) }
+
+// What a shape seen at a yaw and a nod is drawn from: the turned outline (`null`), a key outline, or two of them blended (a key outline with the turned outline near it, or
+// two keys of one row of nods). Keys of a row blend with each other when they are at most 90 degrees apart; a key reaches 45 degrees round into the turned outline;
+// the rows of nods blend the same way with the level row. The weight `w` is how far toward `b`.
+export type KeyPick = { a: Key | null; b: Key | null; w: number }
+const ROW_GAP = 90, REACH = 45
+function rowPick(row: Key[], yaw: number): KeyPick {
+  if (row.length === 0) return { a: null, b: null, w: 0 }
+  const exact = row.find(k => ahead(k.at, yaw) < 1e-6 || ahead(yaw, k.at) < 1e-6)
+  if (exact) return { a: exact, b: null, w: 0 }
+  // the nearest key going back round and the nearest going on
+  let back: Key | null = null, on: Key | null = null, gb = 999, go = 999
+  for (const k of row) { const b = ahead(k.at, yaw), o = ahead(yaw, k.at); if (b < gb) { gb = b; back = k } if (o < go) { go = o; on = k } }
+  if (back && on && back !== on && gb + go <= ROW_GAP) return { a: back, b: on, w: ease(gb / (gb + go)) }
+  // one key near: from the turned outline at REACH away to the key itself
+  const near = gb <= go ? back : on, gap = Math.min(gb, go)
+  return gap < REACH ? { a: null, b: near, w: ease(1 - gap / REACH) } : { a: null, b: null, w: 0 }
+}
+export interface KeyBlend { level: KeyPick; tilted: { pick: KeyPick; w: number } | null }
+// The keys a shape is drawn from at a yaw and a nod: the level row, and (when the shape has keys nodded the way it is nodded) the row nearest the nod, blended in by how far
+// the nod has gone toward it.
+export function pickKeys(keys: readonly Key[], yaw: number, pitch: number): KeyBlend {
+  const level = rowPick(keys.filter(k => k.tilt === 0), yaw)
+  if (Math.abs(pitch) < 1e-6) return { level, tilted: null }
+  const tilts = [...new Set(keys.filter(k => k.tilt !== 0 && Math.sign(k.tilt) === Math.sign(pitch)).map(k => k.tilt))].sort((a, b) => Math.abs(a) - Math.abs(b))
+  if (tilts.length === 0) return { level, tilted: null }
+  // the row at or past the nod, else the furthest; the lower row is the level one or the one before
+  const upper = tilts.find(t => Math.abs(t) >= Math.abs(pitch) - 1e-6) ?? tilts[tilts.length - 1]
+  const i = tilts.indexOf(upper), lowerTilt = i > 0 ? tilts[i - 1] : 0
+  const span = Math.abs(upper) - Math.abs(lowerTilt), w = span > 0 ? Math.min(1, (Math.abs(pitch) - Math.abs(lowerTilt)) / span) : 1
+  const lowerPick = lowerTilt === 0 ? level : rowPick(keys.filter(k => k.tilt === lowerTilt), yaw)
+  const upperPick = rowPick(keys.filter(k => k.tilt === upper), yaw)
+  if (upperPick.a === null && upperPick.b === null) return { level, tilted: null }
+  return { level: lowerPick, tilted: { pick: upperPick, w: ease(w) } }
+}
+// Whether a blend reads any key at all.
+export const usesKeys = (b: KeyBlend): boolean => !!(b.level.a || b.level.b || (b.tilted && (b.tilted.pick.a || b.tilted.pick.b)))
+// The key drawn exactly at a yaw and nod, if there is one.
+export const keyAt = (keys: readonly Key[], at: number, tilt: number): Key | undefined => keys.find(k => k.tilt === tilt && (ahead(k.at, at) < 1e-6 || ahead(at, k.at) < 1e-6))
+// Whether a yaw and a nod are a place a key may be drawn at: multiples of 15, and not the front or the back seen level (those are the outline and the back outline).
+export function isKeySpot(at: number, tilt: number): boolean {
+  const a = ((Math.round(at) % 360) + 360) % 360
+  return Math.abs(at - Math.round(at)) < 1e-6 && Math.abs(tilt - Math.round(tilt)) < 1e-6 && a % 15 === 0 && Math.round(tilt) % 15 === 0 && Math.abs(tilt) <= 60 && !(Math.round(tilt) === 0 && (a === 0 || a === 180))
+}
+// Two built outlines of the same number of points mixed, `w` of the way to the second.
+export function mixBuilt(a: BuiltPoint[], b: BuiltPoint[], w: number): BuiltPoint[] {
+  if (a.length !== b.length) return w < 0.5 ? a : b
+  const m = (x: number, y: number) => x + (y - x) * w
+  return a.map((p, i) => { const q = b[i]; return { ...(w < 0.5 ? p : q), x: m(p.x, q.x), y: m(p.y, q.y), hix: m(p.hix, q.hix), hiy: m(p.hiy, q.hiy), hox: m(p.hox, q.hox), hoy: m(p.hoy, q.hoy) } })
+}
+// The keys of a twin: its original's, each seen from the other side (the angle the other way round) and mirrored about the axis.
+export function twinKeys(keys: readonly Key[], axis: number, reflect: (pts: ModelPoint[], axis: number) => ModelPoint[]): Key[] {
+  return keys.map(k => ({ at: (360 - k.at) % 360, tilt: k.tilt, pts: reflect(k.pts, axis) }))
+}
+
+// An outline in two states, by point: where links, sliders and the skin have put each point (`drawn`) and where it was drawn (`rest`). A key is kept as drawn at rest and
+// moved by the same amounts, point by point, so a shape drawn at an angle still follows what it is linked to and its sliders.
+export interface Moved { drawn: ModelPoint[]; rest: ModelPoint[] }
+// What each point of an outline of `n` points is moved by: from the first state with as many points (null when none has).
+export function shiftOf(states: readonly Moved[], n: number): Array<[number, number]> | null {
+  const s = states.find(m => m.rest.length === n && m.drawn.length === n)
+  return s ? s.rest.map((p, i): [number, number] => [s.drawn[i].x - p.x, s.drawn[i].y - p.y]) : null
+}
+// An outline moved by a shift (unchanged when the counts differ), or moved back by it (`back`: what is kept, from what is shown).
+export function shifted(pts: ModelPoint[], shift: Array<[number, number]> | null, back = false): ModelPoint[] {
+  if (!shift || shift.length !== pts.length) return pts
+  const k = back ? -1 : 1
+  return pts.map((p, i) => (shift[i][0] || shift[i][1] ? { ...p, x: p.x + k * shift[i][0], y: p.y + k * shift[i][1] } : p))
+}
+// A key of the base outline carried to another outline of the shape (a form: round eyes where the key was drawn for almond ones). With as many points, each point moves
+// by what the form moves it by; with another number, each point of the form keeps its place along the nearest edge of the base (and its distance off it), placed on the key.
+export function carryKey(key: ModelPoint[], base: ModelPoint[], other: ModelPoint[], closed: boolean): ModelPoint[] {
+  if (other === base) return key
+  if (other.length === base.length && key.length === base.length) return key.map((p, i) => ({ ...p, x: p.x + other[i].x - base[i].x, y: p.y + other[i].y - base[i].y }))
+  if (key.length !== base.length || base.length < 3 || other.length < 3) return key
+  const a = build(base, closed), b = build(key, closed), sa = windSign(a), sb = windSign(b), n = a.length, last = closed ? n : n - 1
+  return other.map(p => {
+    let best = { e: 0, t: 0, d: Infinity, o: 0 }
+    for (let e = 0; e < last; e++) {
+      for (let k = 0; k <= 16; k++) {
+        const t = k / 16, q = bezierAt(a, e, t), d = Math.hypot(q.x - p.x, q.y - p.y)
+        if (d < best.d) best = { e, t, d, o: (p.x - q.x) * q.ty * sa + (p.y - q.y) * -q.tx * sa }
+      }
+    }
+    const q = bezierAt(b, best.e, best.t)
+    return { ...p, x: q.x + q.ty * sb * best.o, y: q.y - q.tx * sb * best.o, bind: null }
+  })
+}
+// A built outline drawn through `m`, back in the space `m` draws from, as points: where a point of `like` (the outline it was built from) had its handle worked out, it is
+// worked out again; a handle of its own is kept as it is drawn. Links are not kept (a key moves with its points' links by the shift).
+export function unbuild(a: BuiltPoint[], m: Mat, like: readonly ModelPoint[]): ModelPoint[] {
+  const inv = inverse(m), r = (v: number) => Math.round(v * 100) / 100
+  return a.map((p, i) => {
+    const [x, y] = apply(inv, p.x, p.y), [ix, iy] = apply(inv, p.hix, p.hiy), [ox, oy] = apply(inv, p.hox, p.hoy)
+    const ref = like.length === a.length ? like[i] : undefined
+    return {
+      x: r(x), y: r(y), m: p.m,
+      hi: ref && ref.hi == null ? null : [r(ix - x), r(iy - y)],
+      ho: ref && ref.ho == null ? null : [r(ox - x), r(oy - y)],
+      ...(ref?.w != null ? { w: ref.w } : {}),
+    }
+  })
+}
+
 // ---- the data, held to what the server keeps ----
 
 export const DEPTH_RANGE = { min: -200, max: 200 } as const
@@ -159,11 +272,12 @@ const r2 = (v: number) => Math.round(v * 100) / 100
 const within = (v: unknown, lo: number, hi: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback)
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
-// A key angle as the server keeps it: a multiple of 15 that is not the front or the back (null for any other), its nod a multiple of 15 within the range.
-export function keyAngle(v: unknown): number | null {
+// A key angle as the server keeps it: a multiple of 15 (null for any other), and seen level not the front or the back (phase A3: a nodded key may be drawn there); its nod
+// a multiple of 15 within the range.
+export function keyAngle(v: unknown, tilt = 0): number | null {
   if (typeof v !== 'number' || !Number.isFinite(v)) return null
   const a = ((Math.round(v) % 360) + 360) % 360
-  return a % 15 !== 0 || a === 0 || a === 180 ? null : a
+  return a % 15 !== 0 || (tilt === 0 && (a === 0 || a === 180)) ? null : a
 }
 export const keyTilt = (v: unknown): number => Math.round(within(v, TILT_RANGE.min, TILT_RANGE.max, 0) / 15) * 15
 // Outlines at key angles: bad entries dropped, a second one for the same angle and nod too, and one with fewer than three points.
@@ -172,9 +286,9 @@ export function repairAngles(v: unknown, point: (p: unknown) => ModelPoint): Mod
   if (!Array.isArray(v)) return out
   for (const raw of v) {
     if (!isRecord(raw)) continue
-    const at = keyAngle(raw.at)
+    const tilt = keyTilt(raw.tilt), at = keyAngle(raw.at, tilt)
     if (at === null) continue
-    const tilt = keyTilt(raw.tilt), pts = (Array.isArray(raw.pts) ? raw.pts : []).slice(0, 60).map(point)
+    const pts = (Array.isArray(raw.pts) ? raw.pts : []).slice(0, 60).map(point)
     if (pts.length >= 3 && !out.some(x => x.at === at && x.tilt === tilt)) out.push({ at, tilt, pts })
   }
   return out.slice(0, ANGLE_OUTLINES_MAX)

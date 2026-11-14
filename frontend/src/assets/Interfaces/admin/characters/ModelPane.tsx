@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
+import type { ModelContent, ModelEntry, ModelLayer, ModelPoint, ModelShape } from '../../../../api/types'
 import {
   BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
@@ -49,6 +49,10 @@ import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
 import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
 import { alignSkins, weightsOf } from './engine/skin'
+import { angleOf, fromBehind, type View } from './engine/angles'
+import { shifted } from './engine/turn'
+import { alignTurns, clearPointDepths, clearThick, setAngleOutline, setFormAngleOutline, setWrap, stepPointDepth, stepShapeDepth, stepThick } from './engine/turnEdit'
+import { ObjectTurnSection, ShapeTurnSection, type TurnActions, type TurnWhere } from './TurnSection'
 import { autoSkin, bendSlider, clearSkin, copySkin, defaultPartner, mirrorSkin, paintSkin, partnersOf, skinBlocked, smoothSkin, stepPointSkin } from './engine/skinEdit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisCarry, setAxisRoll, setInitialForm, toggleAxisGenre, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
@@ -215,7 +219,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [pickOn, setPickOn] = useState(false)
   // picking a shape on the canvas to clip the selected shape to, or to let cut a hole in it
   const [paintPick, setPaintPick] = useState<'clip' | 'cut' | null>(null)
-  const [view, setView] = useState<ViewName>('front')
+  // the angle the figure is seen from (phase A3: any angle; 'front' and 'back' are 0 and 180)
+  const [view, setView] = useState<View>('front')
+  const turnAngle = angleOf(view)
+  // the side a panel that knows only the front and the back speaks of: the back once more of the back is seen than of the front
+  const side: ViewName = fromBehind(view) ? 'back' : 'front'
   const [linkMode, setLinkMode] = useState<LinkHow | null>(null)
   const [rangeFilter, setRangeFilter] = useState<'selection' | 'all'>('selection')
   const [scrubbing, setScrubbing] = useState<string | null>(null)
@@ -261,7 +269,32 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const show = useMemo(() => showFor(content, sel), [content, sel])
   // looking through a frame leaves out what the frame leaves out
   const through = frameById(content, throughId)
-  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show, fall: test.fall, order: test.order }), [shown, values, recording, view, test.forms, test.hidden, test.fall, test.order, show, through])
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show, fall: test.fall, order: test.order, edit: true }), [shown, values, recording, view, test.forms, test.hidden, test.fall, test.order, show, through])
+  // what the canvas edits: a shape seen at a key spot shows (and is edited as) its outline there, drawn through where that outline is drawn (phase A3)
+  const canvasSolved = useMemo(() => {
+    if (!Object.values(solved.shapes).some(s => s.angle)) return solved
+    const shapes = { ...solved.shapes }
+    for (const [id, s] of Object.entries(shapes)) if (s.angle) shapes[id] = { ...s, local: s.angle.local, matrix: s.angle.matrix }
+    return { ...solved, shapes }
+  }, [solved])
+  // Where a shape is seen from now: the front or the back as they were drawn before angles (an edit goes to its outline or its back outline), a key spot (an edit draws
+  // its outline there), or between key spots (it cannot be edited there).
+  function whereOf(id: string): TurnWhere {
+    const s = solved.shapes[id]
+    if (s?.angle) return 'key'
+    if (!s?.seenAt) return turnAngle === 180 ? 'back' : turnAngle === 0 ? 'front' : 'between'
+    const [y, p] = s.seenAt
+    return p !== 0 ? 'between' : y === 0 ? 'front' : y === 180 ? 'back' : 'between'
+  }
+  // An edit of a shape seen at a key spot: the outline drawn there, kept without what its links and sliders move it by (to the form being edited when one is chosen).
+  function keyEdit(c: ModelContent, id: string, pts: ModelPoint[]): Edit {
+    const spot = solved.shapes[id]?.angle
+    if (!spot) return { ok: false, reason: 'Turn to a key angle to draw the shape there.' }
+    if (pts.length !== spot.local.length) return { ok: false, reason: 'Add or delete points in the front view: an outline drawn at an angle keeps the points of the front one.' }
+    const stored = shifted(pts, spot.shift, true)
+    const t = formTargetIn(c, id)
+    return t ? setFormAngleOutline(c, t.object.id, t.axis.id, t.form.id, id, spot.at, spot.tilt, stored) : setAngleOutline(c, id, spot.at, spot.tilt, stored)
+  }
   const group = groupOfSelection(content, sel)
   const valuesRef = useRef(values)
   valuesRef.current = values
@@ -279,13 +312,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const formTarget = selShape && !selShape.mirrorOf && !recording ? formTargetIn(content, selShape.id) : null
   const hiddenByForm = !!formTarget && overrideState(formTarget.form, formTarget.shapeId) === 'hidden'
   const switchedOff = !!selShape && !!solved.shapes[selShape.id]?.off
-  const editable = !!selShape && !pointDriven && !selShape.mirrorOf && !hiddenByForm && !switchedOff && !selShape.hide
+  const selWhere: TurnWhere = selShape ? whereOf(selShape.id) : 'front'
+  const editable = !!selShape && !pointDriven && !selShape.mirrorOf && !hiddenByForm && !switchedOff && !selShape.hide && selWhere !== 'between'
   // What the canvas draws and edits for the selected shape: the points as the rig puts them (links resolved), in the view being edited. A twin is shown the same
   // way, but not edited.
   const canvasContent = useMemo(() => {
-    const r = selShape ? solved.shapes[selShape.id] : undefined
+    const r = selShape ? canvasSolved.shapes[selShape.id] : undefined
     return selShape && r && r.local.length >= 3 ? updateShape(shown, selShape.id, sh => ({ ...sh, pts: r.local })) : shown
-  }, [shown, solved, selShape])
+  }, [shown, canvasSolved, selShape])
 
   // The form an edit of this shape's points goes to, if a chosen form gives the shape its outline (see forms.targetForShape).
   function formTargetIn(c: ModelContent, shapeId: string) {
@@ -301,7 +335,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function commit(next: ModelContent, immediate = false): boolean {
     // every member has a shape for each shape of its pattern: an edit that added or took away a pattern's shape reaches them here
     // skin weights stay with their points when points are added or taken away (phase O1)
-    const synced = reconcileClasses(alignSkins(content, next), makeId)
+    // depths and outlines at key angles stay with their points too (phase A3)
+    const synced = reconcileClasses(alignTurns(content, alignSkins(content, next)), makeId)
     const refused = policy.writer ? growthRefusal(content, synced, policy.writer) : null
     if (refused) { setNote(refused); return false }
     setHistory(h => remember(h, content))
@@ -321,7 +356,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function live(id: string, next: ModelShape) {
     if (recording) { setRecording(r => (r ? { ...r, draft: next } : r)); return }
     models.edit(entry.id, c => {
-      if (view === 'back') return updateShape(c, id, sh => ({ ...next, pts: sh.pts, back: next.pts }))
+      const where = whereOf(id)
+      if (where === 'between') return c
+      if (where === 'key') { const e = keyEdit(c, id, next.pts); return e.ok ? e.content : c }
+      if (where === 'back') return updateShape(c, id, sh => ({ ...next, pts: sh.pts, back: next.pts }))
       const t = formTargetIn(c, id)
       if (!t) return updateShape(c, id, () => next)
       const e = setOverride(c, t.object.id, t.axis.id, t.form.id, id, next.pts)
@@ -338,12 +376,21 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const old = shapeById(content, id)
     if (!old) return
     // a change of the shape's settings (view, opacity, template name) leaves its points as they are stored
-    if (JSON.stringify(next.pts) === JSON.stringify(solved.shapes[id]?.local ?? old.pts)) {
-      commit(updateShape(content, id, () => ({ ...next, pts: old.pts })))
+    if (JSON.stringify(next.pts) === JSON.stringify(canvasSolved.shapes[id]?.local ?? old.pts)) {
+      commit(updateShape(content, id, () => ({ ...next, pts: old.pts, turn: old.turn, back: old.back })))
       if (point !== undefined) setSelPoint(point)
       return
     }
-    if (view === 'back') {
+    const where = whereOf(id)
+    if (where === 'between') { setNote('Seen between key angles: turn to a multiple of 15 degrees to draw the shape there, or go back to the front.'); return }
+    if (where === 'key') {
+      const e = keyEdit(content, id, next.pts)
+      if (!e.ok) { setNote(e.reason); return }
+      commit(updateShape(e.content, id, sh => ({ ...next, pts: sh.pts, turn: sh.turn, back: sh.back })))
+      if (point !== undefined) setSelPoint(point)
+      return
+    }
+    if (where === 'back') {
       commit(updateShape(content, id, () => ({ ...next, pts: old.pts, back: next.pts })))
       if (point !== undefined) setSelPoint(point)
       return
@@ -380,6 +427,21 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const weights = weighing && selShape && editable ? { onCycle: (i: number) => setWeightAt(i, cycleWeight(weightAt(i))), onStep: (i: number, dir: -1 | 1) => setWeightAt(i, stepWeight(weightAt(i), dir)) } : null
   // The Skin tool: the weights of the selected shape for one group, painted on the canvas (they may be painted on a posed shape: the bend shows what they do).
   const skinBlock = skinning && selShape ? skinBlocked(content, selShape.id, view, !!formTarget) : null
+  // how shapes turn (phase A3): the Turning section of the Shape tab
+  const turnActions: TurnActions = {
+    stepDepth: (id, dir, big) => applyEdit(stepShapeDepth(content, id, dir, big)),
+    stepThick: (id, dir, big) => applyEdit(stepThick(content, id, dir, big)),
+    clearThick: id => applyEdit(clearThick(content, id)),
+    stepPointDepth: (id, i, dir, big) => applyEdit(stepPointDepth(content, id, i, dir, big)),
+    clearPointDepths: id => applyEdit(clearPointDepths(content, id)),
+    setWrap: (objectId, shapeId) => applyEdit(setWrap(content, objectId, shapeId)),
+    dropKey: id => {
+      const spot = solved.shapes[id]?.angle
+      if (!spot) return
+      const t = formTargetIn(content, id)
+      applyEdit(t ? setFormAngleOutline(content, t.object.id, t.axis.id, t.form.id, id, spot.at, spot.tilt, null) : setAngleOutline(content, id, spot.at, spot.tilt, null))
+    },
+  }
   const skinPartners = skinning && selShape ? partnersOf(content, selShape.id) : []
   const skinWith = skinning && selShape ? (skinGroup && skinPartners.some(g => g.id === skinGroup) ? skinGroup : defaultPartner(content, selShape.id)) : null
   const skinWeights = selShape && skinWith ? weightsOf(selShape, skinWith) : []
@@ -708,7 +770,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     breakPair: (kind, id) => { applyEdit(breakPair(content, kind, id)) },
     startLink: how => {
       if (!selShape || selShape.mirrorOf) return
-      if (view === 'back') { setNote('Link points in the front view: a link works in both views.'); return }
+      if (turnAngle !== 0) { setNote('Link points in the front view: a link works in every view.'); return }
       setPickOn(false); setMode('points'); setLinkMode(how)
     },
     stopLink: () => setLinkMode(null),
@@ -724,10 +786,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       applyEdit(setLoose(made.content, [shapeId], id))
     },
     useFront: shapeId => { applyEdit(setBack(content, shapeId, null)) },
-    moveInOrder: (shapeId, dir) => { applyEdit(moveInOrder(content, shapeId, view, dir)) },
+    moveInOrder: (shapeId, dir) => { applyEdit(moveInOrder(content, shapeId, side, dir)) },
     setLeaves: (shapeId, index, on) => { applyEdit(setLeaves(content, shapeId, index, on)) },
     startBridge: () => {
-      if (view === 'back') { setNote('Build a bridge in the front view: its points are locked to edges, which work in both views.'); return }
+      if (turnAngle !== 0) { setNote('Build a bridge in the front view: its points are locked to edges, which work in every view.'); return }
       setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setWeighing(false); setMode('points'); setBridgeSpots([])
     },
     stopBridge: () => setBridgeSpots(null),
@@ -1117,7 +1179,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // Turning the selected open line into a ribbon along its own path (its curve, not only its points).
   const taperLine = selShape && !selShape.closed ? {
     name: selShape.name.trim() || 'the line',
-    blocked: !editable ? 'This line is shown, not edited here (a twin, a shape a slider moves, or one hidden in this form)' : view !== 'front' ? 'Taper a line in the front view' : selShape.pts.length < 2 ? 'The line needs two points' : null,
+    blocked: !editable ? 'This line is shown, not edited here (a twin, a shape a slider moves, or one hidden in this form)' : turnAngle !== 0 ? 'Taper a line in the front view' : selShape.pts.length < 2 ? 'The line needs two points' : null,
   } : null
   function taperSelected() {
     const cs = selShape ? shapeById(canvasContent, selShape.id) : undefined
@@ -1273,7 +1335,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     : selShape?.copyOf && selShape.hide ? `${selShape.name.trim() || 'This shape'} is left out of this member: show it again in the Shape tab to edit it.`
     : selShape?.copyOf && selShape.pts.length < 3 ? `${selShape.name.trim() || 'This shape'} follows the pattern: move a point to give it an outline of its own, or edit the pattern.`
     : selShape?.copyOf ? `${selShape.name.trim() || 'This shape'} has an outline of its own: follow the pattern again from the Shape tab to drop it.`
-    : selShape && view === 'back' ? 'Back view: a shape shows its front outline from behind until you edit its points here; then it has an outline of its own for the back.'
+    : selShape && selWhere === 'between' ? `Seen between key angles (${Math.round(turnAngle)}°): turn to a multiple of 15 degrees to draw ${selShape.name.trim() || 'the shape'} there, or go back to the front.`
+    : selShape && selWhere === 'key' ? (solved.shapes[selShape.id]?.angle?.drawn ? 'Drawn at this angle: the points you move change its outline here only.' : 'Key angle: it is turned from the front here; move a point to draw it here (it keeps the front\'s points).')
+    : selShape && selWhere === 'back' ? 'Back view: a shape shows its front outline from behind until you edit its points here; then it has an outline of its own for the back.'
     : selShape && pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to edit it.'
     : selShape ? (mode === 'points' ? 'Point editor: drag a point or a handle; double-click an edge to add a point.' : 'Move shape: drag the shape.')
     : sel.kind === 'none' ? 'Nothing is selected: this is the end result.' : 'Pick a shape in the tree to edit its points.'
@@ -1291,7 +1355,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   )
   // A lock at a crossing of two outlines is made in the model's own space, so it waits for the sliders at rest, the front view and the base outline.
   const lock: LockTool = {
-    enabled: !!selShape && editable && atRest && awayAll === 0 && view === 'front' && !formTarget && !through,
+    enabled: !!selShape && editable && atRest && awayAll === 0 && turnAngle === 0 && selWhere === 'front' && !formTarget && !through,
     stageOf: cr => (selShape ? lockStage(content, solved, selShape.id, cr).stage : 0),
     onAdvance: cr => { if (selShape) applyEdit(advanceLock(content, solved, selShape.id, cr)) },
   }
@@ -1307,7 +1371,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       <fieldset className="cmFieldset dzFieldset" disabled={busy}>
         <div className="dzStage" ref={stageRef}>
           <DesignerCanvas
-            content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} layers={drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} insets={insets}
+            content={canvasContent} solved={canvasSolved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} layers={drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
@@ -1440,7 +1504,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onToggleLock={test.toggleLock} onDelete={deleteSelection} onCopyShape={copyShape} onRoll={() => test.roll(content)} onReset={resetEverything}
             />
             <Inspector
-              content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
+              content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
+              turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
+                : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
               onSetLayer={(id, layer) => commit({ ...content, objects: content.objects.map(o => (o.id === id ? { ...o, layer } : o)) })}
               onEditShape={editShape} onWeight={(i, dir) => setWeightAt(i, stepWeight(weightAt(i), dir))} bridge={bridgeSpots ? bridgeSpots.length : null}
@@ -1465,7 +1531,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               </div>
             )}
             <ViewBar
-              layers={layerState} onLayers={setLayersRaw} view={view} onView={v => { setView(v); if (v === 'back') setLinkMode(null) }} viewOff={!!recording}
+              layers={layerState} onLayers={setLayersRaw} view={view} onView={v => { setView(v); if (angleOf(v) !== 0) setLinkMode(null) }} viewOff={!!recording}
               fitAll={fitAll}
               onFit={() => {
                 // Pressed with everything fitted and the view left alone: back to fitting the selection. Otherwise fit everything, and start from the middle of it.

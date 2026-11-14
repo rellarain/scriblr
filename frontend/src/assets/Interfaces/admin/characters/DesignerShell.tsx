@@ -9,7 +9,7 @@ import {
   type IconProps,
 } from '../../../icons'
 import { isShown, layerInfo, moveLayer, nudgeLayer, toggleLayer, type LayerId, type LayerState } from './layerStack'
-import type { ViewName } from './rigActions'
+import { ANGLES, angleName, angleOf, viewFor, type View } from './engine/angles'
 import { ZOOM_MAX, ZOOM_MIN, sliderToZoom, wheelZoom, zoomText, zoomToSlider } from './zoomMap'
 
 // The edges of the Designer: the console toolbar (undo, redo, save, publish), the view toolbar (the canvas layers, the view, the zoom) and the panels on the left (the tree) and
@@ -95,8 +95,8 @@ function useRowDrag(onMove: (id: LayerId, before: LayerId | null) => void) {
 export interface ViewBarProps {
   layers: LayerState
   onLayers: (next: LayerState) => void
-  view: ViewName
-  onView: (view: ViewName) => void
+  view: View
+  onView: (view: View) => void
   viewOff: boolean
   fitAll: boolean
   onFit: () => void
@@ -107,6 +107,34 @@ export interface ViewBarProps {
   checks: number
   // A word about a layer that cannot draw yet (the head units with no head bone), added to its toggle's title.
   layerNotes?: Partial<Record<LayerId, string>>
+}
+
+// The angle the figure is seen from (phase A3): a menu of the eight named angles, and a Turn slider for any angle between (in whole degrees; the arrow keys step one,
+// Page Up and Page Down 15, so every key angle is in reach).
+function AngleControls({ view, onView, off }: { view: View; onView: (v: View) => void; off: boolean }) {
+  const a = Math.round(angleOf(view)) % 360, named = ANGLES.find(n => n.at === a)
+  return (
+    <span className="dzAngle">
+      <select
+        value={named ? named.id : 'other'} aria-label="Angle" title="The angle the figure is seen from (named by the side of the character toward you)" disabled={off}
+        onChange={e => { const n = ANGLES.find(x => x.id === e.target.value); if (n) onView(viewFor(n.at)) }}
+      >
+        {ANGLES.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+        {!named && <option value="other">{`${a}°`}</option>}
+      </select>
+      <input
+        type="range" min={0} max={359} step={1} value={a} aria-label="Turn" aria-valuetext={`${a}°${named ? `, ${named.name}` : ''}`} disabled={off}
+        title={`Turn the figure: ${angleName(view)} (arrow keys one degree, Page Up and Page Down 15)`}
+        onChange={e => onView(viewFor(Number(e.target.value)))}
+        onKeyDown={e => {
+          if (e.key !== 'PageUp' && e.key !== 'PageDown') return
+          e.preventDefault()
+          const step = 15, next = e.key === 'PageUp' ? Math.floor(a / step) * step + step : Math.ceil(a / step) * step - step
+          onView(viewFor(((next % 360) + 360) % 360))
+        }}
+      />
+    </span>
+  )
 }
 
 export function ViewBar(p: ViewBarProps) {
@@ -148,8 +176,9 @@ export function ViewBar(p: ViewBarProps) {
         })}
       </div>
       <span className="cmSep" aria-hidden="true" />
-      <button type="button" className={`cmIconBtn${p.view === 'front' ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={p.view === 'front'} disabled={p.viewOff} onClick={() => p.onView('front')}><FrontIcon size={14} /></button>
-      <button type="button" className={`cmIconBtn${p.view === 'back' ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={p.view === 'back'} disabled={p.viewOff} onClick={() => p.onView('back')}><BackIcon size={14} /></button>
+      <button type="button" className={`cmIconBtn${angleOf(p.view) === 0 ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={angleOf(p.view) === 0} disabled={p.viewOff} onClick={() => p.onView('front')}><FrontIcon size={14} /></button>
+      <button type="button" className={`cmIconBtn${angleOf(p.view) === 180 ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={angleOf(p.view) === 180} disabled={p.viewOff} onClick={() => p.onView('back')}><BackIcon size={14} /></button>
+      <AngleControls view={p.view} onView={p.onView} off={p.viewOff} />
       <span className="cmSpacer" />
       <button
         type="button" className={`cmIconBtn${p.fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit to screen" aria-pressed={p.fitAll}

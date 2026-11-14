@@ -166,3 +166,21 @@ export function formCheck(c: ModelContent): CheckLine[] {
   }
   return lines
 }
+
+// How the model turns (phase A3), for the Check panel: an outline drawn at an angle with another number of points than the outline it stands for (it is not blended, it
+// switches half way to it), a shape made flat (it turns into a card), and a model with no depth at all (every shape turns as a rounded cut-out).
+export function turnCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }
+  const angleText = (at: number, tilt: number) => `${at}°${tilt ? ` nodded ${tilt}°` : ''}`
+  for (const s of c.shapes) {
+    const t = s.turn
+    if (!t || s.mirrorOf) continue
+    for (const a of t.angles) if (a.pts.length !== s.pts.length) say(`${s.name || s.id} is drawn at ${angleText(a.at, a.tilt)} with ${a.pts.length} points and has ${s.pts.length}: it switches to that outline half way instead of blending into it.`)
+    if (t.thick === 0 && t.dz.length === 0 && t.angles.length === 0) say(`${s.name || s.id} has no roundness: it turns into a flat card, gone at the side.`)
+  }
+  const deep = c.groups.some(g => (g.depth ?? 0) !== 0) || c.objects.some(o => !!o.wrap)
+    || c.shapes.some(s => !!s.turn && (s.turn.depth !== 0 || s.turn.dz.length > 0 || s.turn.angles.length > 0 || s.turn.thick != null))
+  if (!deep && c.shapes.length > 0) say('Nothing in the model has depth yet: turned, every shape is a rounded cut-out about its middle. Give groups a pivot depth, shapes a depth or depths of their points, or draw them at key angles.')
+  return lines
+}

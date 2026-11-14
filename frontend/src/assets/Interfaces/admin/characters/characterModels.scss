@@ -412,6 +412,8 @@
   &--after { box-shadow: inset -3px 0 0 var(--accent); }
   &--fixed:not(.cmIconBtn--on) { opacity: 1; }
 }
+// the angle the figure is seen from (phase A3): the menu of named angles and the Turn slider
+.dzAngle { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; select { max-width: 9.5em; } input { width: clamp(70px, 12vw, 160px); accent-color: var(--accent); } }
 .dzZoom { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; input { width: clamp(90px, 16vw, 200px); accent-color: var(--accent); } output { flex: 0 0 3.5em; text-align: right; font-size: var(--text-small); color: var(--ink-muted); } }
 .dzDrawerBtn--on { background: var(--ov-sink-3); }
 .dzDrawer {

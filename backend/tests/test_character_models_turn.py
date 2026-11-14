@@ -16,11 +16,18 @@ def test_a_turn_is_kept_and_repaired() -> None:
     assert ModelShape.model_validate({"id": "s", "pts": PTS}).turn is None
 
 
-def test_outlines_at_key_angles_are_multiples_of_15_and_never_the_front_or_the_back() -> None:
+def test_outlines_at_key_angles_are_multiples_of_15_and_never_the_front_or_the_back_seen_level() -> None:
     angles = [{"at": 90, "tilt": 37, "pts": PTS}, {"at": 90, "tilt": 30, "pts": PTS}, {"at": 0, "pts": PTS}, {"at": 180, "pts": PTS}, {"at": 50, "pts": PTS}, {"at": -45, "pts": PTS}, {"at": 135, "pts": PTS[:2]}]
     s = ModelShape.model_validate({"id": "s", "pts": PTS, "turn": {"angles": angles}})
     assert s.turn is not None
     assert [(a.at, a.tilt) for a in s.turn.angles] == [(90, 30), (315, 0)]
+
+
+def test_a_nodded_key_may_be_drawn_at_the_front_and_the_back() -> None:
+    angles = [{"at": 0, "tilt": 30, "pts": PTS}, {"at": 180, "tilt": -60, "pts": PTS}, {"at": 0, "tilt": 0, "pts": PTS}]
+    s = ModelShape.model_validate({"id": "s", "pts": PTS, "turn": {"angles": angles}})
+    assert s.turn is not None
+    assert [(a.at, a.tilt) for a in s.turn.angles] == [(0, 30), (180, -60)]
 
 
 def test_a_form_may_have_outlines_at_key_angles() -> None:

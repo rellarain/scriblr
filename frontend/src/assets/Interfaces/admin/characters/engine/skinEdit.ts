@@ -1,4 +1,5 @@
 import type { ModelContent, ModelRange, ModelShape } from '../../../../../api/types'
+import { angleOf, type View } from './angles'
 import { groupById, shapeById, updateShape } from '../modelContent'
 import { boxOf, build, flatten, reflectList } from './geometry'
 import { LIMITS } from './limits'
@@ -14,14 +15,14 @@ const label = (c: ModelContent, gid: string) => groupById(c, gid)?.name.trim() |
 const FULL = `A shape may follow at most ${LIMITS.skinMax} groups besides its own: clear one of them first.`
 
 // Why the selected shape's weights cannot be painted, in words (null: they can). They are painted on the base outline, seen from the front.
-export function skinBlocked(c: ModelContent, shapeId: string, view: 'front' | 'back', formEditing: boolean): string | null {
+export function skinBlocked(c: ModelContent, shapeId: string, view: View, formEditing: boolean): string | null {
   const s = shapeById(c, shapeId)
   if (!s) return 'Pick a shape to paint its skin weights.'
   if (s.mirrorOf) return 'This is a twin: it is skinned as its original is. Paint the original.'
   if (s.copyOf && s.pts.length < 3) return 'This shape follows its pattern: paint the pattern, or give it an outline of its own.'
   if (s.pts.length < 3) return 'This shape has no outline to paint.'
   if (!ownGroup(c, shapeId)) return 'This shape is in no group, so it has nothing to follow: put its object in a group first.'
-  if (view === 'back') return 'Skin weights are painted from the front: go back to the front view.'
+  if (angleOf(view) !== 0) return 'Skin weights are painted from the front: go back to the front view.'
   if (formEditing) return 'Skin weights are painted on the base outline: choose the default form to paint them.'
   return null
 }

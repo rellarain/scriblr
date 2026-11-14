@@ -1509,9 +1509,10 @@ class ModelSkin(BaseModel):
 
 
 class ModelAngleOutline(BaseModel):
-    """An outline of a shape drawn at a key angle (phase A1): `at` the angle the figure is turned to, in degrees (a multiple of 15, never 0 or 180: those are the front
-    outline and `back`), `tilt` the nod of a pitch key (0: level), and the outline itself. It is blended with the neighbouring keys when it has as many points as the base.
-    A key that is not a multiple of 15 is dropped."""
+    """An outline of a shape drawn at a key angle (phase A1): `at` the angle the figure is turned to, in degrees (a multiple of 15), `tilt` the nod of a pitch key (0:
+    level), and the outline itself. Seen level, the front and the back (0 and 180) are not key angles: those are the outline and `back`; a nodded key may be drawn there
+    (phase A3: the head seen from the front looking up). It is blended with the neighbouring keys when it has as many points as the base. A key that is not a multiple of
+    15 is dropped."""
 
     at: int
     tilt: int = 0
@@ -1523,8 +1524,8 @@ class ModelAngleOutline(BaseModel):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
             raise ValueError("an angle is a number")
         a = int(round(value)) % 360
-        if a % 15 != 0 or a in (0, 180):
-            raise ValueError("a key angle is a multiple of 15, not the front or the back")
+        if a % 15 != 0:
+            raise ValueError("a key angle is a multiple of 15")
         return a
 
     @field_validator("tilt", mode="before")
@@ -1539,6 +1540,12 @@ class ModelAngleOutline(BaseModel):
     @classmethod
     def _pts(cls, value: Any) -> list[Any]:
         return _keep_valid(ModelPoint, value)
+
+    @model_validator(mode="after")
+    def _not_the_front_or_back(self) -> "ModelAngleOutline":
+        if self.tilt == 0 and self.at in (0, 180):
+            raise ValueError("seen level, the front and the back are the outline and its back outline, not key angles")
+        return self
 
 
 def _angle_outlines(value: Any) -> list[ModelAngleOutline]:

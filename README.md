@@ -450,7 +450,7 @@ described, now stale, in `docs/data-model.md`).
   Phase A1 (turning) adds, with defaults: on a shape `turn` (`ModelTurn`: `depth` how far its middle stands toward the
   viewer from its group's pivot, `thick` how deep it is for its width (null: its layer's, body 0.8, clothing 0.85, hair
   0.9), `dz` one depth per point or none, `angles` outlines drawn at key angles (`ModelAngleOutline`: `at` a multiple of
-  15 that is not 0 or 180, `tilt` a nod for a pitch key, `pts`; at most 16), `seen` the angles it shows between), on a
+  15, `tilt` a nod for a pitch key, `pts`; seen level not 0 or 180, which are the outline and `back`; at most 16), `seen` the angles it shows between), on a
   form's outline `angles` too, on a group `depth` (its pivot's, added to its parent's) and on an object `wrap` (the
   shape it lies on: its points take that shape's rounded surface as their depth; a fault when that shape is missing or
   its own). A view is the front, the back or an angle in degrees (`engine/angles.ts`): the front and the back solve as
@@ -460,6 +460,13 @@ described, now stale, in `docs/data-model.md`).
   front.
   Phase A2 adds the drive kinds `yaw` (a group turned in depth about its own up line) and `pitch` (nodded, up for a
   positive amount), both about the group's pivot in depth, the innermost group first; a twin turns the other way.
+  Phase A3 draws the outlines at key angles (no new fields; a nodded key may now sit at 0 or 180): seen at a yaw and a
+  nod (the view's angle plus the turns of its groups), a shape is drawn from its key there, two keys of a row at most 90
+  degrees apart blended, a lone key blended with the turned outline within 45 degrees, and a row of nodded keys blended
+  with the level row. A key is drawn in the group's own space about where the front puts the shape, moved to where its
+  middle turns to; it is kept as drawn at rest and moved point by point by what links and sliders move the outline by.
+  A form's outline is carried to each key of the base (point by point with as many points, else along the nearest
+  edges) unless the form has its own key there; a twin takes its original's keys at 360 minus the angle, mirrored.
   Phase O1 (skin weights) adds, with a default: on a shape `skin` (`ModelSkin`: `g`, a group the shape's points also
   follow besides their own, and `w`, one weight per point, 0..1 in hundredths, fitted to the number of points; at most 3,
   one per group). The solver moves a shape's points after its links and sliders and before they hang: a point turns about

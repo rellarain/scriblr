@@ -1,13 +1,13 @@
 import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelFallSide, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, roundCorners, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
-import { carriesOutline, classKey, classesOf, lookOf, membersOf, overrideFor, type Choices } from './forms'
+import { carriesOutline, classKey, classesOf, lookOf, membersOf, overrideEntry, overrideFor, type Choices } from './forms'
 import { applyDrape, applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 import { texturedPath } from './texture'
-import { angleOf, fromBehind, type View } from './angles'
-import { LAYER_THICK, facing, facingFade, handleDepths, inSeen, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turningOf, viewZ, type Spin, type Surface } from './turn'
+import { angleOf, fromBehind, wrapAngle, type View } from './angles'
+import { LAYER_THICK, carryKey, facing, facingFade, handleDepths, inSeen, isKeySpot, keyAt, mixBuilt, pickKeys, shiftOf, shifted, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turnedX, turningOf, twinKeys, unbuild, usesKeys, viewZ, type Key, type KeyPick, type Moved, type Spin, type Surface } from './turn'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -179,7 +179,15 @@ export interface SolvedShape {
   // the viewer (1 straight at the viewer, -1 away).
   depth?: number
   face?: number
+  // Phase A3, only when the figure or its group is turned: the yaw and nod the shape is seen at (the view's angle and the turns of its groups), each held to 0..360 and
+  // the nod as it is.
+  seenAt?: [number, number]
+  // Phase A3, only when solved for editing (SolveOptions.edit) and the shape is seen at a key spot (see turn.ts isKeySpot): the outline the canvas shows and edits there.
+  angle?: SolvedAngle
 }
+// A shape at a key spot: the yaw and nod it is seen at, whether an outline is drawn there (false: `local` is the outline it is drawn with now, to start one from), the
+// outline as shown in the space `matrix` draws from, and what links and sliders move each point by (an outline drawn there is kept without it: turn.ts shifted).
+export interface SolvedAngle { at: number; tilt: number; drawn: boolean; local: ModelPoint[]; matrix: Mat; shift: Array<[number, number]> | null }
 // The rig outline of a skinned shape before the skin moved it (each point in the space of its base group: see skin.ts PointSkin) and what each point follows (null: a point a link
 // has already put in the shape's own space). A point linked to the shape is placed on this outline and follows the same groups; a twin reflects it and skins itself. `drawn` is
 // the same for the outline that is drawn when it is not the rig outline (a form, the back view; null when that one is not skinned).
@@ -290,7 +298,7 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
 // `fall` is the side things fall to (default: down).
 // `order` is the order a style draws an object's shapes in (back to front), per object; `hidden` may also name shapes (a style hides some of its object's).
 // `zoff` (phase 6b-3) is how far a garment or a hair part has been moved among the parts of its layer (see order.ts `layerUnits`), per part: a writer puts a jacket over a shirt.
-export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide; order?: Record<string, string[]>; zoff?: Record<string, number> }
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide; order?: Record<string, string[]>; zoff?: Record<string, number>; edit?: boolean }
 
 // The model with every slider at rest and every object scaled with its group, kept for the content it was solved from (a stretching object reads its target's
 // box from it).
@@ -375,6 +383,15 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   const formOutline = (sid: string): ModelPoint[] | undefined => {
     const oid = objectOfShape.get(sid), o = oid ? objectMap.get(oid) : undefined
     return o ? overrideFor(o, sid, choices) : undefined
+  }
+  // The whole entry, with the outlines the form has at key angles (phase A3).
+  const formEntry = (sid: string) => {
+    const oid = objectOfShape.get(sid), o = oid ? objectMap.get(oid) : undefined
+    return o ? overrideEntry(o, sid, choices) : undefined
+  }
+  const memberEntry = (tid: string, memberId: string | undefined) => {
+    const oid = objectOfShape.get(tid), t = oid ? objectMap.get(oid) : undefined
+    return t && memberId ? overrideEntry(t, tid, choices, memberId) : undefined
   }
   // The same for a shape of a class member that follows `tid`, a shape of the template: the template's forms, with the member's own choice on each axis.
   const memberForm = (tid: string, memberId: string | undefined): ModelPoint[] | undefined => {
@@ -694,7 +711,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   // The outline of a shape that has points of its own: the base outline linked and driven (what the rig reads), and what is drawn: a chosen form's outline in its
   // place, or in the back view the outline of its own for the back. An empty form outline hides the shape in every view. Each is linked, driven by its sliders, moved by its
   // skin weights, draped and then left to hang, in that order. A form whose axis carries what follows it (phase O8, `carry`) is what the rig reads too.
-  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined, carry = false): { rig: ModelPoint[]; drawn: ModelPoint[]; skin?: SolvedSkin } {
+  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined, carry = false): { rig: ModelPoint[]; drawn: ModelPoint[]; skin?: SolvedSkin; states: Moved[] } {
     const own = groupOfShape.get(sh.id) ?? null
     const outline = (source: ModelPoint[], movesOn: ModelPoint[]) => {
       const list = source.map(copyPoint)
@@ -710,14 +727,16 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     }
     let held = outline(sh.pts, sh.pts)
     let drawn = held.list, other: { list: ModelPoint[]; skinned: ReturnType<typeof skinNow> } | null = null
+    // the outlines it was made from, the front one (the base or the form) first and the back one last when it is drawn (phase A3: what a key is moved by)
+    const states: Moved[] = [{ drawn: held.list, rest: sh.pts }]
     if (form) {
-      other = outline(form, sh.pts); drawn = other.list
+      other = outline(form, sh.pts); drawn = other.list; states[0] = { drawn: other.list, rest: form }
       if (carry && form.length >= 3 && form.length === sh.pts.length) held = other
     }
-    if (behind && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) { other = outline(sh.back, sh.back); drawn = other.list }
+    if (behind && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) { other = outline(sh.back, sh.back); drawn = other.list; states.push({ drawn: other.list, rest: sh.back }) }
     const rig = held.list
-    if (!held.skinned) return { rig, drawn }
-    return { rig, drawn, skin: { ...held.skinned, ...(other && other !== held ? { drawn: other.skinned } : {}) } }
+    if (!held.skinned) return { rig, drawn, states }
+    return { rig, drawn, states, skin: { ...held.skinned, ...(other && other !== held ? { drawn: other.skinned } : {}) } }
   }
   const groupMatOf = (shapeId: string): Mat => { const gid = groupOfShape.get(shapeId); return gid ? groupMat(gid) : IDENTITY }
 
@@ -979,7 +998,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   // An outline built in the front, turned: point by point when it lies on a surface or its points have depths of their own, else as a rounded cut-out about its middle.
   // Returns the turned outline, the matrix that stands in for the turn (for an outline turned point by point, a near one: editing is off between key angles), and how far
   // toward the viewer and which way its middle faces.
-  function turnOutline(sh: ModelShape, origin: ModelShape, twin: boolean, groupId: string | null, fin: BuiltPoint[], count: number, closed: boolean): { fin: BuiltPoint[]; m: Mat; depth: number; face: number } {
+  function turnOutline(sh: ModelShape, origin: ModelShape, twin: boolean, groupId: string | null, fin: BuiltPoint[], count: number, closed: boolean): { fin: BuiltPoint[]; m: Mat; depth: number; face: number; from: [number, number]; to: [number, number] } {
     const b = boxOf(flatten(fin, closed)), cx = b.x + b.w / 2, cy = b.y + b.h / 2
     const own = origin.turn
     const oid = objectOfShape.get(sh.id) ?? objectOfShape.get(origin.id), o = oid ? objectMap.get(oid) : undefined
@@ -1005,18 +1024,44 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const nrm = surface ? surfaceAt(surface, cx, cy) : { nx: 0, nz: 1 }
       const [cx2, , cd2] = spinPoint(spins, cx, cy, dc), [nx, , nz] = spinVector(spins, nrm.nx, 0, nrm.nz)
       const k = Math.sign(Math.cos(((angle + spinTotal(spins).yaw) * Math.PI) / 180)) || 1
+      const [, cy2] = spinPoint(spins, cx, cy, dc)
       const turned = spinOutline(fin, depths, spins, T), X = cx2 * T.cos + cd2 * T.sin + T.axis * (1 - T.cos)
-      return { fin: turned, m: [k, 0, 0, 1, X - k * cx, 0], depth: turnedDepth(T, cx2, cd2), face: facing(T, nx, nz) }
+      return { fin: turned, m: [k, 0, 0, 1, X - k * cx, 0], depth: turnedDepth(T, cx2, cd2), face: facing(T, nx, nz), from: [cx, cy], to: [X, cy2] }
     }
     const dc = groupDepth(groupId) + lift, s = spinSilhouette(fin, cx, cy, dc, thickOf(origin), spins, T)
     const [nx, , nz] = spinVector(spins, 0, 0, 1)
-    return { fin: s.pts, m: s.m, depth: s.depth, face: facing(T, nx, nz) }
+    const [x2, y2, d2] = spinPoint(spins, cx, cy, dc)
+    return { fin: s.pts, m: s.m, depth: s.depth, face: facing(T, nx, nz), from: [cx, cy], to: [turnedX(T, x2, d2), y2] }
+  }
+
+  // Phase A3: the outlines a shape has at key angles, carried to the outline it is drawn from (a form) and kept as drawn (`carried`, for a twin to mirror), and each shape's
+  // outlines in the states its links and sliders put them in (for a twin to mirror too).
+  const carried = new Map<string, Key[]>()
+  const statesOf = new Map<string, Moved[]>()
+  function keysFor(sh: ModelShape, twin: ModelShape | undefined, tpl: ModelShape | undefined, memberId: string | undefined, states: Moved[], closed: boolean): Key[] {
+    if (twin) return twinKeys(carried.get(twin.id) ?? [], axis, reflectList)
+    const origin = tpl ?? sh, entry = tpl ? memberEntry(tpl.id, memberId) : formEntry(sh.id)
+    const rest = states[0]?.rest ?? origin.pts
+    // a form drawn at an angle by hand keeps its own outline there; at the other key angles the base's outline is carried to the form
+    const own: Key[] = entry?.angles ? entry.angles.map(a => ({ at: a.at, tilt: a.tilt, pts: a.pts })) : []
+    const out = [...own]
+    for (const k of origin.turn?.angles ?? []) {
+      if (own.some(x => x.at === k.at && x.tilt === k.tilt)) continue
+      out.push({ at: k.at, tilt: k.tilt, pts: carryKey(k.pts, origin.pts, rest, closed) })
+    }
+    return out
+  }
+  // A twin's outlines in their states: its original's mirrored, the one it draws being its own (a twin posed apart is skinned on its own).
+  function twinStates(twinId: string, drawn: ModelPoint[]): Moved[] {
+    const list = (statesOf.get(twinId) ?? []).map(m => ({ drawn: reflectList(m.drawn, axis), rest: reflectList(m.rest, axis) }))
+    if (list.length) list[list.length - 1] = { ...list[list.length - 1], drawn }
+    return list
   }
 
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
-    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = '', skin: SolvedSkin | undefined
+    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = '', skin: SolvedSkin | undefined, states: Moved[] = []
     // a shape of a class member follows a shape of the template; with no points of its own it is drawn as the template's shape is, in the member's own group,
     // under the member's own choice of form
     const followed = !twin && sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
@@ -1051,12 +1096,12 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       closed = twin.closed
     } else if (tpl && sh.pts.length < 3) {
       const o = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId), formCarries(tpl.id, memberId))
-      rig = o.rig; drawn = o.drawn; closed = tpl.closed; skin = o.skin
+      rig = o.rig; drawn = o.drawn; closed = tpl.closed; skin = o.skin; states = o.states
     } else {
       // The rig always reads the base outline. A form gives only the drawn outline (it still gets the shape's links and, when it has as many points as the
       // base, its recorded moves); an empty one hides the shape in every view.
       const o = plainOutline(sh, Mg, tpl ? memberForm(tpl.id, memberId) : formOutline(sh.id), tpl ? formCarries(tpl.id, memberId) : formCarries(sh.id))
-      rig = o.rig; drawn = o.drawn; skin = o.skin
+      rig = o.rig; drawn = o.drawn; skin = o.skin; states = o.states
       if (tpl) {
         const g = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId)).drawn
         ghost = g.length >= 3 ? pathText(build(g, tpl.closed, mul(G, Mg)), tpl.closed) : ''
@@ -1070,17 +1115,51 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const shown = ok && radius > 0 ? roundCorners(drawn, closed, radius) : drawn
     let fin = ok ? build(shown, closed, matrix) : []
     // phase A1: a turned figure turns each outline here, from where the front put it
-    let turned: { depth: number; face: number } | null = null
+    let turned: { depth: number; face: number } | null = null, weights: ModelPoint[] = shown, angleSpot: SolvedAngle | undefined, seenAt: [number, number] | undefined
+    if (twin) states = twinStates(twin.id, drawn)
     if (ok && !flat) {
+      statesOf.set(sh.id, states)
       frontBoxes.set(sh.id, boxOf(flatten(fin, closed)))
-      const t = turnOutline(sh, twin ?? tpl ?? sh, !!twin, groupId, fin, drawn === shown ? (twin ?? tpl ?? sh).pts.length : -1, closed)
+      const front = matrix, count = drawn === shown ? (twin ?? tpl ?? sh).pts.length : -1
+      const t = turnOutline(sh, twin ?? tpl ?? sh, !!twin, groupId, fin, count, closed)
       fin = t.fin; matrix = mul(t.m, matrix); turned = { depth: t.depth, face: t.face }
+      // phase A3: outlines drawn at key angles, each drawn about where the front put the shape and moved to where its middle turned to
+      const kept = keysFor(sh, twin, tpl, memberId, states, closed)
+      carried.set(sh.id, kept)
+      const spun = spinTotal(spinsOf(groupId)), yaw = wrapAngle(angle + spun.yaw), pitch = spun.pitch
+      seenAt = [Math.abs(yaw - Math.round(yaw)) < 1e-6 ? Math.round(yaw) % 360 : yaw, Math.abs(pitch - Math.round(pitch)) < 1e-6 ? Math.round(pitch) : pitch]
+      const blend = kept.length ? pickKeys(kept, yaw, pitch) : null
+      const B = mul(translate(t.to[0] - t.from[0], t.to[1] - t.from[1]), front)
+      const shownKey = (k: Key): ModelPoint[] => shifted(k.pts, shiftOf(states, k.pts.length))
+      const mixRows = (turnedFin: BuiltPoint[], drawKey: (k: Key) => BuiltPoint[]): BuiltPoint[] => {
+        const row = (p: KeyPick) => { const a = p.a ? drawKey(p.a) : turnedFin; return p.b ? mixBuilt(a, drawKey(p.b), p.w) : a }
+        let mixed = row(blend!.level)
+        if (blend!.tilted) mixed = mixBuilt(mixed, row(blend!.tilted.pick), blend!.tilted.w)
+        return mixed
+      }
+      if (blend && usesKeys(blend)) {
+        fin = mixRows(fin, k => build(radius > 0 ? roundCorners(shownKey(k), closed, radius) : shownKey(k), closed, B))
+        if (fin.length !== shown.length) weights = (blend.level.b ?? blend.level.a ?? blend.tilted?.pick.b ?? blend.tilted?.pick.a)?.pts ?? shown
+      }
+      // for the canvas: at a key spot, the outline to edit there (the one drawn there, or the one shown now to start from)
+      if (opts.edit && isKeySpot(yaw, pitch) && !twin) {
+        const at = Math.round(yaw) % 360, tilt = Math.round(pitch), exact = keyAt(kept, at, tilt)
+        if (exact) {
+          const shift = shiftOf(states, exact.pts.length)
+          angleSpot = { at, tilt, drawn: true, local: shifted(exact.pts, shift), matrix: B, shift }
+        } else {
+          const plainFin = radius > 0 ? turnOutline(sh, twin ?? tpl ?? sh, !!twin, groupId, build(drawn, closed, front), (twin ?? tpl ?? sh).pts.length, closed).fin : t.fin
+          const seen = blend && usesKeys(blend) ? mixRows(plainFin, k => build(shownKey(k), closed, B)) : plainFin
+          const local = unbuild(seen, B, drawn)
+          angleSpot = { at, tilt, drawn: false, local, matrix: B, shift: shiftOf(states, local.length) }
+        }
+      }
     }
     const poly = ok ? flatten(fin, closed) : []
     // the texture of the edge is in the painted path only: the outline that hit tests and boxes read stays smooth
     const texture = ok ? textureOf(sh, twin, tpl) : 0, origin = twin ?? tpl ?? sh
-    const textured = texture > 0 && (shown.some(p => (p.w ?? 0) > 0) || !inHangingObject(origin.id))
-    const d = !ok ? '' : textured ? texturedPath(fin, closed, shown.map(p => p.w), texture, origin.id) : pathText(fin, closed)
+    const textured = texture > 0 && (weights.some(p => (p.w ?? 0) > 0) || !inHangingObject(origin.id))
+    const d = !ok ? '' : textured ? texturedPath(fin, closed, weights.map(p => p.w), texture, origin.id) : pathText(fin, closed)
     // Which way the shape is drawn from: at the front or the back exactly, a shape drawn for one side only shows from that side; turned, it shows while it faces the viewer
     // (or within its own range of angles) and fades as it turns away.
     let seenFade = 1
@@ -1098,6 +1177,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       visible: ok && sideOk && !off && !sh.hide, off, fade: fadeOf(sh) * seenFade, z: (angle === 180 ? zBack : sh.z) + shift,
       ...(skin ? { skin } : {}),
       ...(turned ? { depth: turned.depth, face: turned.face } : {}),
+      ...(seenAt ? { seenAt } : {}),
+      ...(angleSpot ? { angle: angleSpot } : {}),
     }
   }
 

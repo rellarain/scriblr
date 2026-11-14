@@ -1,4 +1,4 @@
-import type { ModelAxis, ModelClass, ModelContent, ModelForm, ModelLook, ModelObject, ModelPoint, ModelPreset, ModelShape } from '../../../../../api/types'
+import type { ModelAxis, ModelClass, ModelContent, ModelForm, ModelLook, ModelObject, ModelOverride, ModelPoint, ModelPreset, ModelShape } from '../../../../../api/types'
 
 // Forms: an object has axes (eye shape, expression, style), each with forms, and shows one form of every axis. What the admin has chosen is test state (like the
 // Try it sliders): `Choices` maps "objectId.axisId" to a form id and is never saved. A form changes the outline of some of the object's shapes; a shape no form
@@ -50,6 +50,15 @@ export function overrideFor(o: ModelObject, shapeId: string, choices: Choices, o
   for (const axis of axesOf(o)) {
     const ov = chosenForm(o, axis, choices, ownerId)?.ovr.find(v => v.shape === shapeId)
     if (ov) return ov.pts
+  }
+  return undefined
+}
+
+// The whole entry the forms give a shape (its outline and its outlines at key angles, phase A3), or undefined, by the same rule.
+export function overrideEntry(o: ModelObject, shapeId: string, choices: Choices, ownerId = o.id): ModelOverride | undefined {
+  for (const axis of axesOf(o)) {
+    const ov = chosenForm(o, axis, choices, ownerId)?.ovr.find(v => v.shape === shapeId)
+    if (ov) return ov
   }
   return undefined
 }

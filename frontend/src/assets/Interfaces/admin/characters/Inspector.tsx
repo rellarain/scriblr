@@ -75,6 +75,8 @@ export interface InspectorProps {
   // Classes (what the Class panel asks for) and the forms chosen now (which member of a family is shown).
   classes: ClassActions
   choices: Choices
+  // How the selected shape or object turns with the figure (phase A3), built by the page.
+  turnSection?: ReactNode
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -149,6 +151,7 @@ function ShapeTab(p: InspectorProps) {
           <p className="cmInsText">{object.shapes.length} of {max.shapesPerObject} shapes. The shapes of an object are drawn in the order of the tree, later ones in front.</p>
           <PairPanel content={content} kind="object" id={object.id} actions={p.pairs} />
           <ClassPanel content={content} object={object} choices={p.choices} actions={p.classes} />
+          {p.turnSection}
         </>
       )}
       {sel.kind === 'group' && group && <p className="cmInsText">{group.objects.length} of {max.objectsPerGroup} objects.</p>}
@@ -182,6 +185,7 @@ function ShapeTab(p: InspectorProps) {
           {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} />}
           <LinksPanel content={content} shape={shape} selPoint={selPoint} linkMode={p.linkMode} bridge={p.bridge} actions={p.pairs} />
           <ViewPanel content={content} shape={shape} view={p.view} actions={p.pairs} />
+          {p.turnSection}
         </>
       )}
     </div>
