@@ -7,6 +7,7 @@ import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/
 import { apply, boxOf, build, flatten, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
+import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget } from './engine/connect'
 import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
@@ -39,6 +40,8 @@ const REACH_EDGE = 6
 const REACH_POINT = 7
 const REACH_CROSS = 9
 const CLICK_SLOP = 3
+// how near (in pixels) a dragged point has to come to a point or a segment of another shape to connect to it (shape editor S5)
+const CONNECT_REACH = 8
 // the box of the selected shape (shape editor S4): how far outside the shape it is drawn, and how far above it the turn handle sits, in pixels
 const BOX_PAD = 8
 const TURN_OFF = 18
@@ -104,6 +107,13 @@ export interface TaperCanvas {
   // take back the last point (Backspace)
   onBack: () => void
 }
+export interface ConnectTool {
+  onConnect: (shapeId: string, i: number, target: DropTarget) => void
+  // a right-drag on a connected point: pull it free and put it at (x, y) in its shape's space (it is then dragged)
+  onLoosen: (shapeId: string, i: number, x: number, y: number) => void
+  // a double-click on a shared segment adds a point to it and to every segment that shares it
+  onAddShared: (shapeId: string, e: number, x: number, y: number) => void
+}
 // How much of each edge of the canvas a toolbar covers, in pixels: the view is fitted and centred in what is left.
 export interface Insets { left: number; right: number; bottom: number; top?: number }
 const NO_INSETS: Insets = { left: 0, right: 0, bottom: 0, top: 0 }
@@ -135,6 +145,9 @@ export interface CanvasProps {
   // The shape editor (S4): the selected shape has a box with handles that resize it and one that turns it; `keepRatio` makes every resize keep the proportions (Shift does too).
   transform?: boolean
   keepRatio?: boolean
+  // The shape editor's connections (S5): a point dragged over a point or a segment of another shape is shown ready (the alert colour) and connected where it is dropped; a
+  // welded point drags the point it is welded to, a point on a segment slides along it, and a right-drag pulls a connected point free.
+  connect?: ConnectTool | null
   // The view was moved by the canvas itself (panned with the right button, or by holding a drag at an edge).
   onViewMoved?: () => void
   // False while the selected shape's points are changed by a slider, or the shape is a derived twin: it is shown, not edited.
@@ -181,7 +194,9 @@ export interface CanvasProps {
 }
 
 type Drag =
-  | { kind: 'point'; shapeId: string; index: number; x0: number; y0: number; moved: boolean }
+  | { kind: 'point'; shapeId: string; index: number; x0: number; y0: number; moved: boolean; via?: { shapeId: string; i: number } }
+  // a point locked onto a segment of another shape, slid along it (shape editor S5)
+  | { kind: 'slide'; shapeId: string; index: number; x0: number; y0: number; moved: boolean }
   | { kind: 'handle'; shapeId: string; index: number; which: 'hi' | 'ho' }
   | { kind: 'move'; shapeId: string; last: [number, number]; start: [number, number]; from: ModelShape; box: Box | null; world0: [number, number]; box0: Box | null; x0: number; y0: number; moved: boolean }
   | { kind: 'pivot' }
@@ -226,6 +241,15 @@ export function DesignerCanvas(p: CanvasProps) {
     return () => observer.disconnect()
   }, [])
   const dragRef = useRef<Drag | null>(null)
+  // what a dragged point would connect to if it were dropped now (shape editor S5)
+  const [drop, setDrop] = useState<DropTarget | null>(null)
+  const dropRef = useRef<DropTarget | null>(null)
+  const showDrop = (t: DropTarget | null) => {
+    const a = dropRef.current
+    const same = a === t || (!!a && !!t && a.kind === t.kind && a.shapeId === t.shapeId && (a.kind === 'point' ? a.i === (t as typeof a).i : a.e === (t as typeof a).e && Math.abs(a.x - t.x) + Math.abs(a.y - t.y) < 1e-3))
+    dropRef.current = t
+    if (!same) setDrop(t)
+  }
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<Hover | null>(null)
   const [guides, setGuides] = useState<{ x: number | null; y: number | null } | null>(null)
@@ -281,7 +305,9 @@ export function DesignerCanvas(p: CanvasProps) {
   const solvedShape = shape ? solved.shapes[shape.id] : undefined
   const matrix = solvedShape?.matrix
   const overlay = !!shape && !p.pose && !through && !!solvedShape?.visible && shape.pts.length >= 3
-  const built = overlay && matrix ? build(shape!.pts, shape!.closed, matrix) : []
+  // in the shape editor the points are drawn where the links put them (a welded point on its target, a shared segment with its handles)
+  const builtFrom = p.connect && solvedShape && solvedShape.local.length === shape?.pts.length ? solvedShape.local : shape?.pts
+  const built = overlay && matrix && builtFrom ? build(builtFrom, shape!.closed, matrix) : []
   const shapesById = new Map(content.shapes.map(s => [s.id, s]))
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
@@ -582,7 +608,22 @@ export function DesignerCanvas(p: CanvasProps) {
     if (p.skin) { beginPaint(e, i); return }
     p.onSelectPoint(i)
     if (p.weights && editable) { p.weights.onCycle(i); return }
-    if (!editable || linkedSet.has(i)) return
+    if (!editable) return
+    if (linkedSet.has(i)) {
+      // the shape editor (S5): a welded point drags the point it is welded to (both move), a point on a segment slides along it
+      if (!p.connect) return
+      const b = shape.pts[i].bind
+      if (isWeld(b)) {
+        const root = rootOf(content, shape.id, i)
+        dragRef.current = { kind: 'point', shapeId: root.shapeId, index: root.i, x0: e.clientX, y0: e.clientY, moved: false, via: { shapeId: shape.id, i } }
+        beginGuides([root.shapeId, shape.id])
+        capture(e)
+      } else if (b?.kind === 'edge') {
+        dragRef.current = { kind: 'slide', shapeId: shape.id, index: i, x0: e.clientX, y0: e.clientY, moved: false }
+        capture(e)
+      }
+      return
+    }
     dragRef.current = { kind: 'point', shapeId: shape.id, index: i, x0: e.clientX, y0: e.clientY, moved: false }
     beginGuides([shape.id])
     capture(e)
@@ -601,7 +642,9 @@ export function DesignerCanvas(p: CanvasProps) {
     e.stopPropagation()
     if (!shape || e.button !== 0 || !editable) return
     p.onGesture()
-    dragRef.current = { kind: 'handle', shapeId: shape.id, index, which }
+    // a handle of a shared segment is the handle of the segment that is drawn (shape editor S5)
+    const home = p.connect && part === 'segment' ? handleHome(content, shape.id, selPoint, index === selPoint ? 'start' : 'end') : null
+    dragRef.current = home ? { kind: 'handle', shapeId: home.shapeId, index: home.index, which: home.which } : { kind: 'handle', shapeId: shape.id, index, which }
     capture(e)
   }
   // The box's handles (shape editor S4): a press on one begins a resize or a turn, worked out from the shape as it is now; it is a click until it has moved a little.
@@ -706,6 +749,24 @@ export function DesignerCanvas(p: CanvasProps) {
         : turnFrom(d.from, d.frame, d.start, x, y, e.shiftKey === true))
       return
     }
+    if (d.kind === 'pan' && p.connect && d.target.kind === 'point' && Math.abs(e.clientX - d.startX) + Math.abs(e.clientY - d.startY) > 3 && isConnected(content, d.target.id, d.target.i)) {
+      // the shape editor (S5): a right-drag on a connected point pulls it free, and then drags it
+      const [fx, fy] = toWorld(e), fm = solved.shapes[d.target.id]?.matrix
+      const [lx, ly] = fm ? apply(inverse(fm), fx, fy) : [fx, fy]
+      p.connect.onLoosen(d.target.id, d.target.i, lx, ly)
+      dragRef.current = { kind: 'point', shapeId: d.target.id, index: d.target.i, x0: d.startX, y0: d.startY, moved: true }
+      return
+    }
+    if (d.kind === 'slide') {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+        d.moved = true
+        p.onGesture()
+      }
+      const [sx, sy] = toWorld(e), slid = slideOnEdge(content, solved, d.shapeId, d.index, sx, sy)
+      if (slid) p.onShape(d.shapeId, slid)
+      return
+    }
     if (d.kind === 'pan') {
       const r = rect(), dx = e.clientX - d.startX, dy = e.clientY - d.startY
       if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true
@@ -728,7 +789,10 @@ export function DesignerCanvas(p: CanvasProps) {
     const s = shapesById.get(d.shapeId)
     if (!s) return
     let [wx, wy] = toWorld(e)
-    if (d.kind === 'point' || d.kind === 'handle') [wx, wy] = snapPoint(s, d.kind === 'point' ? d.index : -1, wx, wy)
+    // the shape editor (S5): a dragged point over a point or a segment of another shape is ready to connect there (and is not snapped meanwhile)
+    const ready = d.kind === 'point' && p.connect ? dropTargetAt(content, solved, d.shapeId, wx, wy, CONNECT_REACH * u, weldTree(content, d.shapeId, d.index)) : null
+    if (d.kind === 'point') showDrop(ready)
+    if ((d.kind === 'point' && !ready) || d.kind === 'handle') [wx, wy] = snapPoint(s, d.kind === 'point' ? d.index : -1, wx, wy)
     else if (d.kind === 'move' && !onGrid && d.box0) {
       const b = d.box0, [sx, sy] = d.world0
       ;[wx, wy] = guided(wx, wy, (px, py) => {
@@ -756,6 +820,8 @@ export function DesignerCanvas(p: CanvasProps) {
     targetsRef.current = null
     setGuides(null)
     if (d && d.kind === 'pose') p.pose?.onUp()
+    if (d && d.kind === 'point' && d.moved && dropRef.current && p.connect) p.connect.onConnect(d.shapeId, d.index, dropRef.current)
+    showDrop(null)
     if (d && d.kind === 'pan' && !d.moved) p.onRightClick(d.target)
     if (d && d.kind === 'paint' && !d.moved && d.point >= 0) p.skin?.onStep(d.point, d.down ? -1 : 1)
   }
@@ -768,6 +834,8 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!h || h.kind !== 'edge') return
     const s = shapesById.get(h.shapeId), r = solved.shapes[h.shapeId]
     if (!s || !r || s.mirrorOf || (shape?.id === s.id && !editable)) return
+    // a shared segment gets its point on the segment that is drawn and on every segment that shares it (shape editor S5)
+    if (p.connect && (sharedSegment(content, s.id, h.e) || sharersOf(content, s.id, h.e).length)) { p.connect.onAddShared(s.id, h.e, h.x, h.y); return }
     const [x, y] = apply(inverse(r.matrix), h.x, h.y)
     const added = addPoint(s, h.e, { mirror, axis })
     if (added.index < 0) { p.onNote?.('A shape may have at most 60 points.'); return }
@@ -844,6 +912,15 @@ export function DesignerCanvas(p: CanvasProps) {
   const selectedPointsDrawn = shown.has('points') && overlay
   // The box of the selected shape (shape editor S4), while the shape itself is what is selected: its frame a few pixels out, eight handles that resize it and a round one above
   // it that turns it.
+  // the point being dragged that is ready to connect (the selected shape's point, also when the drag moves the point it is welded to), and the names of the shared segments
+  // of the selected shape as titles on a band along each (shape editor S5)
+  const dragging = dragRef.current?.kind === 'point' ? dragRef.current : null
+  const connectAt = drop && dragging ? dragging.via ?? { shapeId: dragging.shapeId, i: dragging.index } : null
+  const sharedNames = p.connect && selectedPointsDrawn && shape ? shape.pts.map((pt, k) => {
+    const name = pt.bind?.segName, next = built[(k + 1) % built.length]
+    if (!name || !next || (!shape.closed && k >= built.length - 1) || !sharedSegment(content, shape.id, k)) return null
+    return <path key={`n${k}`} d={segmentPath(built[k], next)} className="cmSegName" data-segment-name={k}><title>{name}</title></path>
+  }) : null
   const boxFrame = p.transform && selectedPointsDrawn && part === 'shape' && editable && !p.taper && !p.weights && !p.skin && !p.pick ? frameOf(shape!) : null
   const boxMarkup = boxFrame && matrix ? (() => {
     const pad = BOX_PAD * u, at = (pt: [number, number]) => apply(matrix, pt[0], pt[1])
@@ -963,15 +1040,24 @@ export function DesignerCanvas(p: CanvasProps) {
     points: selectedPointsDrawn ? (
       <>
         {boxMarkup}
+        {sharedNames}
+        {drop && (
+          <g aria-hidden="true">
+            <circle cx={drop.x} cy={drop.y} r={8 * u} className="cmConnectRing cmConnectRing--under" />
+            <circle cx={drop.x} cy={drop.y} r={8 * u} className="cmConnectRing" data-connect={drop.kind} />
+          </g>
+        )}
         {built.map((b, i) => {
           const w = Math.min(1, Math.max(0, shape!.pts[i].w ?? 0))
           return (
             <circle
               key={i} cx={b.x} cy={b.y} r={(ptOn(i) || i === hoveredPoint ? 5.5 : edgeOnSelected ? 3 : 4) * u} role="button" tabIndex={-1} aria-pressed={ptOn(i)}
               aria-label={`Point ${i + 1}${linkedSet.has(i) ? ', linked' : ''}${p.skin ? `, skin weight ${Math.round((p.skin.weights[i] ?? 0) * 100)}%` : w > 0 ? `, weight ${Math.round(w * 100)}%` : p.weights ? ', no weight' : ''}`}
-              className={`cmPoint${ptOn(i) ? ' cmPoint--sel' : ''}${i === hoveredPoint ? ' cmPoint--hover' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}${w > 0 && !p.skin ? ' cmPoint--weighted' : ''}${p.weights || p.skin ? ' cmPoint--weigh' : ''}`}
+              className={`cmPoint${ptOn(i) ? ' cmPoint--sel' : ''}${i === hoveredPoint ? ' cmPoint--hover' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}${w > 0 && !p.skin ? ' cmPoint--weighted' : ''}${p.weights || p.skin ? ' cmPoint--weigh' : ''}${connectAt && connectAt.shapeId === shape!.id && connectAt.i === i ? ' cmPoint--connect' : ''}`}
               onPointerDown={e => onPointDown(e, i)}
-            />
+            >
+              {shape!.pts[i].bind?.name ? <title>{shape!.pts[i].bind!.name}</title> : null}
+            </circle>
           )
         })}
       </>

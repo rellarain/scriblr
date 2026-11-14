@@ -450,6 +450,11 @@ described, now stale, in `docs/data-model.md`).
   Shape editor S4 adds, with a default: on a shape `rot` (degrees, -180 up to 180 to two decimals, 0 by default;
   repaired, never refused): the angle its own frame is turned. The points stay as drawn; the editor measures the box it
   draws round the shape along this frame, so the box turns with the shape. A template resets it to 0.
+  Shape editor S5 adds, with defaults: on a point link (`ModelBind`) `name` and `segName` (at most 40 characters each, trimmed;
+  empty: none): the name of the connection, and of the shared segment that starts at that point. Connections are the
+  existing point links: a weld is a point link with no offset, a lock an edge link with none; two neighbouring points
+  welded to two neighbouring points of one other shape are drawn as that shape's segment (the solver copies its curve
+  handles), so they share one curve on the writer's card too.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

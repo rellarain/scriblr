@@ -2,6 +2,7 @@ import type {
   ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelFeatureKind, ModelFieldset, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPattern, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelStateOption, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
+import { NAME_LIMIT } from './engine/connect'
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
 import { roundWeight } from './engine/skin'
@@ -46,12 +47,18 @@ const idOrNull = (v: unknown): string | null => idOf(v)
 const pair = (v: unknown): [number, number] | null => (Array.isArray(v) && v.length === 2 ? [num(v[0], 0, -200, 200), num(v[1], 0, -200, 200)] : null)
 
 // A point link the server would accept (it needs the shape it follows), or null.
+// A connection's name, or its shared segment's (shape editor S5), as the server keeps it: trimmed, at most 40 characters, left out when empty.
+const bindName = (key: 'name' | 'segName', v: unknown): Record<string, string> => {
+  const t = typeof v === 'string' ? v.trim().slice(0, NAME_LIMIT) : ''
+  return t ? { [key]: t } : {}
+}
+
 function bind(v: unknown): ModelBind | null {
   if (!isRecord(v)) return null
   const s = idOf(v.s)
   if (!s) return null
   const at = (x: unknown) => Math.round(num(x, 0, 0, LIMITS.pointsMax - 1))
-  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}) }
+  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName) }
 }
 
 function point(v: unknown): ModelPoint {

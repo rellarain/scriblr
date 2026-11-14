@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE, FIGURE_MAX_ON } from '../../../../api/types'
+import { NAME_LIMIT } from './engine/connect'
 import { LIMITS } from './engine/limits'
 import { PROPS, PROP_KEYS } from './engine/props'
 import { DEPTH_MAX } from './engine/rig'
@@ -151,6 +152,8 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.outlineMin).toBe(decimal('MODEL_OUTLINE_MIN'))
     expect(LIMITS.outlineMax).toBe(decimal('MODEL_OUTLINE_MAX'))
     expect(LIMITS.outlineNew).toBe(decimal('MODEL_OUTLINE_NEW'))
+    // the name of a connection (shape editor S5)
+    expect(NAME_LIMIT).toBe(number('MODEL_BIND_NAME_MAX'))
     expect(LIMITS.patternsWarn).toBe(number('MODEL_PATTERNS_WARN'))
     expect(LIMITS.patternsMax).toBe(number('MODEL_PATTERNS_MAX'))
     expect(LIMITS.patternMarksMax).toBe(number('MODEL_PATTERN_MARKS_MAX'))

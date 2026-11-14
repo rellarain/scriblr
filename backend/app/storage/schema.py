@@ -1235,6 +1235,7 @@ MODEL_ROUND_MAX = 20     # corner roundness (phase D4): the radius, in the model
 MODEL_OUTLINE_MIN = 0.25   # a shape's outline (shape editor S3): the thinnest and thickest width, in the model's units, and the width a new shape starts with
 MODEL_OUTLINE_MAX = 20
 MODEL_OUTLINE_NEW = 0.75
+MODEL_BIND_NAME_MAX = 40   # shape editor S5: the name of a connection, and of a shared segment
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
@@ -1353,6 +1354,14 @@ class ModelBind(BaseModel):
     # An edge link may also leave along the direction of its edge (phase 5b): between two such points locked to different shapes the outline runs on
     # smoothly from one edge to the other, as skin does across a joint (a bridge).
     tan: bool = False
+    # Shape editor S5: the name of the connection, and of the shared segment that starts at this point (at most MODEL_BIND_NAME_MAX characters each; empty: none).
+    name: str = ""
+    segName: str = ""
+
+    @field_validator("name", "segName", mode="before")
+    @classmethod
+    def _names(cls, value: Any) -> str:
+        return value.strip()[:MODEL_BIND_NAME_MAX] if isinstance(value, str) else ""
 
     @field_validator("tan", mode="before")
     @classmethod

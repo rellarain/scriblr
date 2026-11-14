@@ -256,6 +256,12 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Time and date on the sky, locked | 4.5:1 | 4.7 (4.6) | 4.6 (4.6) | 4.6 (4.6) | 6.1 (4.6) |
 | Name and time on the sky of a time of day that is off | 4.5:1 | 4.7 (4.6) | 5.6 (4.6) | 4.7 (4.6) | 5.9 (5.4) |
 
+## Designer canvas
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Ring round a point being connected, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
+
 ## Schedule
 
 | Pair | Needs | Dawn | Day | Dusk | Night |

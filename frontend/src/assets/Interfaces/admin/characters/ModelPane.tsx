@@ -43,7 +43,7 @@ import { toggleUnder } from './engine/wear'
 import { stepDrape } from './engine/drapeEdit'
 import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
-import { cycleMode, newShape, toggleSegment } from './engine/edit'
+import { cycleMode, movePoint, newShape, toggleSegment } from './engine/edit'
 import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine/bridgeEdit'
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
@@ -77,7 +77,9 @@ import {
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { LIMITS } from './engine/limits'
-import type { ArrangeActions } from './ShapePanels'
+import type { ArrangeActions, ConnectionActions } from './ShapePanels'
+import type { ConnectTool } from './DesignerCanvas'
+import { addPointShared, connect, disconnect, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
 import type { DrapeActions, FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName, WearActions } from './rigActions'
@@ -415,15 +417,21 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       return
     }
     // points recorded or linked by number cannot survive a change in how many there are
-    let base = content, cleared: string[] = [], cut: string[] = []
+    let base = content, cleared: string[] = [], cut: string[] = [], rebound = false
     if (outlineSize(content, old) !== next.pts.length) {
       const r = clearPointMoves(content, id)
-      const l = clearLinksTo(r.content, id)
-      base = l.content; cleared = r.cleared; cut = l.cut
+      if (shapesOnly) {
+        // the shape editor keeps connections to the same places (S5): a weld follows its point to its new number, and only one whose point went is cut
+        const l = rebindByPlace(r.content, canvasSolved, updateShape(r.content, id, () => next), id)
+        base = l.content; cleared = r.cleared; cut = l.cut; rebound = true
+      } else {
+        const l = clearLinksTo(r.content, id)
+        base = l.content; cleared = r.cleared; cut = l.cut
+      }
     }
-    commit(updateShape(base, id, () => next))
+    commit(rebound ? base : updateShape(base, id, () => next))
     if (cleared.length) setNote(`The recorded point moves of ${cleared.join(', ')} were cleared because the shape's points changed. Record them again.`)
-    else if (cut.length) setNote(`The links of ${cut.join(', ')} to this shape were cut because its points changed. Link them again.`)
+    else if (cut.length) setNote(rebound ? `The connections of ${cut.join(', ')} to the point that was deleted were cut.` : `The links of ${cut.join(', ')} to this shape were cut because its points changed. Link them again.`)
     if (point !== undefined) selectPoint(point)
   }
   // The weight of a point of the selected shape (how free it is to hang), set through the canvas's own edit so a form or the back view gets it where it belongs.
@@ -505,7 +513,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (s && changeable) editShape(s.id, cycleMode(s, t.i, { mirror: mirror && !shapesOnly, axis: content.axis }), t.i)
     } else {
       selectSegment(t.e)
-      if (s && changeable) editShape(s.id, toggleSegment(s, t.e))
+      // a shared segment is the segment that is drawn: it changes there (shape editor S5)
+      const home = shapesOnly && s ? segmentHome(content, s.id, t.e) : null, homeShape = home ? shapeById(content, home.shapeId) : undefined
+      if (home && homeShape && home.shapeId !== s!.id) editShape(home.shapeId, toggleSegment(homeShape, home.e))
+      else if (s && changeable) editShape(s.id, toggleSegment(s, t.e))
     }
   }
 
@@ -1389,6 +1400,34 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     canBack: arrangeIndex > 0,
   } : undefined
 
+  // The shape editor's connections (S5): connecting a dropped point (part of the drag's undo step), pulling a point free with a right-drag (an undo step of its own, before
+  // the drag), adding a point to a shared segment, and naming and cutting connections in the panel.
+  const connectTool: ConnectTool | null = shapesOnly ? {
+    onConnect: (sid, i, target) => {
+      const tried = connect(content, canvasSolved, sid, i, target)
+      if (!tried.ok) { setNote(tried.reason); return }
+      models.edit(entry.id, c => { const e = connect(c, canvasSolved, sid, i, target); return e.ok ? e.content : c })
+    },
+    onLoosen: (sid, i, x, y) => {
+      if (!recording) setHistory(h => remember(h, content))
+      models.edit(entry.id, c => updateShape(loosen(c, canvasSolved, sid, i), sid, sh => movePoint(sh, i, x, y)))
+    },
+    onAddShared: (sid, e, x, y) => {
+      const next = addPointShared(content, canvasSolved, sid, e, x, y, policy.max.points)
+      if (!next) { setNote(`A shape may have at most ${policy.max.points} points.`); return }
+      commit(next, true)
+    },
+  } : null
+  const connections: ConnectionActions | undefined = shapesOnly ? {
+    part,
+    onName: (sid, i, field, value) => models.edit(entry.id, c => nameConnection(c, sid, i, field, value)),
+    onDisconnect: (sid, i, both) => {
+      const n = shapeById(content, sid)?.pts.length ?? 0
+      const once = disconnect(content, canvasSolved, sid, i)
+      commit(both && n ? disconnect(once, canvasSolved, sid, (i + 1) % n) : once, true)
+    },
+  } : undefined
+
   // ---- the toolbars ----
 
   const consoleBar = (
@@ -1423,7 +1462,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
-            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio}
+            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onEditShape={editShape}
             onRightClick={onRightClick}
@@ -1548,7 +1587,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange}
+              arrange={arrange} connections={connections}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}

@@ -1,10 +1,13 @@
-import type { ModelShape } from '../../../../api/types'
-import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PolygonIcon } from '../../../icons'
+import type { ModelContent, ModelShape } from '../../../../api/types'
+import type { PartKind } from './designerState'
+import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine/connect'
+import { shapeById } from './modelContent'
+import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PolygonIcon } from '../../../icons'
 import { LIMITS } from './engine/limits'
 import { MIN_SIDE, alignShape, flipShape, frameOf, setPlace, setSize, setTurn } from './engine/transform'
 import { Stepper } from './Stepper'
 
-// The shape editor's own sections of the panel: how a shape is placed (S4) and how it looks (S3). Each step is one undo step.
+// The shape editor's own sections of the panel: how a shape is placed (S4), how it looks (S3) and what it is connected to (S5). Each step is one undo step.
 
 type EditShape = (id: string, next: ModelShape, selectPoint?: number) => void
 
@@ -61,6 +64,58 @@ export function LookSection({ shape, onEditShape }: { shape: ModelShape; onEditS
         <Stepper label="Outline width" value={on ? String(width) : 'None'} lowerOff={!on || width <= LIMITS.outlineMin} raiseOff={!on || width >= LIMITS.outlineMax} bigBy={1} onStep={stepWidth} />
       </div>
       <Stepper label="Opacity of the shape" value={`${op}%`} lowerOff={op <= 0} raiseOff={op >= 100} bigBy={25} onStep={stepOpacity} />
+    </div>
+  )
+}
+
+// ---- connections (S5) ----
+
+// What the Connections section needs from the page: which part of the shape is selected, naming a connection (or the shared segment that starts at a point) and cutting one
+// (`both`: the two ends of a shared segment).
+export interface ConnectionActions {
+  part: PartKind
+  onName: (shapeId: string, i: number, field: 'name' | 'segName', value: string) => void
+  onDisconnect: (shapeId: string, i: number, both: boolean) => void
+}
+
+interface ConnectionRow { key: string; text: string; shapeId: string; i: number; field: 'name' | 'segName'; value: string; label: string }
+
+// The connections of the selected point (its own, and the points welded to it) or the selected segment (shared with another shape, either way round), each with a name
+// and Disconnect.
+export function ConnectionsSection({ content, shape, selPoint, actions }: { content: ModelContent; shape: ModelShape; selPoint: number; actions: ConnectionActions }) {
+  const nameOf = (id: string): string => shapeById(content, id)?.name || 'a shape'
+  const rows: ConnectionRow[] = []
+  if (actions.part === 'point') {
+    const b = shape.pts[selPoint]?.bind
+    if (b) {
+      const text = b.kind === 'edge' ? `On a segment of ${nameOf(b.s)}` : isWeld(b) ? `Welded to point ${b.i + 1} of ${nameOf(b.s)}` : `Follows point ${b.i + 1} of ${nameOf(b.s)}`
+      rows.push({ key: 'own', text, shapeId: shape.id, i: selPoint, field: 'name', value: b.name ?? '', label: 'Name of the connection' })
+    }
+    for (const f of weldedTo(content, shape.id, selPoint)) {
+      const fb = shapeById(content, f.shapeId)?.pts[f.i]?.bind
+      rows.push({ key: `${f.shapeId}:${f.i}`, text: `Point ${f.i + 1} of ${nameOf(f.shapeId)} is welded to it`, shapeId: f.shapeId, i: f.i, field: 'name', value: fb?.name ?? '', label: `Name of the connection to ${nameOf(f.shapeId)}` })
+    }
+  } else if (actions.part === 'segment') {
+    const own = sharedSegment(content, shape.id, selPoint)
+    if (own) rows.push({ key: 'seg', text: `Shared with ${nameOf(own.shapeId)}`, shapeId: shape.id, i: selPoint, field: 'segName', value: shape.pts[selPoint]?.bind?.segName ?? '', label: 'Name of the shared segment' })
+    for (const sh of sharersOf(content, shape.id, selPoint)) {
+      const fb = shapeById(content, sh.shapeId)?.pts[sh.e]?.bind
+      rows.push({ key: `${sh.shapeId}:${sh.e}`, text: `Shared with ${nameOf(sh.shapeId)}`, shapeId: sh.shapeId, i: sh.e, field: 'segName', value: fb?.segName ?? '', label: `Name of the segment shared with ${nameOf(sh.shapeId)}` })
+    }
+  }
+  if (!rows.length) return null
+  return (
+    <div className="cmConnections" role="group" aria-label="Connections">
+      <h3 className="cmInsSub">Connections</h3>
+      {rows.map(r => (
+        <div key={r.key} className="cmConnRow">
+          <label className="cmField">
+            <span>{r.text}</span>
+            <input value={r.value} maxLength={NAME_LIMIT} aria-label={r.label} onChange={e => actions.onName(r.shapeId, r.i, r.field, e.target.value)} />
+          </label>
+          <button type="button" className="cmIconBtn" aria-label={r.field === 'segName' ? `Disconnect the segment shared with ${r.key === 'seg' ? nameOf(sharedSegment(content, shape.id, selPoint)?.shapeId ?? '') : nameOf(r.shapeId)}` : r.key === 'own' ? 'Disconnect' : `Disconnect ${nameOf(r.shapeId)}`} title="Disconnect" onClick={() => actions.onDisconnect(r.shapeId, r.i, r.field === 'segName')}><CloseIcon size={14} /></button>
+        </div>
+      ))}
     </div>
   )
 }

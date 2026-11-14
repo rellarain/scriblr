@@ -325,7 +325,7 @@ const frameOf = (solved: Solved, shapeId: string): Mat => {
   return (group ? solved.mats[group] : undefined) ?? IDENTITY
 }
 
-function reaches(c: ModelContent, from: string, goal: string): boolean {
+export function reaches(c: ModelContent, from: string, goal: string): boolean {
   const seen = new Set<string>(), stack = [from]
   while (stack.length) {
     const cur = stack.pop()!
