@@ -1239,6 +1239,10 @@ MODEL_UNDER_MAX = 24           # the garments or families one object is worn und
 MODEL_SKIN_MAX = 3             # skin weights (phase O1): the groups one shape follows besides its own
 MODEL_OVER_MAX = 8             # phase O2: the other objects a shading shape lies on (a shadow down the chest and the pelvis)
 MODEL_DEPTH_MAX = 89.0         # phase O2: the most a bone may point toward or away from the viewer, in degrees (a depth drive)
+MODEL_DEPTH_RANGE = (-200.0, 200.0)   # phase A1: how far toward the viewer (+) or away a group's pivot or a shape stands, in the model's units
+MODEL_THICK_RANGE = (0.0, 2.0)        # phase A1: how deep a shape is for its width (1: as deep as it is wide, round; 0: a flat card)
+MODEL_ANGLE_OUTLINES_MAX = 16         # phase A1: outlines drawn at key angles, per shape
+MODEL_TILT_RANGE = (-60, 60)          # phase A1: the nod of a pitch key, in degrees
 MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 24
@@ -1504,6 +1508,92 @@ class ModelSkin(BaseModel):
         return [round(_finite(v, 0.0, 0.0, 1.0), 2) for v in value[:MODEL_POINTS_MAX]]
 
 
+class ModelAngleOutline(BaseModel):
+    """An outline of a shape drawn at a key angle (phase A1): `at` the angle the figure is turned to, in degrees (a multiple of 15, never 0 or 180: those are the front
+    outline and `back`), `tilt` the nod of a pitch key (0: level), and the outline itself. It is blended with the neighbouring keys when it has as many points as the base.
+    A key that is not a multiple of 15 is dropped."""
+
+    at: int
+    tilt: int = 0
+    pts: list[ModelPoint] = Field(default_factory=list, max_length=MODEL_POINTS_MAX)
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+            raise ValueError("an angle is a number")
+        a = int(round(value)) % 360
+        if a % 15 != 0 or a in (0, 180):
+            raise ValueError("a key angle is a multiple of 15, not the front or the back")
+        return a
+
+    @field_validator("tilt", mode="before")
+    @classmethod
+    def _tilt(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+            return 0
+        t = int(round(value / 15)) * 15
+        return max(MODEL_TILT_RANGE[0], min(MODEL_TILT_RANGE[1], t))
+
+    @field_validator("pts", mode="before")
+    @classmethod
+    def _pts(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelPoint, value)
+
+
+def _angle_outlines(value: Any) -> list[ModelAngleOutline]:
+    """Outlines at key angles: a bad entry is dropped, so is a second one for the same angle and nod, and one with fewer than three points."""
+    out: list[ModelAngleOutline] = []
+    for a in _keep_valid(ModelAngleOutline, value):
+        if len(a.pts) >= 3 and all((x.at, x.tilt) != (a.at, a.tilt) for x in out):
+            out.append(a)
+    return out[:MODEL_ANGLE_OUTLINES_MAX]
+
+
+class ModelTurn(BaseModel):
+    """How a shape turns with the figure (phase A1): `depth` how far its middle stands toward the viewer from its group's pivot, `thick` how deep it is for its width (None:
+    its layer's default), `dz` how far each point stands from that (empty: none; else one per point of the outline), `angles` outlines drawn at key angles, and `seen` the
+    angles it is shown between (None: worked out from which way it faces)."""
+
+    depth: float = 0.0
+    thick: Optional[float] = None
+    dz: list[float] = Field(default_factory=list)
+    angles: list[ModelAngleOutline] = Field(default_factory=list, max_length=MODEL_ANGLE_OUTLINES_MAX)
+    seen: Optional[list[float]] = None
+
+    @field_validator("depth", mode="before")
+    @classmethod
+    def _depth(cls, value: Any) -> float:
+        return round(_finite(value, 0.0, *MODEL_DEPTH_RANGE), 2)
+
+    @field_validator("thick", mode="before")
+    @classmethod
+    def _thick(cls, value: Any) -> Optional[float]:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return round(_finite(value, 1.0, *MODEL_THICK_RANGE), 2)
+
+    @field_validator("dz", mode="before")
+    @classmethod
+    def _dz(cls, value: Any) -> list[float]:
+        if not isinstance(value, list):
+            return []
+        return [round(_finite(v, 0.0, *MODEL_DEPTH_RANGE), 2) for v in value[:MODEL_POINTS_MAX]]
+
+    @field_validator("angles", mode="before")
+    @classmethod
+    def _angles(cls, value: Any) -> list[ModelAngleOutline]:
+        return _angle_outlines(value)
+
+    @field_validator("seen", mode="before")
+    @classmethod
+    def _seen(cls, value: Any) -> Optional[list[float]]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return None
+        a, b = (_finite(v, 0.0, -360.0, 720.0) % 360 for v in value)
+        return [round(a, 1), round(b, 1)]
+
+
 class ModelShape(BaseModel):
     """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
 
@@ -1553,11 +1643,18 @@ class ModelShape(BaseModel):
     # Phase O2: the other objects a shading shape lies on besides its own (it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis). A twin
     # takes its original's, each object swapped for its twin.
     over: list[str] = Field(default_factory=list, max_length=MODEL_OVER_MAX)
+    # Phase A1: how the shape turns with the figure (depth, roundness, per-point depth, outlines at key angles). None: it stands at its group's depth with its layer's roundness.
+    turn: Optional[ModelTurn] = None
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("turn", mode="before")
+    @classmethod
+    def _turn(cls, value: Any) -> Any:
+        return _optional_model(ModelTurn, value)
 
     @field_validator("skin", mode="before")
     @classmethod
@@ -1576,6 +1673,9 @@ class ModelShape(BaseModel):
         for s in self.skin:
             if len(s.w) != n:
                 s.w = (s.w + [0.0] * n)[:n]
+        # per-point depth (phase A1): one per point too, when there is any
+        if self.turn is not None and self.turn.dz and len(self.turn.dz) != n:
+            self.turn.dz = (self.turn.dz + [0.0] * n)[:n]
         return self
 
     @field_validator("opBy", mode="before")
@@ -2017,11 +2117,21 @@ class ModelOverride(BaseModel):
 
     shape: str = Field(pattern=_MODEL_ID)
     pts: list[ModelPoint] = Field(default_factory=list, max_length=MODEL_POINTS_MAX)
+    # Phase A1: the form's outline drawn at key angles (None: carried over from the base shape's outlines at those angles).
+    angles: Optional[list[ModelAngleOutline]] = None
 
     @field_validator("pts", mode="before")
     @classmethod
     def _pts(cls, value: Any) -> list[Any]:
         return _keep_valid(ModelPoint, value)
+
+    @field_validator("angles", mode="before")
+    @classmethod
+    def _angles(cls, value: Any) -> Optional[list[ModelAngleOutline]]:
+        if value is None:
+            return None
+        out = _angle_outlines(value)
+        return out or None
 
 
 class ModelLook(BaseModel):
@@ -2226,6 +2336,14 @@ class ModelObject(BaseModel):
     # How far the object's weighted points hang back toward the way they were drawn when the body moves (phase O6), in percent: the hem of a coat or a skirt keeps hanging
     # when the hips tilt. 0 (the default) leaves them where the body takes them. A twin follows its original.
     drape: int = Field(default=0, ge=0, le=100)
+    # Phase A1: the shape the object lies on (an eye on the skull): each of its points stands as far toward the viewer as that shape's rounded surface does there, so it slides
+    # round the head as the head turns. None: its shapes stand at their own depths.
+    wrap: Optional[str] = None
+
+    @field_validator("wrap", mode="before")
+    @classmethod
+    def _wrap(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
 
     @field_validator("drape", mode="before")
     @classmethod
@@ -2378,6 +2496,13 @@ class ModelGroup(BaseModel):
     mirrorOf: Optional[str] = None
     # The switches of the group (phase D3b): each option sets slider values, switches objects and groups off and chooses forms.
     states: list[ModelState] = Field(default_factory=list, max_length=MODEL_STATES_MAX)
+    # Phase A1: how far the group's pivot stands toward the viewer (+) or away from its parent's, in the model's units (what turning the figure moves it by).
+    depth: float = 0.0
+
+    @field_validator("depth", mode="before")
+    @classmethod
+    def _depth(cls, value: Any) -> float:
+        return round(_finite(value, 0.0, *MODEL_DEPTH_RANGE), 2)
 
     @field_validator("states", mode="before")
     @classmethod

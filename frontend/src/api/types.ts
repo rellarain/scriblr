@@ -742,14 +742,19 @@ export type ModelBlend = 'multiply' | 'screen' | 'overlay'
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; skin?: ModelSkin[]; over?: string[] }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }
+// How a shape turns with the figure (phase A1): `depth` how far its middle stands toward the viewer from its group's pivot, `thick` how deep it is for its width (null: its
+// layer's default), `dz` per-point depth (empty, or one per point), `angles` outlines drawn at key angles (`at` a multiple of 15, never 0 or 180; `tilt` the nod of a pitch key),
+// `seen` the angles it is shown between (null: from which way it faces).
+export interface ModelAngleOutline { at: number; tilt: number; pts: ModelPoint[] }
+export interface ModelTurn { depth: number; thick: number | null; dz: number[]; angles: ModelAngleOutline[]; seen: [number, number] | null }
 // over (phase O2, on a shading shape): the other objects it lies on besides its own; it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis.
 // A twin takes its original's, each object swapped for its twin. At most MODEL_OVER_MAX (8).
 // What one form does to one shape of its object: the outline the shape has in that form (an empty list hides the shape in the form).
-export interface ModelOverride { shape: string; pts: ModelPoint[] }
+export interface ModelOverride { shape: string; pts: ModelPoint[]; angles?: ModelAngleOutline[] | null }
 // One form of an axis (round eyes, almond eyes): the shapes it changes with their outlines. A form with no overrides is the base outline.
 // What one form does to the paint of one shape: the colour slot it is painted from, or a fixed gray (no slot), and a tone (-2..2). null leaves the shape's own value.
 // round (phase D4) is the radius the shape's sharp corners are rounded to in this form; null leaves the shape's own.
@@ -769,7 +774,7 @@ export type ModelFit = 'scale' | 'keep' | 'stretch'
 // Which parts of a colour an object (or a style) holds at one value (phase D3a): hue 0..359, saturation and lightness 0..100. A part that is null is free: it comes from the colour chosen for the slot.
 export interface ModelHsl { h: number | null; s: number | null; l: number | null }
 // drape (phase O6): how far, in percent, the object's weighted points hang back toward the way they were drawn when the body moves (a hem keeps hanging when the hips tilt); 0 leaves them where the body takes them.
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number }
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number; wrap?: string | null }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }
@@ -778,7 +783,7 @@ export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; 
 export interface ModelStateOption { id: string; name: string; values: Record<string, number>; hidden: string[]; forms: Record<string, string> }
 // A named switch on a group (Front or Back, Open or Closed): the group shows one option at a time, and several states of a group combine.
 export interface ModelState { id: string; name: string; options: ModelStateOption[] }
-export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null; states?: ModelState[] }
+export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null; states?: ModelState[]; depth?: number }
 export type ModelRangeUnit = '' | '°' | '%'
 // A grip point (phase 5c): the spot of a hand where a held item is taken, in the model's space at rest, carried by the group `group`; angle is the way the held item points, in degrees (0 = straight down, positive toward the picture's right).
 export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }

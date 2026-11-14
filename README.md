@@ -447,6 +447,17 @@ described, now stale, in `docs/data-model.md`).
   Phase O6 adds, with a default: on an object `drape` (0..100, a whole percent, 0 by default: how far its weighted points
   hang back toward the way they were drawn when the body moves, after the skin and before Fall; a run held at both ends
   is hung from each and blended; a twin drapes as its original does).
+  Phase A1 (turning) adds, with defaults: on a shape `turn` (`ModelTurn`: `depth` how far its middle stands toward the
+  viewer from its group's pivot, `thick` how deep it is for its width (null: its layer's, body 0.8, clothing 0.85, hair
+  0.9), `dz` one depth per point or none, `angles` outlines drawn at key angles (`ModelAngleOutline`: `at` a multiple of
+  15 that is not 0 or 180, `tilt` a nod for a pitch key, `pts`; at most 16), `seen` the angles it shows between), on a
+  form's outline `angles` too, on a group `depth` (its pivot's, added to its parent's) and on an object `wrap` (the
+  shape it lies on: its points take that shape's rounded surface as their depth; a fault when that shape is missing or
+  its own). A view is the front, the back or an angle in degrees (`engine/angles.ts`): the front and the back solve as
+  before, any other angle is solved as the front and every outline is turned about the axis by its points' depth at the
+  end (`engine/turn.ts`: point by point when it has depths of its own or lies on a surface, else as a rounded cut-out
+  about its middle), a shape drawn for one side fades as it faces away, and the drawing order moves the near side in
+  front.
   Phase O1 (skin weights) adds, with a default: on a shape `skin` (`ModelSkin`: `g`, a group the shape's points also
   follow besides their own, and `w`, one weight per point, 0..1 in hundredths, fitted to the number of points; at most 3,
   one per group). The solver moves a shape's points after its links and sliders and before they hang: a point turns about

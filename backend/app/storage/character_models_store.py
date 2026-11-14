@@ -355,6 +355,20 @@ def _skin_faults(content: ModelContent, parents: dict[str, Optional[str]], owner
     return faults
 
 
+def _turn_faults(content: ModelContent) -> list[str]:
+    """Turning (phase A1): an object lies on a shape that is there and not its own. The front end says the same (turnFaults)."""
+    faults: list[str] = []
+    shapes = {s.id for s in content.shapes}
+    for o in content.objects:
+        if o.wrap is None:
+            continue
+        if o.wrap not in shapes:
+            faults.append(f"Object {_label(o.name, o.id)} lies on a shape that does not exist.")
+        elif o.wrap in o.shapes:
+            faults.append(f"Object {_label(o.name, o.id)} lies on one of its own shapes.")
+    return faults
+
+
 def _form_faults(content: ModelContent) -> list[str]:
     """Forms (phase 3): a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at
     least three points; on an axis that carries what follows it (phase O8) an outline has as many points as the shape's own. The front end makes the same checks
@@ -773,6 +787,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_pair_faults(content))
     faults.extend(_link_faults(content))
     faults.extend(_skin_faults(content, parents, owner, holder))
+    faults.extend(_turn_faults(content))
     faults.extend(_form_faults(content))
     faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))

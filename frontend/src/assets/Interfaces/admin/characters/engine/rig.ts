@@ -6,13 +6,16 @@ import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 import { texturedPath } from './texture'
+import { angleOf, fromBehind, type View } from './angles'
+import { LAYER_THICK, applySilhouette, facing, facingFade, handleDepths, inSeen, projectSurface, silhouetteMatrix, surfaceAt, turnedDepth, turningOf, viewZ, type Surface } from './turn'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
 // designer-engine.js) without colour and shading, which come in later phases. Pure and finite for any input, so it is tested in node.
 
 export type Values = Record<string, number>
-export type View = 'front' | 'back'
+// A view is the front, the back or an angle in degrees (phase A1: see angles.ts).
+export type { View } from './angles'
 
 // ---- sliders ----
 
@@ -172,6 +175,10 @@ export interface SolvedShape {
   z: number
   // Skin weights (phase O1), for a shape whose points follow other groups or are linked to a shape that does: see SolvedSkin. Absent for every other shape.
   skin?: SolvedSkin
+  // Phase A1, only when the figure is turned (not the front or the back): how far toward the viewer the middle of the shape stands once turned, and how much it faces
+  // the viewer (1 straight at the viewer, -1 away).
+  depth?: number
+  face?: number
 }
 // The rig outline of a skinned shape before the skin moved it (each point in the space of its base group: see skin.ts PointSkin) and what each point follows (null: a point a link
 // has already put in the shape's own space). A point linked to the shape is placed on this outline and follows the same groups; a twin reflects it and skins itself. `drawn` is
@@ -344,7 +351,12 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     if (d.axis !== 'x') gy *= f
   }
   const RF: Mat = [-1, 0, 0, 1, 2 * axis, 0]   // the reflection about the model's axis
-  const flip: Mat = view === 'back' ? RF : IDENTITY
+  // Phase A1: the front and the back are drawn as they always were (the back is the front mirrored about the axis). Any other angle is solved as the front and every outline is
+  // turned at the end, by the depth of its points (turn.ts); `behind` is a view that shows more of the back than of the front.
+  const angle = angleOf(view), behind = fromBehind(view)
+  const flat = angle === 0 || angle === 180
+  const T = turningOf(angle, axis)
+  const flip: Mat = flat && angle === 180 ? RF : IDENTITY
   const G = mul(scale(gx, gy, axis, 392), flip)
 
   const shapeMap = new Map(c.shapes.map(s => [s.id, s]))
@@ -595,7 +607,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     let falling = 0
     for (const r of ranges) for (const d of r.drives) if (d.kind === 'fall' && d.shape === sh.id) falling += amount(r, d, val(r)) / 100
     if (falling > 0 && list.some(p => (p.w ?? 0) > 0)) {
-      const inv = inverse(Mg), w0 = hangDirection(fallSide, view === 'back'), w: [number, number] = mirrored ? [-w0[0], w0[1]] : w0
+      const inv = inverse(Mg), w0 = hangDirection(fallSide, behind), w: [number, number] = mirrored ? [-w0[0], w0[1]] : w0
       const dx = inv[0] * w[0] + inv[2] * w[1], dy = inv[1] * w[0] + inv[3] * w[1]
       applyFall(list, sh.closed, Math.min(1, falling), [dx, dy], squeezeOf(fallSide))
     }
@@ -700,7 +712,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       other = outline(form, sh.pts); drawn = other.list
       if (carry && form.length >= 3 && form.length === sh.pts.length) held = other
     }
-    if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) { other = outline(sh.back, sh.back); drawn = other.list }
+    if (behind && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) { other = outline(sh.back, sh.back); drawn = other.list }
     const rig = held.list
     if (!held.skinned) return { rig, drawn }
     return { rig, drawn, skin: { ...held.skinned, ...(other && other !== held ? { drawn: other.skinned } : {}) } }
@@ -892,6 +904,71 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return clamp(radius, 0, ROUND_MAX)
   }
 
+  // ---- turning (phase A1) ----
+  // How far a group's pivot stands toward the viewer: its own depth and those of the groups above it (a twin group stands as deep as its original).
+  const groupDepths = new Map<string, number>()
+  function groupDepth(id: string | null): number {
+    if (!id) return 0
+    const done = groupDepths.get(id)
+    if (done !== undefined) return done
+    groupDepths.set(id, 0)   // a circle of parents is cut here
+    const g = groupMap.get(id)
+    const original = g?.mirrorOf && g.mirrorOf !== id ? groupMap.get(g.mirrorOf) : undefined
+    const own = (original && !original.mirrorOf ? original.depth : g?.depth) ?? 0
+    const d = (Number.isFinite(own) ? own : 0) + groupDepth(g?.parent ?? null)
+    groupDepths.set(id, d)
+    return d
+  }
+  // The roundness of a shape: its own, else its layer's.
+  const thickOf = (origin: ModelShape): number => {
+    const t = origin.turn?.thick
+    if (t != null && Number.isFinite(t)) return t
+    const layer = objectMap.get(objectOfShape.get(origin.id) ?? '')?.layer ?? 'body'
+    return LAYER_THICK[layer] ?? 0.8
+  }
+  // Each solved shape's outline as solved in the front, before it is turned (a shape that lies on it reads its surface from this box), and its front and back drawing depths.
+  const frontBoxes = new Map<string, Box>()
+  const zFront = new Map<string, { z: number; zBack: number; shift: number }>()
+  // The rounded surface of a shape (what an object that lies on it reads its depths from), or null when it has no outline.
+  function surfaceOf(id: string): Surface | null {
+    shapeOut(id)
+    const box = frontBoxes.get(id), s = shapeMap.get(id)
+    if (!box || !s) return null
+    const tw = s.mirrorOf && s.mirrorOf !== s.id ? shapeMap.get(s.mirrorOf) : undefined, origin = tw && !tw.mirrorOf ? tw : s
+    return { box, dc: groupDepth(groupOfShape.get(id) ?? null) + (origin.turn?.depth ?? 0), thick: thickOf(origin) }
+  }
+  // An outline built in the front, turned: point by point when it lies on a surface or its points have depths of their own, else as a rounded cut-out about its middle.
+  // Returns the turned outline, the matrix that stands in for the turn (for an outline turned point by point, a near one: editing is off between key angles), and how far
+  // toward the viewer and which way its middle faces.
+  function turnOutline(sh: ModelShape, origin: ModelShape, twin: boolean, groupId: string | null, fin: BuiltPoint[], count: number, closed: boolean): { fin: BuiltPoint[]; m: Mat; depth: number; face: number } {
+    const b = boxOf(flatten(fin, closed)), cx = b.x + b.w / 2, cy = b.y + b.h / 2
+    const own = origin.turn
+    const oid = objectOfShape.get(sh.id) ?? objectOfShape.get(origin.id), o = oid ? objectMap.get(oid) : undefined
+    const wrapId = o?.wrap ?? (o?.mirrorOf ? objectMap.get(o.mirrorOf)?.wrap : undefined)
+    // a twin lies on the twin of the shape its original lies on
+    const wrapTarget = wrapId ? (twin ? (c.shapes.find(s => s.mirrorOf === wrapId)?.id ?? wrapId) : wrapId) : undefined
+    const surface = wrapTarget && wrapTarget !== sh.id ? surfaceOf(wrapTarget) : null
+    let dz = own?.dz && own.dz.length === count && count === fin.length ? own.dz : null
+    if (dz && twin) dz = [...dz].reverse()
+    const lift = own?.depth ?? 0
+    if (surface || dz) {
+      const pt: number[] = [], hi: number[] = [], ho: number[] = []
+      const base = surface ? null : groupDepth(groupId) + lift
+      fin.forEach((p, i) => {
+        const add = (dz ? dz[i] : 0) + (surface ? lift : 0)
+        if (surface) {
+          pt.push(surfaceAt(surface, p.x, p.y).d + add); hi.push(surfaceAt(surface, p.hix, p.hiy).d + add); ho.push(surfaceAt(surface, p.hox, p.hoy).d + add)
+        } else pt.push((base ?? 0) + add)
+      })
+      const depths = surface ? { pt, hi, ho } : handleDepths(pt, closed)
+      const dc = pt.reduce((n, d) => n + d, 0) / Math.max(1, pt.length)
+      const nrm = surface ? surfaceAt(surface, cx, cy) : { nx: 0, nz: 1 }
+      return { fin: projectSurface(fin, depths, T), m: silhouetteMatrix(T, cx, dc, 1), depth: turnedDepth(T, cx, dc), face: facing(T, nrm.nx, nrm.nz) }
+    }
+    const dc = groupDepth(groupId) + lift, m = silhouetteMatrix(T, cx, dc, thickOf(origin))
+    return { fin: applySilhouette(fin, m), m, depth: turnedDepth(T, cx, dc), face: facing(T, 0, 1) }
+  }
+
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
@@ -942,23 +1019,41 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       }
     }
     const ok = rig.length >= 3 && drawn.length >= 3
-    const matrix = mul(G, (ok ? fitMatrix(sh) : null) ?? Mg)
+    let matrix = mul(G, (ok ? fitMatrix(sh) : null) ?? Mg)
     const off = switchedOff(sh.id)
     // the corners are rounded in the drawing only: `local` and `rig` keep the points as they were drawn, so editing, anchors and links are not affected
     const radius = ok ? radiusOf(sh, twin, tpl, memberId) : 0
     const shown = ok && radius > 0 ? roundCorners(drawn, closed, radius) : drawn
-    const fin = ok ? build(shown, closed, matrix) : []
+    let fin = ok ? build(shown, closed, matrix) : []
+    // phase A1: a turned figure turns each outline here, from where the front put it
+    let turned: { depth: number; face: number } | null = null
+    if (ok && !flat) {
+      frontBoxes.set(sh.id, boxOf(flatten(fin, closed)))
+      const t = turnOutline(sh, twin ?? tpl ?? sh, !!twin, groupId, fin, drawn === shown ? (twin ?? tpl ?? sh).pts.length : -1, closed)
+      fin = t.fin; matrix = mul(t.m, matrix); turned = { depth: t.depth, face: t.face }
+    }
     const poly = ok ? flatten(fin, closed) : []
     // the texture of the edge is in the painted path only: the outline that hit tests and boxes read stays smooth
     const texture = ok ? textureOf(sh, twin, tpl) : 0, origin = twin ?? tpl ?? sh
     const textured = texture > 0 && (shown.some(p => (p.w ?? 0) > 0) || !inHangingObject(origin.id))
     const d = !ok ? '' : textured ? texturedPath(fin, closed, shown.map(p => p.w), texture, origin.id) : pathText(fin, closed)
+    // Which way the shape is drawn from: at the front or the back exactly, a shape drawn for one side only shows from that side; turned, it shows while it faces the viewer
+    // (or within its own range of angles) and fades as it turns away.
+    let seenFade = 1
+    if (!flat && turned && sh.view !== 'both') {
+      const seen = (twin ?? tpl ?? sh).turn?.seen
+      seenFade = seen ? (inSeen(twin ? [360 - seen[1], 360 - seen[0]] : seen, angle) ? 1 : 0) : facingFade(sh.view === 'front' ? turned.face : -turned.face)
+    }
+    const sideOk = flat ? sh.view === 'both' || sh.view === (angle === 180 ? 'back' : 'front') : seenFade > 0.004
+    const zBack = sh.zBack ?? sh.z, shift = zShift(sh)
+    if (!flat) zFront.set(sh.id, { z: sh.z, zBack, shift })
     out.shapes[sh.id] = {
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
       d, poly, box: poly.length ? boxOf(poly) : NO_BOX,
-      visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, fade: fadeOf(sh), z: (view === 'back' && sh.zBack != null ? sh.zBack : sh.z) + zShift(sh),
+      visible: ok && sideOk && !off && !sh.hide, off, fade: fadeOf(sh) * seenFade, z: (angle === 180 ? zBack : sh.z) + shift,
       ...(skin ? { skin } : {}),
+      ...(turned ? { depth: turned.depth, face: turned.face } : {}),
     }
   }
 
@@ -1109,6 +1204,30 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   for (const g of groupOrder(c)) groupMat(g.id)
   for (const sh of c.shapes) shapeOut(sh.id)   // a shape in no group stands still
 
+  // Turned (phase A1): every shape takes a place in the drawing order at this angle from where it stands across the figure as solved in the front. The shapes of an object on
+  // one side of the axis (and those across the middle) share one place, the middle of what they cover, so they keep their order between them; and a garment that covers both
+  // arms (one object, a sleeve each side) has each sleeve go with its arm.
+  if (!flat) {
+    const SIDE_GAP = 3
+    const sideOf = (b: Box): -1 | 0 | 1 => { const x = b.x + b.w / 2; return x < axis - SIDE_GAP ? -1 : x > axis + SIDE_GAP ? 1 : 0 }
+    const centres = new Map<string, number>()
+    for (const o of c.objects) {
+      const spans = new Map<number, [number, number]>()
+      for (const sid of o.shapes) {
+        const b = frontBoxes.get(sid)
+        if (!b) continue
+        const k = sideOf(b), s = spans.get(k) ?? [Infinity, -Infinity]
+        spans.set(k, [Math.min(s[0], b.x), Math.max(s[1], b.x + b.w)])
+      }
+      for (const [k, [x0, x1]] of spans) centres.set(`${o.id}|${k}`, (x0 + x1) / 2)
+    }
+    for (const s of Object.values(out.shapes)) {
+      const f = zFront.get(s.id), b = frontBoxes.get(s.id)
+      if (!f || !b) continue
+      const xc = centres.get(`${objectOfShape.get(s.id) ?? ''}|${sideOf(b)}`) ?? b.x + b.w / 2
+      s.z = viewZ(T, f.z, f.zBack, xc) + f.shift
+    }
+  }
   const visible = Object.values(out.shapes).filter(s => s.visible)
   out.order = drawOrder(c, visible.map(s => ({ id: s.id, z: s.z })), undefined, opts.order, opts.zoff).map(s => s.id)
   return out

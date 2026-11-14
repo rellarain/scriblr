@@ -4,6 +4,7 @@ import { r2, type Box } from './geometry'
 import { LIMITS } from './limits'
 import { done, fail, type Edit } from './rigEdit'
 import type { View } from './rig'
+import { angleOf } from './angles'
 
 // Frames (phase 5a): named crops of the figure. A frame is a box in the model's space and the groups and objects left out when the figure is seen through it
 // (a bust frame leaves out the legs). A size is never typed: the box is set by dragging its rectangle on the canvas, and by the arrow keys. The operations
@@ -24,9 +25,14 @@ export function fitBox(b: Box): Box {
   return { x: r2(cut(Number.isFinite(b.x) ? b.x : 0, X_RANGE[0], X_RANGE[1])), y: r2(cut(Number.isFinite(b.y) ? b.y : 0, Y_RANGE[0], Y_RANGE[1])), w, h }
 }
 
-// The box to look through in a view: the back view turns the figure round, so a frame on a part of the body is mirrored about the axis to stay on it.
+// The box to look through in a view: a turned figure takes the middle of a frame on a part of the body with it (the back view mirrors it about the axis), and the box keeps
+// its size.
 export function viewBoxOf(f: Pick<ModelFrame, 'x' | 'y' | 'w' | 'h'>, view: View, axis = 100): Box {
-  return view === 'back' ? { x: 2 * axis - (f.x + f.w), y: f.y, w: f.w, h: f.h } : boxOfFrame(f)
+  const a = angleOf(view)
+  if (a === 0) return boxOfFrame(f)
+  if (a === 180) return { x: 2 * axis - (f.x + f.w), y: f.y, w: f.w, h: f.h }
+  const cx = f.x + f.w / 2, x = axis + (cx - axis) * Math.cos((a * Math.PI) / 180) - f.w / 2
+  return { x, y: f.y, w: f.w, h: f.h }
 }
 
 // ---- dragging a box ----

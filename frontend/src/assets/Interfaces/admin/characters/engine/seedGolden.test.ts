@@ -29,6 +29,10 @@ describe('the basic model draws as it was recorded', () => {
     ['every slider at its most', () => solve(seed, at((_, __, hi) => hi), 'front')],
     ['seeded random sliders', () => { const rng = seededRng(7); return solve(seed, at((lo, _, hi) => lo + (hi - lo) * rng()), 'front') }],
     ['seeded random sliders, from the back', () => { const rng = seededRng(11); return solve(seed, at((lo, _, hi) => lo + (hi - lo) * rng()), 'back') }],
+    // phase A1: turned to three of the named angles
+    ['at rest, front right', () => solve(seed, defaultValues(seed), 45)],
+    ['at rest, right profile', () => solve(seed, defaultValues(seed), 90)],
+    ['at rest, left profile', () => solve(seed, defaultValues(seed), 270)],
   ]
   for (const [name, run] of cases) it(name, () => expect(drawing(run())).toMatchSnapshot())
 })

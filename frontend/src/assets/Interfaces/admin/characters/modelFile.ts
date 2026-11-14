@@ -5,6 +5,7 @@ import type {
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
 import { roundWeight } from './engine/skin'
+import { repairAngles, repairDepth, repairTurn } from './engine/turn'
 import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairDrape, repairHsl, repairLooks, repairRoll, roundOf } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
@@ -96,6 +97,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy), round: roundOf(typeof v.round === 'number' ? v.round : 0),
     skin: skins(v.skin, list(v.pts).length),
     over: [...new Set(list(v.over).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.overMax),
+    turn: repairTurn(v.turn, list(v.pts).length, p => point(p as never)),
   }
 }
 
@@ -203,6 +205,7 @@ function group(v: Record<string, unknown>, id: string): ModelGroup {
     pivot: Array.isArray(v.pivot) && v.pivot.length === 2 ? [num(v.pivot[0], 100, -50, 250), num(v.pivot[1], 200, -50, 450)] : null,
     attach: a && shapeId ? { shape: shapeId, kind, i: Math.round(num(a.i, 0, 0, LIMITS.pointsMax - 1)), t: num(a.t, 0, 0, 1), slider: idOrNull(a.slider), rx: num(a.rx, 0.5, 0, 1), ry: num(a.ry, 0.5, 0, 1) } : null,
     states: withIds(list(v.states), groupState).slice(0, LIMITS.statesMax),
+    depth: repairDepth(v.depth),
   }
 }
 
@@ -221,7 +224,9 @@ function withIds<T>(items: unknown[], read: (v: Record<string, unknown>, id: str
 
 function override(v: Record<string, unknown>): ModelOverride | null {
   const shapeId = idOf(v.shape)
-  return shapeId ? { shape: shapeId, pts: list(v.pts).map(point) } : null
+  if (!shapeId) return null
+  const angles = repairAngles(v.angles, p => point(p as never))
+  return { shape: shapeId, pts: list(v.pts).map(point), ...(angles.length ? { angles } : {}) }
 }
 
 function form(v: Record<string, unknown>, id: string): ModelForm {
@@ -255,7 +260,7 @@ function object(v: Record<string, unknown>, id: string): ModelObject {
     id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string'),
     mirrorOf: idOrNull(v.mirrorOf), classOf: idOrNull(v.classOf), axes: withIds(list(v.axes), axis),
     fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null,
-    under: [...new Set(list(v.under).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.underMax), drape: repairDrape(v.drape), hsl: lockMap(v.hsl),
+    under: [...new Set(list(v.under).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.underMax), drape: repairDrape(v.drape), hsl: lockMap(v.hsl), wrap: idOrNull(v.wrap),
   }
 }
 

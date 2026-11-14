@@ -36,6 +36,16 @@ The Designer is an **Admin console of its own**, beside Configuration (a tile wi
 - **Looseness**: a shape can take its looseness from a slider (*Make a slider* makes one, 0 to 200%, resting at 100%): the distance of its links (outward from an edge, or a follow's offset) is stretched by the slider over its rest value, so 200% drapes the shirt twice as far from the body and 0% pulls it tight.
 - **The back view**: the view toolbar's *Back view* turns the figure round about the mirror line. Anchors, links and sliders are the same in both views (they read the front outline, so one edit moves both). A shape shows its front outline from behind until its points are edited in the back view; it then has an **outline of its own for the back** (*Use the front outline again* undoes that). Its depth is its own in the back view once it is moved there: *In front* and *Behind* (in the panel *In the front / back view*) move it one place among the shapes shown in the view being edited, and give that view its own depths (the back follows the front until then). Recording points is done in the front view.
 
+## Turning (phase A1)
+
+A figure can be seen from any angle, not only the front and the back (`engine/angles.ts`: front 0, front right 45, right profile 90, back right 135, back 180, back left 225, left profile 270, front left 315, and anything between; an angle is named by the side of the character toward the viewer). The front and the back are drawn exactly as before. Any other angle solves the figure as the front and then turns every outline about the mirror line by how far toward the viewer its points stand (`engine/turn.ts`):
+
+- **Depth** comes from the group (its pivot's `depth`, added to its parent's), the shape (`turn.depth`, its middle from the group's pivot), its points (`turn.dz`, one per point) or a shape its object lies on (`wrap`: an eye on the skull takes the skull's rounded surface as its depth, so it slides round the head as the head turns).
+- **Roundness** (`turn.thick`, how deep a shape is for its width): an outline with no depths of its own turns as a rounded cut-out about its middle, as wide as it is deep at the side. With none set, a body part is 0.8, a garment 0.85 and hair 0.9, so every model turns, the writers' own too.
+- **Which way it faces**: a shape drawn for the front only fades as it turns away past the side (a shape that lies on a surface faces the way the surface does there), or keeps to its own range of angles (`turn.seen`).
+- **Drawing order**: from the front, `z`; from the back, the back depth; between, blended, with the near side of the figure moved toward the front (in profile the far arm goes behind the body). The shapes of an object on one side of the mirror line keep their order between them, and a garment that covers both arms has each sleeve go with its arm.
+- Outlines drawn at key angles (`turn.angles`) are stored now and drawn from phase A3, with the angle menu of the Designer.
+
 ## The rig
 
 The **Rig tab** is for the selected group (or the group an object or shape is in):

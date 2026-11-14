@@ -41,7 +41,7 @@ describe('the model types match the backend schema', () => {
     ['ModelGenre', 'ModelGenre'], ['ModelSwatch', 'ModelSwatch'], ['ModelColour', 'ModelColour'], ['ModelSlot', 'ModelSlot'],
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'], ['ModelFade', 'ModelFade'],
     ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'], ['ModelGrip', 'ModelGrip'],
-    ['ModelHsl', 'ModelHsl'], ['ModelSkin', 'ModelSkin'],
+    ['ModelHsl', 'ModelHsl'], ['ModelSkin', 'ModelSkin'], ['ModelTurn', 'ModelTurn'], ['ModelAngleOutline', 'ModelAngleOutline'],
     ['ModelState', 'ModelState'], ['ModelStateOption', 'ModelStateOption'], ['ModelFieldset', 'ModelFieldset'], ['ModelPattern', 'ModelPattern'],
     // the figure of a character (phase 6)
     ['CharacterFigure', 'CharacterFigure'], ['FigureColour', 'FigureColour'], ['FigureModel', 'FigureModel'],

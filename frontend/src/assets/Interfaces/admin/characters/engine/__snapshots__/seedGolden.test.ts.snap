@@ -4,6 +4,12 @@ exports[`the basic model draws as it was recorded > at rest, from the back 1`] =
 
 exports[`the basic model draws as it was recorded > at rest, from the front 1`] = `"d01e5516"`;
 
+exports[`the basic model draws as it was recorded > at rest, front right 1`] = `"0ea66006"`;
+
+exports[`the basic model draws as it was recorded > at rest, left profile 1`] = `"c862f90a"`;
+
+exports[`the basic model draws as it was recorded > at rest, right profile 1`] = `"0fbaf044"`;
+
 exports[`the basic model draws as it was recorded > every slider at its least 1`] = `"dbfb3f45"`;
 
 exports[`the basic model draws as it was recorded > every slider at its most 1`] = `"123f17c0"`;
