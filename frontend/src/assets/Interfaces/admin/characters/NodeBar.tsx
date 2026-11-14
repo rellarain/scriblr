@@ -7,7 +7,7 @@ import { CARD_NAMES } from './treeNav'
 // The top of the editor for what is open in the tree: which kind of thing it is and its name, the buttons that act on it as a whole (copy a shape, delete a shape, an object or a
 // group, which takes what is in it along), and the randomize, lock and reset controls: roll a new look for the test character, lock this group or object so the roll leaves it as it
 // is, and put the test values back to rest.
-export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDelete, onCopyShape, onRoll, onReset }: {
+export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDelete, onCopyShape, onRoll, onReset, simple = false }: {
   content: ModelContent
   sel: Selection
   locked: boolean
@@ -19,6 +19,8 @@ export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDele
   onCopyShape: (id: string) => void
   onRoll: () => void
   onReset: () => void
+  // the shape editor (designerFeatures.ts): no randomize, lock or reset
+  simple?: boolean
 }) {
   const thing = sel.kind === 'shape' ? shapeById(content, sel.id) : sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'group' ? groupById(content, sel.id) : null
   const kind = sel.kind === 'none' ? 'model' : sel.kind
@@ -42,7 +44,7 @@ export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDele
           )}
         </span>
       </div>
-      <div className="dzRoll" role="group" aria-label="Randomize, lock and reset">
+      {!simple && <div className="dzRoll" role="group" aria-label="Randomize, lock and reset">
         <button type="button" className="cmBtn cmBtn--small" aria-label="Roll the look" disabled={busy} title="Roll a new look for the test character: colours, a form on every axis and the member of each family; what is locked stays" onClick={onRoll}><DiceIcon size={12} /> Roll</button>
         {lockable && thing && (
           <button
@@ -53,7 +55,7 @@ export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDele
         {away > 0 && (
           <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" disabled={busy} title="Put every slider back at rest, every axis on its default form and show everything" onClick={onReset}><RestoreIcon size={12} /> {away} off rest</button>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

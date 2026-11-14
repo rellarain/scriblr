@@ -5,6 +5,7 @@ import { seededRng } from '../../../admin/characters/engine/previews'
 import { ensureFigureModel } from './figureModelStore'
 import { blankFigure, rollFigure } from './figureState'
 import { getModelChoices, type ModelChoice } from './modelChoices'
+import { DESIGNER_TOOLS } from '../../../admin/characters/designerFeatures'
 
 // How a new character starts (phase 6c-5): as a mannequin of the basic model, with a first look rolled within a genre, instead of the plain portrait. The basic model is the one the
 // app comes with (published on a fresh install); when it is not published (the admin took it away) a new character starts with the portrait, as before, and the Portrait section can
@@ -12,13 +13,16 @@ import { getModelChoices, type ModelChoice } from './modelChoices'
 // of their own, or any of the catalog's): a Start with dropdown by the plus, remembered, which falls back to the basic model when the one picked is gone.
 
 export const START_MODEL_ID = 'basic'
+// While the Designer is only a shape editor (designerFeatures.ts), the models it publishes are demonstrations: a new character starts only on the basic model (so, with it
+// gone, with the portrait), and there is no Start with choice.
+const START_ON_BASIC_ONLY = DESIGNER_TOOLS === 'shapes'
 // Where the genre and the model chosen beside the plus are remembered.
 export const START_GENRE_KEY = 'scriblr.characters.startGenre'
 export const START_MODEL_KEY = 'scriblr.characters.startModel'
 
 // The model a new character starts on, among the published ones: the one asked for, else the basic model, else none.
 export const startModelOf = <T extends PublishedModelOut>(models: T[] | null | undefined, wanted: string = START_MODEL_ID): T | null =>
-  (models ?? []).find(m => m.id === wanted) ?? (models ?? []).find(m => m.id === START_MODEL_ID) ?? null
+  (START_ON_BASIC_ONLY ? null : (models ?? []).find(m => m.id === wanted)) ?? (models ?? []).find(m => m.id === START_MODEL_ID) ?? null
 
 const seed = () => Math.floor(Math.random() * 0x100000000)
 
@@ -44,6 +48,6 @@ export function useStartChoices(wanted: string): { models: ModelChoice[]; model:
   }, [])
   // With a choice to make there is always a model chosen (the first when neither the one asked for nor the basic one is there), so what the dropdown shows is what the plus uses;
   // with one model or none, and no basic model, a new character starts with the portrait (the rule of phase 6c-5).
-  const model = startModelOf(models, wanted) ?? (models.length > 1 ? models[0] : null)
-  return { models, model, genres: model ? genresOf(model.content) : [] }
+  const model = startModelOf(models, wanted) ?? (models.length > 1 && !START_ON_BASIC_ONLY ? models[0] : null)
+  return { models: START_ON_BASIC_ONLY ? [] : models, model, genres: model ? genresOf(model.content) : [] }
 }

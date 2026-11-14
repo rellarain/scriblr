@@ -13,7 +13,7 @@ vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resou
 // The plot presets page (covered by its own tests) is mocked for the same reason.
 vi.mock('./admin/instructor/InstructorConsole', () => ({ default: () => <div>instructor console</div> }))
 vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
-vi.mock('./admin/characters/DesignerConsole', () => ({ default: () => <div>character models console</div> }))
+vi.mock('./admin/characters/DesignerConsole', () => ({ default: (p: { tools?: string }) => <div>character models console ({p.tools ?? 'all'})</div> }))
 vi.mock('./admin/characters/WriterLimitsConsole', () => ({ default: () => <div>writer limits console</div> }))
 
 beforeEach(() => {
@@ -49,16 +49,16 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(plot.querySelector('h2')).toBeNull()
   })
 
-  it("shows Configuration > Writers' designer as the page of limits for the models writers design", async () => {
+  it("leaves out Configuration > Writers' designer while the writers' own designer is off the screen", () => {
     render(<AUI />)
-    const page = within(tile('configuration')).getByRole('region', { name: "Writers' designer" })
-    expect(await within(page).findByText('writer limits console')).toBeTruthy()
+    expect(within(tile('configuration')).queryByRole('region', { name: "Writers' designer" })).toBeNull()
   })
 
   it('shows the Designer as a console of its own beside Configuration, with a slot in its title bar for the console tools', async () => {
     render(<AUI />)
     expect(within(tile('designer')).getByRole('heading', { name: /Designer/ })).toBeTruthy()
-    expect(await within(tile('designer')).findByText('character models console')).toBeTruthy()
+    // the Designer is only a shape editor for now
+    expect(await within(tile('designer')).findByText('character models console (shapes)')).toBeTruthy()
     expect(tile('designer').querySelector('.gtTitle .gtRailSlot--tools')).not.toBeNull()
     // it left Configuration: the characters page is not one of that console's tiles any more
     expect(within(tile('configuration')).queryByRole('region', { name: 'Characters' })).toBeNull()

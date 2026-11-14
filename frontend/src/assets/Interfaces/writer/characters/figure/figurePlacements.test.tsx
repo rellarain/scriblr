@@ -13,6 +13,8 @@ import { SceneCast } from '../SceneCast'
 import { CharacterArt } from './CharacterArt'
 import { __resetFigureModelsForTests, registerCopies } from './figureModelStore'
 import { atAge, blankFigure } from './figureState'
+// the writers' own designer and the basic model's button are off the screen for now (designerFeatures.ts); these tests are about them
+vi.mock('../../../admin/characters/designerFeatures', async importOriginal => ({ ...(await importOriginal<typeof import('../../../admin/characters/designerFeatures')>()), DESIGNER_TOOLS: 'all', WRITER_DESIGNER: true, OFFER_BASIC_MODEL: true }))
 
 // The figure of a character in the places that draw a character: the art (the figure when its model copy is here, else the portrait), the cast list, the overview, Compare and
 // Age, a scene's heads, the story's states, a reader's card, and the Portrait section that makes one. The heavy renders get time.

@@ -177,7 +177,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
   models: ModelsNav
   actions: TreeActions
 }) {
-  const { max } = useDesignerPolicy()
+  const { max, shapes: simple } = useDesignerPolicy()
   const [query, setQuery] = useState('')
   const [openAxis, setOpenAxis] = useState<string | null>(null)
   const q = query.trim()
@@ -190,7 +190,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
 
   // ---- states: the variants, poses, styles ----
   function states(kind: 'variant' | 'pose' | 'style', list: ModelPreset[], scope: string | null, heading: string): ReactNode {
-    if (list.length === 0 && kind !== 'variant') return null
+    if (simple || (list.length === 0 && kind !== 'variant')) return null
     const on = list.find(p => isOn(content, state, p)), shown = on ? [on] : list
     const full = list.length >= LIMITS.presetsMax
     return (
@@ -214,7 +214,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
 
   // ---- the states of a group: switches whose options each set several things of the group at once ----
   function groupStates(g: ModelGroup): ReactNode {
-    if (g.mirrorOf) return null
+    if (simple || g.mirrorOf) return null
     const list = statesOf(g), gname = label(g.name, 'the group')
     return (
       <section className="dzStates" aria-label="States">
@@ -256,7 +256,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
   // ---- expressions: the forms of an object's axes ----
   function expressions(o: ModelObject): ReactNode {
     const list = expressionsOf(content, o, state.forms)
-    if (list.length === 0) return null
+    if (simple || list.length === 0) return null
     return (
       <section className="dzStates" aria-label="Expressions">
         <div className="dzLevelHead"><span className="dzLevelName">Expressions <span className="cmCount">{list.reduce((n, e) => n + e.forms.length, 0)}</span></span></div>
@@ -288,7 +288,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         marks={g.mirrorOf ? <Mark {...TWIN(name)}><SwapIcon size={11} /></Mark> : null}
         sub={`${g.objects.length} object${g.objects.length === 1 ? '' : 's'}`}
         onMain={() => actions.onSelect(stepTo(content, sel, 'group', g.id))}
-        tools={{ hide: () => actions.onToggleHidden(g.id), plus: actions.onAddGroup, copy: () => actions.onTwin('group', g.id) }}
+        tools={{ hide: () => actions.onToggleHidden(g.id), plus: actions.onAddGroup, copy: simple ? undefined : () => actions.onTwin('group', g.id) }}
       >{kids}</Card>
     )
   }
@@ -301,7 +301,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         marks={<ObjectMarks content={content} object={o} name={name} />}
         sub={`${o.shapes.length} shape${o.shapes.length === 1 ? '' : 's'}`}
         onMain={() => actions.onSelect(stepTo(content, sel, 'object', o.id))}
-        tools={{ hide: () => actions.onToggleHidden(o.id), plus: () => actions.onAddObject(g.id), copy: () => actions.onTwin('object', o.id) }}
+        tools={{ hide: () => actions.onToggleHidden(o.id), plus: () => actions.onAddObject(g.id), copy: simple ? undefined : () => actions.onTwin('object', o.id) }}
       >{kids}</Card>
     )
   }
@@ -312,7 +312,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         key={s.id} kind="shape" id={s.id} name={s.name} open={open} off={hidden.has(o.id) || hidden.has(g.id) || !!s.hide} grip={grip}
         marks={<ShapeMarks content={content} shape={s} name={name} />}
         onMain={() => actions.onSelect(stepTo(content, sel, 'shape', s.id))}
-        tools={{ plus: () => actions.onAddShape(o.id, 'rounded'), copy: () => actions.onTwin('shape', s.id) }}
+        tools={{ plus: () => actions.onAddShape(o.id, simple ? 'circle' : 'rounded'), copy: simple ? undefined : () => actions.onTwin('shape', s.id) }}
       />
     )
   }
@@ -337,7 +337,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
             <span className="dzLevelName">Groups <span className="cmCount">{content.groups.length}</span></span>
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New group" title="New group" disabled={content.groups.length >= max.groups} onClick={actions.onAddGroup}><FolderPlusIcon size={12} /></button>
           </div>
-          {content.groups.length === 0 && <p className="cmInsText">No group yet. Make one with the button above.</p>}
+          {content.groups.length === 0 && !simple && <p className="cmInsText">No group yet. Make one with the button above.</p>}
           <ReorderList
             className="dzCardList" items={(level.cards as ModelGroup[]).map(g => ({ id: g.id, g }))} label={x => label(x.g.name, 'the group')}
             onMove={(id, before) => actions.onReorderGroup(id, storedBefore(stored.group, before))}
@@ -363,7 +363,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
             <span className="dzLevelName">Objects <span className="cmCount">{group.objects.length}</span></span>
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`New object in ${label(group.name, 'the group')}`} title={`New object in ${label(group.name, 'the group')}`} disabled={group.objects.length >= max.objectsPerGroup} onClick={() => actions.onAddObject(group.id)}><PlusIcon size={12} /></button>
           </div>
-          {group.objects.length === 0 && <p className="cmInsText">No object yet.</p>}
+          {group.objects.length === 0 && !simple && <p className="cmInsText">No object yet.</p>}
           <ReorderList
             className="dzCardList" items={(level.cards as ModelObject[]).map(o => ({ id: o.id, o }))} label={x => label(x.o.name, 'the object')}
             onMove={(id, before) => actions.onReorderObject(group.id, id, storedBefore(group.objects, before))}
@@ -380,7 +380,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
             <span className="dzLevelName">Shapes <span className="cmCount">{object.shapes.length}</span></span>
             <TemplateMenu label={`Add a shape to ${label(object.name, 'the object')}`} onPick={t => actions.onAddShape(object.id, t)} disabled={object.shapes.length >= max.shapesPerObject} />
           </div>
-          {object.shapes.length === 0 && <p className="cmInsText">No shape yet: add one from a template.</p>}
+          {object.shapes.length === 0 && !simple && <p className="cmInsText">No shape yet: add one from a template.</p>}
           <ReorderList
             className="dzCardList" items={(level.cards as ModelShape[]).map(s => ({ id: s.id, s }))} label={x => label(x.s.name, 'the shape')}
             onMove={(id, before) => actions.onReorderShape(object.id, id, storedBefore(object.shapes, before))}

@@ -20,6 +20,14 @@ export const LAYERS: LayerInfo[] = [
 export const LAYER_IDS: LayerId[] = LAYERS.map(l => l.id)
 export const layerInfo = (id: LayerId): LayerInfo => LAYERS.find(l => l.id === id)!
 
+// The layers the shape editor offers (designerFeatures.ts), and the names some of them go by there.
+export const SHAPE_LAYERS: LayerId[] = ['weights', 'points', 'outlines', 'guides', 'figure', 'gridlines']
+const SHAPE_NAMES: Partial<Record<LayerId, Pick<LayerInfo, 'name' | 'hint'>>> = {
+  weights: { name: 'Curve handles', hint: 'the curve handles of the selected point or segment' },
+  mirror: { name: 'Symmetry axes', hint: 'the axes of the selected shape\'s symmetry' },
+}
+export const shapeLayerInfo = (id: LayerId): LayerInfo => ({ ...layerInfo(id), ...SHAPE_NAMES[id] })
+
 export interface LayerState {
   // Leftmost (on top) first.
   order: LayerId[]

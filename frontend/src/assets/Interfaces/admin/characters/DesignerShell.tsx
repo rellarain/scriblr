@@ -8,7 +8,7 @@ import {
   BackIcon, BodyIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon, WrenchIcon,
   type IconProps,
 } from '../../../icons'
-import { isShown, layerInfo, moveLayer, nudgeLayer, toggleLayer, type LayerId, type LayerState } from './layerStack'
+import { SHAPE_LAYERS, isShown, layerInfo, moveLayer, nudgeLayer, shapeLayerInfo, toggleLayer, type LayerId, type LayerState } from './layerStack'
 import { ANGLES, angleName, angleOf, viewFor, type View } from './engine/angles'
 import { ZOOM_MAX, ZOOM_MIN, sliderToZoom, wheelZoom, zoomText, zoomToSlider } from './zoomMap'
 
@@ -107,6 +107,8 @@ export interface ViewBarProps {
   checks: number
   // A word about a layer that cannot draw yet (the head units with no head bone), added to its toggle's title.
   layerNotes?: Partial<Record<LayerId, string>>
+  // The shape editor (designerFeatures.ts): its layers only, no front, back or angle, and a Checks button for the drawer.
+  simple?: boolean
 }
 
 // The angle the figure is seen from (phase A3): a menu of the eight named angles, and a Turn slider for any angle between (in whole degrees; the arrow keys step one,
@@ -156,8 +158,8 @@ export function ViewBar(p: ViewBarProps) {
   return (
     <div className="dzViewBar" role="toolbar" aria-label="View controls">
       <div className="dzLayers" role="group" aria-label="Canvas layers (the leftmost is drawn on top)" ref={drag.listRef}>
-        {p.layers.order.map(id => {
-          const info = layerInfo(id), Icon = LAYER_ICONS[id], on = isShown(p.layers, id)
+        {(p.simple ? p.layers.order.filter(id => SHAPE_LAYERS.includes(id)) : p.layers.order).map(id => {
+          const info = p.simple ? shapeLayerInfo(id) : layerInfo(id), Icon = LAYER_ICONS[id], on = isShown(p.layers, id)
           return (
             <button
               key={id} type="button" data-layer-id={id}
@@ -175,10 +177,10 @@ export function ViewBar(p: ViewBarProps) {
           )
         })}
       </div>
-      <span className="cmSep" aria-hidden="true" />
-      <button type="button" className={`cmIconBtn${angleOf(p.view) === 0 ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={angleOf(p.view) === 0} disabled={p.viewOff} onClick={() => p.onView('front')}><FrontIcon size={14} /></button>
-      <button type="button" className={`cmIconBtn${angleOf(p.view) === 180 ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={angleOf(p.view) === 180} disabled={p.viewOff} onClick={() => p.onView('back')}><BackIcon size={14} /></button>
-      <AngleControls view={p.view} onView={p.onView} off={p.viewOff} />
+      {!p.simple && <span className="cmSep" aria-hidden="true" />}
+      {!p.simple && <button type="button" className={`cmIconBtn${angleOf(p.view) === 0 ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={angleOf(p.view) === 0} disabled={p.viewOff} onClick={() => p.onView('front')}><FrontIcon size={14} /></button>}
+      {!p.simple && <button type="button" className={`cmIconBtn${angleOf(p.view) === 180 ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={angleOf(p.view) === 180} disabled={p.viewOff} onClick={() => p.onView('back')}><BackIcon size={14} /></button>}
+      {!p.simple && <AngleControls view={p.view} onView={p.onView} off={p.viewOff} />}
       <span className="cmSpacer" />
       <button
         type="button" className={`cmIconBtn${p.fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit to screen" aria-pressed={p.fitAll}
@@ -193,10 +195,17 @@ export function ViewBar(p: ViewBarProps) {
         <output aria-hidden="true">{zoomText(p.zoom)}</output>
       </span>
       <span className="cmSep" aria-hidden="true" />
-      <button
-        type="button" className={`cmBtn cmBtn--small${p.drawerOpen ? ' dzDrawerBtn--on' : ''}`} aria-expanded={p.drawerOpen} aria-controls="dz-drawer"
-        title="Previews of how the model holds up at random sizes, and the checks it has to pass to be published" onClick={p.onDrawer}
-      >{p.drawerOpen ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />} Previews and checks{p.checks > 0 ? ` (${p.checks})` : ''}</button>
+      {p.simple ? (
+        <button
+          type="button" className={`cmIconBtn${p.drawerOpen ? ' cmIconBtn--on' : ''}`} aria-expanded={p.drawerOpen} aria-controls="dz-drawer" aria-label={p.checks > 0 ? `Checks (${p.checks})` : 'Checks'}
+          title={p.checks > 0 ? `The checks the model has to pass to be published: ${p.checks} to fix` : 'The checks the model has to pass to be published'} onClick={p.onDrawer}
+        ><CheckIcon size={14} />{p.checks > 0 && <span className="dzCheckCount">{p.checks}</span>}</button>
+      ) : (
+        <button
+          type="button" className={`cmBtn cmBtn--small${p.drawerOpen ? ' dzDrawerBtn--on' : ''}`} aria-expanded={p.drawerOpen} aria-controls="dz-drawer"
+          title="Previews of how the model holds up at random sizes, and the checks it has to pass to be published" onClick={p.onDrawer}
+        >{p.drawerOpen ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />} Previews and checks{p.checks > 0 ? ` (${p.checks})` : ''}</button>
+      )}
     </div>
   )
 }

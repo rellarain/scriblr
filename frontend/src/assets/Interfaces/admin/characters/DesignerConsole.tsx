@@ -3,7 +3,9 @@ import { myModelsApi } from '../../../../api/characterModelsApi'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { useStoredState } from '../../writer/storage'
 import { downloadTextFile, readFileText } from '../plot/presetFile'
-import { ADMIN_POLICY, DesignerPolicyProvider, policyFor, useWriterLimits } from './designerPolicy'
+import { ADMIN_POLICY, DesignerPolicyProvider, SHAPES_POLICY, policyFor, useWriterLimits } from './designerPolicy'
+import type { DesignerTools } from './designerFeatures'
+import { ImportIcon, PlusIcon } from '../../../icons'
 import { ModelPane } from './ModelPane'
 import { ModelFileError, exportFileName, parseModelFile, serializeModels } from './modelFile'
 import { MY_ID_PREFIX, copyName, randomId, starterContent } from './modelContent'
@@ -21,14 +23,16 @@ interface ImportNotice { tone: 'ok' | 'error'; lines: string[] }
 // The same console serves a writer's own models (`library="mine"`, in the Characters console's Models section): another file of models that start with "my-", a copy of one
 // of Scriblr's as a way to begin instead of the basic model's button, and the same drafts, versions and publishing. There it is held to the limits the admin set for writers
 // (how big a model may be, and how many a library holds) and keeps the advanced tabs away until the writer asks for them; `openId` is the model to open first.
+// `tools="shapes"` is the shape editor the app shows for now (designerFeatures.ts): one Shape tab and the shape tools; the default is every tool.
 const MY_LIBRARY = { api: myModelsApi, idPrefix: MY_ID_PREFIX }
-function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null }: { toolbarHost?: HTMLElement | null; library?: 'admin' | 'mine'; openId?: string | null }) {
+function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null, tools = 'all' }: { toolbarHost?: HTMLElement | null; library?: 'admin' | 'mine'; openId?: string | null; tools?: DesignerTools }) {
   const mine = library === 'mine'
+  const shapes = tools === 'shapes' && !mine
   const models = useCharacterModels(randomId, mine ? MY_LIBRARY : undefined)
   const { entries } = models
   const { limits } = useWriterLimits(mine)
   const [advanced, setAdvanced] = useStoredState<boolean>('scriblr.designer.advanced', false)
-  const policy = useMemo(() => (mine ? policyFor(limits, advanced === true) : ADMIN_POLICY), [mine, limits, advanced])
+  const policy = useMemo(() => (mine ? policyFor(limits, advanced === true) : shapes ? SHAPES_POLICY : ADMIN_POLICY), [mine, shapes, limits, advanced])
   // the library holds as many models as the admin allows
   const full = mine && !!limits && entries.length >= limits.models
   const [selectedId, setSelectedId] = useState<string | null>(openId)
@@ -128,7 +132,15 @@ function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null 
           </div>
         )}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Import character models from a file" onChange={e => void onFile(e)} />
-        {entries.length === 0 ? (
+        {entries.length === 0 && shapes ? (
+          <div className="cmEmpty">
+            <h3>No models yet</h3>
+            <div className="cmFoot">
+              <button type="button" className="cmIconBtn" aria-label="New model" title="New model" onClick={create}><PlusIcon size={16} /></button>
+              <button type="button" className="cmIconBtn" aria-label="Import" title="Import models from a file" onClick={() => fileInput.current?.click()}><ImportIcon size={16} /></button>
+            </div>
+          </div>
+        ) : entries.length === 0 ? (
           <div className="cmEmpty">
             <h3>{mine ? 'No models of your own yet' : 'No models yet'}</h3>
             <p>
@@ -151,7 +163,7 @@ function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null 
               onAdvanced={mine ? () => setAdvanced(a => a !== true) : undefined}
               nav={{
                 entries, currentId: current.id, open: listOpen, onOpen: setListOpen, onSelect: select, onNew: create, onImport: () => fileInput.current?.click(), full,
-                ...(mine ? { extraTools: <ScriblrPicker onPick={addFromScriblr} disabled={full} /> } : { onAddBasic: () => void addBasic() }),
+                ...(mine ? { extraTools: <ScriblrPicker onPick={addFromScriblr} disabled={full} /> } : shapes ? {} : { onAddBasic: () => void addBasic() }),
                 onExportAll: () => exportEntries(entries), onDuplicate: duplicate, onMove: models.moveModel,
               }}
             />

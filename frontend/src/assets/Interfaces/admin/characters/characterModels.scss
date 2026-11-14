@@ -416,6 +416,9 @@
 .dzAngle { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; select { max-width: 9.5em; } input { width: clamp(70px, 12vw, 160px); accent-color: var(--accent); } }
 .dzZoom { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; input { width: clamp(90px, 16vw, 200px); accent-color: var(--accent); } output { flex: 0 0 3.5em; text-align: right; font-size: var(--text-small); color: var(--ink-muted); } }
 .dzDrawerBtn--on { background: var(--ov-sink-3); }
+// the shape editor: the count of checks to fix beside the Checks icon, and the counts of the overview
+.dzCheckCount { margin-left: 1px; font-size: var(--text-small); font-variant-numeric: tabular-nums; }
+.cmCounts { display: grid; grid-template-columns: auto auto; justify-content: start; gap: var(--space-1) var(--space-4); margin: 0; dt { color: var(--ink-muted); } dd { margin: 0; font-variant-numeric: tabular-nums; } }
 .dzDrawer {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px; box-sizing: border-box; overflow: hidden; background: var(--hairline);
   > .cmStrip, > .cmCheck { overflow-y: auto; min-height: 0; background: var(--surface-raised); scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

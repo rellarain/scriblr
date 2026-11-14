@@ -74,8 +74,9 @@ async def _lifespan(_app: FastAPI):
     except OSError:
         pass
     try:
-        character_models_store.seed_on_first_start(get_app_data_root())  # a fresh install gets the basic adult, published
-        character_models_store.update_basic_on_start(get_app_data_root())  # a newer bundled basic adult is published as its next version, unless the admin changed it
+        # The Designer is a shape editor for now (2026-11-14): the old catalog is put aside once, and the basic model is no longer seeded or updated on start
+        # (seed_on_first_start and update_basic_on_start stay, unused).
+        character_models_store.retire_catalog_on_start(get_app_data_root())
     except (OSError, ValueError):
         pass
     yield

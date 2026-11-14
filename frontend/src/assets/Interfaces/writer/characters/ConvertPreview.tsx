@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { OFFER_BASIC_MODEL } from '../../admin/characters/designerFeatures'
 import { addBasicModel, getPublishedModels } from '../../../../api/characterModelsApi'
 import { getFrozenPortraits } from '../../../../api/charactersApi'
 import type { CharacterDoc, ConvertBody, FigureModel, FrozenPortrait } from '../../../../api/types'
@@ -85,7 +86,7 @@ export function ConvertPreview({ projectId, doc, convert, onClose }: { projectId
       {load.state === 'missing' && (
         <div className="charRow">
           <p className="charHint">The basic model that the conversion is made for is not published.</p>
-          <button type="button" className="charIconBtn" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr, published" disabled={busy} onClick={() => { void addBasic() }}><UserIcon size={16} /></button>
+          {OFFER_BASIC_MODEL && <button type="button" className="charIconBtn" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr, published" disabled={busy} onClick={() => { void addBasic() }}><UserIcon size={16} /></button>}
         </div>
       )}
       {load.state === 'error' && <p className="charHint" role="alert">{load.text}</p>}

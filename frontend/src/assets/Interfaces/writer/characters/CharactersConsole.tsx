@@ -14,6 +14,7 @@ import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
 import { useFigureModels } from './figure/figureModelStore'
 import { OpenMyModelContext } from './figure/ownModel'
+import { WRITER_DESIGNER } from '../../admin/characters/designerFeatures'
 import { exportSheet } from './sheet'
 import { PortraitSection } from './PortraitSection'
 import { ProfileSection } from './ProfileSection'
@@ -39,6 +40,8 @@ const SECTIONS: Array<{ section: Section; label: string; Icon: typeof FaceIcon }
 ]
 // Not about the open character, nor about this project: the writer's own models, kept for every project (a character is drawn from a published one).
 const MODELS = { section: 'models' as const, label: 'My models', Icon: MannequinIcon }
+// My models is off the screen while the writers' own designer is (designerFeatures.ts); the models a writer made are kept
+const EXTRA = WRITER_DESIGNER ? [MODELS] : []
 // Project > Characters: the cast. A list of characters and, for the open one, what to work on: its appearance in words, its portrait (a card drawn from a handful of choices,
 // made with dropdowns in tabs), its profile, relationships and story, the cast as a whole, and what readers see; and the writer's own models, designed here and kept for every
 // project. Edits save the way the Writer's do: the Save button, and autosave when the user has turned it on.
@@ -63,7 +66,7 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
   }, [store.cast, doc])
   const [sheetNote, setSheetNote] = useState('')
   // The Models section is the designer on its own, under the bar (the cast list and the character's sections give way to it).
-  const inModels = section === 'models'
+  const inModels = WRITER_DESIGNER && section === 'models'
 
   // The first character opens by itself.
   useEffect(() => {
@@ -86,12 +89,12 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
   if (c.status === 'loading') return <p className="charNote" role="status">Loading the cast…</p>
 
   return (
-    <OpenMyModelContext.Provider value={openModel}>
+    <OpenMyModelContext.Provider value={WRITER_DESIGNER ? openModel : null}>
       <div className="charPage">
         <div className="charBar">
           <h2 className="charBarTitle">Characters</h2>
           <div className="charTools" role="toolbar" aria-label="What to work on">
-            {(doc ? [...SECTIONS, MODELS] : [MODELS]).map(({ section: x, label, Icon }) => (
+            {(doc ? [...SECTIONS, ...EXTRA] : EXTRA).map(({ section: x, label, Icon }) => (
               <button key={x} type="button" className="charIconBtn" aria-pressed={section === x} aria-label={label} title={label} onClick={() => { setModelToOpen(null); setSection(x) }}><Icon size={18} /></button>
             ))}
           </div>

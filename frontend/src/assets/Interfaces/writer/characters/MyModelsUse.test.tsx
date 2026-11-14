@@ -9,6 +9,8 @@ import { charactersBackend } from '../../../../test/charactersBackend'
 import CharactersConsole from './CharactersConsole'
 import { START_MODEL_KEY, startModelOf } from './figure/figureStart'
 import { choiceLabel, getModelChoices } from './figure/modelChoices'
+// the writers' own designer and the basic model's button are off the screen for now (designerFeatures.ts); these tests are about them
+vi.mock('../../admin/characters/designerFeatures', async importOriginal => ({ ...(await importOriginal<typeof import('../../admin/characters/designerFeatures')>()), DESIGNER_TOOLS: 'all', WRITER_DESIGNER: true, OFFER_BASIC_MODEL: true }))
 
 vi.setConfig({ testTimeout: 60000 })
 

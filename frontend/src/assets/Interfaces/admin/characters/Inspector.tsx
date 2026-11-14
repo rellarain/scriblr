@@ -39,7 +39,8 @@ export const ADVANCED_TABS: InspectorTab[] = ['rig', 'fields', 'proportions', 'f
 // The tabs that mean something for what is open: the rig is for a group and what is in it, forms belong to an object (and so to its shapes), and the rest are the model's own and
 // stay (the colour of a shape, the span a slider gives a writer, a frame round the selection). A tab that is not here is not offered, and one that was open falls back to Shape.
 // Without the advanced tools (a writer's designer that has them off) the tabs above are left out too.
-export function tabsFor(kind: Selection['kind'], advanced = true): InspectorTab[] {
+export function tabsFor(kind: Selection['kind'], advanced = true, shapes = false): InspectorTab[] {
+  if (shapes) return ['shape']
   return TABS.map(t => t.id).filter(id => (advanced || !ADVANCED_TABS.includes(id)) && (id === 'rig' ? kind !== 'none' : id === 'forms' ? kind === 'object' || kind === 'shape' : true))
 }
 
@@ -82,9 +83,12 @@ export interface InspectorProps {
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
 
 export function Inspector(p: InspectorProps) {
-  const offered = tabsFor(p.sel.kind, useDesignerPolicy().advanced)
+  const policy = useDesignerPolicy()
+  const offered = tabsFor(p.sel.kind, policy.advanced, policy.shapes)
   const tabs = TABS.filter(t => offered.includes(t.id))
   const tab = offered.includes(p.tab) ? p.tab : 'shape'
+  // the shape editor has one tab: its body without the strip
+  if (policy.shapes) return <div className="cmInspector"><div className="cmTabPanel"><ShapeTab {...p} /></div></div>
   return (
     <div className="cmInspector">
       <div className="cmTabs" role="tablist" aria-label="Inspector tabs">
@@ -111,13 +115,25 @@ export function Inspector(p: InspectorProps) {
 
 function ShapeTab(p: InspectorProps) {
   const { content, sel, selPoint, mirror } = p
-  const { max } = useDesignerPolicy()
+  const { max, shapes: simple } = useDesignerPolicy()
   const shape = activeShape(content, sel)
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
   const group = sel.kind === 'group' ? groupById(content, sel.id) : object ? groupOfObject(content, object.id) : undefined
   const crumbs = [group?.name || (group ? 'Untitled group' : ''), object?.name || (object ? 'Untitled object' : ''), shape ? shape.name || 'Untitled shape' : ''].filter(Boolean)
   const name = shape ? shape.name : sel.kind === 'object' ? object?.name ?? '' : sel.kind === 'group' ? group?.name ?? '' : ''
 
+  if (sel.kind === 'none' && simple) {
+    return (
+      <div className="cmTabBody">
+        <h2 className="cmInsTitle">Overview</h2>
+        <dl className="cmCounts">
+          <dt>Groups</dt><dd>{content.groups.length}</dd>
+          <dt>Objects</dt><dd>{content.objects.length}</dd>
+          <dt>Shapes</dt><dd>{content.shapes.length}</dd>
+        </dl>
+      </div>
+    )
+  }
   if (sel.kind === 'none') {
     return (
       <div className="cmTabBody">
@@ -140,7 +156,7 @@ function ShapeTab(p: InspectorProps) {
         <input value={name} maxLength={NAME_MAX} aria-label={`${sel.kind === 'shape' ? 'Shape' : sel.kind === 'object' ? 'Object' : 'Group'} name`} onChange={e => p.onRename(sel, e.target.value)} />
       </label>
 
-      {sel.kind === 'object' && object && (
+      {sel.kind === 'object' && object && !simple && (
         <>
           <label className="cmField">
             <span>Layer</span>
@@ -154,9 +170,18 @@ function ShapeTab(p: InspectorProps) {
           {p.turnSection}
         </>
       )}
-      {sel.kind === 'group' && group && <p className="cmInsText">{group.objects.length} of {max.objectsPerGroup} objects.</p>}
+      {sel.kind === 'group' && group && !simple && <p className="cmInsText">{group.objects.length} of {max.objectsPerGroup} objects.</p>}
 
-      {shape && (
+      {shape && simple && (
+        <>
+          <label className="cmField">
+            <span>Opacity</span>
+            <span className="cmRange"><input type="range" min={0} max={100} step={5} value={Math.round(shape.op * 100)} aria-label="Opacity of the shape" onChange={e => p.onEditShape(shape.id, { ...shape, op: Number(e.target.value) / 100 })} /><output>{Math.round(shape.op * 100)}%</output></span>
+          </label>
+          {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} simple />}
+        </>
+      )}
+      {shape && !simple && (
         <>
           <label className="cmField">
             <span>View</span>
@@ -192,7 +217,7 @@ function ShapeTab(p: InspectorProps) {
   )
 }
 
-function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, onWeight }: { shape: ModelShape; selPoint: number; mirror: boolean; onSelectPoint: (i: number) => void; onEditShape: InspectorProps['onEditShape']; onWeight: InspectorProps['onWeight'] }) {
+function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, onWeight, simple = false }: { shape: ModelShape; selPoint: number; mirror: boolean; onSelectPoint: (i: number) => void; onEditShape: InspectorProps['onEditShape']; onWeight: InspectorProps['onWeight']; simple?: boolean }) {
   const { max } = useDesignerPolicy()
   const lv = level(shape.pts.length, Math.min(LIMITS.pointsWarn, max.points), max.points), cur = shape.pts[selPoint]
   const opts = { mirror }
@@ -213,8 +238,15 @@ function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, on
               <button key={m} type="button" className={`cmChip cmChip--wide${cur.m === m ? ' cmChip--on' : ''}`} aria-pressed={cur.m === m} onClick={() => onEditShape(shape.id, setMode(shape, selPoint, m, opts), selPoint)}>{MODE_NAMES[m]}</button>
             ))}
           </div>
-          <Stepper label={`Weight of point ${selPoint + 1}`} value={`${Math.round(weightOf(cur) * 100)}%`} lowerOff={weightOf(cur) <= 0} raiseOff={weightOf(cur) >= 1} onStep={dir => onWeight(selPoint, dir)} />
-          <p className="cmInsText">A weight says how free the point is to hang when something lets this shape fall (Ranges tab). None: it holds still.</p>
+          {!simple && <Stepper label={`Weight of point ${selPoint + 1}`} value={`${Math.round(weightOf(cur) * 100)}%`} lowerOff={weightOf(cur) <= 0} raiseOff={weightOf(cur) >= 1} onStep={dir => onWeight(selPoint, dir)} />}
+          {!simple && <p className="cmInsText">A weight says how free the point is to hang when something lets this shape fall (Ranges tab). None: it holds still.</p>}
+          {simple ? (
+            <div className="cmInline" role="group" aria-label={`Point ${selPoint + 1}`}>
+              <button type="button" className="cmIconBtn" aria-label="Add a point after it" title="Add a point after it" disabled={lv === 'stop'} onClick={() => { const r = addPoint(shape, selPoint, { ...opts, max: max.points }); if (r.index >= 0) onEditShape(shape.id, r.shape, r.index) }}><PlusIcon size={14} /></button>
+              <button type="button" className="cmIconBtn" aria-label="Delete the point" title="Delete the point" disabled={shape.pts.length <= 3} onClick={() => { const r = deletePoint(shape, selPoint, opts); if (r) onEditShape(shape.id, r, Math.max(0, Math.min(selPoint, r.pts.length - 1))) }}><TrashIcon size={14} /></button>
+              <button type="button" className="cmIconBtn" aria-label="Reset its curve handles" title="Reset its curve handles" disabled={!cur.hi && !cur.ho} onClick={() => onEditShape(shape.id, resetHandles(shape, selPoint, opts), selPoint)}><UndoIcon size={14} /></button>
+            </div>
+          ) : (
           <div className="cmInline">
             <button type="button" className="cmBtn cmBtn--small" disabled={lv === 'stop'} onClick={() => { const r = addPoint(shape, selPoint, { ...opts, max: max.points }); if (r.index >= 0) onEditShape(shape.id, r.shape, r.index) }}>
               <PlusIcon size={12} /> Add a point after it
@@ -226,6 +258,7 @@ function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, on
               <UndoIcon size={12} /> Reset its handles
             </button>
           </div>
+          )}
         </>
       )}
     </div>

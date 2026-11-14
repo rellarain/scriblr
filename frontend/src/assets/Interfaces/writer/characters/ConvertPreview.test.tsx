@@ -11,6 +11,8 @@ import CharactersConsole from './CharactersConsole'
 import { __resetFigureModelsForTests } from './figure/figureModelStore'
 import { blankFigure } from './figure/figureState'
 import { defaultPortrait } from './portrait/defaults'
+// the writers' own designer and the basic model's button are off the screen for now (designerFeatures.ts); these tests are about them
+vi.mock('../../admin/characters/designerFeatures', async importOriginal => ({ ...(await importOriginal<typeof import('../../admin/characters/designerFeatures')>()), DESIGNER_TOOLS: 'all', WRITER_DESIGNER: true, OFFER_BASIC_MODEL: true }))
 
 // Convert: the Portrait section's preview of a portrait next to the mannequin it would become, what it keeps in one step (the character, its story looks, its editions), and going back.
 // The model is the basic one that comes with the app. The heavy renders get time.

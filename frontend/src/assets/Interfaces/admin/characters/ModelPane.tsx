@@ -15,7 +15,7 @@ import { CheckPanel } from './CheckPanel'
 import { useDesignerPolicy } from './designerPolicy'
 import { DesignerCanvas, type FrameCanvas, type GripMark, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
 import { ConsoleBar, PANEL_REST, ToolbarPanel, ViewBar, type PanelState } from './DesignerShell'
-import { DEFAULT_LAYERS, drawOrder, normalizeLayers, type LayerState } from './layerStack'
+import { DEFAULT_LAYERS, SHAPE_LAYERS, drawOrder, normalizeLayers, type LayerState } from './layerStack'
 import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
@@ -205,6 +205,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const { ui } = useSettings()
   // what the designer is for: the admin's own limits and every tab, or the writer's limits and the tabs the writer has turned on
   const policy = useDesignerPolicy()
+  // the shape editor (designerFeatures.ts): one Shape tab and the shape tools; mirror editing (about x = 100) is off there
+  const shapesOnly = policy.shapes
   const [history, setHistory] = useState<History<ModelContent>>(emptyHistory)
   const [versions, setVersions] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -212,7 +214,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [note, setNote] = useState('')
   const [tabRaw, setTab] = useState<InspectorTab>('shape')
   // a tab the writer has put away with the advanced tools is not the open one, whatever was open before
-  const tab: InspectorTab = !policy.advanced && ADVANCED_TABS.includes(tabRaw) ? 'shape' : tabRaw
+  const tab: InspectorTab = shapesOnly || (!policy.advanced && ADVANCED_TABS.includes(tabRaw)) ? 'shape' : tabRaw
   const test = useTestState()
   const { values, setValues } = test
   const [recording, setRecording] = useState<RecordingState | null>(null)
@@ -1355,7 +1357,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   )
   // A lock at a crossing of two outlines is made in the model's own space, so it waits for the sliders at rest, the front view and the base outline.
   const lock: LockTool = {
-    enabled: !!selShape && editable && atRest && awayAll === 0 && turnAngle === 0 && selWhere === 'front' && !formTarget && !through,
+    enabled: !shapesOnly && !!selShape && editable && atRest && awayAll === 0 && turnAngle === 0 && selWhere === 'front' && !formTarget && !through,
     stageOf: cr => (selShape ? lockStage(content, solved, selShape.id, cr).stage : 0),
     onAdvance: cr => { if (selShape) applyEdit(advanceLock(content, solved, selShape.id, cr)) },
   }
@@ -1371,9 +1373,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       <fieldset className="cmFieldset dzFieldset" disabled={busy}>
         <div className="dzStage" ref={stageRef}>
           <DesignerCanvas
-            content={canvasContent} solved={canvasSolved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} layers={drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
+            content={canvasContent} solved={canvasSolved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
-            editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
+            editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
             onSelect={choose} onSelectPoint={setSelPoint}
@@ -1390,8 +1392,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
           <div className="dzNotes">
             {models.actionError && <p className="cmErr" role="alert">{models.actionError} <button type="button" className="cmLink" onClick={models.clearActionError}>Dismiss</button></p>}
             {note && <p className="cmErr" role="status">{note}</p>}
-            {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
-            <p className="cmStageNote" aria-live="polite">{stageNote}</p>
+            {empty && !shapesOnly && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
+            {!shapesOnly && <p className="cmStageNote" aria-live="polite">{stageNote}</p>}
           </div>
 
           <ToolbarPanel side="left" title="Tree" label="Tree tools" state={left} min={PANEL_LIMITS.left.min} max={PANEL_LIMITS.left.max} onOpen={open => setPanel('left', { open })} onWidth={onPanelWidth('left')}>
@@ -1424,7 +1426,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 )}
               </span>
             </div>
-            {entry.id === 'basic' && models.basicUpdate && (
+            {entry.id === 'basic' && models.basicUpdate && !shapesOnly && (
               <div className="dzBasicUpdate" role="group" aria-label="A newer basic model">
                 <p className="cmHint" role="status">A newer basic model came with this version of Scriblr. This one was left as it is because it had been changed.</p>
                 {confirmUpdate ? (
@@ -1444,6 +1446,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
               <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles; click a point to step its handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
+              {!shapesOnly && <>
               <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setTapering(false); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setTapering(false); setSkinPick(false); setMode('points'); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
               <button
@@ -1454,11 +1457,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setTapering(false); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
+              </>}
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units, the mirror line and the alignment guides" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${gridSnap ? ' cmIconBtn--on' : ''}`} aria-label="Snap to grid" title="Snap to grid: a shape moved whole, a pivot and a frame land on the grid lines" aria-pressed={gridSnap} onClick={() => setGridSnap(s => !s)}><GridSnapIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
-              {(weighing || content.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) && (
+              {!shapesOnly && (weighing || content.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) && (
                 <span className="cmFallSide" role="group" aria-label="The side things fall to">
                   {FALL_SIDES.map(side => (
                     <button
@@ -1500,11 +1504,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
 
             <NodeBar
-              content={content} sel={sel} locked={sel.kind === 'group' || sel.kind === 'object' ? lockSet.has(sel.id) : false} away={awayAll} busy={!!recording}
+              content={content} sel={sel} locked={sel.kind === 'group' || sel.kind === 'object' ? lockSet.has(sel.id) : false} away={awayAll} busy={!!recording} simple={shapesOnly}
               onToggleLock={test.toggleLock} onDelete={deleteSelection} onCopyShape={copyShape} onRoll={() => test.roll(content)} onReset={resetEverything}
             />
             <Inspector
-              content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
+              content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={setSelPoint}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
@@ -1525,8 +1529,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
           <div className="dzFoot" style={{ left: 0, right: 0 }}>
             {drawer && (
-              <div id="dz-drawer" className="dzDrawer" role="region" aria-label="Previews and checks" style={{ height: DRAWER }}>
-                <PreviewStrip content={content} sel={sel} view={view} tile={tile} />
+              <div id="dz-drawer" className="dzDrawer" role="region" aria-label={shapesOnly ? 'Checks' : 'Previews and checks'} style={{ height: DRAWER }}>
+                {!shapesOnly && <PreviewStrip content={content} sel={sel} view={view} tile={tile} />}
                 <CheckPanel content={content} />
               </div>
             )}
@@ -1538,7 +1542,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const same = fitAll && !viewMoved && Math.abs(zoom - 1) < 1e-6
                 setFitAll(!same); setZoom(1); setViewMoved(false); setViewNonce(n => n + 1)
               }}
-              zoom={zoom} onZoom={setZoom} drawerOpen={drawer} onDrawer={() => setDrawer(d => !d)} checks={faults.length}
+              zoom={zoom} onZoom={setZoom} drawerOpen={drawer} onDrawer={() => setDrawer(d => !d)} checks={faults.length} simple={shapesOnly}
               layerNotes={{ heads: content.headBone && boneById(content, content.headBone) ? undefined : 'There is no head bone yet: add a bone in the Proportions tab and press Use as the head.' }}
             />
           </div>

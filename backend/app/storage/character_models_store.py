@@ -8,6 +8,7 @@ ever touches a project or a character.
 
 import hashlib
 import json
+import os
 import sys
 import threading
 from datetime import datetime
@@ -1038,3 +1039,32 @@ def update_basic_model(root: Path) -> ModelCatalog:
         catalog = _mutate(root, lambda c: _put_basic(c, bundled))
         _record_basic(root, _content_key(bundled))
         return catalog
+
+
+# ---- the shape editor (2026-11-14): the old catalog is taken out once ----
+
+_RETIRED_MARKER = "character-models.retired"
+RETIRED_COPY = "character-models.before-shapes"
+
+
+def retire_catalog_on_start(root: Path) -> bool:
+    """On the first start of the shape-editor build: the admin's catalog of the old models (the basic model and any others, with their versions) is taken out of the
+    Designer. The file is renamed beside it (character-models.before-shapes.json, or -2, -3 ... when that name is taken) rather than deleted, and the next read starts an
+    empty catalog. Done once, by a marker, so models made afterwards stay. The writer's own library is never touched, and projects keep their frozen copies of the models
+    their characters use. True when a catalog was put aside."""
+    marker = root / _RETIRED_MARKER
+    with _lock:
+        if marker.exists():
+            return False
+        path = _models_path(root)
+        moved = False
+        if path.exists():
+            target = root / f"{RETIRED_COPY}.json"
+            n = 2
+            while target.exists():
+                target = root / f"{RETIRED_COPY}-{n}.json"
+                n += 1
+            os.replace(path, target)
+            moved = True
+        marker.write_text("done", encoding="utf-8")
+        return moved

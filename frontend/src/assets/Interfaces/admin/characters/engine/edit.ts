@@ -90,6 +90,25 @@ export function cycleMode(shape: ModelShape, i: number, o: EditOptions = {}): Mo
   return p ? setMode(shape, i, NEXT_MODE[p.m] ?? 's', o) : copyShape(shape)
 }
 
+// ---- segments (the shape editor): segment e is the side from point e to the next point ----
+// A point's mode with its incoming (or outgoing) curve handle on or off, the other side as it was.
+export const withIn = (m: ModelPointMode, on: boolean): ModelPointMode => (on ? (hasOut(m) ? 'c' : 'cs') : hasOut(m) ? 'sc' : 's')
+export const withOut = (m: ModelPointMode, on: boolean): ModelPointMode => (on ? (hasIn(m) ? 'c' : 'sc') : hasIn(m) ? 'cs' : 's')
+// Whether segment e is curved: straight only when neither end has a curve handle on its side.
+export function segmentCurved(shape: ModelShape, e: number): boolean {
+  const n = shape.pts.length, a = shape.pts[e], b = shape.pts[(e + 1) % n]
+  return !!a && !!b && (hasOut(a.m) || hasIn(b.m))
+}
+// Segment e made straight (its ends lose their handles on its side) or curved (they get automatic ones). The last point of an open shape has no segment after it.
+export function toggleSegment(shape: ModelShape, e: number): ModelShape {
+  const s = copyShape(shape), n = s.pts.length
+  if (!s.pts[e] || n < 2 || (!shape.closed && e >= n - 1)) return s
+  const curved = segmentCurved(shape, e), a = s.pts[e], b = s.pts[(e + 1) % n]
+  a.m = withOut(a.m, !curved); b.m = withIn(b.m, !curved)
+  if (!curved) { a.ho = null; b.hi = null }
+  return s
+}
+
 // Back to the automatic handles.
 export function resetHandles(shape: ModelShape, i: number, o: EditOptions = {}): ModelShape {
   const s = copyShape(shape)

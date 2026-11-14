@@ -11,6 +11,8 @@ import { defaultWriterLimits } from '../../../admin/characters/engine/writerLimi
 import CharactersConsole from '../CharactersConsole'
 import { __resetFigureModelsForTests } from './figureModelStore'
 import { blankFigure } from './figureState'
+// the writers' own designer and the basic model's button are off the screen for now (designerFeatures.ts); these tests are about them
+vi.mock('../../../admin/characters/designerFeatures', async importOriginal => ({ ...(await importOriginal<typeof import('../../../admin/characters/designerFeatures')>()), DESIGNER_TOOLS: 'all', WRITER_DESIGNER: true, OFFER_BASIC_MODEL: true }))
 
 // Edit this model, in the Mannequin group of the figure editor's first step: it opens the model a character is drawn from in My models, as a copy of its own when the model is
 // Scriblr's (or one of the writer's that is no longer in the library), as it is when the model is the writer's and still there.

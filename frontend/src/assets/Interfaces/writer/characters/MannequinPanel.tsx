@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { OFFER_BASIC_MODEL } from '../../admin/characters/designerFeatures'
 import { addBasicModel } from '../../../../api/characterModelsApi'
 import type { CharacterDoc, CharacterFigure } from '../../../../api/types'
 import { CloseIcon, DiceIcon, SwapIcon, UserIcon } from '../../../icons'
@@ -66,8 +67,8 @@ function Make({ projectId, setFigure, onConvert }: { projectId: string; setFigur
       {models === null && <p className="charHint" role="status">Looking for models…</p>}
       {models !== null && models.length === 0 && !problem && (
         <div className="charRow">
-          <p className="charHint">No model is published yet. Models are designed and published in Designer, or in My models; the basic adult that comes with Scriblr can be added here.</p>
-          <button type="button" className="charIconBtn" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr, published" disabled={busy} onClick={() => { void addBasic() }}><UserIcon size={16} /></button>
+          <p className="charHint">{OFFER_BASIC_MODEL ? 'No model is published yet. Models are designed and published in Designer, or in My models; the basic adult that comes with Scriblr can be added here.' : 'No model is published yet.'}</p>
+          {OFFER_BASIC_MODEL && <button type="button" className="charIconBtn" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr, published" disabled={busy} onClick={() => { void addBasic() }}><UserIcon size={16} /></button>}
         </div>
       )}
       {chosen && (

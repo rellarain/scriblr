@@ -12,15 +12,18 @@ export interface DesignerPolicy {
   advanced: boolean
   // The most each count may grow to (the writer's limit, else the admin's own).
   max: DesignerMax
+  // Whether the Designer is only a shape editor (designerFeatures.ts): one Shape tab, the tree as model > group > object > shape, the other tools off the screen.
+  shapes: boolean
 }
 
-export const ADMIN_POLICY: DesignerPolicy = { writer: null, advanced: true, max: designerMax(null) }
+export const ADMIN_POLICY: DesignerPolicy = { writer: null, advanced: true, max: designerMax(null), shapes: false }
+export const SHAPES_POLICY: DesignerPolicy = { ...ADMIN_POLICY, shapes: true }
 
 const PolicyContext = createContext<DesignerPolicy>(ADMIN_POLICY)
 export const DesignerPolicyProvider = PolicyContext.Provider
 export const useDesignerPolicy = (): DesignerPolicy => useContext(PolicyContext)
 
-export const policyFor = (writer: WriterModelLimits | null, advanced: boolean): DesignerPolicy => ({ writer, advanced, max: designerMax(writer) })
+export const policyFor = (writer: WriterModelLimits | null, advanced: boolean): DesignerPolicy => ({ writer, advanced, max: designerMax(writer), shapes: false })
 
 // The limits the admin set for a writer's own models, read when the writer's designer opens. A failed read is not fatal: the admin's own limits apply on the page (the server
 // still holds the writer to the admin's choice when a model is published), and `failed` says so.

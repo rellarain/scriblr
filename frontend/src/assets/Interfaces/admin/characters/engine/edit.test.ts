@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelShape } from '../../../../../api/types'
-import { addPoint, applyTemplate, deletePoint, isSymmetric, moveHandle, movePoint, moveShape, newShape, nudgePoint, resetHandles, setMode } from './edit'
+import { addPoint, applyTemplate, deletePoint, isSymmetric, moveHandle, movePoint, moveShape, newShape, nudgePoint, resetHandles, setMode, segmentCurved, toggleSegment, withIn, withOut } from './edit'
 import { LIMITS } from './limits'
 
 const BOX = { x: 80, y: 40, w: 40, h: 40 }
@@ -114,5 +114,40 @@ describe('adding and deleting points', () => {
     const both = deletePoint(s, 1, { mirror: true })!
     expect(both.pts).toHaveLength(s.pts.length - 2)
     expect(deletePoint(shape('triangle'), 0)).toBeNull()
+  })
+})
+
+describe('segments (the shape editor)', () => {
+  it('turns a handle of a mode on or off and leaves the other side', () => {
+    expect(withIn('s', true)).toBe('cs')
+    expect(withIn('sc', true)).toBe('c')
+    expect(withIn('c', false)).toBe('sc')
+    expect(withOut('s', true)).toBe('sc')
+    expect(withOut('cs', true)).toBe('c')
+    expect(withOut('c', false)).toBe('cs')
+  })
+
+  it('makes a straight segment curved and back, touching only its two ends', () => {
+    const square = shape('square')
+    expect(segmentCurved(square, 0)).toBe(false)
+    const curved = toggleSegment(square, 0)
+    expect(segmentCurved(curved, 0)).toBe(true)
+    expect(curved.pts.map(p => p.m)).toEqual(['sc', 'cs', 's', 's'])
+    expect(segmentCurved(curved, 1)).toBe(false)
+    const back = toggleSegment(curved, 0)
+    expect(back.pts.map(p => p.m)).toEqual(['s', 's', 's', 's'])
+  })
+
+  it('makes a curved segment of a circle straight and keeps the curves beside it', () => {
+    const circle = shape('circle')
+    const one = toggleSegment(circle, 3)
+    expect(one.pts.map(p => p.m)).toEqual(['sc', 'c', 'c', 'cs'])
+    expect(segmentCurved(one, 3)).toBe(false)
+    expect(segmentCurved(one, 0)).toBe(true)
+  })
+
+  it('has no segment after the last point of an open shape', () => {
+    const open = { ...shape('square'), closed: false }
+    expect(toggleSegment(open, 3).pts.map(p => p.m)).toEqual(['s', 's', 's', 's'])
   })
 })

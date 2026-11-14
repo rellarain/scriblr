@@ -303,12 +303,13 @@ function CharactersCard() {
   )
 }
 
-// The Designer console as it sits in the admin panel (in the admin accent), and the page of limits for the models writers design (Configuration > Writers' designer).
+// The Designer console as it sits in the admin panel (in the admin accent): the shape editor the app shows for now (views 'designer'), every tool ('all'), and the page of
+// limits for the models writers design (Configuration > Writers' designer, off the screen for now).
 function CharacterModelsCard({ view }: { view: string }) {
   return (
     <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
       <div className="aUIPanel" style={{ height: '100%', overflow: 'auto', boxSizing: 'border-box', padding: 14 }}>
-        {view === 'limits' ? <WriterLimitsConsole /> : <DesignerConsole />}
+        {view === 'limits' ? <WriterLimitsConsole /> : <DesignerConsole tools={view === 'all' ? 'all' : 'shapes'} />}
       </div>
     </div>
   )
