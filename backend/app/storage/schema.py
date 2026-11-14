@@ -5386,11 +5386,18 @@ class CharacterFigure(BaseModel):
     order: dict[str, list[str]] = Field(default_factory=dict)
     # Made from the character's portrait by Convert (phase 6c-4): the portrait is still kept, and Back to the old portrait drops this figure again.
     converted: bool = False
+    # The angle the character is seen from (phase A4), in whole degrees 0..359 (0 the front, 180 the back, 90 the right profile): every picture of the character uses it.
+    angle: int = 0
 
     @field_validator("converted", mode="before")
     @classmethod
     def _figure_converted(cls, value: Any) -> bool:
         return value is True
+
+    @field_validator("angle", mode="before")
+    @classmethod
+    def _figure_angle(cls, value: Any) -> int:
+        return _view_angle(value) or 0
 
     @field_validator("on", mode="before")
     @classmethod
@@ -5816,6 +5823,24 @@ class LifeEvent(BaseModel):
         return _cut(value, 1000)
 
 
+def _view_angle(value: Any) -> Optional[int]:
+    """An angle a figure is seen from, in whole degrees held to 0..359 (None for anything that is not a number)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+        return None
+    return int(round(value)) % 360
+
+
+class SceneLook(BaseModel):
+    """How a character is drawn in one chapter or scene they are tagged on (phase A4): the angle they are seen from there (None: their own)."""
+
+    angle: Optional[int] = None
+
+    @field_validator("angle", mode="before")
+    @classmethod
+    def _angle(cls, value: Any) -> Optional[int]:
+        return _view_angle(value)
+
+
 class CharacterDoc(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=80)
@@ -5834,6 +5859,8 @@ class CharacterDoc(BaseModel):
     events: list[LifeEvent] = Field(default_factory=list)
     # The chapters and scenes of the outline the author has tagged this character on (outline node ids, in the order they were tagged).
     appearances: list[str] = Field(default_factory=list)
+    # How the character is drawn in some of those (phase A4: an angle of its own there), by outline node id; a look for a node they are no longer tagged on is dropped.
+    sceneLooks: dict[str, SceneLook] = Field(default_factory=dict)
     # What readers may see of this character (see ReaderShare); `fields` and `reveals` are keyed by CHARACTER_SHARE_FIELDS and "field:<id>".
     reader: ReaderShare = Field(default_factory=ReaderShare)
     updatedAt: datetime = Field(default_factory=utcnow)
@@ -5895,6 +5922,30 @@ class CharacterDoc(BaseModel):
     @classmethod
     def _look(cls, value: Any) -> Any:
         return value if isinstance(value, (dict, CharacterLook)) else {}
+
+    @field_validator("sceneLooks", mode="before")
+    @classmethod
+    def _scene_looks(cls, value: Any) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for key, look in value.items() if isinstance(value, dict) else []:
+            text = _cut(key, 80)
+            if not text or not isinstance(look, (dict, SceneLook)):
+                continue
+            try:
+                kept = SceneLook.model_validate(look)
+            except ValidationError:
+                continue
+            if kept.angle is not None:
+                out[text] = kept
+            if len(out) >= CHARACTER_MAX_APPEARANCES:
+                break
+        return out
+
+    @model_validator(mode="after")
+    def _looks_where_they_appear(self) -> "CharacterDoc":
+        if any(k not in self.appearances for k in self.sceneLooks):
+            self.sceneLooks = {k: v for k, v in self.sceneLooks.items() if k in self.appearances}
+        return self
 
     @field_validator("portrait", mode="before")
     @classmethod

@@ -5,13 +5,14 @@ import { seededRng } from '../../../admin/characters/engine/previews'
 import { FALL_SIDES } from '../../../admin/characters/modelContent'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, DiceIcon, LockIcon, UndoIcon } from '../../../../icons'
 import { Field, Slider } from '../CharFields'
+import { angleName } from '../../../admin/characters/engine/angles'
 import {
   FALL_LABELS, NONE, chooseKind, chooseOption, groupPartsOf, isMine, layerListIn, layersIn, lockSheet, moveLayer, objectPartOf, optionalObjects, figurePartOf, pickColour, rollPart, setBrightness, setForm, setLock,
   setMember, setOpacity, setPattern, setFall, setWorn, sheetLocked, slotViewOf, type FieldsetPart, type Layers, type MovableLayer, type ObjectPart, type PresetKind, type StateChoice,
 } from './figureEditing'
 import { CardColour, EditModel, MineBlock, OtherModel, PaletteEditor } from './FigureSettings'
 import { cropAround, kindCrop } from './figurePictures'
-import { setValue, spanOf, valuesOf } from './figureState'
+import { setValue, spanOf, valuesOf, withAngle } from './figureState'
 import { PictureSelect } from './PictureSelect'
 
 // The controls under the card, one step at a time: the figure as a whole (step 0), what a sheet of the card holds (step 1: its groups, and the clothes worn there) and one part of it
@@ -150,6 +151,10 @@ export function FigureStep({ ctx, projectId, model, describe, onForget, onRevert
   return (
     <div className="charStep">
       <p className="charHint">Point at the figure: a sheet shows where each part of it lies. Click a sheet to open it, then click the part you want to change.</p>
+      <Slider
+        label="Turn" value={ctx.figure.angle ?? 0} min={0} max={359} step={1} format={v => { const n = angleName(v); return n.endsWith('°') ? n : `${Math.round(v)}°, ${n}` }}
+        hint="Turn the character to any angle: every picture of them uses it (a scene can have its own in the Story section)" onChange={v => ctx.apply(f => withAngle(f, v), 'angle')}
+      />
       {part.kinds.length > 0 && <div className="charStepGrid"><Kinds kinds={part.kinds} ctx={ctx} /></div>}
       <Ranges ranges={part.sliders} ctx={ctx} />
       <Fieldsets parts={part.fieldsets} ctx={ctx} />

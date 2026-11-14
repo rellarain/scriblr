@@ -5,7 +5,8 @@ import { PlusIcon, TrashIcon } from '../../../icons'
 import { TextField } from './CharFields'
 import { CharacterArt } from './figure/CharacterArt'
 import { useFigureCopies } from './figure/figureModelStore'
-import { copyFigure } from './figure/figureState'
+import { copyFigure, figureView, withAngle } from './figure/figureState'
+import { ANGLES, angleName, angleOf } from '../../admin/characters/engine/angles'
 import { appearanceGaps, nextId, stateAt, statesInOrder, type StoryPoint } from './story'
 
 // Names separated by commas, kept as typed (the comma and the space after it are not lost while typing).
@@ -77,6 +78,14 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
               <div className="charRow">
                 {kept && <span className="charStateHead"><CharacterArt portrait={s.portrait} figure={s.figure} crop="head" label={`${what} kept for state ${i + 1}`} className="charPortraitArt" /></span>}
                 <button type="button" className="charChip" onClick={() => setState(s.id, doc.figure ? { figure: copyFigure(doc.figure), portrait: null } : { portrait: structuredClone(doc.portrait), figure: null })}>{kept ? `Capture the ${doc.figure ? 'figure' : 'portrait'} again` : `Capture the ${doc.figure ? 'figure' : 'portrait'} now`}</button>
+                {s.figure && (
+                  <select
+                    className="charSelect charSelect--auto" aria-label={`Angle in state ${i + 1}`} title="The angle the character is seen from in this state"
+                    value={String(Math.round(angleOf(figureView(s.figure))) % 360)} onChange={e => setState(s.id, { figure: withAngle(s.figure!, Number(e.target.value)) })}
+                  >
+                    {angleChoices(Math.round(angleOf(figureView(s.figure))) % 360).map(o => <option key={o.at} value={o.at}>{o.name}</option>)}
+                  </select>
+                )}
                 {kept && <button type="button" className="charChip" onClick={() => setState(s.id, { portrait: null, figure: null })}>Forget the {what.toLowerCase()}</button>}
                 {kept && <span className="charHint">A {what.toLowerCase()} is kept for this state.</span>}
                 {!kept && s.snapshot && <span className="charHint">An older look is kept with this state; capture the {doc.figure ? 'figure' : 'portrait'} to compare.</span>}
@@ -106,7 +115,17 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
           {doc.appearances.map(id => (
             <li key={id} className="charRow">
               <span className="charRowName">{pointName(id)}</span>
-              <button type="button" className="charIconBtn" aria-label={`Take them out of ${pointName(id)}`} title="Take them out of this" onClick={() => edit(d => ({ ...d, appearances: d.appearances.filter(x => x !== id) }), 'appearances')}><TrashIcon size={16} /></button>
+              {doc.figure && (
+                <select
+                  className="charSelect charSelect--auto" aria-label={`Angle in ${pointName(id)}`} title="The angle the character is seen from here (their own unless you choose one)"
+                  value={doc.sceneLooks?.[id]?.angle != null ? String(doc.sceneLooks[id].angle) : ''}
+                  onChange={e => { const v = e.target.value; edit(d => ({ ...d, sceneLooks: withSceneAngle(d.sceneLooks, id, v === '' ? null : Number(v)) }), 'sceneLooks') }}
+                >
+                  <option value="">{`Their own (${angleName(figureView(doc.figure))})`}</option>
+                  {angleChoices(doc.sceneLooks?.[id]?.angle ?? null).map(o => <option key={o.at} value={o.at}>{o.name}</option>)}
+                </select>
+              )}
+              <button type="button" className="charIconBtn" aria-label={`Take them out of ${pointName(id)}`} title="Take them out of this" onClick={() => edit(d => ({ ...d, appearances: d.appearances.filter(x => x !== id), sceneLooks: withSceneAngle(d.sceneLooks, id, null) }), 'appearances')}><TrashIcon size={16} /></button>
             </li>
           ))}
         </ul>
@@ -158,4 +177,18 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
       {links && <section className="charPanel" aria-label="Links">{links}</section>}
     </div>
   )
+}
+
+// The angles offered for a story look or a scene (phase A4): the eight named ones, and the one chosen when it is between them.
+function angleChoices(current: number | null): Array<{ at: number; name: string }> {
+  const list = ANGLES.map(a => ({ at: a.at, name: a.name }))
+  if (current != null && !list.some(a => a.at === current)) list.push({ at: current, name: `${current}°` })
+  return list
+}
+// A character's scene looks with one scene's angle set (null: their own there again; a look with nothing in it is not kept).
+function withSceneAngle(looks: CharacterDoc['sceneLooks'], id: string, angle: number | null): CharacterDoc['sceneLooks'] {
+  const next = { ...(looks ?? {}) }
+  if (angle === null) delete next[id]
+  else next[id] = { angle: Math.round(((angle % 360) + 360) % 360) }
+  return next
 }

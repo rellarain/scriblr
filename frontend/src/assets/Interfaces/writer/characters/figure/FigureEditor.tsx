@@ -4,19 +4,19 @@ import { BackIcon, ChevronLeftIcon, DiceIcon, ExportIcon, FrontIcon, GridViewIco
 import { genresOf } from '../../../admin/characters/engine/colour'
 import { framesOf } from '../../../admin/characters/engine/frames'
 import { seededRng } from '../../../admin/characters/engine/previews'
-import type { View } from '../../../admin/characters/engine/rig'
+import { ANGLES, angleOf, viewFor, type View } from '../../../admin/characters/engine/angles'
 import type { Characters } from '../useCharacters'
 import { FigureCard } from './FigureCard'
 import { ALL_LAYERS, objectPartOf, regionOfObject, regionsOf, unlockAll, type Layers } from './figureEditing'
-import { rollFigure, type Crop } from './figureState'
+import { figureView, rollFigure, withAngle, type Crop } from './figureState'
 import { cardFileName, downloadCard } from './figureExport'
 import { FigureOverview } from './FigureOverview'
 import { FigureStep, ObjectStep, RegionStep, Toggle, type Apply, type Ctx } from './FigureSteps'
 
 // The writer's editor of a figure, in the character card (phase 6b-2): the figure on its card with the model's frames laid on it as sheets, and under it (beside it when the console is
 // wide) the controls, one step at a time. Step 0 is the figure; click a sheet for step 1, what that part of the figure holds; click a part of the card for step 2, that part. Back
-// goes one step up. The view (front or back), the frame the card looks through and where the writer is are the editor's own and are not saved; what is chosen is saved on the
-// character's figure, and undone with the page's Undo. Randomise rolls the whole figure inside its genre; each step has a dice for just that part.
+// goes one step up. The angle the figure is seen from is saved on the figure (phase A4: every picture of the character uses it); the frame the card looks through and where the
+// writer is are the editor's own and are not saved; what is chosen is saved on the character's figure, and undone with the page's Undo. Randomise rolls the whole figure inside its genre; each step has a dice for just that part.
 const seed = (): number => Math.floor(Math.random() * 0x100000000)
 
 export function FigureEditor({ projectId, figure, model, label, setFigure, onRevert, name = '', caption = '' }: {
@@ -25,7 +25,7 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
   name?: string; caption?: string
 }) {
   const copy = model.content
-  const [view, setView] = useState<View>('front')
+  const view = figureView(figure)
   const [frameId, setFrameId] = useState<string | null>(null)
   const [region, setRegion] = useState<string | null>(null)
   const [objectId, setObjectId] = useState<string | null>(null)
@@ -41,6 +41,9 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
   const genres = genresOf(copy)
   const crop: Crop = frameId && frames.some(f => f.id === frameId) ? { frame: frameId } : 'figure'
   const apply: Apply = useCallback((op, group) => setFigure(op, group ?? null), [setFigure])
+  // turning the figure is saved on it; a run of turns is one step of Undo
+  const setView = (v: View) => apply(f => withAngle(f, angleOf(v)), 'angle')
+  const at = Math.round(angleOf(view)) % 360, named = ANGLES.find(n => n.at === at)
 
   const openRegion = (id: string) => { setRegion(id); setObjectId(null); setOverview(false) }
   const openObject = useCallback((id: string) => { setObjectId(id); setRegion(regionOfObject(copy, id)); setOverview(false) }, [copy])
@@ -62,8 +65,15 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
     <div className="charFigWrap"><div className="charFigEdit">
       <div className="charFigTools" role="toolbar" aria-label="View and frame">
         <div className="charRow charFigViews" role="group" aria-label="View">
-          <button type="button" className="charIconBtn" aria-pressed={view === 'front'} aria-label="Front view" title="Front view" onClick={() => setView('front')}><FrontIcon size={18} /></button>
-          <button type="button" className="charIconBtn" aria-pressed={view === 'back'} aria-label="Back view" title="Back view: the figure turned round, with the sheets in front of it" onClick={() => setView('back')}><BackIcon size={18} /></button>
+          <button type="button" className="charIconBtn" aria-pressed={at === 0} aria-label="Front view" title="Front view" onClick={() => setView('front')}><FrontIcon size={18} /></button>
+          <button type="button" className="charIconBtn" aria-pressed={at === 180} aria-label="Back view" title="Back view: the figure turned round, with the sheets in front of it" onClick={() => setView('back')}><BackIcon size={18} /></button>
+          <select
+            className="charSelect charSelect--auto" aria-label="Angle" title="The angle the character is seen from (named by the side of the character toward you): every picture of them uses it"
+            value={named ? named.id : 'other'} onChange={e => { const n = ANGLES.find(x => x.id === e.target.value); if (n) setView(viewFor(n.at)) }}
+          >
+            {ANGLES.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+            {!named && <option value="other">{`${at}°`}</option>}
+          </select>
         </div>
         {frames.length > 0 && (
           <div className="charRow charFigFrames" role="group" aria-label="Frame">

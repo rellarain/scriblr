@@ -3,17 +3,19 @@ import type { CharacterFigure, ModelContent } from '../../../../../api/types'
 import { paintDefs } from '../../../admin/characters/engine/paint'
 import type { View } from '../../../admin/characters/engine/rig'
 import { PaintDefs, PaintedPath, useSvgPrefix } from '../../../admin/characters/PaintedPath'
-import { drawFigure, type Crop } from './figureState'
+import { drawFigure, figureView, type Crop } from './figureState'
 
 // A character's figure: the model copy drawn with the writer's choices on the card colour, through a crop (the whole figure, the head or one of the model's frames). The
 // picture is drawn by the same code as the designer's previews. `label` names it for a screen reader (an empty one hides it, for a picture that sits beside its name).
 // `square` grows the tile to a square (a small card); the editor looks at the frame's own shape. `layer` draws only the tile or only the figure on it: the editor lays its
 // sheets between the two (in the front view they lie behind the figure, in the back view in front of it), the two pictures sharing one box and one rounded corner.
 export type FigureLayer = 'all' | 'tile' | 'figure'
-export const Figure = memo(function Figure({ copy, figure, crop = 'figure', view = 'front', square = true, layer = 'all', label, className }: {
+export const Figure = memo(function Figure({ copy, figure, crop = 'figure', view: asked, square = true, layer = 'all', label, className }: {
   copy: ModelContent; figure: CharacterFigure; crop?: Crop; view?: View; square?: boolean; layer?: FigureLayer; label: string; className?: string
 }) {
   const prefix = useSvgPrefix()
+  // seen from the angle asked for, else the figure's own (phase A4)
+  const view = asked ?? figureView(figure)
   const { box, items, tile } = useMemo(() => drawFigure(copy, figure, crop, view, square), [copy, figure, crop, view, square])
   const defs = useMemo(() => (layer === 'tile' ? paintDefs([], prefix) : paintDefs(items, prefix)), [items, prefix, layer])
   const r = (n: number) => Math.round(n * 100) / 100

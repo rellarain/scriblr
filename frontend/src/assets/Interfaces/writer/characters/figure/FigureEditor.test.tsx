@@ -80,6 +80,19 @@ describe('the card and its toolbar', () => {
     await user.click(screen.getByRole('button', { name: 'Front view' }))
     expect(card()).toHaveClass('charFigCard--front')
   })
+  it('saves the angle the character is seen from on the figure, one step of Undo for a run of turns', async () => {
+    const { seen, user } = setup()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Angle' }), 'right')
+    expect(seen.figure.angle).toBe(90)
+    expect(seen.groups.at(-1)).toBe('angle')
+    expect(card()).toHaveClass('charFigCard--front')                                  // more of the front than the back is seen
+    fireEvent.change(slider('Turn'), { target: { value: '135' } })
+    expect(seen.figure.angle).toBe(135)
+    expect(card()).toHaveClass('charFigCard--back')
+    expect(screen.getByRole('combobox', { name: 'Angle' })).toHaveDisplayValue('Back right')
+    await user.click(screen.getByRole('button', { name: 'Front view' }))
+    expect(seen.figure.angle).toBeUndefined()                                          // the front is no angle at all
+  })
   it('looks through a frame, and the card takes the shape of it', async () => {
     const { user } = setup()
     const whole = card().style.getPropertyValue('--ar')
@@ -100,7 +113,7 @@ describe('step 0: the figure', () => {
     expect(pickerValue('Expression')).toBe('')
     expect(await optionNames(userEvent.setup(), 'Age')).toEqual(['Infant', 'Child', 'Teen', 'Adult', 'Elder'])
     const palette = screen.getByRole('group', { name: 'Palette' })
-    expect(steps().getAllByRole('slider').filter(s => !palette.contains(s)).map(s => s.getAttribute('aria-label'))).toEqual(['Height'])
+    expect(steps().getAllByRole('slider').filter(s => !palette.contains(s)).map(s => s.getAttribute('aria-label'))).toEqual(['Turn', 'Height'])
   })
   it('holds a slider to the span the writer may move it in', () => {
     setup()

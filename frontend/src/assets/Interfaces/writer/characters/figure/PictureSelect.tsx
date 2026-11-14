@@ -35,7 +35,7 @@ export function PictureSelect({ label, value, options, onChange, copy, figure, f
     <Field label={label}>
       <PreviewSelect
         bare label={label} options={options} value={value} onChange={onChange} buttonThumb={false} custom={custom}
-        thumb={o => <Figure copy={copy} figure={figureOf(o.id)} crop={cropOf()} label="" className="charPickArt" />}
+        thumb={o => <Figure copy={copy} figure={figureOf(o.id)} crop={cropOf()} view="front" label="" className="charPickArt" />}
       />
     </Field>
   )

@@ -3,7 +3,7 @@ import type { CharacterFigure, ModelContent } from '../../../../../api/types'
 import { LockIcon } from '../../../../icons'
 import { viewBoxOf } from '../../../admin/characters/engine/frames'
 import type { Box } from '../../../admin/characters/engine/geometry'
-import type { View } from '../../../admin/characters/engine/rig'
+import { fromBehind, type View } from '../../../admin/characters/engine/angles'
 import { hotspotsOf, regionsOf, type Layers, type Region } from './figureEditing'
 import { cropBox, followHeight, solveFigure, type Crop } from './figureState'
 import { Figure } from './Figure'
@@ -46,7 +46,7 @@ export function FigureCard({ copy, figure, view, crop, region, objectId, layers,
   const shown = spots.find(s => s.h.object.id === tip)
 
   return (
-    <div className={`charFigCard charFigCard--${view}`} style={{ '--ar': box.w / box.h } as CSSProperties}>
+    <div className={`charFigCard charFigCard--${fromBehind(view) ? 'back' : 'front'}`} style={{ '--ar': box.w / box.h } as CSSProperties}>
       <Figure copy={copy} figure={figure} crop={crop} view={view} square={false} layer="tile" label="" className="charFigLayer charFigLayer--tile" />
       {sheets.map(({ region: r, at }) => (
         <button

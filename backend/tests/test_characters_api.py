@@ -342,3 +342,27 @@ def test_the_whole_cast_is_one_request_and_keeps_appearances(client: TestClient)
     rows = client.get(f"/api/projects/{pid}/characters/all").json()
     assert [r["name"] for r in rows] == ["A", "B"] and rows[0]["appearances"] == ["ch1", "sc1"] and "look" in rows[1]
     assert client.get(f"/api/projects/{pid}/characters/{b['id']}").status_code == 200
+
+
+def test_a_figure_keeps_the_angle_it_is_seen_from_in_whole_degrees() -> None:
+    from app.storage.schema import CharacterFigure
+
+    assert CharacterFigure.model_validate({}).angle == 0
+    assert CharacterFigure.model_validate({"angle": 405.4}).angle == 45
+    assert CharacterFigure.model_validate({"angle": -90}).angle == 270
+    assert CharacterFigure.model_validate({"angle": "left"}).angle == 0
+    assert CharacterFigure.model_validate({"angle": True}).angle == 0
+
+
+def test_a_scene_look_is_kept_only_where_the_character_appears(client: TestClient) -> None:
+    pid = _project(client)
+    c = _new(client, pid, name="Ada")
+    c["appearances"] = ["s1", "s2"]
+    c["sceneLooks"] = {"s1": {"angle": -90}, "s2": {"angle": None}, "s3": {"angle": 45}, "s4": "turned"}
+    saved = client.put(f"/api/projects/{pid}/characters/{c['id']}", json=c).json()
+    assert saved["sceneLooks"] == {"s1": {"angle": 270}}
+    saved["appearances"] = ["s2"]
+    again = client.put(f"/api/projects/{pid}/characters/{c['id']}", json=saved).json()
+    assert again["sceneLooks"] == {}
+    # a character saved before scene looks reads with none
+    assert CharacterDoc.model_validate({"id": "old"}).sceneLooks == {}

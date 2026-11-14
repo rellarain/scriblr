@@ -648,7 +648,11 @@ export interface CharacterFigure {
   order?: Record<string, string[]>
   // Made from the character's portrait by Convert: Back to the old portrait drops it again.
   converted?: boolean
+  // The angle the character is seen from (phase A4), in whole degrees 0..359 (0 the front, 180 the back, 90 the right profile; 0 when it is missing). Every picture of the character uses it.
+  angle?: number
 }
+// How a character is drawn in one chapter or scene they are tagged on (phase A4): the angle they are seen from there (null: their own).
+export interface SceneLook { angle: number | null }
 // Convert (phase 6c-4): the portrait of a character frozen in an edition of a book, and what Convert sends to keep a conversion (the figure for the character, for each captured
 // story look that holds a portrait and for each edition card).
 export interface FrozenPortrait { bookId: string; n: number; portrait: CharacterPortrait; hasFigure: boolean; converted: boolean }
@@ -700,6 +704,8 @@ export interface CharacterDoc {
   profile: CharacterProfile; possessions: CharacterPossession[]; relationships: CharacterRelationship[]; states: CharacterState[]; arc: ArcStage[]; events: LifeEvent[]
   // The chapters and scenes of the outline the character is tagged on.
   appearances: string[]
+  // How the character is drawn in some of those (by outline node id; the server drops a look for a node they are no longer tagged on).
+  sceneLooks?: Record<string, SceneLook>
   // What readers may see of the character (absent = nothing).
   reader?: ReaderShare
 }

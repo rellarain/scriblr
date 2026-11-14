@@ -12,7 +12,7 @@ export function FigureOverview({ ctx, onOpen, onFigure }: { ctx: Ctx; onOpen: (o
   const picture = (r: OverviewRow) => (
     <>
       <span className="charOverviewThumb" aria-hidden="true">
-        <Figure copy={copy} figure={figure} crop={r.objectId ? cropAround(copy, [figure], r.objectId) : kindCrop(r.label)} label="" className="charPickArt" />
+        <Figure copy={copy} figure={figure} crop={r.objectId ? cropAround(copy, [figure], r.objectId) : kindCrop(r.label)} view="front" label="" className="charPickArt" />
       </span>
       <span className="charOverviewText"><span className="charOverviewLabel">{r.label}</span><span className="charOverviewValue">{r.value}</span></span>
     </>

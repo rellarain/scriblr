@@ -1,4 +1,5 @@
 import type { CharacterFigure, FigureColour, ModelContent, ModelFrame, ModelPreset, ModelRange, ModelSlot } from '../../../../../api/types'
+import { viewFor, wrapAngle } from '../../../admin/characters/engine/angles'
 import { colourById, paletteOf, rollChoices, slotById, slotsOf, type Colouring, type Rng, type SlotChoice, type SlotChoices } from '../../../admin/characters/engine/colour'
 import { axesFor, chosenForm, classesOf, membersOf, presetsOf, shownMember, type Choices } from '../../../admin/characters/engine/forms'
 import { framesOf, hiddenThrough, tileOf, viewBoxOf } from '../../../admin/characters/engine/frames'
@@ -43,7 +44,22 @@ export function normalizeFigure(raw: unknown): CharacterFigure | null {
     locks: list<string>(raw.locks), zoff: map<number>(raw.zoff), mine: list<ModelPreset>(raw.mine), genre: typeof raw.genre === 'string' && raw.genre ? raw.genre : null,
     on: list<string>(raw.on), order: map<string[]>(raw.order),
     ...(raw.converted === true ? { converted: true } : {}),
+    ...(typeof raw.angle === 'number' && Number.isFinite(raw.angle) && Math.round(wrapAngle(raw.angle)) % 360 !== 0 ? { angle: Math.round(wrapAngle(raw.angle)) % 360 } : {}),
   }
+}
+
+// The angle a figure is seen from (phase A4): its own, as a view (the front when it has none).
+export const figureView = (f: CharacterFigure | null | undefined): View => viewFor(f?.angle ?? 0)
+// A figure turned to an angle (whole degrees, 0..359; 0 is kept as no angle).
+export function withAngle(f: CharacterFigure, a: number): CharacterFigure {
+  const at = Math.round(wrapAngle(a)) % 360
+  if (at === 0) { const { angle: _gone, ...rest } = f; void _gone; return rest }
+  return { ...f, angle: at }
+}
+// The view a character is drawn from in a chapter or scene: the scene's own angle, else the figure's.
+export function sceneView(doc: { figure?: CharacterFigure | null; sceneLooks?: Record<string, { angle: number | null }> }, nodeId: string): View {
+  const own = doc.sceneLooks?.[nodeId]?.angle
+  return own != null ? viewFor(own) : figureView(doc.figure)
 }
 
 // A figure kept as it is (a story state captures one): nothing in it is shared with the figure it was copied from.

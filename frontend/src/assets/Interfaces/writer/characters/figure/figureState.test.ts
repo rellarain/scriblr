@@ -297,3 +297,20 @@ describe("a frame follows the figure's height", () => {
     expect(followHeight(box, [0, 0, 0, 0, 0, 0])).toEqual(box)
   })
 })
+
+describe('the angle a figure is seen from (phase A4)', () => {
+  it('is kept in whole degrees, the front as no angle at all', async () => {
+    const { figureView, sceneView, withAngle } = await import('./figureState')
+    const f = blankFigure('0123456789ab', previewModels()[0].draft)
+    expect(figureView(f)).toBe('front')
+    expect(withAngle(f, 450.4).angle).toBe(90)
+    expect(figureView(withAngle(f, 180))).toBe('back')
+    expect('angle' in withAngle(withAngle(f, 90), 360)).toBe(false)
+    expect(normalizeFigure({ ...f, angle: -45 })?.angle).toBe(315)
+    expect(normalizeFigure({ ...f, angle: 'x' })?.angle).toBeUndefined()
+    const doc = { figure: withAngle(f, 45), sceneLooks: { s1: { angle: 270 }, s2: { angle: null } } }
+    expect(sceneView(doc, 's1')).toBe(270)
+    expect(sceneView(doc, 's2')).toBe(45)
+    expect(sceneView({ figure: null }, 's1')).toBe('front')
+  })
+})
