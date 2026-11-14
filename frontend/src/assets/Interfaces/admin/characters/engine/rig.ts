@@ -7,7 +7,7 @@ import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './pr
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 import { texturedPath } from './texture'
 import { angleOf, fromBehind, type View } from './angles'
-import { LAYER_THICK, applySilhouette, facing, facingFade, handleDepths, inSeen, projectSurface, silhouetteMatrix, surfaceAt, turnedDepth, turningOf, viewZ, type Surface } from './turn'
+import { LAYER_THICK, facing, facingFade, handleDepths, inSeen, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turningOf, viewZ, type Spin, type Surface } from './turn'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -354,7 +354,9 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   // Phase A1: the front and the back are drawn as they always were (the back is the front mirrored about the axis). Any other angle is solved as the front and every outline is
   // turned at the end, by the depth of its points (turn.ts); `behind` is a view that shows more of the back than of the front.
   const angle = angleOf(view), behind = fromBehind(view)
-  const flat = angle === 0 || angle === 180
+  // phase A2: a group turned or nodded in depth by a slider (a head that looks over its shoulder or up) is drawn through the turning stage too, at any view
+  const spinDrives = ranges.some(r => valueOf(r, values) !== r.rest && r.drives.some(d => (d.kind === 'yaw' || d.kind === 'pitch') && amount(r, d, valueOf(r, values)) !== 0))
+  const flat = (angle === 0 || angle === 180) && !spinDrives
   const T = turningOf(angle, axis)
   const flip: Mat = flat && angle === 180 ? RF : IDENTITY
   const G = mul(scale(gx, gy, axis, 392), flip)
@@ -919,6 +921,43 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     groupDepths.set(id, d)
     return d
   }
+  // How far a group is turned and nodded in depth by its sliders (phase A2): a twin turns the other way round (its original's drives that it follows and its own), and nods alike.
+  const spinOf = (id: string): { yaw: number; pitch: number } => {
+    const g = groupMap.get(id)
+    const original = g?.mirrorOf && g.mirrorOf !== id ? groupMap.get(g.mirrorOf) : undefined
+    let yaw = 0, pitch = 0
+    for (const r of ranges) for (const d of r.drives) {
+      if (d.kind !== 'yaw' && d.kind !== 'pitch') continue
+      const mine = d.group === id || (!!original && !original.mirrorOf && d.group === original.id && d.mirror !== false)
+      if (!mine) continue
+      const a = amount(r, d, val(r))
+      if (d.kind === 'yaw') yaw += original && !original.mirrorOf ? -a : a
+      else pitch += a
+    }
+    return { yaw, pitch }
+  }
+  // The spins that carry a shape of a group: its own group's and those of the groups above it, the innermost first (each about its pivot as the front solve placed it).
+  const spinCache = new Map<string, Spin[]>()
+  function spinsOf(groupId: string | null): Spin[] {
+    if (!groupId || !spinDrives) return []
+    const done = spinCache.get(groupId)
+    if (done) return done
+    const list: Spin[] = [], seen = new Set<string>()
+    for (let id: string | null = groupId; id && !seen.has(id); id = groupMap.get(id)?.parent ?? null) {
+      seen.add(id)
+      const { yaw, pitch } = spinOf(id)
+      if (!yaw && !pitch) continue
+      const Mg = groupMat(id), p = solvedPivot(id)
+      const [px, py] = apply(G, p[0], p[1])
+      const ux0 = -(G[0] * Mg[2] + G[2] * Mg[3]), uy0 = -(G[1] * Mg[2] + G[3] * Mg[3]), ul = Math.hypot(ux0, uy0) || 1
+      list.push({ px, py, pd: groupDepth(id), ux: ux0 / ul, uy: uy0 / ul, yaw, pitch })
+    }
+    spinCache.set(groupId, list)
+    return list
+  }
+  const solvedPivot = (id: string): [number, number] => solvedPivots.get(id) ?? [axis, 200]
+  const solvedPivots = new Map<string, [number, number]>()
+
   // The roundness of a shape: its own, else its layer's.
   const thickOf = (origin: ModelShape): number => {
     const t = origin.turn?.thick
@@ -928,7 +967,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   }
   // Each solved shape's outline as solved in the front, before it is turned (a shape that lies on it reads its surface from this box), and its front and back drawing depths.
   const frontBoxes = new Map<string, Box>()
-  const zFront = new Map<string, { z: number; zBack: number; shift: number }>()
+  const zFront = new Map<string, { z: number; zBack: number; shift: number; group: string | null }>()
   // The rounded surface of a shape (what an object that lies on it reads its depths from), or null when it has no outline.
   function surfaceOf(id: string): Surface | null {
     shapeOut(id)
@@ -951,6 +990,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     let dz = own?.dz && own.dz.length === count && count === fin.length ? own.dz : null
     if (dz && twin) dz = [...dz].reverse()
     const lift = own?.depth ?? 0
+    const spins = spinsOf(groupId)
     if (surface || dz) {
       const pt: number[] = [], hi: number[] = [], ho: number[] = []
       const base = surface ? null : groupDepth(groupId) + lift
@@ -963,10 +1003,14 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const depths = surface ? { pt, hi, ho } : handleDepths(pt, closed)
       const dc = pt.reduce((n, d) => n + d, 0) / Math.max(1, pt.length)
       const nrm = surface ? surfaceAt(surface, cx, cy) : { nx: 0, nz: 1 }
-      return { fin: projectSurface(fin, depths, T), m: silhouetteMatrix(T, cx, dc, 1), depth: turnedDepth(T, cx, dc), face: facing(T, nrm.nx, nrm.nz) }
+      const [cx2, , cd2] = spinPoint(spins, cx, cy, dc), [nx, , nz] = spinVector(spins, nrm.nx, 0, nrm.nz)
+      const k = Math.sign(Math.cos(((angle + spinTotal(spins).yaw) * Math.PI) / 180)) || 1
+      const turned = spinOutline(fin, depths, spins, T), X = cx2 * T.cos + cd2 * T.sin + T.axis * (1 - T.cos)
+      return { fin: turned, m: [k, 0, 0, 1, X - k * cx, 0], depth: turnedDepth(T, cx2, cd2), face: facing(T, nx, nz) }
     }
-    const dc = groupDepth(groupId) + lift, m = silhouetteMatrix(T, cx, dc, thickOf(origin))
-    return { fin: applySilhouette(fin, m), m, depth: turnedDepth(T, cx, dc), face: facing(T, 0, 1) }
+    const dc = groupDepth(groupId) + lift, s = spinSilhouette(fin, cx, cy, dc, thickOf(origin), spins, T)
+    const [nx, , nz] = spinVector(spins, 0, 0, 1)
+    return { fin: s.pts, m: s.m, depth: s.depth, face: facing(T, nx, nz) }
   }
 
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
@@ -1046,7 +1090,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     }
     const sideOk = flat ? sh.view === 'both' || sh.view === (angle === 180 ? 'back' : 'front') : seenFade > 0.004
     const zBack = sh.zBack ?? sh.z, shift = zShift(sh)
-    if (!flat) zFront.set(sh.id, { z: sh.z, zBack, shift })
+    if (!flat) zFront.set(sh.id, { z: sh.z, zBack, shift, group: groupId })
     out.shapes[sh.id] = {
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
@@ -1197,6 +1241,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     }
     if (!finiteMat(Mg)) Mg = IDENTITY
     out.mats[id] = Mg
+    { const pw = out.pivots[id]; if (pw) solvedPivots.set(id, pw) }
     busyGroups.delete(id)
     return Mg
   }
@@ -1210,22 +1255,28 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   if (!flat) {
     const SIDE_GAP = 3
     const sideOf = (b: Box): -1 | 0 | 1 => { const x = b.x + b.w / 2; return x < axis - SIDE_GAP ? -1 : x > axis + SIDE_GAP ? 1 : 0 }
-    const centres = new Map<string, number>()
+    const centres = new Map<string, [number, number]>()
     for (const o of c.objects) {
-      const spans = new Map<number, [number, number]>()
+      const spans = new Map<number, [number, number, number, number]>()
       for (const sid of o.shapes) {
         const b = frontBoxes.get(sid)
         if (!b) continue
-        const k = sideOf(b), s = spans.get(k) ?? [Infinity, -Infinity]
-        spans.set(k, [Math.min(s[0], b.x), Math.max(s[1], b.x + b.w)])
+        const k = sideOf(b), s = spans.get(k) ?? [Infinity, -Infinity, Infinity, -Infinity]
+        spans.set(k, [Math.min(s[0], b.x), Math.max(s[1], b.x + b.w), Math.min(s[2], b.y), Math.max(s[3], b.y + b.h)])
       }
-      for (const [k, [x0, x1]] of spans) centres.set(`${o.id}|${k}`, (x0 + x1) / 2)
+      for (const [k, [x0, x1, y0, y1]] of spans) centres.set(`${o.id}|${k}`, [(x0 + x1) / 2, (y0 + y1) / 2])
     }
     for (const s of Object.values(out.shapes)) {
       const f = zFront.get(s.id), b = frontBoxes.get(s.id)
       if (!f || !b) continue
-      const xc = centres.get(`${objectOfShape.get(s.id) ?? ''}|${sideOf(b)}`) ?? b.x + b.w / 2
-      s.z = viewZ(T, f.z, f.zBack, xc) + f.shift
+      const [xc, yc] = centres.get(`${objectOfShape.get(s.id) ?? ''}|${sideOf(b)}`) ?? [b.x + b.w / 2, b.y + b.h / 2]
+      const spins = spinsOf(f.group)
+      if (spins.length === 0) { s.z = viewZ(T, f.z, f.zBack, xc) + f.shift; continue }
+      // a group turned in depth: the place its middle has come to, turned with the view, against where the view alone would put it
+      const d0 = groupDepth(f.group), [x2, , d2] = spinPoint(spins, xc, yc, d0), yaw = spinTotal(spins).yaw
+      const Te = turningOf(angle + yaw, axis)
+      const across = (turnedDepth(T, x2, d2) - d0 * Te.cos) * 0.6
+      s.z = f.z + (f.zBack - f.z) * (1 - Te.cos) / 2 + Math.max(-25, Math.min(25, across)) + f.shift
     }
   }
   const visible = Object.values(out.shapes).filter(s => s.visible)

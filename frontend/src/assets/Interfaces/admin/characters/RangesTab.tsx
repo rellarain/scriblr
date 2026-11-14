@@ -18,7 +18,7 @@ import { driveText, offRest, rangesForSelection, valueText } from './rigView'
 // The Ranges tab: the model's sliders. Each has a Try it slider (the test value is only for looking: it is never saved), its minimum, rest and maximum,
 // and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape, lengthen a bone, let a shape fall), each with steppers for how much. A slider that
 // is offered to writers also has the span a writer may choose within.
-const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone', depth: 'Turn a bone toward the viewer', fall: 'Let the shape fall' }
+const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone', depth: 'Turn a bone toward the viewer', fall: 'Let the shape fall', yaw: 'Turn the group in depth', pitch: 'Nod the group' }
 const AXES: Array<{ id: ModelScaleAxis; name: string }> = [{ id: 'xy', name: 'Both ways' }, { id: 'x', name: 'Across' }, { id: 'y', name: 'Up and down' }]
 
 export interface RangesTabProps {
@@ -45,12 +45,12 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   const away = offRest(content, values)
   const together = turnsTogether(content)
   const can = (kind: NewSliderKind): string | null =>
-    kind === 'turn' ? (group ? null : 'Select a group first')
+    kind === 'turn' || kind === 'yaw' || kind === 'pitch' ? (group ? null : 'Select a group first')
       : kind === 'scale' ? null
       : kind === 'length' || kind === 'depth' ? ((content.bones ?? []).length > 0 ? null : 'Add a bone in the Proportions tab first')
       : kind === 'fall' ? (!shapeSel ? 'Select a shape first' : selected && hangs(selected.pts, selected.closed) ? null : 'Mark points with the Weights tool first')
       : shapeSel ? null : 'Select a shape first'
-  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend', 'length', 'depth', 'fall']
+  const kinds: NewSliderKind[] = ['turn', 'yaw', 'pitch', 'scale', 'points', 'bend', 'length', 'depth', 'fall']
   const recShape = recording ? content.shapes.find(s => s.id === recording.shapeId) : undefined
   const recRange = recording ? content.ranges.find(r => r.id === recording.rangeId) : undefined
 

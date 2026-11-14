@@ -48,3 +48,20 @@ def test_an_object_must_lie_on_a_shape_that_is_there_and_not_its_own() -> None:
     faults = publish_faults(content)
     assert "Object Eyes lies on one of its own shapes." in faults
     assert "Object Nose lies on a shape that does not exist." in faults
+
+
+def test_a_group_turns_and_nods_in_depth_with_sliders() -> None:
+    from app.storage.schema import ModelDrive
+
+    yaw = ModelDrive.model_validate({"kind": "yaw", "group": "head", "atMin": -500, "atMax": 45})
+    assert (yaw.atMin, yaw.atMax) == (-360.0, 45.0)
+    assert ModelDrive.model_validate({"kind": "pitch", "group": "head", "atMax": 30}).atMax == 30.0
+    import pytest
+
+    with pytest.raises(ValueError):
+        ModelDrive.model_validate({"kind": "yaw"})
+    content = ModelContent.model_validate({
+        "name": "M", "shapes": [{"id": "a", "pts": PTS}], "objects": [{"id": "o", "shapes": ["a"]}], "groups": [{"id": "g", "objects": ["o"]}],
+        "ranges": [{"id": "r", "name": "Look", "min": -45, "rest": 0, "max": 45, "drives": [{"kind": "yaw", "group": "gone", "atMin": -45, "atMax": 45}]}],
+    })
+    assert "Slider Look turns a group that does not exist." in publish_faults(content)

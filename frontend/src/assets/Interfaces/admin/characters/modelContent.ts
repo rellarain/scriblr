@@ -567,7 +567,7 @@ function rigFaults(c: ModelContent, circular: boolean, owner: Map<string, string
   for (const r of c.ranges) {
     const name = label(r.name, r.id)
     for (const d of r.drives) {
-      if (d.kind === 'turn' && !(d.group && groupIds.has(d.group))) faults.push(`Slider ${name} turns a group that does not exist.`)
+      if ((d.kind === 'turn' || d.kind === 'yaw' || d.kind === 'pitch') && !(d.group && groupIds.has(d.group))) faults.push(`Slider ${name} turns a group that does not exist.`)
       else if (d.kind === 'scale' && d.target !== 'model' && !((d.target === 'group' && d.id && groupIds.has(d.id)) || (d.target === 'shape' && d.id && shapes.has(d.id)))) faults.push(`Slider ${name} scales something that does not exist.`)
       else if (d.kind === 'scale' && d.target === 'shape' && d.id && shapes.get(d.id)?.mirrorOf) faults.push(`Slider ${name} scales a twin; scale the original instead.`)
       else if ((d.kind === 'points' || d.kind === 'bend' || d.kind === 'fall') && !(d.shape && shapes.has(d.shape))) faults.push(`Slider ${name} moves a shape that does not exist.`)

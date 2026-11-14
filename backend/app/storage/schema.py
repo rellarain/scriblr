@@ -1271,7 +1271,7 @@ ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
 ModelAnchorKind = Literal["point", "edge", "range", "inside"]
 ModelRangeUnit = Literal["", "°", "%"]
-ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop", "depth"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop", "depth", "yaw", "pitch"]
 # Authored fields (phase D3c): a `prop` drive changes one property of a feature (a whole shape, one point or one edge of a shape, a whole object). For each property: the features
 # that have it, the amount at the slider's rest, and the least and the most it may be. Positions and offsets are in the model's units, sizes/opacity/reach/blend in percent
 # (100 at rest), rotation and direction in degrees, colour shifts in degrees of hue and points of saturation and lightness (0 at rest).
@@ -1913,7 +1913,7 @@ class ModelDrive(BaseModel):
 
     @model_validator(mode="after")
     def _complete(self) -> "ModelDrive":
-        if self.kind == "turn" and not self.group:
+        if self.kind in ("turn", "yaw", "pitch") and not self.group:
             raise ValueError("a turn drive needs a group")
         if self.kind == "scale" and (self.target is None or (self.target != "model" and not self.id)):
             raise ValueError("a scale drive needs a target")

@@ -2,7 +2,7 @@ import type { ModelAttach, ModelScaleAxis } from '../../../../api/types'
 import type { Selection } from './designerState'
 
 // What the Rig and Ranges tabs ask the page to do. The page (ModelPane) applies them to the content, keeps the undo stack and says why when one is refused.
-export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'depth'
+export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'depth' | 'yaw' | 'pitch'
 export interface Recording { rangeId: string; shapeId: string; end: 'max' | 'min' }
 
 export interface RigActions {
@@ -11,6 +11,8 @@ export interface RigActions {
   // null takes the anchor away.
   setAttach: (groupId: string, att: ModelAttach | null) => void
   centerPivot: (groupId: string) => void
+  // How far the group's pivot stands toward the viewer (phase A2).
+  stepDepth: (groupId: string, dir: -1 | 1, big: boolean) => void
   // Start or stop picking an anchor by clicking a shape on the canvas.
   pick: (on: boolean) => void
   newSlider: (kind: NewSliderKind) => void

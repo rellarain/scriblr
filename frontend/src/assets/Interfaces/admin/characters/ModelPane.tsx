@@ -69,8 +69,8 @@ import * as patternOps from './engine/patterns'
 import { addShading } from './engine/shadeEdit'
 import { apartSlider, joinSides, oneSideEach, poseSides } from './engine/sidesEdit'
 import {
-  addBend, addDepth, addLength, addRange, addScale, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
-  setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
+  addBend, addDepth, addLength, addRange, addScale, addSpin, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
+  setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
@@ -481,6 +481,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       else if (!start.ok) setNote(start.reason)
       return
     }
+    if (kind === 'yaw' || kind === 'pitch') {
+      if (!group) { setNote('Select a group first.'); return }
+      const start = addRange(content, newRange(id, sliderName(content, `${gName} ${kind === 'yaw' ? 'turn in depth' : 'nod'}`), kind, group.id))
+      if (start.ok && applyEdit(addSpin(start.content, id, group.id, kind))) { setTab('ranges'); setRangeFilter('selection') }
+      else if (!start.ok) setNote(start.reason)
+      return
+    }
     if (kind === 'scale') {
       const t = scaleTarget()
       const start = addRange(content, newRange(id, sliderName(content, t.target === 'model' ? 'Size' : `${t.name} size`), 'scale', t.target === 'model' ? null : t.id))
@@ -501,6 +508,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (kind === 'length') { const b = lengthBone(); if (!b) setNote('Add a bone first (Proportions tab): a Length slider lengthens a bone.'); else applyEdit(addLength(content, rangeId, b.id)); return }
     if (kind === 'depth') { const b = lengthBone(); if (!b) setNote('Add a bone first (Proportions tab): a Depth slider turns a bone toward the viewer.'); else applyEdit(addDepth(content, rangeId, b.id)); return }
     if (kind === 'turn') { if (!group) setNote('Select a group first.'); else applyEdit(addTurn(content, rangeId, group.id)); return }
+    if (kind === 'yaw' || kind === 'pitch') { if (!group) setNote('Select a group first.'); else applyEdit(addSpin(content, rangeId, group.id, kind)); return }
     if (kind === 'scale') { const t = scaleTarget(); applyEdit(addScale(content, rangeId, t.target, t.id)); return }
     if (!selShape) { setNote('Select a shape first.'); return }
     if (kind === 'fall') applyEdit(addFall(content, rangeId, selShape.id))
@@ -529,6 +537,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const [x, y] = restPivot(content, g)
       commit(setPivot(content, groupId, x, y), true)
     },
+    stepDepth: (groupId, dir, big) => commit(stepGroupDepth(content, groupId, dir, big), true),
     pick: setPickOn,
     newSlider,
     renameRange: (id, name) => models.edit(entry.id, c => renameRange(c, id, name), false),

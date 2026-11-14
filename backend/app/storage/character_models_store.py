@@ -249,7 +249,7 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
     for r in content.ranges:
         name = _label(r.name, r.id)
         for d in r.drives:
-            if d.kind == "turn" and d.group not in group_ids:
+            if d.kind in ("turn", "yaw", "pitch") and d.group not in group_ids:
                 faults.append(f"Slider {name} turns a group that does not exist.")
             elif d.kind == "scale" and d.target != "model" and not ((d.target == "group" and d.id in group_ids) or (d.target == "shape" and d.id in shapes)):
                 faults.append(f"Slider {name} scales something that does not exist.")

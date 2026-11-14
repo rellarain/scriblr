@@ -100,6 +100,8 @@ export function RigTab({ content, group, object, picking, fitPicking, actions, p
               <button type="button" className="cmBtn cmBtn--small" onClick={() => actions.centerPivot(group.id)}>Put it in the middle of the group</button>
             </div>
             <p className="cmInsText">The cross on the canvas is the pivot: drag it, or focus it and press the arrow keys.</p>
+            <Stepper label="Pivot depth" value={`${group.depth ?? 0} toward the viewer`} onStep={(dir, big) => actions.stepDepth(group.id, dir, big)} bigBy={10} />
+            <p className="cmInsText">How far the pivot stands toward the viewer from its parent's: what turning the figure, or the group in depth, swings it by.</p>
           </>
         )}
       </section>

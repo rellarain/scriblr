@@ -117,10 +117,10 @@ export function setAxis(c: ModelContent, x: number): ModelContent {
 
 // ---- sliders ----
 
-export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'depth'
+export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'depth' | 'yaw' | 'pitch'
 // A new slider with a sensible span for the first thing it will drive.
 export function newRange(id: string, name: string, kind: DriveKindPreset, scope: string | null = null): ModelRange {
-  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : kind === 'fall' ? { min: 0, rest: 0, max: 100, unit: '%' as const } : kind === 'depth' ? { min: -60, rest: 0, max: 60, unit: '°' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
+  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : kind === 'fall' ? { min: 0, rest: 0, max: 100, unit: '%' as const } : kind === 'depth' || kind === 'yaw' ? { min: -60, rest: 0, max: 60, unit: '°' as const } : kind === 'pitch' ? { min: -45, rest: 0, max: 45, unit: '°' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
   return { id, name, scope, ...span, show: true, rand: null, drives: [] }
 }
 
@@ -207,6 +207,22 @@ export function addTurn(c: ModelContent, rangeId: string, groupId: string): Edit
   if (g.mirrorOf) return fail('A twin follows its original: turn the original instead, or break the pair.')
   const edit = addDrive(ensurePivot(c, groupId), rangeId, { ...blankDrive('turn'), group: groupId, atMin: -20, atMax: 20 })
   return edit
+}
+
+// The slider turns a group in depth (phase A2: `yaw`, about the group's own up line, as a head looks over a shoulder) or nods it (`pitch`, up for a positive amount), about its
+// pivot: 45 and 30 degrees each way to begin with. A twin follows its original, turning the other way round.
+export function addSpin(c: ModelContent, rangeId: string, groupId: string, kind: 'yaw' | 'pitch'): Edit {
+  const g = c.groups.find(x => x.id === groupId)
+  if (!g) return fail('There is no such group.')
+  if (g.mirrorOf) return fail(`A twin follows its original: ${kind === 'yaw' ? 'turn' : 'nod'} the original instead, or break the pair.`)
+  const reach = kind === 'yaw' ? 45 : 30
+  return addDrive(ensurePivot(c, groupId), rangeId, { ...blankDrive(kind), group: groupId, atMin: -reach, atMax: reach })
+}
+
+// How far a group's pivot stands toward the viewer from its parent's (phase A2), held to the range, in tenths.
+export const DEPTH_STEP = 1
+export function stepGroupDepth(c: ModelContent, groupId: string, dir: -1 | 1, big: boolean): ModelContent {
+  return mapGroup(c, groupId, g => ({ ...g, depth: Math.round(clamp((g.depth ?? 0) + dir * (big ? 10 : DEPTH_STEP), -200, 200) * 10) / 10 }))
 }
 
 // The slider scales a group, a shape or the whole model: 80 percent at its minimum and 120 at its maximum to begin with.

@@ -351,7 +351,8 @@ describe('the Ranges tab', () => {
     const { user, backend } = await open()
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: 'New slider' }))
-    expect(screen.getByRole('menuitem', { name: /Turn the group/ })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /^Turn the group\s*Select/ })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /^Turn the group in depth/ })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'New slider' }))           // closes the menu again
     await pick(user, 'Arm', 'group')
     await user.click(screen.getByRole('button', { name: 'New slider' }))
@@ -364,6 +365,24 @@ describe('the Ranges tab', () => {
     expect(made).toMatchObject({ name: 'Arm turn', scope: 'gA', unit: '°' })
     expect(made.drives[0]).toMatchObject({ kind: 'turn', group: 'gA' })
     expect(savedGroup(backend, 'gA').pivot).not.toBeNull()
+  })
+
+  it('makes sliders that turn and nod the selected group in depth, and steps how deep its pivot stands (phase A2)', async () => {
+    const { user, backend } = await open()
+    await pick(user, 'Arm', 'group')
+    await user.click(tab('Ranges'))
+    await user.click(screen.getByRole('button', { name: 'New slider' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Turn the group in depth' }))
+    expect(within(screen.getByRole('region', { name: 'Slider Arm turn in depth' })).getByText(/Turns Arm in depth by -45° at the minimum and \+45° at the maximum/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'New slider' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Nod the group' }))
+    expect(within(screen.getByRole('region', { name: 'Slider Arm nod' })).getByText(/Nods Arm by -30° at the minimum and \+30° at the maximum/)).toBeInTheDocument()
+    await user.click(tab('Rig'))
+    await user.click(screen.getByRole('button', { name: 'Raise Pivot depth' }))
+    await save(user)
+    await waitFor(() => expect(backend.entries[0].draft.ranges).toHaveLength(3))
+    expect(backend.entries[0].draft.ranges.slice(1).map(r => r.drives[0])).toMatchObject([{ kind: 'yaw', group: 'gA', atMax: 45 }, { kind: 'pitch', group: 'gA', atMax: 30 }])
+    expect(savedGroup(backend, 'gA').depth).toBe(1)
   })
 
   it('makes a slider that scales the model when nothing is selected, and scales a shape or a group otherwise', async () => {

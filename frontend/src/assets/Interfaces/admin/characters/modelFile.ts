@@ -121,7 +121,7 @@ function move(v: unknown): ModelMove {
 
 // A drive the server would accept, or null (the server drops the same ones).
 function drive(v: unknown): ModelDrive | null {
-  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop', 'depth'].includes(v.kind as string)) return null
+  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop', 'depth', 'yaw', 'pitch'].includes(v.kind as string)) return null
   const kind = v.kind as ModelDrive['kind']
   const group = idOf(v.group), id = idOf(v.id), shapeId = idOf(v.shape)
   if (kind === 'prop') {
@@ -136,7 +136,7 @@ function drive(v: unknown): ModelDrive | null {
     }
   }
   const target = v.target === 'group' || v.target === 'shape' || v.target === 'model' ? v.target : null
-  if (kind === 'turn' && !group) return null
+  if ((kind === 'turn' || kind === 'yaw' || kind === 'pitch') && !group) return null
   if (kind === 'scale' && (!target || (target !== 'model' && !id))) return null
   if ((kind === 'points' || kind === 'bend' || kind === 'fall') && !shapeId) return null
   if ((kind === 'length' || kind === 'depth') && !id) return null

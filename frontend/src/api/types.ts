@@ -789,7 +789,7 @@ export type ModelRangeUnit = '' | '°' | '%'
 export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }
 // depth (phase O2): a bone points toward the viewer (+) or away (-), atMin/atMax in degrees (at most 89 either way); `group` set to the twin of the bone's group poses that
 // twin instead (the two sides posed apart).
-export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop' | 'depth'
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop' | 'depth' | 'yaw' | 'pitch'
 // Authored fields (phase D3c). A 'prop' drive changes one property of a feature: a whole shape, one point or one edge of a shape, or a whole object.
 export type ModelFeatureKind = 'shape' | 'point' | 'edge' | 'object'
 export type ModelOwnerKind = 'object' | 'group' | 'preset'

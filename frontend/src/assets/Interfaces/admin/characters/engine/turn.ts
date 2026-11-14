@@ -91,6 +91,64 @@ export function viewZ(t: Turning, z: number, zBack: number, xc: number): number 
   return z + (zBack - z) * (1 - t.cos) / 2 + Math.max(-DEPTH_ORDER_MAX, Math.min(DEPTH_ORDER_MAX, across))
 }
 
+// ---- groups turned in depth (phase A2) ----
+
+// A group turned in depth: about its pivot (x, y, and its depth), first nodded (pitch: up for a positive amount, about the line across the group) and then turned (yaw:
+// about the group's own up line, the same way round as the figure turns). `ux, uy` is the group's up line in the picture (y down), so a head tilted sideways turns about its
+// own tilted up line.
+export interface Spin { px: number; py: number; pd: number; ux: number; uy: number; yaw: number; pitch: number }
+
+// A point (x, y, depth) carried through a list of spins, the innermost group first.
+export function spinPoint(spins: readonly Spin[], x: number, y: number, d: number): [number, number, number] {
+  for (const s of spins) {
+    const ax = -s.uy, ay = s.ux, rx = x - s.px, ry = y - s.py
+    let across = rx * ax + ry * ay, up = rx * s.ux + ry * s.uy, depth = d - s.pd
+    if (s.pitch) {
+      const a = (s.pitch * Math.PI) / 180, c = Math.cos(a), n = Math.sin(a)
+      const u2 = up * c + depth * n
+      depth = -up * n + depth * c; up = u2
+    }
+    if (s.yaw) {
+      const a = (s.yaw * Math.PI) / 180, c = Math.cos(a), n = Math.sin(a)
+      const a2 = across * c + depth * n
+      depth = -across * n + depth * c; across = a2
+    }
+    x = s.px + across * ax + up * s.ux; y = s.py + across * ay + up * s.uy; d = s.pd + depth
+  }
+  return [x, y, d]
+}
+// A direction (across, up and down, toward the viewer) carried through the spins: a normal turns with the group, it does not move.
+export function spinVector(spins: readonly Spin[], x: number, y: number, d: number): [number, number, number] {
+  let p = spinPoint(spins.map(s => ({ ...s, px: 0, py: 0, pd: 0 })), x, y, d)
+  const len = Math.hypot(p[0], p[1], p[2]) || 1
+  p = [p[0] / len, p[1] / len, p[2] / len]
+  return p
+}
+// The whole turn and nod of a list of spins (what a rounded outline narrows to; near enough when the up lines lean).
+export const spinTotal = (spins: readonly Spin[]): { yaw: number; pitch: number } => spins.reduce((t, s) => ({ yaw: t.yaw + s.yaw, pitch: t.pitch + s.pitch }), { yaw: 0, pitch: 0 })
+
+// A whole outline built in the front, its depths given, carried through the spins and then the view: every point and handle where it comes to.
+export function spinOutline(a: BuiltPoint[], depth: Depths, spins: readonly Spin[], t: Turning): BuiltPoint[] {
+  return a.map((p, i) => {
+    const [x, y, d] = spinPoint(spins, p.x, p.y, depth.pt[i] ?? 0)
+    const [hix, hiy, hid] = spinPoint(spins, p.hix, p.hiy, depth.hi[i] ?? 0)
+    const [hox, hoy, hod] = spinPoint(spins, p.hox, p.hoy, depth.ho[i] ?? 0)
+    return { ...p, x: turnedX(t, x, d), y, hix: turnedX(t, hix, hid), hiy, hox: turnedX(t, hox, hod), hoy }
+  })
+}
+// A rounded outline carried through spins and the view: its middle goes where the spins and the view put it, and the outline is drawn about it as wide as the whole turn
+// leaves it and as tall as the whole nod does.
+export function spinSilhouette(a: BuiltPoint[], cx: number, cy: number, dc: number, thick: number, spins: readonly Spin[], t: Turning): { pts: BuiltPoint[]; m: Mat; depth: number } {
+  const [x, y, d] = spinPoint(spins, cx, cy, dc), tot = spinTotal(spins)
+  const kx = squash(turningOf(angleOfTurning(t) + tot.yaw, t.axis), thick), ky = Math.abs(squash(turningOf(tot.pitch, t.axis), thick))
+  const X = turnedX(t, x, d)
+  const m: Mat = [kx, 0, 0, ky, X - kx * cx, y - ky * cy]
+  const pts = a.map(p => ({ ...p, x: kx * p.x + m[4], y: ky * p.y + m[5], hix: kx * p.hix + m[4], hiy: ky * p.hiy + m[5], hox: kx * p.hox + m[4], hoy: ky * p.hoy + m[5] }))
+  return { pts, m, depth: turnedDepth(t, x, d) }
+}
+// The angle a turning stands for, in degrees.
+export const angleOfTurning = (t: Turning): number => (Math.atan2(t.sin, t.cos) * 180) / Math.PI
+
 // ---- the data, held to what the server keeps ----
 
 export const DEPTH_RANGE = { min: -200, max: 200 } as const

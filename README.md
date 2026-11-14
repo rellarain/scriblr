@@ -458,6 +458,8 @@ described, now stale, in `docs/data-model.md`).
   end (`engine/turn.ts`: point by point when it has depths of its own or lies on a surface, else as a rounded cut-out
   about its middle), a shape drawn for one side fades as it faces away, and the drawing order moves the near side in
   front.
+  Phase A2 adds the drive kinds `yaw` (a group turned in depth about its own up line) and `pitch` (nodded, up for a
+  positive amount), both about the group's pivot in depth, the innermost group first; a twin turns the other way.
   Phase O1 (skin weights) adds, with a default: on a shape `skin` (`ModelSkin`: `g`, a group the shape's points also
   follow besides their own, and `w`, one weight per point, 0..1 in hundredths, fitted to the number of points; at most 3,
   one per group). The solver moves a shape's points after its links and sliders and before they hang: a point turns about

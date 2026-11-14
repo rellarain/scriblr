@@ -2,12 +2,12 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { ModelContent, ModelGroup, ModelObject, ModelPoint, ModelShape } from '../../../../../api/types'
+import type { ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
 import { ANGLES, angleName, angleOf, fromBehind, isFlat, nearestAngle, viewFor } from './angles'
 import { viewBoxOf } from './frames'
 import { build, flatten, type BuiltPoint } from './geometry'
 import { defaultValues, solve } from './rig'
-import { applySilhouette, facing, facingFade, handleDepths, inSeen, keyAngle, projectSurface, repairTurn, silhouetteMatrix, squash, surfaceAt, turnFaults, turningOf, viewZ } from './turn'
+import { applySilhouette, facing, facingFade, handleDepths, inSeen, keyAngle, projectSurface, repairTurn, silhouetteMatrix, spinPoint, spinVector, squash, surfaceAt, turnFaults, turningOf, viewZ } from './turn'
 
 const seed: ModelContent = JSON.parse(readFileSync(path.resolve(__dirname, '../../../../../../../backend/app/seed/basic_model.json'), 'utf-8'))
 const pt = (x: number, y: number): ModelPoint => ({ x, y, m: 'c', hi: null, ho: null })
@@ -195,5 +195,66 @@ describe('solving a turned figure', () => {
     expect(viewBoxOf(f, 'back')).toEqual({ x: 60, y: 0, w: 20, h: 20 })
     expect(viewBoxOf(f, 90).x).toBeCloseTo(90, 6)
     expect(flatten(build(box4(0, 0, 1, 1), true), true).length).toBe(4)
+  })
+})
+
+describe('groups turned and nodded in depth (phase A2)', () => {
+  const up = { px: 100, py: 50, pd: 0, ux: 0, uy: -1 }
+  it('turns a point about the group up line the way the figure turns, and nods it up', () => {
+    // a point in front of the pivot (toward the viewer) swings to the right of the picture, as the figure turned to its right profile does
+    const [x, y, d] = spinPoint([{ ...up, yaw: 90, pitch: 0 }], 100, 50, 10)
+    expect([x, y, d].map(v => Math.round(v * 1e6) / 1e6)).toEqual([110, 50, 0])
+    // nodding up: what stands toward the viewer rises
+    const [, y2] = spinPoint([{ ...up, yaw: 0, pitch: 90 }], 100, 50, 10)
+    expect(y2).toBeCloseTo(40, 6)
+    // a head tilted sideways turns about its own tilted up line
+    const tilted = spinPoint([{ px: 0, py: 0, pd: 0, ux: 1, uy: 0, yaw: 90, pitch: 0 }], 0, 0, 10)
+    expect(tilted[1]).toBeCloseTo(10, 6)
+    const n = spinVector([{ ...up, yaw: 90, pitch: 0 }], 0, 0, 1)
+    expect(n[0]).toBeCloseTo(1, 6)
+  })
+
+  const drive = (kind: 'yaw' | 'pitch', group: string, over: Partial<ModelDrive> = {}): ModelDrive =>
+    ({ kind, group, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: -90, atMax: 90, mirror: true, ...over })
+  const slider = (id: string, drives: ModelDrive[]): ModelRange => ({ id, name: id, scope: null, min: -90, rest: 0, max: 90, unit: '°', show: true, rand: null, drives } as ModelRange)
+  const head = (drives: ModelDrive[]) => {
+    const c = model(
+      [shape('body', box4(80, 60, 120, 120)), shape('skull', box4(85, 0, 115, 40)), shape('eye', box4(104, 15, 110, 20), { view: 'front' }), shape('eyeR', [], { mirrorOf: 'eye', view: 'front' }),
+        shape('nose', box4(98, 22, 102, 28), { turn: { depth: 0, thick: null, dz: [8, 8, 8, 8], angles: [], seen: null } })],
+      [object('torso', ['body']), object('skullO', ['skull']), object('eyes', ['eye', 'eyeR'], { wrap: 'skull' }), object('noseO', ['nose'])],
+      [group('torsoG', ['torso']), group('headG', ['skullO', 'eyes', 'noseO'], { parent: 'torsoG', pivot: [100, 40] })])
+    c.ranges = [slider('look', drives)]
+    return c
+  }
+
+  it('turns the head alone from the front: the body stays, the nose swings and the far eye hides', () => {
+    const c = head([drive('yaw', 'headG')])
+    const rest = solve(c, {}, 'front'), turned = solve(c, { look: 90 }, 'front')
+    expect(turned.shapes.body.d).toBe(rest.shapes.body.d)
+    expect(centreX(turned.shapes.nose)).toBeGreaterThan(centreX(rest.shapes.nose) + 6)
+    // turned to show its right side, the head shows the eye on the picture's left (the character's right) and hides the other
+    expect(turned.shapes.eyeR.visible).toBe(true)
+    expect(turned.shapes.eye.visible).toBe(false)
+    // at rest the front is drawn as it always was
+    expect(solve(c, { look: 0 }, 'front').shapes.nose.d).toBe(solve(head([]), {}, 'front').shapes.nose.d)
+  })
+
+  it('nods the head up: the nose rises against the rest of the face', () => {
+    const c = head([drive('pitch', 'headG')])
+    const rest = solve(c, {}, 'front'), up2 = solve(c, { look: 45 }, 'front')
+    const top = (s: { poly: Array<[number, number]> }) => Math.min(...s.poly.map(p => p[1]))
+    const mid = (s: { poly: Array<[number, number]> }) => { const ys = s.poly.map(p => p[1]); return (Math.min(...ys) + Math.max(...ys)) / 2 }
+    // about the chin, the face tips back and shortens, and what stands toward the viewer rises against it
+    expect(top(up2.shapes.nose) - mid(up2.shapes.skull)).toBeLessThan(top(rest.shapes.nose) - mid(rest.shapes.skull) - 4)
+  })
+
+  it('turns a twin group the other way round', () => {
+    const c = model([shape('l', box4(120, 0, 130, 10), { turn: { depth: 0, thick: null, dz: [5, 5, 5, 5], angles: [], seen: null } }), shape('r', [], { mirrorOf: 'l' })],
+      [object('lo', ['l']), object('ro', ['r'])], [group('lg', ['lo'], { pivot: [125, 5] }), group('rg', ['ro'], { mirrorOf: 'lg' })])
+    c.ranges = [slider('s', [drive('yaw', 'lg')])]
+    const s = solve(c, { s: 90 }, 'front')
+    // the original's point 5 toward the viewer swings 5 to the right, the twin's 5 to the left
+    expect(centreX(s.shapes.l)).toBeCloseTo(130, 4)
+    expect(centreX(s.shapes.r)).toBeCloseTo(70, 4)
   })
 })

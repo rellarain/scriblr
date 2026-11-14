@@ -35,7 +35,7 @@ export function rangesForSelection(c: ModelContent, sel: Selection): ModelRange[
 // The sliders that turn, scale, lengthen or anchor a group.
 export function rangesMovingGroup(c: ModelContent, groupId: string): ModelRange[] {
   const lengthens = (d: ModelDrive) => ((d.kind === 'length' || (d.kind === 'depth' && !d.group)) && (c.bones ?? []).some(b => b.id === d.id && b.start === groupId)) || (d.kind === 'depth' && d.group === groupId)
-  return c.ranges.filter(r => r.drives.some(d => (d.kind === 'turn' && d.group === groupId) || (d.kind === 'scale' && d.target === 'group' && d.id === groupId) || lengthens(d)) || c.groups.some(g => g.id === groupId && g.attach?.kind === 'range' && g.attach.slider === r.id))
+  return c.ranges.filter(r => r.drives.some(d => ((d.kind === 'turn' || d.kind === 'yaw' || d.kind === 'pitch') && d.group === groupId) || (d.kind === 'scale' && d.target === 'group' && d.id === groupId) || lengthens(d)) || c.groups.some(g => g.id === groupId && g.attach?.kind === 'range' && g.attach.slider === r.id))
 }
 
 const named = (name: string | undefined, id: string | null) => name?.trim() || id || 'something'
@@ -44,6 +44,8 @@ const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`)
 // "Turns Head by -12 degrees at the minimum and +12 at the maximum", for a drive.
 export function driveText(c: ModelContent, d: ModelDrive): string {
   if (d.kind === 'turn') return `Turns ${named(groupById(c, d.group ?? '')?.name, d.group)} by ${sign(d.atMin)}° at the minimum and ${sign(d.atMax)}° at the maximum`
+  if (d.kind === 'yaw') return `Turns ${named(groupById(c, d.group ?? '')?.name, d.group)} in depth by ${sign(d.atMin)}° at the minimum and ${sign(d.atMax)}° at the maximum (more than none turns it the way the figure turns to show its right side)`
+  if (d.kind === 'pitch') return `Nods ${named(groupById(c, d.group ?? '')?.name, d.group)} by ${sign(d.atMin)}° at the minimum and ${sign(d.atMax)}° at the maximum (more than none looks up)`
   if (d.kind === 'scale') {
     const target = d.target === 'model' ? 'the whole model' : d.target === 'group' ? named(groupById(c, d.id ?? '')?.name, d.id) : named(c.shapes.find(s => s.id === d.id)?.name, d.id)
     const axis = d.axis === 'x' ? ' across' : d.axis === 'y' ? ' up and down' : ''
