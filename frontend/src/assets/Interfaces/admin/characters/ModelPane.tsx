@@ -43,7 +43,7 @@ import { toggleUnder } from './engine/wear'
 import { stepDrape } from './engine/drapeEdit'
 import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
-import { cycleMode, movePoint, newShape, toggleSegment } from './engine/edit'
+import { cycleMode, deletePoint, joinSegment, movePoint, newShape, setMode, toggleSegment } from './engine/edit'
 import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine/bridgeEdit'
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
@@ -79,7 +79,9 @@ import {
 import { LIMITS } from './engine/limits'
 import type { ArrangeActions, ConnectionActions, SymmetryActions } from './ShapePanels'
 import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
-import type { ConnectTool, RightSpot } from './DesignerCanvas'
+import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
+import { PointForm } from './PointForm'
+import * as clipboard from './shapeClipboard'
 import { FIRST_CHOICE, ShapeForm, templateOfChoice, type FormKind, type ShapeChoice } from './ShapeForm'
 import { CAST_OPACITY, KIND_NAMES } from './engine/kinds'
 import { castOverlaps, hasBothCasts } from './engine/castOverlap'
@@ -244,6 +246,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [formChoice, setFormChoice] = useState<ShapeChoice>(FIRST_CHOICE)
   const worldRef = useRef<((clientX: number, clientY: number) => [number, number]) | null>(null)
   const closeShapeForm = useCallback(() => setShapeForm(null), [])
+  // the point form (T2): the point it was opened for and where; and the last place the pointer was over the canvas (a paste goes there)
+  const [pointForm, setPointForm] = useState<{ id: string; i: number; left: number; top: number } | null>(null)
+  const closePointForm = useCallback(() => setPointForm(null), [])
+  const pointerRef = useRef<[number, number] | null>(null)
   const turnAngle = angleOf(view)
   // the side a panel that knows only the front and the back speaks of: the back once more of the back is seen than of the front
   const side: ViewName = fromBehind(view) ? 'back' : 'front'
@@ -410,7 +416,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       return e.ok ? e.content : c
     }, false)
   }
-  function editShape(id: string, next: ModelShape, point?: number) {
+  // `followed`: a symmetric shape's copies were already made to follow (a joined segment, T2)
+  function editShape(id: string, next: ModelShape, point?: number, followed = false) {
     if (recording) {
       if (next.pts.length !== recording.draft.pts.length) { setNote('Adding or deleting points is not recorded: record the points that are there.'); return }
       setRecording({ ...recording, draft: next })
@@ -420,7 +427,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const old = shapeById(content, id)
     if (!old) return
     // an edit of a symmetric shape's points goes to its source, and the copies follow (shape editor S6)
-    if (old.sym && next.sym) {
+    if (old.sym && next.sym && !followed) {
       const f = followSymmetry(old, next)
       if (f.refused) { setNote(f.refused); return }
       next = f.shape
@@ -528,6 +535,17 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function onKeyDown(e: KeyboardEvent) {
     const t = e.target as HTMLElement
     if (!(e.ctrlKey || e.metaKey) || /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || recording) return
+    // the shape editor's clipboard (T2): copy, cut and paste the selected shape
+    if (shapesOnly && !e.shiftKey && !e.altKey) {
+      const k = e.key.toLowerCase(), held = sel.kind === 'shape' ? shapeById(content, sel.id) : undefined
+      if ((k === 'c' || k === 'x') && held && !held.mirrorOf) {
+        e.preventDefault()
+        clipboard.copyShape(held)
+        if (k === 'x') deleteSelection({ kind: 'shape', id: held.id })
+        return
+      }
+      if (k === 'v' && clipboard.hasCopy()) { e.preventDefault(); pasteHere(); return }
+    }
     if (e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo() }
     else if (e.key.toLowerCase() === 'y') { e.preventDefault(); redo() }
   }
@@ -550,7 +568,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const changeable = !!s && (other ? !s.mirrorOf && !s.hide && atRest && awayAll === 0 : editable)
     if (t.kind === 'point') {
       selectPoint(t.i)
-      if (s && changeable) editShape(s.id, cycleMode(s, t.i, { mirror: mirror && !shapesOnly, axis: content.axis }), t.i)
+      // in the shape editor it opens the point form there (T2)
+      if (s && changeable && shapesOnly && at) { const r = stageRef.current?.getBoundingClientRect(); setPointForm({ id: s.id, i: t.i, left: at.clientX - (r?.left ?? 0), top: at.clientY - (r?.top ?? 0) }) }
+      else if (s && changeable) editShape(s.id, cycleMode(s, t.i, { mirror: mirror && !shapesOnly, axis: content.axis }), t.i)
     } else {
       selectSegment(t.e)
       // a shared segment is the segment that is drawn: it changes there (shape editor S5)
@@ -1231,6 +1251,40 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
   }
 
+  // Paste (T2): the copied shape into the selection's object (else a new one), under the pointer when it is over the canvas, else a little right of and below where it was.
+  function pasteHere() {
+    const into = contextObject(content, sel)
+    const base = into ? { content, objectId: into } : addObjectOn('body')
+    const obj = objectById(base.content, base.objectId)
+    if (obj && obj.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
+    const id = freshId(base.content, 's', makeId), shape = clipboard.pasted(id, pointerRef.current)
+    if (shape && commit(addShape(base.content, base.objectId, shape), true)) choose({ kind: 'shape', id })
+  }
+  // Ctrl + click (T2): a point is removed; a segment's two points are joined into one at its middle (a symmetric shape's copies do the same).
+  function removeAt(t: RemoveTarget) {
+    if (recording) return
+    const s = shapeById(content, t.id)
+    if (!s || s.mirrorOf) return
+    if (!(sel.kind === 'shape' && sel.id === s.id)) choose({ kind: 'shape', id: s.id })
+    const few = 'A shape needs at least three points.'
+    if (t.kind === 'point') {
+      const next = deletePoint(s, t.i)
+      if (!next) { setNote(few); return }
+      editShape(s.id, next, Math.max(0, Math.min(t.i, next.pts.length - 1)))
+      return
+    }
+    const joined = joinSegment(s, t.e)
+    if (!joined) { setNote(few); return }
+    const j = (t.e + 1) % s.pts.length, at = t.e < j ? t.e : t.e - 1
+    if (!s.sym) { editShape(s.id, joined, at); return }
+    const moved = followSymmetry(s, movePoint(s, t.e, joined.pts[at].x, joined.pts[at].y))
+    if (moved.refused) { setNote(moved.refused); return }
+    const fewer = deletePoint(moved.shape, j)
+    if (!fewer) { setNote(few); return }
+    const f = followSymmetry(moved.shape, fewer)
+    if (f.refused) { setNote(f.refused); return }
+    editShape(s.id, f.shape, undefined, true)
+  }
   // The new-shape form (shape types T1): opened where a right-click was, or (the New shape button, a tree's add button) in the middle of what the panels leave of the canvas.
   function openShapeForm(clientX: number, clientY: number, objectId: string | null = null) {
     const r = stageRef.current?.getBoundingClientRect(), toWorld = worldRef.current
@@ -1552,7 +1606,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onEditShape={editShape}
-            onRightClick={onRightClick} worldRef={worldRef}
+            onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
+            onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
@@ -1563,6 +1618,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {!shapesOnly && <p className="cmStageNote" aria-live="polite">{stageNote}</p>}
           </div>
 
+          {pointForm && shapeById(content, pointForm.id)?.pts[pointForm.i] && (
+            <PointForm
+              at={{ left: pointForm.left, top: pointForm.top }} mode={shapeById(content, pointForm.id)!.pts[pointForm.i].m}
+              onMode={m => { const s = shapeById(content, pointForm.id); if (s) editShape(s.id, setMode(s, pointForm.i, m, { axis: content.axis }), pointForm.i); setPointForm(null) }}
+              onClose={closePointForm}
+            />
+          )}
           {shapeForm && (
             <ShapeForm
               at={{ left: shapeForm.left, top: shapeForm.top }} choice={formChoice} onChoice={setFormChoice} onCreate={createFromForm}

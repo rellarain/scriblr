@@ -108,6 +108,9 @@ export interface TaperCanvas {
   // take back the last point (Backspace)
   onBack: () => void
 }
+// What a Ctrl + click is on (shape types T2).
+export type RemoveTarget = { kind: 'point'; id: string; i: number } | { kind: 'segment'; id: string; e: number }
+
 // Where a right-click was: in canvas space, and on the screen.
 export interface RightSpot { x: number; y: number; clientX: number; clientY: number }
 
@@ -199,6 +202,11 @@ export interface CanvasProps {
   onRightClick: (target: RightTarget, at: RightSpot) => void
   // set to a function that turns a place on the screen into canvas space (the shape editor's new-shape form puts its shape there)
   worldRef?: { current: ((clientX: number, clientY: number) => [number, number]) | null }
+  // the last place the pointer was over the canvas, in canvas space (null once it has left): the shape editor pastes there (T2)
+  pointerRef?: { current: [number, number] | null }
+  // the shape editor (T2): Delete on a selected shape removes it; Ctrl + click on a point removes it, and on a segment joins its two points
+  onDeleteShape?: (id: string) => void
+  onRemove?: (target: RemoveTarget) => void
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -585,6 +593,7 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (e.button !== 0) return
+    if (ctrlRemove(e)) return
     if (p.taper) { addTaper(e); return }
     if (hoverDown(e)) return
     // a click on the empty grid unselects everything (not while a tool is waiting for a click of its own)
@@ -598,6 +607,7 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (e.button !== 0) return
+    if (ctrlRemove(e)) return
     if (p.taper) { addTaper(e); return }
     if (p.pose) { if (p.pose.onDown({ kind: 'part', shapeId: id }, toWorld(e), e.altKey)) { dragRef.current = { kind: 'pose' }; capture(e) } return }
     if (p.pick) {
@@ -652,8 +662,17 @@ export function DesignerCanvas(p: CanvasProps) {
     beginGuides([shape.id])
     capture(e)
   }
+  // Ctrl + click on a point removes it, on a segment joins its two points (shape types T2); true when it was one
+  function ctrlRemove(e: ReactPointerEvent): boolean {
+    if (e.button !== 0 || !(e.ctrlKey || e.metaKey) || !p.onRemove || p.pose || p.pick || through) return false
+    const h = hitTest(e)
+    if (h?.kind === 'point') { p.onRemove({ kind: 'point', id: h.shapeId, i: h.i }); return true }
+    if (h?.kind === 'edge') { p.onRemove({ kind: 'segment', id: h.shapeId, e: h.e }); return true }
+    return false
+  }
   function onPointDown(e: ReactPointerEvent, i: number) {
     e.stopPropagation()
+    if ((e.ctrlKey || e.metaKey) && e.button === 0 && p.onRemove && shape) { p.onRemove({ kind: 'point', id: shape.id, i }); return }
     if (e.button === 2 && shape) {
       dragRef.current = { kind: 'pan', startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y, target: { kind: 'point', id: shape.id, i }, moved: false }
       capture(e)
@@ -745,6 +764,7 @@ export function DesignerCanvas(p: CanvasProps) {
   // ---- moving ----
 
   function onMove(e: { clientX: number; clientY: number; shiftKey?: boolean }) {
+    if (p.pointerRef) p.pointerRef.current = toWorld(e)
     const d = dragRef.current
     if (p.skin) { const at = toWorld(e); setBrush(b => (b && Math.abs(b[0] - at[0]) < 1e-6 && Math.abs(b[1] - at[1]) < 1e-6 ? b : at)) }
     if (!d) { if (symFrame) symHoverAt(e); updateHover(e); return }
@@ -922,6 +942,9 @@ export function DesignerCanvas(p: CanvasProps) {
         : part === 'segment' ? nudgePoint(nudgePoint(shape, selPoint, dx, dy, { mirror, axis }), (selPoint + 1) % n, dx, dy, { mirror, axis })
         : nudgePoint(shape, selPoint, dx, dy, { mirror, axis })
       p.onEditShape(shape.id, next, undefined)
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && part === 'shape' && p.onDeleteShape) {
+      e.preventDefault()
+      p.onDeleteShape(shape.id)
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && part === 'point') {
       e.preventDefault()
       const next = deletePoint(shape, selPoint, { mirror, axis })
@@ -1215,7 +1238,7 @@ export function DesignerCanvas(p: CanvasProps) {
     <svg
       ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}${p.skin ? ' cmCanvas--skin' : ''}${p.taper ? ' cmCanvas--taper' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
       aria-label={`Designer canvas. ${nudgeHint}. Click the empty grid to unselect everything, or right-click it.`}
-      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => { setHover(null); setBrush(null) }} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => { setHover(null); setBrush(null); if (p.pointerRef) p.pointerRef.current = null }} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
       onDoubleClick={onDouble}
     >
       <rect x={vb.x - 1} y={vb.y - 1} width={vb.w + 2} height={vb.h + 2} className="cmCanvasBg" />

@@ -1,13 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CheckIcon } from '../../../icons'
+import { CanvasForm } from './CanvasForm'
 import { KIND_NAMES } from './engine/kinds'
 import { POLYGON_SIDES, SHAPE_BASICS, polygonId, starId, templateById } from './engine/templates'
 import { Stepper } from './Stepper'
 import { Thumb } from './TemplateMenu'
 
 // The new-shape form of the shape editor (shape types T1): opened on the canvas by a right-click on the grid (or the New shape button). It holds the type of the new shape, a
-// preset shape (a picture only) or a polygon with a count of points, and Create, which puts the shape where the form was opened. It lies over the whole stage, so no panel's
-// scrolling area clips it, and keeps itself inside the stage.
+// preset shape (a picture only) or a polygon with a count of points, and Create, which puts the shape where the form was opened.
 
 export type FormKind = 'base' | 'stretch' | 'shadow' | 'light'
 export const FORM_KINDS: FormKind[] = ['base', 'stretch', 'shadow', 'light']
@@ -18,34 +17,11 @@ export const PRESETS: string[] = [...SHAPE_BASICS, starId(5)]
 // the template a choice makes
 export const templateOfChoice = (c: ShapeChoice): string => (c.template === 'polygon' ? polygonId(c.sides) : c.template)
 
-const MARGIN = 8
-
 export function ShapeForm({ at, choice, onChoice, onCreate, onClose }: { at: { left: number; top: number }; choice: ShapeChoice; onChoice: (c: ShapeChoice) => void; onCreate: () => void; onClose: () => void }) {
-  const root = useRef<HTMLDivElement>(null)
-  const [place, setPlace] = useState(at)
-  // kept inside the stage it lies over
-  useLayoutEffect(() => {
-    const el = root.current, stage = el?.parentElement
-    if (!el || !stage) return
-    const w = el.offsetWidth, h = el.offsetHeight, W = stage.clientWidth, H = stage.clientHeight
-    setPlace({ left: Math.max(MARGIN, Math.min(at.left, W - w - MARGIN)), top: Math.max(MARGIN, Math.min(at.top, H - h - MARGIN)) })
-  }, [at.left, at.top])
-  // the chosen picture has the focus when the form opens; a press outside and Escape (wherever the focus is) close it
-  useEffect(() => {
-    root.current?.querySelector<HTMLElement>('[data-choice="on"]')?.focus()
-    const away = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) onClose() }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
-    document.addEventListener('mousedown', away)
-    document.addEventListener('keydown', esc, true)
-    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc, true) }
-  }, [onClose])
   const pick = (template: string) => onChoice({ ...choice, template })
   const polygon = templateById(polygonId(choice.sides))
   return (
-    <div
-      ref={root} className="cmShapeForm" role="dialog" aria-label="New shape" style={{ left: place.left, top: place.top }}
-      onContextMenu={e => e.preventDefault()}
-    >
+    <CanvasForm at={at} label="New shape" className="cmShapeForm" onClose={onClose}>
       <div className="cmShapeFormKinds" role="group" aria-label="Type of the shape">
         {FORM_KINDS.map(k => (
           <button key={k} type="button" className={`cmChip${choice.kind === k ? ' cmChip--on' : ''}`} aria-pressed={choice.kind === k} onClick={() => onChoice({ ...choice, kind: k })}>{KIND_NAMES[k]}</button>
@@ -74,6 +50,6 @@ export function ShapeForm({ at, choice, onChoice, onCreate, onClose }: { at: { l
       <div className="cmShapeFormFoot">
         <button type="button" className="cmShapeFormCreate" aria-label="Create" title="Create the shape here" onClick={onCreate}><CheckIcon size={16} /></button>
       </div>
-    </div>
+    </CanvasForm>
   )
 }

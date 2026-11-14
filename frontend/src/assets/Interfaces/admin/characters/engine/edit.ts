@@ -1,6 +1,6 @@
 import type { ModelPoint, ModelPointMode, ModelShape } from '../../../../../api/types'
 import { LIMITS } from './limits'
-import { SWAP, autoHandles, build, hasIn, hasOut, r2, transformList, translate, twinIndex } from './geometry'
+import { SWAP, autoHandles, bezierAt, build, hasIn, hasOut, r2, transformList, translate, twinIndex } from './geometry'
 import { templatePoints } from './templates'
 import type { Box } from './geometry'
 
@@ -152,6 +152,19 @@ export function deletePoint(shape: ModelShape, i: number, o: EditOptions = {}): 
   if (ti !== i && s.pts.length - 2 >= min) { s.pts.splice(Math.max(i, ti), 1); s.pts.splice(Math.min(i, ti), 1) }
   else s.pts.splice(i, 1)
   return s
+}
+
+// The two points of segment e (from point e to the next) joined into one, at the middle of the segment (shape types T2: Ctrl + click on a segment). The joined point comes in
+// as point e came in and goes out as the next point went out. Null when the shape would be left with too few points.
+export function joinSegment(shape: ModelShape, e: number, min = 3): ModelShape | null {
+  const n = shape.pts.length
+  if (n <= min || !shape.pts[e] || (!shape.closed && e >= n - 1)) return null
+  const j = (e + 1) % n, a = shape.pts[e], b = shape.pts[j]
+  const mid = bezierAt(build(shape.pts, shape.closed), e, 0.5)
+  const inHas = hasIn(a.m), outHas = hasOut(b.m)
+  const m: ModelPointMode = inHas && outHas ? 'c' : inHas ? 'cs' : outHas ? 'sc' : 's'
+  const joined: ModelPoint = { ...a, x: r2(mid.x), y: r2(mid.y), m, hi: a.hi ?? null, ho: b.ho ?? null }
+  return { ...shape, pts: shape.pts.map((p, k) => (k === e ? joined : p)).filter((_, k) => k !== j) }
 }
 
 // The whole shape moves.
