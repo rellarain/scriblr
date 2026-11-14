@@ -77,12 +77,13 @@ import {
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { LIMITS } from './engine/limits'
+import type { ArrangeActions } from './ShapePanels'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
 import type { DrapeActions, FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName, WearActions } from './rigActions'
 import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
-  FALL_SIDES, NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
+  FALL_SIDES, NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject, stepShape,
   outlineSize, removeShape, renameGroup, renameObject, renameShape, shapeById, twinsOf, updateShape, groupById, type MakeId,
 } from './modelContent'
 import type { CharacterModels } from './useCharacterModels'
@@ -134,6 +135,9 @@ const VIEW_BAR = 44
 // below this many pixels across, the console has room for one side toolbar at a time
 const NARROW = 640
 const DRAWER = 240
+
+// The middle of the model's space down (it runs from 0 to 400): where Align down puts a shape's middle (shape editor S4).
+const MODEL_MIDDLE_Y = 200
 
 export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport, barHost = null, nav, onAdvanced }: {
   entry: ModelEntry
@@ -225,6 +229,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [paintPick, setPaintPick] = useState<'clip' | 'cut' | null>(null)
   // the angle the figure is seen from (phase A3: any angle; 'front' and 'back' are 0 and 180)
   const [view, setView] = useState<View>('front')
+  // the shape editor's Keep proportions (S4): every resize keeps the shape's proportions
+  const [keepRatio, setKeepRatio] = useState(false)
   const turnAngle = angleOf(view)
   // the side a panel that knows only the front and the back speaks of: the back once more of the back is seen than of the front
   const side: ViewName = fromBehind(view) ? 'back' : 'front'
@@ -1371,6 +1377,18 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     : selShape ? 'Drag a point, a curve handle or the shape; right-click a point or a segment to change it; double-click a segment to add a point.'
     : sel.kind === 'none' ? 'Nothing is selected: this is the end result.' : 'Pick a shape in the tree to edit its points.'
 
+  // The shape editor's Arrange section (S4): Keep proportions, the middle of the model in the shape's own space, and Forward and Back within its object.
+  const arrangeObject = shapesOnly && selShape ? objectOfShape(content, selShape.id) : undefined
+  const arrangeAt = selShape ? solved.shapes[selShape.id] : undefined
+  const arrangeIndex = selShape && arrangeObject ? arrangeObject.shapes.indexOf(selShape.id) : -1
+  const arrange: ArrangeActions | undefined = shapesOnly && selShape ? {
+    keep: keepRatio, onKeep: setKeepRatio,
+    centre: arrangeAt ? apply(inverse(arrangeAt.matrix), content.axis, MODEL_MIDDLE_Y) : [content.axis, MODEL_MIDDLE_Y],
+    onStep: (id, dir) => { commit(stepShape(content, id, dir), true) },
+    canForward: !!arrangeObject && arrangeIndex >= 0 && arrangeIndex < arrangeObject.shapes.length - 1,
+    canBack: arrangeIndex > 0,
+  } : undefined
+
   // ---- the toolbars ----
 
   const consoleBar = (
@@ -1405,7 +1423,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
-            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom}
+            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onEditShape={editShape}
             onRightClick={onRightClick}
@@ -1530,6 +1548,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
+              arrange={arrange}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}

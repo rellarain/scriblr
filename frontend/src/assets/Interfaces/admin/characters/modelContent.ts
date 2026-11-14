@@ -1,3 +1,4 @@
+import { normTurn } from './engine/transform'
 import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
@@ -77,7 +78,7 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), rot: rotValue(s.rot), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
     turn: repairTurn(s.turn, s.pts.length, p => p as ModelShape['pts'][number]),
   }
 }
@@ -93,6 +94,8 @@ function skinOf(s: ModelShape): ModelSkin[] {
 }
 // A radius as the server keeps it: a whole number from 0 to the most, 0 when it is not a number.
 export const roundOf = (v: number | null | undefined): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(LIMITS.roundMax, Math.max(0, v))) : 0)
+// The turn of a shape's frame as the server keeps it (shape editor S4): -180 up to 180 degrees, to two decimals, 0 unless it is a number.
+export const rotValue = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? normTurn(v) : 0)
 // A shape's outline as the server keeps it (shape editor S3): no outline unless it is a number, held to its range, to two decimals.
 export const outlineOf = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(LIMITS.outlineMax, Math.max(LIMITS.outlineMin, v)) * 100) / 100 : null)
 // The sides things may fall to, and a shape's fade as the server keeps it (phase 5b): the places are held to the span a slider may have.
@@ -507,6 +510,17 @@ export function duplicateShape(c: ModelContent, id: string, newId: string): Mode
 }
 
 // A shape moves up or down among the shapes of its object (the later in the list, the higher it is drawn).
+// A shape moved one place among the shapes of its object (shape editor S4): forward (+1) is later in the list, so drawn in front; at either end it stays.
+export function stepShape(c: ModelContent, shapeId: string, dir: -1 | 1): ModelContent {
+  const o = objectOfShape(c, shapeId)
+  if (!o) return c
+  const i = o.shapes.indexOf(shapeId), j = i + dir
+  if (i < 0 || j < 0 || j >= o.shapes.length) return c
+  const shapes = [...o.shapes]
+  ;[shapes[i], shapes[j]] = [shapes[j], shapes[i]]
+  return { ...c, objects: c.objects.map(x => (x.id === o.id ? { ...x, shapes } : x)) }
+}
+
 export function moveShapeWithin(c: ModelContent, objectId: string, shapeId: string, beforeId: string | null): ModelContent {
   return { ...c, objects: c.objects.map(o => (o.id === objectId ? { ...o, shapes: moveBefore(o.shapes.map(id => ({ id })), shapeId, beforeId).map(x => x.id) } : o)) }
 }

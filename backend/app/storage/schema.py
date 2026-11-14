@@ -1651,6 +1651,8 @@ class ModelShape(BaseModel):
     # Shape editor S3: the width of the shape's outline in the model's units (None: no outline). It is drawn in one dark ink, and the shape's opacity fades only its
     # fill. A twin and a shape that follows a template take it from the shape they copy.
     outline: Optional[float] = None
+    # Shape editor S4: the angle, in degrees, the shape's own frame is turned (its points stay as drawn; the box the editor draws round it is measured along this frame).
+    rot: float = 0.0
     # Phase O1: skin weights, the groups the shape's points also follow (at most MODEL_SKIN_MAX, one weight per point each). A twin is skinned as its original is.
     skin: list[ModelSkin] = Field(default_factory=list, max_length=MODEL_SKIN_MAX)
     # Phase O2: the other objects a shading shape lies on besides its own (it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis). A twin
@@ -1765,6 +1767,15 @@ class ModelShape(BaseModel):
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return 0
         return int(round(_finite(value, 0.0, 0.0, float(MODEL_ROUND_MAX))))
+
+    @field_validator("rot", mode="before")
+    @classmethod
+    def _rot(cls, value: Any) -> float:
+        # repaired, never refused: kept from -180 up to (not including) 180 degrees, to two decimals
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0.0
+        turned = (_finite(value, 0.0, -1e6, 1e6) + 180.0) % 360.0 - 180.0
+        return round(turned, 2)
 
     @field_validator("outline", mode="before")
     @classmethod

@@ -447,6 +447,9 @@ described, now stale, in `docs/data-model.md`).
   shading shape has none. A shape made in the shape editor starts at 0.75. The templates gain an ellipse, an equilateral
   and a right triangle, a pentagon, and polygons (`polygon-3`..`polygon-12`) and stars (`star-4`..`star-12`) made from
   their id.
+  Shape editor S4 adds, with a default: on a shape `rot` (degrees, -180 up to 180 to two decimals, 0 by default;
+  repaired, never refused): the angle its own frame is turned. The points stay as drawn; the editor measures the box it
+  draws round the shape along this frame, so the box turns with the shape. A template resets it to 0.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

@@ -107,6 +107,15 @@
 .cmShape { fill: var(--shape-fill, var(--ink-muted)); stroke: none; vector-effect: non-scaling-stroke; cursor: pointer; &--dim { opacity: 0.35; } }
 // a shape's outline (shape editor S3): its own path over the fill, in the model's units, never picked
 .cmShapeLine { pointer-events: none; &--dim { opacity: 0.35; } }
+// the box of the selected shape (shape editor S4): its frame, eight square handles that resize it and a round one that turns it
+.cmBoxLine { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmBoxHandle, .cmBoxTurn {
+  fill: var(--surface-raised); stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke;
+  &:hover { fill: var(--accent); }
+}
+.cmBoxHandle { &--nw, &--se { cursor: nwse-resize; } &--ne, &--sw { cursor: nesw-resize; } &--n, &--s { cursor: ns-resize; } &--e, &--w { cursor: ew-resize; } }
+.cmBoxTurn { cursor: grab; }
+.cmArrangeTools { flex-wrap: wrap; }
 .cmRing { fill: none; pointer-events: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; &--under { stroke: var(--on-accent); stroke-width: 4; } &--over { stroke: var(--accent); stroke-width: 2; } }
 .cmHandles { pointer-events: none; .cmHandle { pointer-events: auto; } }
 .cmHandleLine { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.7; }

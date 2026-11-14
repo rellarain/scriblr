@@ -7,6 +7,7 @@ import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/
 import { apply, boxOf, build, flatten, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
+import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
@@ -38,6 +39,9 @@ const REACH_EDGE = 6
 const REACH_POINT = 7
 const REACH_CROSS = 9
 const CLICK_SLOP = 3
+// the box of the selected shape (shape editor S4): how far outside the shape it is drawn, and how far above it the turn handle sits, in pixels
+const BOX_PAD = 8
+const TURN_OFF = 18
 const REACH_GUIDE = 3
 
 export interface PivotMarker {
@@ -128,6 +132,9 @@ export interface CanvasProps {
   viewNonce?: number
   // The toolbars over the edges of the canvas.
   insets?: Insets
+  // The shape editor (S4): the selected shape has a box with handles that resize it and one that turns it; `keepRatio` makes every resize keep the proportions (Shift does too).
+  transform?: boolean
+  keepRatio?: boolean
   // The view was moved by the canvas itself (panned with the right button, or by holding a drag at an edge).
   onViewMoved?: () => void
   // False while the selected shape's points are changed by a slider, or the shape is a derived twin: it is shown, not edited.
@@ -180,6 +187,9 @@ type Drag =
   | { kind: 'pivot' }
   | { kind: 'pose' }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
+  // the box of the selected shape (shape editor S4): a resize from one of its handles, or a turn by its round handle, worked out from the shape as it was when it began
+  | { kind: 'resize'; shapeId: string; handle: BoxHandle; from: ModelShape; frame: Frame; x0: number; y0: number; moved: boolean }
+  | { kind: 'turn'; shapeId: string; from: ModelShape; frame: Frame; start: [number, number]; x0: number; y0: number; moved: boolean }
   | { kind: 'pan'; startX: number; startY: number; panX: number; panY: number; target: RightTarget; moved: boolean }
   | { kind: 'paint'; point: number; down: boolean; x0: number; y0: number; moved: boolean }
 
@@ -594,6 +604,25 @@ export function DesignerCanvas(p: CanvasProps) {
     dragRef.current = { kind: 'handle', shapeId: shape.id, index, which }
     capture(e)
   }
+  // The box's handles (shape editor S4): a press on one begins a resize or a turn, worked out from the shape as it is now; it is a click until it has moved a little.
+  function onBoxDown(e: ReactPointerEvent, h: BoxHandle) {
+    e.stopPropagation()
+    if (!shape || e.button !== 0 || !editable) return
+    const f = frameOf(shape)
+    if (!f) return
+    dragRef.current = { kind: 'resize', shapeId: shape.id, handle: h, from: shape, frame: f, x0: e.clientX, y0: e.clientY, moved: false }
+    capture(e)
+  }
+  function onTurnDown(e: ReactPointerEvent) {
+    e.stopPropagation()
+    if (!shape || e.button !== 0 || !editable) return
+    const f = frameOf(shape), r = solved.shapes[shape.id]
+    if (!f) return
+    const [wx, wy] = toWorld(e)
+    const start: [number, number] = r ? apply(inverse(r.matrix), wx, wy) : [wx, wy]
+    dragRef.current = { kind: 'turn', shapeId: shape.id, from: shape, frame: f, start, x0: e.clientX, y0: e.clientY, moved: false }
+    capture(e)
+  }
   function onPivotDown(e: ReactPointerEvent) {
     e.stopPropagation()
     if (e.button !== 0 || !pivot?.draggable) return
@@ -631,7 +660,7 @@ export function DesignerCanvas(p: CanvasProps) {
 
   // ---- moving ----
 
-  function onMove(e: { clientX: number; clientY: number }) {
+  function onMove(e: { clientX: number; clientY: number; shiftKey?: boolean }) {
     const d = dragRef.current
     if (p.skin) { const at = toWorld(e); setBrush(b => (b && Math.abs(b[0] - at[0]) < 1e-6 && Math.abs(b[1] - at[1]) < 1e-6 ? b : at)) }
     if (!d) { updateHover(e); return }
@@ -662,6 +691,19 @@ export function DesignerCanvas(p: CanvasProps) {
         }
       }
       p.frames?.onBox(d.id, d.handle === 'move' ? movedBox(d.box, dx, dy) : resizedBox(d.box, d.handle, dx, dy))
+      return
+    }
+    if (d.kind === 'resize' || d.kind === 'turn') {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+        d.moved = true
+        p.onGesture()
+      }
+      const at = solved.shapes[d.shapeId], [wx, wy] = toWorld(e)
+      const [x, y] = at ? apply(inverse(at.matrix), wx, wy) : [wx, wy]
+      p.onShape(d.shapeId, d.kind === 'resize'
+        ? resizeFrom(d.from, d.frame, d.handle, x, y, { keep: e.shiftKey === true || p.keepRatio === true, grid: onGrid ? unit : null })
+        : turnFrom(d.from, d.frame, d.start, x, y, e.shiftKey === true))
       return
     }
     if (d.kind === 'pan') {
@@ -800,6 +842,30 @@ export function DesignerCanvas(p: CanvasProps) {
   const hoveredPoint = hover?.kind === 'point' && hover.shapeId === shape?.id ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
   const selectedPointsDrawn = shown.has('points') && overlay
+  // The box of the selected shape (shape editor S4), while the shape itself is what is selected: its frame a few pixels out, eight handles that resize it and a round one above
+  // it that turns it.
+  const boxFrame = p.transform && selectedPointsDrawn && part === 'shape' && editable && !p.taper && !p.weights && !p.skin && !p.pick ? frameOf(shape!) : null
+  const boxMarkup = boxFrame && matrix ? (() => {
+    const pad = BOX_PAD * u, at = (pt: [number, number]) => apply(matrix, pt[0], pt[1])
+    const corners = frameCorners(boxFrame, pad).map(at)
+    const top = at(handleAt(boxFrame, 'n', pad)), knob = at(turnHandleAt(boxFrame, pad + TURN_OFF * u))
+    return (
+      <g className="cmBox" data-box={shape!.id}>
+        <polygon points={corners.map(c => `${c[0]},${c[1]}`).join(' ')} className="cmBoxLine" aria-hidden="true" />
+        <line x1={top[0]} y1={top[1]} x2={knob[0]} y2={knob[1]} className="cmBoxLine" aria-hidden="true" />
+        {BOX_HANDLES.map(h => {
+          const [x, y] = at(handleAt(boxFrame, h, pad))
+          return (
+            <rect
+              key={h} x={x - 4 * u} y={y - 4 * u} width={8 * u} height={8 * u} transform={boxFrame.rot ? `rotate(${boxFrame.rot} ${x} ${y})` : undefined}
+              className={`cmBoxHandle cmBoxHandle--${h}`} role="button" tabIndex={-1} aria-label={`Resize from the ${HANDLE_NAMES[h]}`} data-handle={h} onPointerDown={e => onBoxDown(e, h)}
+            />
+          )
+        })}
+        <circle cx={knob[0]} cy={knob[1]} r={5 * u} className="cmBoxTurn" role="button" tabIndex={-1} aria-label="Turn the shape" data-handle="turn" onPointerDown={onTurnDown} />
+      </g>
+    )
+  })() : null
   const ptOn = (i: number) => part === 'point' && i === selPoint
 
   const figure = (
@@ -896,6 +962,7 @@ export function DesignerCanvas(p: CanvasProps) {
     ) : null,
     points: selectedPointsDrawn ? (
       <>
+        {boxMarkup}
         {built.map((b, i) => {
           const w = Math.min(1, Math.max(0, shape!.pts[i].w ?? 0))
           return (

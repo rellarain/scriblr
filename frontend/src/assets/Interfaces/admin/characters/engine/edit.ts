@@ -162,7 +162,11 @@ export function moveShape(shape: ModelShape, dx: number, dy: number): ModelShape
 // The shape takes a template's points in a box; its name, id, order and the rest stay.
 export function applyTemplate(shape: ModelShape, templateId: string, box: Box): ModelShape {
   const pts = templatePoints(templateId, box)
-  return pts.length ? { ...shape, pts, template: templateId, half: 0 } : copyShape(shape)
+  if (!pts.length) return copyShape(shape)
+  const next: ModelShape = { ...shape, pts, template: templateId, half: 0 }
+  // a template starts with its frame square to the page (shape editor S4)
+  if (next.rot) next.rot = 0
+  return next
 }
 
 // A new shape from a template.

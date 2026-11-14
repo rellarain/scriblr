@@ -1049,6 +1049,56 @@ export function WeightIcon(props: IconProps) {
   </IconBase>
 }
 
+// A shape and its mirror image either side of an upright line: flip a shape across.
+export function FlipAcrossIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 3v18" strokeDasharray="2 2.5" />
+    <path d="M9 7L3.5 17H9z" fill="currentColor" />
+    <path d="M15 7l5.5 10H15z" />
+  </IconBase>
+}
+
+// A shape and its mirror image either side of a level line: flip a shape down.
+export function FlipDownIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 12h18" strokeDasharray="2 2.5" />
+    <path d="M7 9L17 3.5V9z" fill="currentColor" />
+    <path d="M7 15l10 5.5V15z" />
+  </IconBase>
+}
+
+// A box on an upright middle line: put a shape's middle on the middle across.
+export function AlignAcrossIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 2.5v19" />
+    <rect x="6" y="7.5" width="12" height="9" rx="1.200" />
+  </IconBase>
+}
+
+// A box on a level middle line: put a shape's middle on the middle down.
+export function AlignDownIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M2.5 12h19" />
+    <rect x="7.5" y="6" width="9" height="12" rx="1.200" />
+  </IconBase>
+}
+
+// Two overlapping squares, the front one filled: bring a shape forward.
+export function ForwardIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 15H4V4h11v5" />
+    <rect x="9" y="9" width="11" height="11" rx="1" fill="currentColor" />
+  </IconBase>
+}
+
+// Two overlapping squares, the back one filled: send a shape back.
+export function BackwardIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 15H4V4h11v5z" fill="currentColor" />
+    <rect x="9" y="9" width="11" height="11" rx="1" />
+  </IconBase>
+}
+
 // An arch between two posts: skin that joins two parts.
 export function BridgeIcon(props: IconProps) {
   return <IconBase {...props}>
