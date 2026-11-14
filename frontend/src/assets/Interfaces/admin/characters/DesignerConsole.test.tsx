@@ -190,33 +190,27 @@ describe('drawing', () => {
     expect(shapePaths()).toHaveLength(1)
   })
 
-  it('cycles point editor, move shape and unselected with the right button, and unselects on the grid', async () => {
+  it('selects a shape with the right button (no modes to step through), and unselects on the grid', async () => {
     const { user } = await open([draftEntry('a', complete('Adult'))])
     const shape = shapePaths()[0]
     const rightClick = (el: Element) => { pointer(el, 'pointerdown', { button: 2 }); pointer(canvas(), 'pointerup', { button: 2 }) }
     const note = () => document.querySelector('.cmStageNote')!
 
     rightClick(shape)
-    expect(note()).toHaveTextContent('Point editor')
-    expect(screen.getByRole('button', { name: 'Point editor' })).toHaveAttribute('aria-pressed', 'true')
+    expect(note()).toHaveTextContent('Drag a point')
+    expect(screen.queryByRole('button', { name: 'Point editor' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Move shape' })).toBeNull()
     rightClick(shape)
-    expect(note()).toHaveTextContent('Move shape')
-    expect(screen.getByRole('button', { name: 'Move shape' })).toHaveAttribute('aria-pressed', 'true')
-    rightClick(shape)
-    expect(note()).toHaveTextContent('Nothing is selected')
-
-    rightClick(shape)
-    expect(note()).toHaveTextContent('Point editor')
+    expect(note()).toHaveTextContent('Drag a point')
     rightClick(canvas())
     expect(note()).toHaveTextContent('Nothing is selected')
     await pick(user, 'Head')
     expect(note()).toHaveTextContent('Pick a shape')
   })
 
-  it('moves the whole shape in move mode', async () => {
+  it('moves the whole shape when its body is dragged', async () => {
     const { user } = await open([draftEntry('a', complete('Adult'))])
     await pick(user, 'Skull')
-    await user.click(screen.getByRole('button', { name: 'Move shape' }))
     const shape = shapePaths()[0], before = shape.getAttribute('d')
     const start = pixelOf(100, 46)
     pointer(shape, 'pointerdown', start)
@@ -225,12 +219,14 @@ describe('drawing', () => {
     expect(shapePaths()[0].getAttribute('d')).not.toBe(before)
   })
 
-  it('adds a point on a double-clicked edge and deletes the selected point with Delete', async () => {
-    const { user } = await startWithOval()
+  it('adds a point on a double-clicked segment and deletes the selected point with Delete', async () => {
+    const { user } = await open([draftEntry('a', complete('Adult', polygon(4)))])
+    await pick(user, 'Round')
     await user.click(screen.getByRole('button', { name: 'Mirror editing' }))   // off: exactly one point is added
     expect(screen.getByText('4 of 60')).toBeInTheDocument()
-    const at = pixelOf(100 + 20, 46)
-    fireEvent(shapePaths()[0], new MouseEvent('dblclick', { bubbles: true, clientX: at.x, clientY: at.y }))
+    // the middle of the straight segment from (100, 60) to (140, 100)
+    const at = pixelOf(120, 80)
+    fireEvent(canvas(), new MouseEvent('dblclick', { bubbles: true, clientX: at.x, clientY: at.y }))
     expect(screen.getByText('5 of 60')).toBeInTheDocument()
     canvas().focus()
     fireEvent.keyDown(canvas(), { key: 'Delete' })

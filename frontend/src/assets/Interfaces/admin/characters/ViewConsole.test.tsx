@@ -45,11 +45,11 @@ const pixelOf = (wx: number, wy: number) => { const [x, y, w, h] = viewBox(); re
 function pointer(el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup', at: { x?: number; y?: number; button?: number } = {}) {
   fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, button: at.button ?? 0, clientX: at.x ?? 0, clientY: at.y ?? 0 }))
 }
-// Select the torso (the view fits it), and switch to Move shape.
+// Select the torso (the view fits it); a drag on its body then moves it.
 async function pickTorso(user: ReturnType<typeof userEvent.setup>) {
+  void user
   pointer(pathOf('torso'), 'pointerdown', pixelOf(100, 90))
   pointer(canvas(), 'pointerup')
-  await user.click(screen.getByRole('button', { name: 'Move shape' }))
 }
 
 afterEach(() => { vi.useRealTimers() })
@@ -72,7 +72,6 @@ describe('the view while something is dragged', () => {
     const user = await open()
     pointer(pathOf('torso'), 'pointerdown', pixelOf(100, 90))
     pointer(canvas(), 'pointerup')
-    expect(screen.getByRole('button', { name: 'Point editor' })).toHaveAttribute('aria-pressed', 'true')
     const before = viewBox()
     const dot = canvas().querySelector('[data-point="0"]') ?? canvas().querySelector('.cmPoint')
     expect(dot).not.toBeNull()
@@ -81,7 +80,7 @@ describe('the view while something is dragged', () => {
     pointer(canvas(), 'pointermove', { x: from.x - 70, y: from.y - 50 })
     pointer(canvas(), 'pointerup')
     expect(viewBox()).toEqual(before)
-    await user.click(screen.getByRole('button', { name: 'Move shape' }))
+    void user
   })
 
   it('leaves the view where it is when what is selected is in view, however it is selected', async () => {
@@ -94,13 +93,12 @@ describe('the view while something is dragged', () => {
     pointer(pathOf('arm'), 'pointerdown', pixelOf(141, 90))
     pointer(canvas(), 'pointerup')
     expect(viewBox()).toEqual(start)
-    // a right-click selects a shape, moves it on to Move shape, and then unselects it: none of it moves the view
+    // a right-click selects a shape (again and again): none of it moves the view
     for (const id of ['torso', 'torso', 'torso']) {
       pointer(pathOf(id), 'pointerdown', { ...pixelOf(100, 90), button: 2 })
       pointer(canvas(), 'pointerup', { button: 2 })
       expect(viewBox()).toEqual(start)
     }
-    expect(screen.getByRole('button', { name: 'Point editor' })).toHaveAttribute('aria-pressed', 'true')
     // a right-click on the grid unselects, and nothing selected leaves the view too
     pointer(pathOf('arm'), 'pointerdown', { ...pixelOf(141, 90), button: 2 })
     pointer(canvas(), 'pointerup', { button: 2 })
@@ -223,7 +221,6 @@ describe('Fit to screen', () => {
     pointer(pathOf('arm'), 'pointerdown', pixelOf(141, 90))
     pointer(canvas(), 'pointerup')
     expect(viewBox()).toEqual(before)
-    await user.click(screen.getByRole('button', { name: 'Move shape' }))
     const from = pixelOf(141, 90)
     pointer(pathOf('arm'), 'pointerdown', from)
     pointer(canvas(), 'pointermove', { x: from.x - 80, y: from.y + 40 })

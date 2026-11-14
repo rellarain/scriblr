@@ -6,9 +6,9 @@ import { content as blank, draftEntry, modelsBackend } from '../../../../test/ch
 import DesignerConsole from './DesignerConsole'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
-// The canvas's gestures: a left click on the empty grid unselects everything; hovering an outline widens it, shows its points and puts a large handle on it, and a click on that
-// handle adds a point; a click on a point steps its handles; hovering the crossing of two outlines offers a lock, which a click steps (onto the edge, welded, free); a dragged
-// shape shows where it lines up with the others.
+// The canvas's gestures (S2 of the shape editor): a left click on the empty grid unselects everything; hovering an outline widens it, shows its points and puts a large handle
+// on it; a click on a point or a segment selects it, a right-click changes its type (a point steps its handles, a segment turns straight or curved), a double-click on a segment
+// adds a point; hovering the crossing of two outlines offers a lock, which a click steps (onto the edge, welded, free); a dragged shape shows where it lines up with the others.
 vi.setConfig({ testTimeout: 30000 })
 
 const sharp = (id: string, pts: Array<[number, number]>): ModelShape => ({ id, name: `${id} shape`, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts: pts.map(([x, y]) => ({ x, y, m: 's' as const })) })
@@ -36,6 +36,7 @@ const pixelOf = (wx: number, wy: number) => { const [x, y, w, h] = viewBox(); re
 function pointer(el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup', at: { x?: number; y?: number; button?: number } = {}) {
   fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, button: at.button ?? 0, clientX: at.x ?? 0, clientY: at.y ?? 0 }))
 }
+const pixelOfClient = (wx: number, wy: number) => { const p = pixelOf(wx, wy); return { clientX: p.x, clientY: p.y } }
 const select = (id: string, wx: number, wy: number) => { pointer(pathOf(id), 'pointerdown', pixelOf(wx, wy)); pointer(canvas(), 'pointerup') }
 const hoverAt = (wx: number, wy: number) => pointer(canvas(), 'pointermove', pixelOf(wx, wy))
 const pointsText = () => screen.getAllByText(/ of 60$/).map(e => e.textContent)
@@ -83,14 +84,30 @@ describe('hovering an outline', () => {
     expect(canvas().querySelector('[data-edge-handle="b"]')).toHaveClass('cmEdgeHandle--soft')
   })
 
-  it('adds a point where the larger handle is when it is clicked', async () => {
+  it('selects the segment when it is clicked, with no point added, and adds one where it is double-clicked', async () => {
     await open()
     select('a', 70, 110)
     expect(pointsText()).toEqual(['4 of 60'])
     hoverAt(80, 100)
     pointer(canvas(), 'pointerdown', pixelOf(80, 100))
     pointer(canvas(), 'pointerup')
+    expect(pointsText()).toEqual(['4 of 60'])
+    expect(canvas().querySelector('[data-segment="0"]')).not.toBeNull()
+    fireEvent.doubleClick(canvas(), pixelOfClient(80, 100))
     expect(pointsText()).toEqual(['5 of 60'])
+  })
+
+  it('makes a segment curved with a right-click, and straight again', async () => {
+    await open()
+    select('a', 70, 110)
+    hoverAt(80, 100)
+    pointer(canvas(), 'pointerdown', { ...pixelOf(80, 100), button: 2 })
+    pointer(canvas(), 'pointerup', { ...pixelOf(80, 100), button: 2 })
+    expect(pathOf('a').getAttribute('d')).toContain('C')
+    // the curve bows out: the middle of the segment is now about 91.7 down
+    pointer(canvas(), 'pointerdown', { ...pixelOf(80, 91.7), button: 2 })
+    pointer(canvas(), 'pointerup', { ...pixelOf(80, 91.7), button: 2 })
+    expect(pathOf('a').getAttribute('d')).not.toContain('C')
   })
 
   it('selects an unselected shape instead when its outline is clicked', async () => {
@@ -102,28 +119,38 @@ describe('hovering an outline', () => {
   })
 })
 
-describe('a click on a point', () => {
-  it('steps its handles: none, both, the incoming one, the outgoing one, and round again', async () => {
+describe('a point', () => {
+  it('is selected by a click, which leaves its handles as they are', async () => {
+    await open()
+    select('a', 70, 110)
+    const dot = () => canvas().querySelectorAll('.cmPoint')[1]
+    pointer(dot(), 'pointerdown', pixelOf(100, 100))
+    pointer(canvas(), 'pointerup')
+    expect(dot()).toHaveClass('cmPoint--sel')
+    expect(dot()).toHaveClass('cmPoint--sharp')
+  })
+
+  it('steps its handles with a right-click: none, both, the incoming one, the outgoing one, and round again', async () => {
     await open()
     select('a', 70, 110)
     const dot = () => canvas().querySelector('.cmPoint')!
     expect(dot()).toHaveClass('cmPoint--sharp')
     const seen: string[] = []
     for (let i = 0; i < 4; i++) {
-      pointer(dot(), 'pointerdown', pixelOf(60, 100))
-      pointer(canvas(), 'pointerup')
+      pointer(dot(), 'pointerdown', { ...pixelOf(60, 100), button: 2 })
+      pointer(canvas(), 'pointerup', { ...pixelOf(60, 100), button: 2 })
       for (const name of ['Sharp', 'Curve', 'Curve, then sharp', 'Sharp, then curve']) if (modeChip(name).getAttribute('aria-pressed') === 'true') seen.push(name)
     }
     expect(seen).toEqual(['Curve', 'Curve, then sharp', 'Sharp, then curve', 'Sharp'])
   })
 
-  it('is one undo step, and a drag of the point moves it instead and leaves its handles alone', async () => {
+  it('changes type in one undo step, and a drag of the point moves it instead and leaves its handles alone', async () => {
     const { user } = await open()
     select('a', 70, 110)
     const dot = () => canvas().querySelector('.cmPoint')!
     const start = pixelOf(60, 100)
-    pointer(dot(), 'pointerdown', start)
-    pointer(canvas(), 'pointerup')
+    pointer(dot(), 'pointerdown', { ...start, button: 2 })
+    pointer(canvas(), 'pointerup', { ...start, button: 2 })
     expect(modeChip('Curve')).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(modeChip('Sharp')).toHaveAttribute('aria-pressed', 'true')
@@ -202,9 +229,8 @@ describe('the crossing of two outlines', () => {
 
 describe('the alignment guides', () => {
   it('show where a dragged shape lines up with another, and snap to it', async () => {
-    const { user } = await open()
+    await open()
     select('a', 70, 110)
-    await user.click(screen.getByRole('button', { name: 'Move shape' }))
     const from = pixelOf(70, 110)
     pointer(pathOf('a'), 'pointerdown', from)
     const to = pixelOf(89.8, 110)   // A's left side (60) is then 79.8: next to B's left side at 80
@@ -221,7 +247,6 @@ describe('the alignment guides', () => {
     const { user } = await open()
     await user.click(screen.getByRole('button', { name: 'Alignment guides' }))
     select('a', 70, 110)
-    await user.click(screen.getByRole('button', { name: 'Move shape' }))
     const from = pixelOf(70, 110)
     pointer(pathOf('a'), 'pointerdown', from)
     pointer(canvas(), 'pointermove', pixelOf(89.8, 110))

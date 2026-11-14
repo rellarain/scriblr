@@ -32,7 +32,7 @@ import { FieldsTab, type FieldActions } from './FieldsTab'
 import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
-import { NONE, contextObject, contextObjectOf, repair, rightClickGrid, rightClickShape, shapesOf, showFor, type EditMode, type Selection } from './designerState'
+import { NONE, contextObject, contextObjectOf, repair, rightClickGrid, rightClickShape, shapesOf, showFor, type PartKind, type RightTarget, type Selection } from './designerState'
 import {
   NEUTRAL_GRAY, addColour, addGenre, addSlot, addStandardSlots, addSwatch, removeColour, removeGenre, removeSlot, removeSwatch, renameColour, renameGenre, renameSlot, setColourHex,
   setStarterPalette, setSwatch, stepSlot, toggleColourGenre,
@@ -43,7 +43,7 @@ import { toggleUnder } from './engine/wear'
 import { stepDrape } from './engine/drapeEdit'
 import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
-import { newShape } from './engine/edit'
+import { cycleMode, newShape, toggleSegment } from './engine/edit'
 import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine/bridgeEdit'
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
@@ -150,7 +150,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 }) {
   const content = entry.draft
   const [sel, setSel] = useState<Selection>(NONE)
-  const [mode, setMode] = useState<EditMode>('points')
+  // what of the selected shape is selected: the shape, a point or a segment (`selPoint` says which point or segment)
+  const [part, setPart] = useState<PartKind>('shape')
   const [selPoint, setSelPoint] = useState(0)
   const [mirror, setMirror] = useState(true)
   const [snap, setSnap] = useState(true)
@@ -372,7 +373,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (recording) {
       if (next.pts.length !== recording.draft.pts.length) { setNote('Adding or deleting points is not recorded: record the points that are there.'); return }
       setRecording({ ...recording, draft: next })
-      if (point !== undefined) setSelPoint(point)
+      if (point !== undefined) selectPoint(point)
       return
     }
     const old = shapeById(content, id)
@@ -380,7 +381,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     // a change of the shape's settings (view, opacity, template name) leaves its points as they are stored
     if (JSON.stringify(next.pts) === JSON.stringify(canvasSolved.shapes[id]?.local ?? old.pts)) {
       commit(updateShape(content, id, () => ({ ...next, pts: old.pts, turn: old.turn, back: old.back })))
-      if (point !== undefined) setSelPoint(point)
+      if (point !== undefined) selectPoint(point)
       return
     }
     const where = whereOf(id)
@@ -389,12 +390,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const e = keyEdit(content, id, next.pts)
       if (!e.ok) { setNote(e.reason); return }
       commit(updateShape(e.content, id, sh => ({ ...next, pts: sh.pts, turn: sh.turn, back: sh.back })))
-      if (point !== undefined) setSelPoint(point)
+      if (point !== undefined) selectPoint(point)
       return
     }
     if (where === 'back') {
       commit(updateShape(content, id, () => ({ ...next, pts: old.pts, back: next.pts })))
-      if (point !== undefined) setSelPoint(point)
+      if (point !== undefined) selectPoint(point)
       return
     }
     // a chosen form gives the shape its outline: the points go there, and the base outline (which anchors and links read) is left alone
@@ -403,7 +404,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const e = setOverride(content, t.object.id, t.axis.id, t.form.id, id, next.pts)
       if (!e.ok) { setNote(e.reason); return }
       commit(updateShape(e.content, id, sh => ({ ...next, pts: sh.pts })))
-      if (point !== undefined) setSelPoint(point)
+      if (point !== undefined) selectPoint(point)
       return
     }
     // points recorded or linked by number cannot survive a change in how many there are
@@ -416,7 +417,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     commit(updateShape(base, id, () => next))
     if (cleared.length) setNote(`The recorded point moves of ${cleared.join(', ')} were cleared because the shape's points changed. Record them again.`)
     else if (cut.length) setNote(`The links of ${cut.join(', ')} to this shape were cut because its points changed. Link them again.`)
-    if (point !== undefined) setSelPoint(point)
+    if (point !== undefined) selectPoint(point)
   }
   // The weight of a point of the selected shape (how free it is to hang), set through the canvas's own edit so a form or the back view gets it where it belongs.
   function setWeightAt(i: number, w: number) {
@@ -478,9 +479,32 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     else if (e.key.toLowerCase() === 'y') { e.preventDefault(); redo() }
   }
 
+  // A point or a segment of the selected shape chosen (on the canvas, or by its chip).
+  function selectPoint(i: number) { setSelPoint(i); setPart('point') }
+  function selectSegment(e: number) { setSelPoint(e); setPart('segment') }
+  // A right-click that did not drag: on a point it changes the point's type, on a segment it makes the segment straight or curved (of the shape it is on, which is
+  // selected with it), on a shape it selects the shape, on the grid it unselects everything.
+  function onRightClick(t: RightTarget) {
+    if (recording) return
+    if (t.kind === 'grid') { setSel(rightClickGrid()); setPart('shape'); return }
+    const other = !(sel.kind === 'shape' && sel.id === t.id)
+    if (other) choose(rightClickShape(t.id))
+    if (t.kind === 'shape') { setPart('shape'); return }
+    const s = shapeById(content, t.id)
+    // the shape the click is on can be changed when it is the selected one and editable, or another shape that is plain (not a twin, nothing away from rest)
+    const changeable = !!s && (other ? !s.mirrorOf && !s.hide && atRest && awayAll === 0 : editable)
+    if (t.kind === 'point') {
+      selectPoint(t.i)
+      if (s && changeable) editShape(s.id, cycleMode(s, t.i, { mirror: mirror && !shapesOnly, axis: content.axis }), t.i)
+    } else {
+      selectSegment(t.e)
+      if (s && changeable) editShape(s.id, toggleSegment(s, t.e))
+    }
+  }
+
   function choose(next: Selection) {
     if (recording) return
-    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setBridgeSpots(null)
+    setSel(next); setSelPoint(0); setPart('shape'); setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setBridgeSpots(null)
   }
 
   // ---- the sliders' test values ----
@@ -518,7 +542,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (s.mirrorOf) { setNote('A twin follows its original: record the original instead, or break the pair.'); return }
     setView('front'); setLinkMode(null); setPoseMode(false); poseRef.current = null
     setValues({}); setScrubbing(null); setPickOn(false); setPanel('right', { open: true }); setTab('ranges')
-    setSel({ kind: 'shape', id: shapeId }); setSelPoint(0); setMode('points')
+    setSel({ kind: 'shape', id: shapeId }); setSelPoint(0); setPart('shape')
     setRecording({ rangeId, shapeId, end, draft: { ...s, pts: s.pts.map(p => ({ ...p })) } })
     setNote('')
   }
@@ -773,7 +797,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     startLink: how => {
       if (!selShape || selShape.mirrorOf) return
       if (turnAngle !== 0) { setNote('Link points in the front view: a link works in every view.'); return }
-      setPickOn(false); setMode('points'); setLinkMode(how)
+      setPickOn(false); setLinkMode(how)
     },
     stopLink: () => setLinkMode(null),
     unlink: (shapeId, index) => commit(unlinkPoint(content, shapeId, index), true),
@@ -792,7 +816,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     setLeaves: (shapeId, index, on) => { applyEdit(setLeaves(content, shapeId, index, on)) },
     startBridge: () => {
       if (turnAngle !== 0) { setNote('Build a bridge in the front view: its points are locked to edges, which work in every view.'); return }
-      setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setWeighing(false); setMode('points'); setBridgeSpots([])
+      setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setWeighing(false); setBridgeSpots([])
     },
     stopBridge: () => setBridgeSpots(null),
   }
@@ -1341,7 +1365,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     : selShape && selWhere === 'key' ? (solved.shapes[selShape.id]?.angle?.drawn ? 'Drawn at this angle: the points you move change its outline here only.' : 'Key angle: it is turned from the front here; move a point to draw it here (it keeps the front\'s points).')
     : selShape && selWhere === 'back' ? 'Back view: a shape shows its front outline from behind until you edit its points here; then it has an outline of its own for the back.'
     : selShape && pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to edit it.'
-    : selShape ? (mode === 'points' ? 'Point editor: drag a point or a handle; double-click an edge to add a point.' : 'Move shape: drag the shape.')
+    : selShape ? 'Drag a point, a curve handle or the shape; right-click a point or a segment to change it; double-click a segment to add a point.'
     : sel.kind === 'none' ? 'Nothing is selected: this is the end result.' : 'Pick a shape in the tree to edit its points.'
 
   // ---- the toolbars ----
@@ -1373,19 +1397,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       <fieldset className="cmFieldset dzFieldset" disabled={busy}>
         <div className="dzStage" ref={stageRef}>
           <DesignerCanvas
-            content={canvasContent} solved={canvasSolved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
+            content={canvasContent} solved={canvasSolved} sel={sel} part={part} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
-            onSelect={choose} onSelectPoint={setSelPoint}
+            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onEditShape={editShape}
-            onRightClick={t => {
-              if (recording) return
-              const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
-              setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
-            }}
+            onRightClick={onRightClick}
             onEscape={() => { if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
@@ -1444,11 +1464,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             )}
 
             <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
-              <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles; click a point to step its handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
               {!shapesOnly && <>
-              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setTapering(false); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setTapering(false); setSkinPick(false); setMode('points'); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setTapering(false); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setTapering(false); setSkinPick(false); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
               <button
                 type="button" className={`cmIconBtn${tapering ? ' cmIconBtn--on' : ''}`} aria-label="Taper" aria-pressed={tapering} disabled={!!recording || poseMode}
                 title="Taper: lay a line on the canvas and make a ribbon along it, wider in the middle and pointed at the ends (brows, lashes, folds, collarbones)"
@@ -1508,7 +1526,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onToggleLock={test.toggleLock} onDelete={deleteSelection} onCopyShape={copyShape} onRoll={() => test.roll(content)} onReset={resetEverything}
             />
             <Inspector
-              content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={setSelPoint}
+              content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
