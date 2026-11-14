@@ -4,10 +4,11 @@ import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PolygonIcon } from '../../../icons'
 import { LIMITS } from './engine/limits'
+import { SYM_AXES_MAX } from './engine/symmetry'
 import { MIN_SIDE, alignShape, flipShape, frameOf, setPlace, setSize, setTurn } from './engine/transform'
 import { Stepper } from './Stepper'
 
-// The shape editor's own sections of the panel: how a shape is placed (S4), how it looks (S3) and what it is connected to (S5). Each step is one undo step.
+// The shape editor's own sections of the panel: how a shape is placed (S4), how it looks (S3), what it is connected to (S5) and its symmetry (S6). Each step is one undo step.
 
 type EditShape = (id: string, next: ModelShape, selectPoint?: number) => void
 
@@ -116,6 +117,51 @@ export function ConnectionsSection({ content, shape, selPoint, actions }: { cont
           <button type="button" className="cmIconBtn" aria-label={r.field === 'segName' ? `Disconnect the segment shared with ${r.key === 'seg' ? nameOf(sharedSegment(content, shape.id, selPoint)?.shapeId ?? '') : nameOf(r.shapeId)}` : r.key === 'own' ? 'Disconnect' : `Disconnect ${nameOf(r.shapeId)}`} title="Disconnect" onClick={() => actions.onDisconnect(r.shapeId, r.i, r.field === 'segName')}><CloseIcon size={14} /></button>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ---- symmetry (S6) ----
+
+// What the Symmetry section needs from the page: the axes being chosen (the canvas then waits for a click on the side to copy), starting and changing that, and turning
+// symmetry off (the points stay).
+export interface SymmetryActions {
+  choosing: { a: number; n: number } | null
+  onStart: () => void
+  onChoose: (a: number, n: number) => void
+  onCancel: () => void
+  onOff: (shapeId: string) => void
+}
+
+// The presets of the first axis: its angle in the shape's frame (y grows downward, so 45 runs down to the right).
+const AXIS_PRESETS: Array<{ a: number; name: string }> = [
+  { a: 90, name: 'Vertical' }, { a: 0, name: 'Horizontal' }, { a: 45, name: 'Diagonal, down to the right' }, { a: 135, name: 'Diagonal, up to the right' },
+]
+
+export function SymmetrySection({ shape, actions }: { shape: ModelShape; actions: SymmetryActions }) {
+  const sym = shape.sym, ch = actions.choosing, pressed = !!sym || !!ch
+  const turnAxis = (a: number, by: number) => (((a + by) % 180) + 180) % 180
+  return (
+    <div className="cmSymmetry" role="group" aria-label="Symmetry">
+      <h3 className="cmInsSub">Symmetry</h3>
+      <div className="cmInline">
+        <button
+          type="button" className={`cmIconBtn${pressed ? ' cmIconBtn--on' : ''}`} aria-pressed={pressed} aria-label="Symmetry" title="Symmetry"
+          disabled={shape.mirrorOf != null || !shape.closed} onClick={() => (sym ? actions.onOff(shape.id) : ch ? actions.onCancel() : actions.onStart())}
+        ><FlipAcrossIcon size={14} /></button>
+        {sym && <span className="cmInsText">{sym.n === 1 ? '1 axis' : `${sym.n} axes`} at {sym.a}°</span>}
+      </div>
+      {ch && !sym && (
+        <>
+          <div className="cmChips" role="group" aria-label="Axis presets">
+            {AXIS_PRESETS.map(pr => (
+              <button key={pr.a} type="button" className={`cmChip${ch.a === pr.a ? ' cmChip--on' : ''}`} aria-pressed={ch.a === pr.a} onClick={() => actions.onChoose(pr.a, ch.n)}>{pr.name}</button>
+            ))}
+          </div>
+          <Stepper label="Angle of the first axis" value={`${ch.a}°`} bigBy={15} onStep={(dir, big) => actions.onChoose(turnAxis(ch.a, dir * (big ? 15 : 1)), ch.n)} />
+          <Stepper label="Number of axes" value={String(ch.n)} lowerOff={ch.n <= 1} raiseOff={ch.n >= SYM_AXES_MAX} onStep={dir => actions.onChoose(ch.a, Math.min(SYM_AXES_MAX, Math.max(1, ch.n + dir)))} />
+        </>
+      )}
     </div>
   )
 }

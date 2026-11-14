@@ -49,7 +49,7 @@ describe('the shape editor', () => {
   it('has the shape layers in the view bar, no front, back or angle, and a Checks drawer without previews', async () => {
     const { user } = await open()
     const layers = within(screen.getByRole('group', { name: 'Canvas layers (the leftmost is drawn on top)' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(layers.sort()).toEqual(['Alignment guides', 'Curve handles', 'Gridlines', 'Shape outlines', 'Shape points', 'The figure'])
+    expect(layers.sort()).toEqual(['Alignment guides', 'Curve handles', 'Gridlines', 'Shape outlines', 'Shape points', 'Symmetry axes', 'The figure'])
     expect(screen.queryByRole('button', { name: 'Front view' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Back view' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Angle' })).toBeNull()

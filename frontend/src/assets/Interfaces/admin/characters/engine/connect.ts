@@ -64,6 +64,7 @@ export function followRefusal(c: ModelContent, shapeId: string, i: number, targe
   const s = shapeById(c, shapeId)
   if (!s) return 'There is no such shape.'
   if (s.mirrorOf) return 'A twin has no points of its own.'
+  if (s.sym) return 'A point of a symmetric shape cannot follow another shape.'
   if (!s.pts[i]) return 'There is no such point.'
   if (target === shapeId) return 'A point cannot be connected to its own shape.'
   const t = shapeById(c, target)

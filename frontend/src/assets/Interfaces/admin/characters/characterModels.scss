@@ -126,6 +126,11 @@
 .cmPoint--connect { fill: var(--alert); stroke: var(--ink); stroke-width: 2; }
 .cmConnectRing { fill: none; stroke: var(--alert); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; &--under { stroke: var(--ink); stroke-width: 4; } }
 .cmSegName { fill: none; stroke: transparent; stroke-width: 10; vector-effect: non-scaling-stroke; pointer-events: stroke; }
+// the shape editor's symmetry (S6): the axes being chosen as rays, the side under the pointer lit, the sheet that takes the click, and a symmetric shape's axes
+.cmSymRay { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmSymWedge { fill: var(--accent); fill-opacity: 0.2; stroke: none; pointer-events: none; }
+.cmSymPick { fill: transparent; cursor: pointer; }
+.cmSymAxis { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmConnRow { display: flex; align-items: flex-end; gap: var(--space-2); .cmField { flex: 1 1 auto; min-width: 0; } }
 
 // ---- the inspector ----

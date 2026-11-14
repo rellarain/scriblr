@@ -8,7 +8,8 @@ import { apply, boxOf, build, flatten, inverse, nearestEdge, type Box, type Buil
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
 import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget } from './engine/connect'
-import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
+import { rayAngles, wedgeAt } from './engine/symmetry'
+import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, rotOf, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
@@ -148,6 +149,9 @@ export interface CanvasProps {
   // The shape editor's connections (S5): a point dragged over a point or a segment of another shape is shown ready (the alert colour) and connected where it is dropped; a
   // welded point drags the point it is welded to, a point on a segment slides along it, and a right-drag pulls a connected point free.
   connect?: ConnectTool | null
+  // The shape editor's symmetry (S6): while axes are being chosen the canvas draws them through the selected shape's middle, lights the side under the pointer and takes a
+  // click as the side to copy; a symmetric shape's axes are the Symmetry axes layer.
+  symmetry?: { choosing: { a: number; n: number } | null; onPick: (side: number) => void } | null
   // The view was moved by the canvas itself (panned with the right button, or by holding a drag at an edge).
   onViewMoved?: () => void
   // False while the selected shape's points are changed by a slider, or the shape is a derived twin: it is shown, not edited.
@@ -241,6 +245,8 @@ export function DesignerCanvas(p: CanvasProps) {
     return () => observer.disconnect()
   }, [])
   const dragRef = useRef<Drag | null>(null)
+  // the side under the pointer while the axes of a symmetry are being chosen (shape editor S6)
+  const [symHover, setSymHover] = useState<number | null>(null)
   // what a dragged point would connect to if it were dropped now (shape editor S5)
   const [drop, setDrop] = useState<DropTarget | null>(null)
   const dropRef = useRef<DropTarget | null>(null)
@@ -666,6 +672,23 @@ export function DesignerCanvas(p: CanvasProps) {
     dragRef.current = { kind: 'turn', shapeId: shape.id, from: shape, frame: f, start, x0: e.clientX, y0: e.clientY, moved: false }
     capture(e)
   }
+  // Choosing the side of a symmetry to copy (shape editor S6): the side under the pointer lights, and a click takes it.
+  function symSideAt(e: { clientX: number; clientY: number }): number | null {
+    const ch = p.symmetry?.choosing
+    if (!ch || !symFrame || !shape) return null
+    const [wx, wy] = toWorld(e), [lx, ly] = matrix ? apply(inverse(matrix), wx, wy) : [wx, wy]
+    return wedgeAt(symFrame.cx, symFrame.cy, rotOf(shape), ch.a, ch.n, lx, ly)
+  }
+  function symHoverAt(e: { clientX: number; clientY: number }) {
+    const w = symSideAt(e)
+    setSymHover(h => (h === w ? h : w))
+  }
+  function onSymPick(e: ReactPointerEvent) {
+    e.stopPropagation()
+    if (e.button !== 0) return
+    const w = symSideAt(e)
+    if (w !== null) p.symmetry?.onPick(w)
+  }
   function onPivotDown(e: ReactPointerEvent) {
     e.stopPropagation()
     if (e.button !== 0 || !pivot?.draggable) return
@@ -706,7 +729,7 @@ export function DesignerCanvas(p: CanvasProps) {
   function onMove(e: { clientX: number; clientY: number; shiftKey?: boolean }) {
     const d = dragRef.current
     if (p.skin) { const at = toWorld(e); setBrush(b => (b && Math.abs(b[0] - at[0]) < 1e-6 && Math.abs(b[1] - at[1]) < 1e-6 ? b : at)) }
-    if (!d) { updateHover(e); return }
+    if (!d) { if (symFrame) symHoverAt(e); updateHover(e); return }
     lastPointer.current = { clientX: e.clientX, clientY: e.clientY }
     if (d.kind === 'paint') {
       if (!d.moved) {
@@ -921,6 +944,34 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!name || !next || (!shape.closed && k >= built.length - 1) || !sharedSegment(content, shape.id, k)) return null
     return <path key={`n${k}`} d={segmentPath(built[k], next)} className="cmSegName" data-segment-name={k}><title>{name}</title></path>
   }) : null
+  // The shape editor's symmetry (S6): the axes being chosen as rays from the selected shape's middle, the side under the pointer lit, and a sheet over everything that takes the
+  // click; and a symmetric shape's axes as lines through its middle (the Symmetry axes layer).
+  const symFrame = p.symmetry?.choosing && shape && overlay ? frameOf(shape) : null
+  const symMarkup = symFrame && matrix && p.symmetry?.choosing ? (() => {
+    const ch = p.symmetry!.choosing!, reach = Math.max(symFrame.w, symFrame.h) * 0.75 + 16 * u, angles = rayAngles(rotOf(shape!), ch.a, ch.n), span = 180 / ch.n
+    const along = (ang: number, r: number): [number, number] => apply(matrix, symFrame.cx + Math.cos((ang * Math.PI) / 180) * r, symFrame.cy + Math.sin((ang * Math.PI) / 180) * r)
+    const c = apply(matrix, symFrame.cx, symFrame.cy), lit = symHover !== null && symHover < angles.length ? symHover : null
+    const wedge = lit === null ? '' : `M${[c, ...Array.from({ length: 13 }, (_, k) => along(angles[lit] + (span * k) / 12, reach))].map(q => `${q[0]} ${q[1]}`).join(' L')} Z`
+    return (
+      <g className="cmSym">
+        {lit !== null && <path d={wedge} className="cmSymWedge" data-sym-wedge={lit} aria-hidden="true" />}
+        {angles.map((ang, j) => { const e = along(ang, reach); return <line key={j} x1={c[0]} y1={c[1]} x2={e[0]} y2={e[1]} className="cmSymRay" data-sym-ray={j} aria-hidden="true" /> })}
+        <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h} className="cmSymPick" data-sym-pick="" onPointerDown={onSymPick} aria-hidden="true" />
+      </g>
+    )
+  })() : null
+  const symAxes = shape?.sym && matrix && overlay ? (() => {
+    const sym = shape.sym, f = frameOf(shape), reach = (f ? Math.max(f.w, f.h) * 0.75 : 40) + 16 * u
+    return (
+      <g className="cmLayer" data-layer="symmetry" aria-hidden="true">
+        {Array.from({ length: sym.n }, (_, k) => {
+          const ang = ((rotOf(shape) + sym.a + (k * 180) / sym.n) * Math.PI) / 180, dx = Math.cos(ang) * reach, dy = Math.sin(ang) * reach
+          const a = apply(matrix, sym.cx - dx, sym.cy - dy), b = apply(matrix, sym.cx + dx, sym.cy + dy)
+          return <line key={k} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className="cmSymAxis" data-sym-axis={k} />
+        })}
+      </g>
+    )
+  })() : null
   const boxFrame = p.transform && selectedPointsDrawn && part === 'shape' && editable && !p.taper && !p.weights && !p.skin && !p.pick ? frameOf(shape!) : null
   const boxMarkup = boxFrame && matrix ? (() => {
     const pad = BOX_PAD * u, at = (pt: [number, number]) => apply(matrix, pt[0], pt[1])
@@ -1023,7 +1074,7 @@ export function DesignerCanvas(p: CanvasProps) {
         })}
       </>
     ),
-    mirror: <line x1={axis} y1={vb.y} x2={axis} y2={vb.y + vb.h} className={`cmMirrorLine${mirror ? ' cmMirrorLine--on' : ''}`} />,
+    mirror: p.transform ? symAxes : <line x1={axis} y1={vb.y} x2={axis} y2={vb.y + vb.h} className={`cmMirrorLine${mirror ? ' cmMirrorLine--on' : ''}`} />,
     guides: guides ? (
       <g className="cmLayer" data-layer="guides" aria-hidden="true">
         {guides.x !== null && <line x1={guides.x} y1={vb.y} x2={guides.x} y2={vb.y + vb.h} className="cmGuide" data-guide="x" />}
@@ -1180,6 +1231,7 @@ export function DesignerCanvas(p: CanvasProps) {
         </g>
       )}
       {p.skin && brush && overlay && <circle cx={brush[0]} cy={brush[1]} r={p.skin.radius} className="cmSkinBrush" data-brush="" aria-hidden="true" />}
+      {symMarkup}
     </svg>
   )
 }

@@ -1,4 +1,4 @@
-import type { ModelPoint, ModelShape } from '../../../../../api/types'
+import type { ModelPoint, ModelShape, ModelSymmetry } from '../../../../../api/types'
 import { apply, boxOf, build, flatten, mul, r2, rotate, scale, transformList, translate, type Mat } from './geometry'
 import { snapTo } from './gridSnap'
 
@@ -65,7 +65,22 @@ export function transformShape(s: ModelShape, m: Mat, turn = 0): ModelShape {
   const next: ModelShape = { ...s, pts: transformList(s.pts, m).map(roundPoint) }
   if (s.back) next.back = transformList(s.back, m).map(roundPoint)
   if (turn) next.rot = normTurn(rotOf(s) + turn)
+  if (s.sym) next.sym = moveSymmetry(s.sym, m)
   return next
+}
+
+// The middle and axes of a symmetric shape (shape editor S6) moved by a matrix (a move, a turn, a flip, a resize): the axes are measured in the shape's frame, so a mirror
+// image turns them the other way.
+export function moveSymmetry(sym: ModelSymmetry, m: Mat): ModelSymmetry {
+  const [cx, cy] = apply(m, sym.cx, sym.cy), mirrored = m[0] * m[3] - m[1] * m[2] < 0
+  return { ...sym, cx: r2(cx), cy: r2(cy), a: mirrored ? (180 - sym.a) % 180 : sym.a }
+}
+
+// Whether a resize of a symmetric shape must keep its proportions: a stretch along the frame keeps it symmetric only when its axes are the frame's own (one or two of them,
+// across and down).
+export function mustKeepRatio(s: ModelShape): boolean {
+  const sym = s.sym
+  return !!sym && !(sym.n <= 2 && Math.abs(sym.a % 90) < 1e-6)
 }
 
 // A scale along the frame's own axes about a place in the frame's coordinates.
@@ -91,7 +106,7 @@ export function resizeFrom(s0: ModelShape, f0: Frame, h: BoxHandle, px: number, 
     if (v) ht = Math.max(MIN_SIDE, (snapTo(f0.cy + ay + v * ht, o.grid) - (f0.cy + ay)) * v)
   }
   let sx = f0.w > 1e-6 ? w / f0.w : 1, sy = f0.h > 1e-6 ? ht / f0.h : 1
-  if (o.keep) {
+  if (o.keep || mustKeepRatio(s0)) {
     if (u && v) sx = sy = Math.max(sx, sy)
     else if (u) sy = sx
     else sx = sy
@@ -120,8 +135,8 @@ export function setSize(s: ModelShape, side: 'w' | 'h', value: number, keep = fa
   if (!f) return s
   const now = side === 'w' ? f.w : f.h
   if (now <= 1e-6) return s
-  const k = Math.max(MIN_SIDE, value) / now
-  return transformShape(s, frameScale(f, side === 'w' || keep ? k : 1, side === 'h' || keep ? k : 1))
+  const k = Math.max(MIN_SIDE, value) / now, both = keep || mustKeepRatio(s)
+  return transformShape(s, frameScale(f, side === 'w' || both ? k : 1, side === 'h' || both ? k : 1))
 }
 
 export function setTurn(s: ModelShape, deg: number): ModelShape {

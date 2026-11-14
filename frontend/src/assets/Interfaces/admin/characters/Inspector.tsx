@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { ArrangeSection, ConnectionsSection, LookSection, type ArrangeActions, type ConnectionActions } from './ShapePanels'
+import { ArrangeSection, ConnectionsSection, LookSection, SymmetrySection, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -82,6 +82,8 @@ export interface InspectorProps {
   // The shape editor's Arrange section (S4) and Connections section (S5): what they need from the page.
   arrange?: ArrangeActions
   connections?: ConnectionActions
+  // ... and its Symmetry section (S6)
+  symmetry?: SymmetryActions
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -180,6 +182,7 @@ function ShapeTab(p: InspectorProps) {
         <>
           {p.arrange && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} />
+          {p.symmetry && <SymmetrySection shape={shape} actions={p.symmetry} />}
           {p.connections && <ConnectionsSection content={content} shape={shape} selPoint={selPoint} actions={p.connections} />}
           {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} simple />}
         </>

@@ -156,7 +156,10 @@ export function deletePoint(shape: ModelShape, i: number, o: EditOptions = {}): 
 
 // The whole shape moves.
 export function moveShape(shape: ModelShape, dx: number, dy: number): ModelShape {
-  return { ...shape, pts: transformList(shape.pts, translate(dx, dy)).map(p => ({ ...p, x: r2(p.x), y: r2(p.y) })) }
+  const moved: ModelShape = { ...shape, pts: transformList(shape.pts, translate(dx, dy)).map(p => ({ ...p, x: r2(p.x), y: r2(p.y) })) }
+  // a symmetric shape's middle goes with it (shape editor S6)
+  if (shape.sym) moved.sym = { ...shape.sym, cx: r2(shape.sym.cx + dx), cy: r2(shape.sym.cy + dy) }
+  return moved
 }
 
 // The shape takes a template's points in a box; its name, id, order and the rest stay.
@@ -164,8 +167,9 @@ export function applyTemplate(shape: ModelShape, templateId: string, box: Box): 
   const pts = templatePoints(templateId, box)
   if (!pts.length) return copyShape(shape)
   const next: ModelShape = { ...shape, pts, template: templateId, half: 0 }
-  // a template starts with its frame square to the page (shape editor S4)
+  // a template starts with its frame square to the page (shape editor S4), and not symmetric (S6)
   if (next.rot) next.rot = 0
+  if (next.sym) next.sym = null
   return next
 }
 

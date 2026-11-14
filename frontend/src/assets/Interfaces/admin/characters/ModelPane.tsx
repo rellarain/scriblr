@@ -77,7 +77,8 @@ import {
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { LIMITS } from './engine/limits'
-import type { ArrangeActions, ConnectionActions } from './ShapePanels'
+import type { ArrangeActions, ConnectionActions, SymmetryActions } from './ShapePanels'
+import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
 import type { ConnectTool } from './DesignerCanvas'
 import { addPointShared, connect, disconnect, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
 import { templateBox, templateById } from './engine/templates'
@@ -233,6 +234,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [view, setView] = useState<View>('front')
   // the shape editor's Keep proportions (S4): every resize keeps the shape's proportions
   const [keepRatio, setKeepRatio] = useState(false)
+  // the shape editor's symmetry being chosen for a shape (S6): its axes, until the side to copy is clicked on the canvas
+  const [symChoose, setSymChoose] = useState<{ id: string; a: number; n: number } | null>(null)
   const turnAngle = angleOf(view)
   // the side a panel that knows only the front and the back speaks of: the back once more of the back is seen than of the front
   const side: ViewName = fromBehind(view) ? 'back' : 'front'
@@ -373,7 +376,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (where === 'key') { const e = keyEdit(c, id, next.pts); return e.ok ? e.content : c }
       if (where === 'back') return updateShape(c, id, sh => ({ ...next, pts: sh.pts, back: next.pts }))
       const t = formTargetIn(c, id)
-      if (!t) return updateShape(c, id, () => next)
+      if (!t) {
+        // a symmetric shape's copies follow what a drag does to any of them (shape editor S6)
+        const before = shapeById(c, id), followed = before?.sym && next.sym ? followSymmetry(before, next).shape : next
+        return updateShape(c, id, () => followed)
+      }
       const e = setOverride(c, t.object.id, t.axis.id, t.form.id, id, next.pts)
       return e.ok ? e.content : c
     }, false)
@@ -387,6 +394,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     }
     const old = shapeById(content, id)
     if (!old) return
+    // an edit of a symmetric shape's points goes to its source, and the copies follow (shape editor S6)
+    if (old.sym && next.sym) {
+      const f = followSymmetry(old, next)
+      if (f.refused) { setNote(f.refused); return }
+      next = f.shape
+    }
     // a change of the shape's settings (view, opacity, template name) leaves its points as they are stored
     if (JSON.stringify(next.pts) === JSON.stringify(canvasSolved.shapes[id]?.local ?? old.pts)) {
       commit(updateShape(content, id, () => ({ ...next, pts: old.pts, turn: old.turn, back: old.back })))
@@ -1418,6 +1431,27 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       commit(next, true)
     },
   } : null
+  // The shape editor's symmetry (S6): choosing the axes in the panel, then the side on the canvas; turning it on lets go of the shape's own connections (a symmetric shape's
+  // points follow nothing) and keeps the connections to it by place; turning it off keeps every point.
+  const symChoosing = symChoose && selShape && symChoose.id === selShape.id ? { a: symChoose.a, n: symChoose.n } : null
+  const symmetry: SymmetryActions | undefined = shapesOnly && selShape ? {
+    choosing: symChoosing,
+    onStart: () => setSymChoose({ id: selShape.id, a: 90, n: 1 }),
+    onChoose: (a, n) => setSymChoose({ id: selShape.id, a, n }),
+    onCancel: () => setSymChoose(null),
+    onOff: id => { commit(updateShape(content, id, sh => disableSymmetry(sh)), true) },
+  } : undefined
+  const symCanvas = shapesOnly && selShape && symChoosing ? {
+    choosing: symChoosing,
+    onPick: (side: number) => {
+      let base = content
+      shapeById(base, selShape.id)?.pts.forEach((pt, i) => { if (pt.bind) base = disconnect(base, canvasSolved, selShape.id, i) })
+      const made = enableSymmetry(shapeById(base, selShape.id)!, symChoosing, side, policy.max.points)
+      if (!made.ok) { setNote(made.reason); return }
+      const kept = rebindByPlace(base, canvasSolved, updateShape(base, selShape.id, () => made.shape), selShape.id)
+      if (commit(kept.content, true)) { setSymChoose(null); selectPoint(0) }
+    },
+  } : null
   const connections: ConnectionActions | undefined = shapesOnly ? {
     part,
     onName: (sid, i, field, value) => models.edit(entry.id, c => nameConnection(c, sid, i, field, value)),
@@ -1462,11 +1496,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
-            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool}
+            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onEditShape={editShape}
             onRightClick={onRightClick}
-            onEscape={() => { if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+            onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
           <div className="dzNotes">
@@ -1587,7 +1621,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections}
+              arrange={arrange} connections={connections} symmetry={symmetry}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}

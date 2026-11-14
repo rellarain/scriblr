@@ -1236,6 +1236,7 @@ MODEL_OUTLINE_MIN = 0.25   # a shape's outline (shape editor S3): the thinnest a
 MODEL_OUTLINE_MAX = 20
 MODEL_OUTLINE_NEW = 0.75
 MODEL_BIND_NAME_MAX = 40   # shape editor S5: the name of a connection, and of a shared segment
+MODEL_SYM_AXES_MAX = 6     # shape editor S6: the most axes a symmetric shape has
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
@@ -1613,6 +1614,33 @@ class ModelTurn(BaseModel):
         return [round(a, 1), round(b, 1)]
 
 
+class ModelSymmetry(BaseModel):
+    """Shape editor S6: a symmetric shape. `n` axes (1 to MODEL_SYM_AXES_MAX) through (`cx`, `cy`), evenly spaced, the first at `a` degrees in the shape's own frame;
+    `side` is the wedge its source was taken from and `m` the number of its points strictly inside that wedge. The shape's points are the whole outline, 2n(m + 1) of
+    them, the source first; a spec that does not fit the points is let go (the points stay)."""
+
+    a: float = 0.0
+    n: int = Field(default=1, ge=1, le=MODEL_SYM_AXES_MAX)
+    side: int = Field(default=0, ge=0, le=2 * MODEL_SYM_AXES_MAX - 1)
+    cx: float = 0.0
+    cy: float = 0.0
+    m: int = Field(default=0, ge=0, le=MODEL_POINTS_MAX)
+
+    @field_validator("a", mode="before")
+    @classmethod
+    def _angle(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("an angle")
+        return round(_finite(value, 0.0, -1e6, 1e6) % 180.0, 2)
+
+    @field_validator("cx", "cy", mode="before")
+    @classmethod
+    def _centre(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("a place")
+        return round(_finite(value, 0.0, -1e5, 1e5), 2)
+
+
 class ModelShape(BaseModel):
     """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
 
@@ -1662,6 +1690,8 @@ class ModelShape(BaseModel):
     outline: Optional[float] = None
     # Shape editor S4: the angle, in degrees, the shape's own frame is turned (its points stay as drawn; the box the editor draws round it is measured along this frame).
     rot: float = 0.0
+    # Shape editor S6: the shape is symmetric about axes through its middle (see ModelSymmetry); None: it is not.
+    sym: Optional[ModelSymmetry] = None
     # Phase O1: skin weights, the groups the shape's points also follow (at most MODEL_SKIN_MAX, one weight per point each). A twin is skinned as its original is.
     skin: list[ModelSkin] = Field(default_factory=list, max_length=MODEL_SKIN_MAX)
     # Phase O2: the other objects a shading shape lies on besides its own (it is kept inside their base shapes too, so one shadow runs down the chest and the pelvis). A twin
@@ -1700,7 +1730,15 @@ class ModelShape(BaseModel):
         # per-point depth (phase A1): one per point too, when there is any
         if self.turn is not None and self.turn.dz and len(self.turn.dz) != n:
             self.turn.dz = (self.turn.dz + [0.0] * n)[:n]
+        # symmetry (shape editor S6) that does not fit the points is let go; the points stay
+        if self.sym is not None and n != 2 * self.sym.n * (self.sym.m + 1):
+            self.sym = None
         return self
+
+    @field_validator("sym", mode="before")
+    @classmethod
+    def _sym(cls, value: Any) -> Any:
+        return _optional_model(ModelSymmetry, value)
 
     @field_validator("opBy", mode="before")
     @classmethod

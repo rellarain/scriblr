@@ -1,4 +1,5 @@
 import { normTurn } from './engine/transform'
+import { symmetryOf } from './engine/symmetry'
 import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
@@ -78,7 +79,7 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), rot: rotValue(s.rot), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), rot: rotValue(s.rot), sym: symmetryOf(s.sym, s.pts.length), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
     turn: repairTurn(s.turn, s.pts.length, p => p as ModelShape['pts'][number]),
   }
 }

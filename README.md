@@ -455,6 +455,10 @@ described, now stale, in `docs/data-model.md`).
   existing point links: a weld is a point link with no offset, a lock an edge link with none; two neighbouring points
   welded to two neighbouring points of one other shape are drawn as that shape's segment (the solver copies its curve
   handles), so they share one curve on the writer's card too.
+  Shape editor S6 adds, with a default: on a shape `sym` (`ModelSymmetry`: `a` the first axis's angle in the shape's frame,
+  0..180; `n` axes, 1..6, evenly spaced; `side` the wedge the source came from; `cx`, `cy` the middle; `m` the points strictly
+  inside the source wedge; null: not symmetric). The points hold the whole outline, 2n(m + 1) of them with the source first,
+  so nothing else has to draw it; a spec that does not fit the points is let go on both sides (the points stay).
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).
