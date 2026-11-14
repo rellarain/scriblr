@@ -6,6 +6,7 @@ import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 import { texturedPath } from './texture'
+import { followBound } from './symmetry'
 import { angleOf, fromBehind, wrapAngle, type View } from './angles'
 import { LAYER_THICK, carryKey, facing, facingFade, handleDepths, inSeen, isKeySpot, keyAt, mixBuilt, pickKeys, shiftOf, shifted, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turnedX, turningOf, twinKeys, unbuild, usesKeys, viewZ, type Key, type KeyPick, type Moved, type Spin, type Surface } from './turn'
 
@@ -741,6 +742,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const outline = (source: ModelPoint[], movesOn: ModelPoint[]) => {
       const list = source.map(copyPoint)
       const carried = link(sh, list, Mg)
+      // a symmetric shape's points that follow other shapes take their copies with them, so it stays symmetric (shape types T1)
+      if (sh.sym && source === sh.pts && source.some(p => p.bind)) followBound(sh, list).forEach((p, i) => { list[i] = { ...p, bind: list[i].bind } })
       drive(sh, list, movesOn, Mg)
       const before = list.map(copyPoint)
       const skinned = skinNow(sh, list, source, carried, own)

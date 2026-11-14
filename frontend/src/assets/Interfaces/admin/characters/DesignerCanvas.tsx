@@ -108,6 +108,9 @@ export interface TaperCanvas {
   // take back the last point (Backspace)
   onBack: () => void
 }
+// Where a right-click was: in canvas space, and on the screen.
+export interface RightSpot { x: number; y: number; clientX: number; clientY: number }
+
 export interface ConnectTool {
   onConnect: (shapeId: string, i: number, target: DropTarget) => void
   // a right-drag on a connected point: pull it free and put it at (x, y) in its shape's space (it is then dragged)
@@ -192,7 +195,10 @@ export interface CanvasProps {
   onEditShape: (id: string, next: ModelShape, selectPoint?: number) => void
   // Something the canvas could not do, in words (a shape at its most points).
   onNote?: (note: string) => void
-  onRightClick: (target: RightTarget) => void
+  // a right-click that did not drag, with where it was (in canvas space and on the screen)
+  onRightClick: (target: RightTarget, at: RightSpot) => void
+  // set to a function that turns a place on the screen into canvas space (the shape editor's new-shape form puts its shape there)
+  worldRef?: { current: ((clientX: number, clientY: number) => [number, number]) | null }
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -329,6 +335,7 @@ export function DesignerCanvas(p: CanvasProps) {
     const r = rect()
     return [vb.x + ((e.clientX - r.left) / r.w) * vb.w, vb.y + ((e.clientY - r.top) / r.h) * vb.h]
   }
+  if (p.worldRef) p.worldRef.current = (clientX, clientY) => toWorld({ clientX, clientY })
   function toLocal(e: { clientX: number; clientY: number }): [number, number] {
     const [x, y] = toWorld(e)
     return matrix ? apply(inverse(matrix), x, y) : [x, y]
@@ -437,10 +444,21 @@ export function DesignerCanvas(p: CanvasProps) {
     return guided(wx, wy)
   }
 
-  // Ctrl and the wheel zoom about the pointer: the point under it stays where it is (a listener that is not passive, so the page does not zoom or scroll as well).
+  // Ctrl and the wheel zoom about the pointer: the point under it stays where it is. Plain scrolling moves the view across the grid, up and down (sideways with Shift, or a
+  // sideways scroll). The listener is not passive, so the page does not zoom or scroll as well.
   const wheelRef = useRef<(e: WheelEvent) => void>(() => {})
   wheelRef.current = (e: WheelEvent) => {
-    if (!e.ctrlKey || !p.onZoom) return
+    if (!e.ctrlKey) {
+      const r = rect(), unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.h : 1
+      let dx = e.deltaX * unit, dy = e.deltaY * unit
+      if (e.shiftKey && !dx) { dx = dy; dy = 0 }
+      if (!dx && !dy) return
+      e.preventDefault()
+      setPan(q => ({ x: q.x + (dx / r.w) * vb.w, y: q.y + (dy / r.h) * vb.h }))
+      p.onViewMoved?.()
+      return
+    }
+    if (!p.onZoom) return
     e.preventDefault()
     const next = wheelZoom(zoom, e.deltaY)
     if (Math.abs(next - zoom) < 1e-9) return
@@ -845,7 +863,10 @@ export function DesignerCanvas(p: CanvasProps) {
     if (d && d.kind === 'pose') p.pose?.onUp()
     if (d && d.kind === 'point' && d.moved && dropRef.current && p.connect) p.connect.onConnect(d.shapeId, d.index, dropRef.current)
     showDrop(null)
-    if (d && d.kind === 'pan' && !d.moved) p.onRightClick(d.target)
+    if (d && d.kind === 'pan' && !d.moved) {
+      const [wx, wy] = toWorld({ clientX: d.startX, clientY: d.startY })
+      p.onRightClick(d.target, { x: wx, y: wy, clientX: d.startX, clientY: d.startY })
+    }
     if (d && d.kind === 'paint' && !d.moved && d.point >= 0) p.skin?.onStep(d.point, d.down ? -1 : 1)
   }
   // A double-click on a segment adds a point there (on the segment of the shape the pointer is over, which the first click selected).
@@ -1010,13 +1031,18 @@ export function DesignerCanvas(p: CanvasProps) {
           const id = item.id, s = shapesById.get(id)
           if (!s) return null
           const pickable = picking.has(id), selected = sel.kind === 'shape' && sel.id === id
+          // a shadow or a light (shape types T1) shows only where it lies over other shapes, but the whole of it can be grabbed: an unclipped, unpainted area over it
+          const hit = item.cast ? <path d={item.d} className="cmShapeHit" fill="none" pointerEvents="fill" data-hit={id} aria-hidden="true" onPointerDown={e => onShapeDown(e, id)} onDoubleClick={onDouble} /> : null
           return (
+            <Fragment key={id}>
             <PaintedPath
-              key={id} item={item} prefix={prefix} data-shape={id}
+              item={item} prefix={prefix} data-shape={id}
               lineClass={`cmShapeLine${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShapeLine--dim' : ''}`}
               className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${selected ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}${item.helper ? ' cmShape--helper' : ''}`}
               onPointerDown={e => onShapeDown(e, id)} onDoubleClick={onDouble}
             />
+            {hit}
+            </Fragment>
           )
         })}
       </g>

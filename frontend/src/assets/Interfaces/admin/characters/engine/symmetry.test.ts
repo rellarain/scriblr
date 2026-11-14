@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { ModelPoint, ModelShape } from '../../../../../api/types'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, newShape } from './edit'
 import { apply, build, flatten } from './geometry'
-import { disableSymmetry, enableSymmetry, followSymmetry, reflectAbout, symmetryOf, wedgeAt } from './symmetry'
+import { disableSymmetry, enableSymmetry, followSymmetry, orbitOf, reflectAbout, symmetryOf, wedgeAt } from './symmetry'
+import { content as blank } from '../../../../../test/characterModelsBackend'
+import { addGroup, addObject, addShape, newGroup } from '../modelContent'
+import { connect, followRefusal } from './connect'
+import { solve } from './rig'
 import { flipShape, frameOf, setTurn } from './transform'
 
 // Symmetry in the shape editor (S6): the outline made from one wedge's part of it, about one to six axes; edits of any copy going back to the source; turning it off
@@ -143,5 +147,56 @@ describe('editing a symmetric shape', () => {
     expect(symmetryOf({ a: 0, n: 2, side: 0, cx: 0, cy: 0, m: 1 }, 7)).toBeNull()
     expect(symmetryOf({ a: 'x', n: 2, m: 1 }, 8)).toBeNull()
     expect(symmetryOf(null, 8)).toBeNull()
+  })
+})
+
+describe('a symmetric shape whose points follow other shapes (shape types T1)', () => {
+  const quartered = () => ok(enableSymmetry(square(), { a: 0, n: 2 }, 1, 60))
+  const target: ModelShape = { ...newShape('t', 'Target', 'square', box(130, 60, 20, 20)) }
+  function model(s: ModelShape) {
+    let c = addGroup(blank('Sym'), newGroup('g', 'Group'))
+    c = addObject(c, 'g', { id: 'o', name: 'Part', layer: 'body', shapes: [] })
+    return addShape(addShape(c, 'o', s), 'o', target)
+  }
+
+  it('knows the copies of each point', () => {
+    const s = quartered()
+    expect(orbitOf(s, 1)).toEqual([1, 3, 5, 7])
+    expect(orbitOf(s, 0)).toEqual([0, 4])
+    expect(orbitOf(s, 2)).toEqual([2, 6])
+  })
+
+  it('stays symmetric when a point follows another shape, the copies moving with it', () => {
+    const s = quartered()
+    const corner = s.pts.findIndex(p => p.x === 100 && p.y === 100)
+    const linked = connect(model(s), solve(model(s)), 'sq', corner, { kind: 'point', shapeId: 't', i: 0, x: 130, y: 60 })
+    expect(linked.ok).toBe(true)
+    if (!linked.ok) return
+    const solved = solve(linked.content).shapes.sq
+    // the corner is on the target's first point (130, 60), and the outline is still symmetric about the shape's axes
+    const local = solved.local
+    expect(local[corner].x).toBeCloseTo(130, 1)
+    expect(local[corner].y).toBeCloseTo(60, 1)
+    expect(symmetricAbout({ ...s, pts: local.map(p => ({ ...p, bind: null })) })).toBe(true)
+  })
+
+  it('lets only one copy of a point follow a shape', () => {
+    const s = quartered()
+    const corner = s.pts.findIndex(p => p.x === 100 && p.y === 100)
+    const c = model(s), linked = connect(c, solve(c), 'sq', corner, { kind: 'point', shapeId: 't', i: 0, x: 130, y: 60 })
+    if (!linked.ok) throw new Error(linked.reason)
+    const other = orbitOf(s, corner).find(j => j !== corner)!
+    expect(followRefusal(linked.content, 'sq', other, 't')).toMatch(/Another copy/)
+    // a point of another orbit may still follow
+    const side = orbitOf(s, 0)[0]
+    expect(followRefusal(linked.content, 'sq', side, 't')).toBeNull()
+  })
+
+  it('keeps what its points follow when a copy is edited', () => {
+    const s = quartered()
+    const withBind = { ...s, pts: s.pts.map((p, i) => (i === 1 ? { ...p, bind: { kind: 'point' as const, s: 't', i: 0, d: [0, 0] as [number, number], e: 0, t: 0, o: 0 } } : p)) }
+    const moved = followSymmetry(withBind, movePoint(withBind, 0, withBind.pts[0].x + 2, withBind.pts[0].y)).shape
+    expect(moved.pts[1].bind).toMatchObject({ s: 't', i: 0 })
+    expect(moved.pts.filter(p => p.bind)).toHaveLength(1)
   })
 })

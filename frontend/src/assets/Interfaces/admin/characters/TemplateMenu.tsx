@@ -8,7 +8,7 @@ import { Stepper } from './Stepper'
 // A button that opens the list of template shapes (each drawn small); picking one calls onPick with its id. Used to add a shape and to put another
 // template on the selected one. Escape and a click outside close it. In the shape editor (S3) the list is the basics, then a polygon and a star, each with a
 // stepper for its count of sides or points.
-function Thumb({ id }: { id: string }) {
+export function Thumb({ id }: { id: string }) {
   const d = shapePath({ pts: templatePoints(id, templateBox(id, 50, 50, 36)), closed: true })
   return <svg className="cmTplThumb" viewBox="0 0 100 100" aria-hidden="true"><path d={d} /></svg>
 }

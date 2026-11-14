@@ -201,14 +201,14 @@ describe('the zoom', () => {
     expect(zoom()).toHaveAttribute('aria-valuetext', expect.stringMatching(/%$/))
   })
 
-  it('zooms in when the wheel scrolls down over it and out when it scrolls up', async () => {
+  it('zooms in when the wheel scrolls up over it and out when it scrolls down', async () => {
     await open()
     const w0 = width()
-    wheel(zoom(), 100)
+    wheel(zoom(), -100)
     const closer = width()
     expect(closer).toBeLessThan(w0)
-    wheel(zoom(), -100)
-    wheel(zoom(), -100)
+    wheel(zoom(), 100)
+    wheel(zoom(), 100)
     expect(width()).toBeGreaterThan(closer)
   })
 

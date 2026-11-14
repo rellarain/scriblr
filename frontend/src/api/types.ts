@@ -744,11 +744,14 @@ export interface ModelTint { kind: ModelTintKind; t: number }
 export type ModelGradDir = 'down' | 'up' | 'left' | 'right' | 'radial'
 export interface ModelGradient { dir: ModelGradDir; to: string | null }
 export type ModelBlend = 'multiply' | 'screen' | 'overlay'
+// Shape types T1: what a shape is (a stretch shape acts as one once every point follows another shape; a pivot circle turns the shapes hung on it; a shadow and a light are black and
+// white, see-through, drawn above the rest and kept inside it)
+export type ModelShapeKind = 'base' | 'stretch' | 'pivot' | 'shadow' | 'light'
 // A shape that shows with a slider (phase 5b; a crease): fully hidden when the slider is at `hidden`, fully drawn at `shown`, in proportion between.
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }

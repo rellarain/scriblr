@@ -68,14 +68,60 @@ function unfold(sym: ModelSymmetry, rot: number, run: ModelPoint[]): { runs: Mod
   return { runs, maps, flipped }
 }
 
-// The whole outline made from its source (the first m + 2 points).
+// The point without what it follows (a copy made by reflection must not follow what its source follows).
+const unbound = (p: ModelPoint): ModelPoint => { const { bind: _bind, ...rest } = p; return rest }
+
+// The whole outline made from its source (the first m + 2 points). The copies are geometry only: what a point follows is put back by the caller (see `withBinds`).
 export function regenerate(shape: ModelShape): ModelShape {
   const sym = shape.sym
   if (!sym) return shape
   const run = shape.pts.slice(0, sym.m + 2)
   if (run.length < 2) return shape
   const { runs } = unfold(sym, rotOf(shape), run)
-  return { ...shape, pts: runs.flatMap(r => r.slice(0, -1)).map(roundPt) }
+  return { ...shape, pts: runs.flatMap(r => r.slice(0, -1)).map(roundPt).map(unbound) }
+}
+
+// What the points of `from` follow, put back on the made outline: by number when the count is the same, else on the point at the same place (shape types T1: a symmetric shape's
+// points may follow other shapes).
+function withBinds(made: ModelShape, from: ModelPoint[]): ModelShape {
+  if (!from.some(p => p.bind)) return made
+  if (made.pts.length === from.length) return { ...made, pts: made.pts.map((p, i) => (from[i].bind ? { ...p, bind: from[i].bind } : p)) }
+  const pts = made.pts.map(p => ({ ...p }))
+  for (const q of from) {
+    if (!q.bind) continue
+    const at = pts.findIndex(p => !p.bind && Math.abs(p.x - q.x) < 0.01 && Math.abs(p.y - q.y) < 0.01)
+    if (at >= 0) pts[at] = { ...pts[at], bind: q.bind }
+  }
+  return { ...made, pts }
+}
+
+// The points of the outline that are copies of the same point of the source (that point's orbit), point i among them.
+export function orbitOf(shape: Pick<ModelShape, 'sym' | 'pts'>, i: number): number[] {
+  const sym = shape.sym
+  if (!sym || shape.pts.length !== 2 * sym.n * (sym.m + 1)) return [i]
+  const per = sym.m + 1, src = (j: number) => { const k = Math.floor(j / per), o = j % per; return k % 2 === 1 ? per - o : o }
+  const mine = src(i)
+  return shape.pts.flatMap((_, j) => (src(j) === mine ? [j] : []))
+}
+
+// The outline of a symmetric shape after its points that follow other shapes were moved there (`list`, in the solver): each moved point goes back to the source and the copies
+// follow it, so the shape stays symmetric. A shape that is not symmetric, or whose count differs, is left as it is.
+export function followBound(shape: ModelShape, list: ModelPoint[]): ModelPoint[] {
+  const sym = shape.sym
+  if (!sym || list.length !== shape.pts.length || list.length !== 2 * sym.n * (sym.m + 1)) return list
+  const rot = rotOf(shape), runLen = sym.m + 2, per = sym.m + 1
+  const source = shape.pts.slice(0, runLen)
+  const { maps, flipped } = unfold(sym, rot, source)
+  const src = source.map(p => ({ ...p }))
+  let any = false
+  // every point that follows, where the link put it (whether or not that is where it is kept), goes back to the source
+  shape.pts.forEach((p, i) => {
+    if (!p.bind) return
+    const k = Math.floor(i / per), o = i % per, at = flipped[k] ? per - o : o
+    src[at] = pinToAxis(sym, rot, source, backToSource(list[i], maps[k], flipped[k]), at)
+    any = true
+  })
+  return any ? regenerate({ ...shape, pts: src }).pts : list
 }
 
 // ---- turning it on ----
@@ -201,6 +247,16 @@ function backToSource(p: ModelPoint, map: Mat, flipped: boolean): ModelPoint {
 
 export type SymmetryEdit = { shape: ModelShape; refused?: string }
 
+// A point of the source that lies on an axis (its first or its last) kept on that axis line: the handle that was changed is kept and mirrored to the other side.
+function pinToAxis(sym: ModelSymmetry, rot: number, source: ModelPoint[], p: ModelPoint, src: number): ModelPoint {
+  if (src !== 0 && src !== source.length - 1) return p
+  const ref = source[src], line = nearestLine(sym.cx, sym.cy, rot, sym.a, sym.n, ref.x, ref.y), u: V = [Math.cos(rad(line)), Math.sin(rad(line))]
+  const d = (p.x - sym.cx) * u[0] + (p.y - sym.cy) * u[1], refl = reflectAbout(sym.cx, sym.cy, line)
+  const keep: 'hi' | 'ho' = JSON.stringify(p.ho ?? null) !== JSON.stringify(ref.ho ?? null) ? 'ho' : 'hi'
+  const h = p[keep]
+  return { ...p, x: sym.cx + u[0] * d, y: sym.cy + u[1] * d, m: h ? 'c' : p.m === 's' ? 's' : p.m, hi: keep === 'hi' ? h ?? null : linear(refl, h), ho: keep === 'ho' ? h ?? null : linear(refl, h) }
+}
+
 // After an edit of a symmetric shape's points (`next`, from `old`): the edited points are taken back to the source and the copies are made again. A point added to any copy
 // is added to the source (so to every copy); a point deleted from a copy is deleted from the source, but a point on an axis cannot be. An edit that moved the middle or the
 // axes (a move or a turn of the whole shape) is kept as it is.
@@ -214,16 +270,7 @@ export function followSymmetry(old: ModelShape, next: ModelShape): SymmetryEdit 
   const { maps, flipped } = unfold(sym, rot, source)
   const place = (index: number) => { const k = Math.floor(index / per), o = index % per; return { k, o, src: flipped[k] ? per - o : o } }
   const onAxis = (src: number) => src === 0 || src === runLen - 1
-  // the axis line an end of the source lies on, to keep it there
-  const pin = (p: ModelPoint, src: number): ModelPoint => {
-    if (!onAxis(src)) return p
-    const ref = source[src], line = nearestLine(sym.cx, sym.cy, rot, sym.a, sym.n, ref.x, ref.y), u: V = [Math.cos(rad(line)), Math.sin(rad(line))]
-    const d = (p.x - sym.cx) * u[0] + (p.y - sym.cy) * u[1], refl = reflectAbout(sym.cx, sym.cy, line)
-    // keep the handle that was changed and mirror it to the other side
-    const keep: 'hi' | 'ho' = JSON.stringify(p.ho ?? null) !== JSON.stringify(ref.ho ?? null) ? 'ho' : 'hi'
-    const h = p[keep]
-    return { ...p, x: sym.cx + u[0] * d, y: sym.cy + u[1] * d, m: h ? 'c' : p.m === 's' ? 's' : p.m, hi: keep === 'hi' ? h ?? null : linear(refl, h), ho: keep === 'ho' ? h ?? null : linear(refl, h) }
-  }
+  const pin = (p: ModelPoint, src: number): ModelPoint => pinToAxis(sym, rot, source, p, src)
   if (next.pts.length === old.pts.length) {
     const src = source.map(p => ({ ...p }))
     let changed = false
@@ -234,7 +281,7 @@ export function followSymmetry(old: ModelShape, next: ModelShape): SymmetryEdit 
       changed = true
     })
     if (!changed) return { shape: next }
-    return { shape: regenerate({ ...next, pts: src }) }
+    return { shape: withBinds(regenerate({ ...next, pts: src }), next.pts) }
   }
   if (next.pts.length === old.pts.length + 1) {
     // the new point and the side of the old outline it went into
@@ -246,7 +293,7 @@ export function followSymmetry(old: ModelShape, next: ModelShape): SymmetryEdit 
     const after = flipped[k] ? per - o - 1 : o
     const added = backToSource(next.pts[at], maps[k], flipped[k])
     const src = [...source.slice(0, after + 1), added, ...source.slice(after + 1)]
-    return { shape: regenerate({ ...next, pts: src, sym: { ...sym, m: sym.m + 1 } }) }
+    return { shape: withBinds(regenerate({ ...next, pts: src, sym: { ...sym, m: sym.m + 1 } }), next.pts) }
   }
   if (next.pts.length === old.pts.length - 1) {
     let at = 0
@@ -255,7 +302,7 @@ export function followSymmetry(old: ModelShape, next: ModelShape): SymmetryEdit 
     if (onAxis(s)) return { shape: old, refused: 'A point on an axis of a symmetric shape cannot be deleted: turn symmetry off first.' }
     if (sym.m < 1) return { shape: old, refused: 'A symmetric shape needs its points.' }
     const src = source.filter((_, i) => i !== s)
-    return { shape: regenerate({ ...next, pts: src, sym: { ...sym, m: sym.m - 1 } }) }
+    return { shape: withBinds(regenerate({ ...next, pts: src, sym: { ...sym, m: sym.m - 1 } }), next.pts) }
   }
   return { shape: old, refused: 'That edit cannot be made to a symmetric shape: turn symmetry off first.' }
 }

@@ -67,7 +67,7 @@ describe('the model types match the backend schema', () => {
     expect(union('ModelLayer')).toEqual(literal('ModelLayer'))
     expect(union('ModelView')).toEqual(literal('ModelView'))
     expect(union('ModelPointMode').length).toBe(4)
-    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend', 'ModelFit', 'ModelBoneEndKind', 'ModelFallSide', 'ModelFeatureKind', 'ModelOwnerKind']) {
+    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend', 'ModelShapeKind', 'ModelFit', 'ModelBoneEndKind', 'ModelFallSide', 'ModelFeatureKind', 'ModelOwnerKind']) {
       expect(union(alias), alias).toEqual(literal(alias))
       expect(union(alias).length, alias).toBeGreaterThan(1)
     }

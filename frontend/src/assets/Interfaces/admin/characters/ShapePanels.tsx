@@ -1,9 +1,10 @@
-import type { ModelContent, ModelShape } from '../../../../api/types'
+import type { ModelContent, ModelShape, ModelShapeKind } from '../../../../api/types'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine/connect'
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PolygonIcon } from '../../../icons'
 import { LIMITS } from './engine/limits'
+import { CAST_OPACITY, KIND_NAMES, actsAs, isCast, kindOf, unlinkedCount } from './engine/kinds'
 import { SYM_AXES_MAX } from './engine/symmetry'
 import { MIN_SIDE, alignShape, flipShape, frameOf, setPlace, setSize, setTurn } from './engine/transform'
 import { Stepper } from './Stepper'
@@ -51,7 +52,30 @@ export function ArrangeSection({ shape, actions, onEditShape }: { shape: ModelSh
   )
 }
 
-// The look of a shape (S3): its outline (on or off, and its width in the model's units) and its opacity, which fades the fill only.
+// The type of a shape (shape types T1): Base, Shadow or Light. A shadow or a light has no outline and starts see-through; one turned back into a base shape is opaque with the thin
+// outline again. A shape whose every point follows another shape is a stretch shape (a shape made as one says how many of its points still follow nothing).
+const TYPE_CHIPS: ModelShapeKind[] = ['base', 'shadow', 'light']
+export function TypeSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: EditShape }) {
+  const kind = kindOf(shape.kind), chip = kind === 'stretch' ? 'base' : kind, acts = actsAs(shape)
+  const missing = kind === 'stretch' && acts !== 'stretch' ? unlinkedCount(shape) : 0
+  const set = (k: ModelShapeKind) => {
+    if (k === chip) return
+    const cast = k === 'shadow' || k === 'light', was = isCast(shape)
+    onEditShape(shape.id, { ...shape, kind: k, ...(cast ? { outline: null, op: was ? shape.op : CAST_OPACITY[k] } : was ? { op: 1, outline: LIMITS.outlineNew } : {}) })
+  }
+  return (
+    <div className="cmShapeType" role="group" aria-label="Type of the shape">
+      <h3 className="cmInsSub">Type</h3>
+      <div className="cmInline">
+        {TYPE_CHIPS.map(k => <button key={k} type="button" className={`cmChip${chip === k ? ' cmChip--on' : ''}`} aria-pressed={chip === k} onClick={() => set(k)}>{KIND_NAMES[k]}</button>)}
+      </div>
+      {acts === 'stretch' && <p className="cmInsText" role="status">Stretch: every point follows a shape</p>}
+      {missing > 0 && <p className="cmInsText" role="status">Stretch: {missing} {missing === 1 ? 'point follows' : 'points follow'} nothing yet</p>}
+    </div>
+  )
+}
+
+// The look of a shape (S3): its outline (on or off, and its width in the model's units) and its opacity, which fades the fill only. A shadow or a light has only its opacity (T1).
 export function LookSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: EditShape }) {
   const on = typeof shape.outline === 'number', width = shape.outline ?? LIMITS.outlineNew, op = Math.round(shape.op * 100)
   const set = (patch: Partial<ModelShape>) => onEditShape(shape.id, { ...shape, ...patch })
@@ -60,10 +84,12 @@ export function LookSection({ shape, onEditShape }: { shape: ModelShape; onEditS
   return (
     <div className="cmLook" role="group" aria-label="Look of the shape">
       <h3 className="cmInsSub">Look</h3>
+      {!isCast(shape) && (
       <div className="cmInline">
         <button type="button" className={`cmIconBtn${on ? ' cmIconBtn--on' : ''}`} aria-pressed={on} aria-label="Outline" title="Outline" onClick={() => set({ outline: on ? null : width })}><PolygonIcon size={14} /></button>
         <Stepper label="Outline width" value={on ? String(width) : 'None'} lowerOff={!on || width <= LIMITS.outlineMin} raiseOff={!on || width >= LIMITS.outlineMax} bigBy={1} onStep={stepWidth} />
       </div>
+      )}
       <Stepper label="Opacity of the shape" value={`${op}%`} lowerOff={op <= 0} raiseOff={op >= 100} bigBy={25} onStep={stepOpacity} />
     </div>
   )

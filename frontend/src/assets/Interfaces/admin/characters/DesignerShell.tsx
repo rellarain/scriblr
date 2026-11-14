@@ -189,7 +189,7 @@ export function ViewBar(p: ViewBarProps) {
       <span className="dzZoom" ref={zoomBox}>
         <input
           type="range" min={0} max={1} step={0.005} value={zoomToSlider(p.zoom)} aria-label="Zoom" aria-valuetext={zoomText(p.zoom)}
-          title={`Zoom (${Math.round(ZOOM_MIN * 100)}% to ${Math.round(ZOOM_MAX * 100)}%): scroll down over it to zoom in, up to zoom out`}
+          title={`Zoom (${Math.round(ZOOM_MIN * 100)}% to ${Math.round(ZOOM_MAX * 100)}%): scroll up over it to zoom in, down to zoom out`}
           onChange={e => p.onZoom(sliderToZoom(Number(e.target.value)))}
         />
         <output aria-hidden="true">{zoomText(p.zoom)}</output>

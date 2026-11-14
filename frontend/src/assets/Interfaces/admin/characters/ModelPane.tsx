@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelContent, ModelEntry, ModelLayer, ModelPoint, ModelShape } from '../../../../api/types'
 import {
-  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
+  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, PlusIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -79,7 +79,10 @@ import {
 import { LIMITS } from './engine/limits'
 import type { ArrangeActions, ConnectionActions, SymmetryActions } from './ShapePanels'
 import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
-import type { ConnectTool } from './DesignerCanvas'
+import type { ConnectTool, RightSpot } from './DesignerCanvas'
+import { FIRST_CHOICE, ShapeForm, templateOfChoice, type FormKind, type ShapeChoice } from './ShapeForm'
+import { CAST_OPACITY, KIND_NAMES } from './engine/kinds'
+import { castOverlaps, hasBothCasts } from './engine/castOverlap'
 import { addPointShared, connect, disconnect, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
@@ -236,6 +239,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [keepRatio, setKeepRatio] = useState(false)
   // the shape editor's symmetry being chosen for a shape (S6): its axes, until the side to copy is clicked on the canvas
   const [symChoose, setSymChoose] = useState<{ id: string; a: number; n: number } | null>(null)
+  // the shape editor's new-shape form (shape types T1): where it was opened (in the stage, and in canvas space) and the object it adds to, and what it made last
+  const [shapeForm, setShapeForm] = useState<{ left: number; top: number; x: number; y: number; objectId: string | null } | null>(null)
+  const [formChoice, setFormChoice] = useState<ShapeChoice>(FIRST_CHOICE)
+  const worldRef = useRef<((clientX: number, clientY: number) => [number, number]) | null>(null)
+  const closeShapeForm = useCallback(() => setShapeForm(null), [])
   const turnAngle = angleOf(view)
   // the side a panel that knows only the front and the back speaks of: the back once more of the back is seen than of the front
   const side: ViewName = fromBehind(view) ? 'back' : 'front'
@@ -346,6 +354,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // ---- applying changes ----
 
+  // Lights and shadows may not overlap (shape types T1): a change that makes a light and a shadow overlap that did not overlap before is refused, and the note says which.
+  function castRefusal(before: ModelContent, after: ModelContent): string | null {
+    if (!shapesOnly || !hasBothCasts(after)) return null
+    const had = new Set(hasBothCasts(before) ? castOverlaps(before, solve(before)).map(p => p.join(' ')) : [])
+    const now = castOverlaps(after, solve(after)).find(p => !had.has(p.join(' ')))
+    if (!now) return null
+    const name = (id: string) => shapeById(after, id)?.name.trim() || 'a shape'
+    return `A light and a shadow may not overlap: ${name(now[0])} would overlap ${name(now[1])}.`
+  }
   // A change that is one undo step of its own. In a writer's designer a change that makes a count grow past a limit the admin set is not made, and the note says so.
   function commit(next: ModelContent, immediate = false): boolean {
     // every member has a shape for each shape of its pattern: an edit that added or took away a pattern's shape reaches them here
@@ -354,6 +371,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const synced = reconcileClasses(alignTurns(content, alignSkins(content, next)), makeId)
     const refused = policy.writer ? growthRefusal(content, synced, policy.writer) : null
     if (refused) { setNote(refused); return false }
+    const cast = castRefusal(content, synced)
+    if (cast) { setNote(cast); return false }
     setHistory(h => remember(h, content))
     models.edit(entry.id, () => synced, immediate)
     setNote('')
@@ -370,6 +389,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // points go back into `pts`, in the back view into the outline of its own for the back.
   function live(id: string, next: ModelShape) {
     if (recording) { setRecording(r => (r ? { ...r, draft: next } : r)); return }
+    // a drag that would push a light into a shadow stops where it was (shape types T1)
+    if (shapesOnly && hasBothCasts(content)) {
+      const before = shapeById(content, id), followed = before?.sym && next.sym ? followSymmetry(before, next).shape : next
+      const cast = castRefusal(content, updateShape(content, id, () => followed))
+      if (cast) { setNote(cast); return }
+    }
     models.edit(entry.id, c => {
       const where = whereOf(id)
       if (where === 'between') return c
@@ -512,8 +537,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function selectSegment(e: number) { setSelPoint(e); setPart('segment') }
   // A right-click that did not drag: on a point it changes the point's type, on a segment it makes the segment straight or curved (of the shape it is on, which is
   // selected with it), on a shape it selects the shape, on the grid it unselects everything.
-  function onRightClick(t: RightTarget) {
+  function onRightClick(t: RightTarget, at?: RightSpot) {
     if (recording) return
+    // in the shape editor a right-click on the grid opens the new-shape form there (shape types T1)
+    if (t.kind === 'grid' && shapesOnly && at) { openShapeForm(at.clientX, at.clientY); return }
     if (t.kind === 'grid') { setSel(rightClickGrid()); setPart('shape'); return }
     const other = !(sel.kind === 'shape' && sel.id === t.id)
     if (other) choose(rightClickShape(t.id))
@@ -1125,13 +1152,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const id = freshId(base, 'o', makeId)
     return { content: addObject(base, groupId, { id, name: `Object ${base.objects.length + 1}`, layer, shapes: [] }), objectId: id }
   }
-  function addShapeTo(objectId: string, templateId: string, c: ModelContent) {
+  function addShapeTo(objectId: string, templateId: string, c: ModelContent, from?: { kind: FormKind; at: [number, number] }) {
     const obj = objectById(c, objectId)
     if (obj && obj.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
     const id = freshId(c, 's', makeId)
-    const made = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, templateBox(templateId, 100, 100))
-    // the shape editor's shapes start with a thin outline (S3)
-    const shape = shapesOnly ? { ...made, outline: LIMITS.outlineNew } : made
+    const at = from?.at ?? [100, 100], kind = from?.kind ?? 'base'
+    const made = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, templateBox(templateId, at[0], at[1]))
+    // the shape editor's shapes start with a thin outline (S3); a shadow or a light has none, and starts see-through (T1)
+    const shape = !shapesOnly ? made : kind === 'shadow' || kind === 'light' ? { ...made, name: KIND_NAMES[kind], kind, op: CAST_OPACITY[kind], outline: null } : { ...made, kind, outline: LIMITS.outlineNew }
     if (commit(addShape(c, objectId, shape), true)) choose({ kind: 'shape', id })
   }
   // Delete what is selected, with what goes with it (a group's objects, an object's shapes, a twin).
@@ -1176,6 +1204,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (commit(addObject(content, groupId, { id, name: `Object ${content.objects.length + 1}`, layer: 'body', shapes: [] }), true)) choose({ kind: 'object', id })
     },
     onAddShape: (objectId, t) => addShapeTo(objectId, t, content),
+    onShapeForm: objectId => openShapeFormInView(objectId),
     onTwin: (kind, id) => { applyEdit(makeTwin(content, kind, id, makeId)) },
     onReorderShape: (objectId, shapeId, before) => commit(moveShapeWithin(content, objectId, shapeId, before), true),
     onReorderObject: (groupId, objectId, before) => commit(moveObjectWithin(content, groupId, objectId, before), true),
@@ -1202,6 +1231,28 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
   }
 
+  // The new-shape form (shape types T1): opened where a right-click was, or (the New shape button, a tree's add button) in the middle of what the panels leave of the canvas.
+  function openShapeForm(clientX: number, clientY: number, objectId: string | null = null) {
+    const r = stageRef.current?.getBoundingClientRect(), toWorld = worldRef.current
+    if (!r || !toWorld) return
+    const [x, y] = toWorld(clientX, clientY)
+    setShapeForm({ left: clientX - r.left, top: clientY - r.top, x, y, objectId })
+  }
+  function openShapeFormInView(objectId: string | null = null) {
+    const r = stageRef.current?.getBoundingClientRect()
+    if (!r) return
+    openShapeForm(r.left + insets.left + Math.max(0, r.width - insets.left - insets.right) / 2, r.top + Math.max(0, r.height - insets.bottom) / 2, objectId)
+  }
+  // Create: the chosen shape where the form was opened, into the object it was opened for, else the selection's, else a new object on the Body layer.
+  function createFromForm() {
+    if (!shapeForm) return
+    const from = { kind: formChoice.kind, at: [shapeForm.x, shapeForm.y] as [number, number] }, t = templateOfChoice(formChoice)
+    const into = shapeForm.objectId && objectById(content, shapeForm.objectId) ? shapeForm.objectId : contextObject(content, sel)
+    setShapeForm(null)
+    if (into) { addShapeTo(into, t, content, from); return }
+    const r = addObjectOn('body')
+    addShapeTo(r.objectId, t, r.content, from)
+  }
   // The canvas's "new shape" button: into the selected object, else into a new object (and group) on the Body layer.
   function newShapeFromCanvas(templateId: string) {
     const inObject = contextObject(content, sel)
@@ -1419,6 +1470,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onConnect: (sid, i, target) => {
       const tried = connect(content, canvasSolved, sid, i, target)
       if (!tried.ok) { setNote(tried.reason); return }
+      const cast = castRefusal(content, tried.content)
+      if (cast) { setNote(cast); return }
       models.edit(entry.id, c => { const e = connect(c, canvasSolved, sid, i, target); return e.ok ? e.content : c })
     },
     onLoosen: (sid, i, x, y) => {
@@ -1499,7 +1552,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onEditShape={editShape}
-            onRightClick={onRightClick}
+            onRightClick={onRightClick} worldRef={worldRef}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
@@ -1510,6 +1563,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {!shapesOnly && <p className="cmStageNote" aria-live="polite">{stageNote}</p>}
           </div>
 
+          {shapeForm && (
+            <ShapeForm
+              at={{ left: shapeForm.left, top: shapeForm.top }} choice={formChoice} onChoice={setFormChoice} onCreate={createFromForm}
+              onClose={closeShapeForm}
+            />
+          )}
           <ToolbarPanel side="left" title="Tree" label="Tree tools" state={left} min={PANEL_LIMITS.left.min} max={PANEL_LIMITS.left.max} onOpen={open => setPanel('left', { open })} onWidth={onPanelWidth('left')}>
             <TreeBar content={content} sel={sel} state={test.state} hidden={hiddenSet} models={nav} actions={actions} />
           </ToolbarPanel>
@@ -1573,7 +1632,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units, the mirror line and the alignment guides" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${gridSnap ? ' cmIconBtn--on' : ''}`} aria-label="Snap to grid" title="Snap to grid: a shape moved whole, a pivot and a frame land on the grid lines" aria-pressed={gridSnap} onClick={() => setGridSnap(s => !s)}><GridSnapIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
-              <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
+              {shapesOnly
+                ? <button type="button" className="cmIconBtn" aria-label="New shape" title="New shape" aria-haspopup="dialog" aria-expanded={!!shapeForm} onClick={() => openShapeFormInView()}><PlusIcon size={14} /></button>
+                : <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />}
               {!shapesOnly && (weighing || content.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) && (
                 <span className="cmFallSide" role="group" aria-label="The side things fall to">
                   {FALL_SIDES.map(side => (

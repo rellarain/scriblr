@@ -4,6 +4,7 @@ import { NAME_MAX, SWATCH_NAME_MAX, shapeById, type MakeId, randomId } from '../
 import { freshFormId } from './formEdit'
 import { axesOf, chosenForm, type Choices } from './forms'
 import { LIMITS } from './limits'
+import { CAST_FILL, type CastKind } from './kinds'
 import { isPaintProp, PROPS, type PropKey } from './props'
 import { done, fail, type Edit } from './rigEdit'
 import { amount, valueOf, type Values } from './rig'
@@ -39,6 +40,8 @@ export interface PaintLayer extends Paint {
   helper: boolean
   // the width of its outline in the model's units (shape editor S3), or null: none (a helper and a shading shape never have one)
   line: number | null
+  // a shadow or a light (shape types T1): black or white at the shape's own opacity, drawn above every other shape and kept inside them; null for any other shape
+  cast: CastKind | null
 }
 
 export const NEUTRAL_GRAY = 50
@@ -263,6 +266,8 @@ export function shiftColour(hex: string, hue: number, sat: number, light: number
 // Everything a shape is painted with. The paint fields (tone, derived tone, shading, gradient, blend, clip, cut-outs, helper) come from the shape the paint walk ends
 // at, whose slot or fixed gray is the one used; the forms the colouring chooses may change that shape's slot, gray and tone.
 export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelShape): PaintLayer {
+  // a shadow or a light is black or white, see-through by its own opacity, with no outline, gradient or blend (shape types T1)
+  if (shape.kind === 'shadow' || shape.kind === 'light') return { fill: CAST_FILL[shape.kind], opacity: shape.op, gradient: null, blend: null, clip: null, cuts: [], shading: false, helper: false, line: null, cast: shape.kind }
   const ix = paintIndex(c), origin = paintOrigin(c, shape), o = origin.shape
   const forms = colouring.forms ?? {}
   const look = Object.keys(forms).length > 0 ? lookFor(ix, origin, forms) : undefined
@@ -297,7 +302,7 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
   // a mark of a pattern (phase D4) is kept inside the pattern's base unless it is clipped to something of its own
   const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : ix.marks.has(o.id) ? mapRef(ix, origin.hops, ix.marks.get(o.id)!) : null
   const cuts = [...new Set((o.cut ?? []).map(t => mapRef(ix, origin.hops, t)))].filter(t => t !== shape.id)
-  return { fill, opacity: slot ? round2(shape.op * alpha) : shape.op, gradient, blend: o.blend ?? null, clip: clip === shape.id ? null : clip, cuts, shading, helper: o.helper === true, line: shading || o.helper ? null : o.outline ?? null }
+  return { fill, opacity: slot ? round2(shape.op * alpha) : shape.op, gradient, blend: o.blend ?? null, clip: clip === shape.id ? null : clip, cuts, shading, helper: o.helper === true, line: shading || o.helper ? null : o.outline ?? null, cast: null }
 }
 
 // The fill and opacity a shape is drawn with: its shape's own opacity times the opacity the colour has.

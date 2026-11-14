@@ -1,4 +1,5 @@
 import type { ModelContent, ModelLayer, ModelObject, ModelShape } from '../../../../../api/types'
+import { isCast } from './kinds'
 
 // The order shapes are drawn in: lowest z first, and shapes of the same z in the order of the tree (the Body layer, then Clothing, then Hair; inside a
 // layer the groups in their order, their objects, and each object's shapes: the later in a list, the nearer the front). So the up and down arrows
@@ -58,7 +59,10 @@ export function drawOrder<S extends Pick<ModelShape, 'id' | 'z'>>(c: ModelConten
     }
   }
   const sorted = [...shapes].sort((a, b) => key.get(a.id)![0] - key.get(b.id)![0] || key.get(a.id)![1] - key.get(b.id)![1])
-  return zoff && Object.keys(zoff).length > 0 ? withLayerOffsets(c, sorted, zoff) : sorted
+  const placed = zoff && Object.keys(zoff).length > 0 ? withLayerOffsets(c, sorted, zoff) : sorted
+  // shadows and lights (shape types T1) are drawn above every other shape, in their own order among themselves
+  const cast = new Set(c.shapes.filter(isCast).map(s => s.id))
+  return cast.size === 0 ? placed : [...placed.filter(s => !cast.has(s.id)), ...placed.filter(s => cast.has(s.id))]
 }
 
 // ---- moving a garment or a hair part among the parts of its layer (phase 6b-3) ----

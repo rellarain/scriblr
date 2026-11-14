@@ -459,6 +459,10 @@ described, now stale, in `docs/data-model.md`).
   0..180; `n` axes, 1..6, evenly spaced; `side` the wedge the source came from; `cx`, `cy` the middle; `m` the points strictly
   inside the source wedge; null: not symmetric). The points hold the whole outline, 2n(m + 1) of them with the source first,
   so nothing else has to draw it; a spec that does not fit the points is let go on both sides (the points stay).
+  Shape types T1 adds, with a default: on a shape `kind` (`base`, `stretch`, `pivot`, `shadow` or `light`; anything else is read as
+  `base`). A shape acts as a stretch shape when every point is linked; a shadow and a light are drawn black and white at the
+  shape's opacity, above every other shape and kept inside them. A symmetric shape's points may now be linked: the solver moves
+  the copies with a linked point.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

@@ -16,12 +16,12 @@ describe('the zoom slider', () => {
     expect(sliderToZoom(-5)).toBe(ZOOM_MIN)
   })
   it('zooms in when the wheel scrolls down over it and out when it scrolls up', () => {
-    expect(wheelZoom(1, 100)).toBeGreaterThan(1)
-    expect(wheelZoom(1, -100)).toBeLessThan(1)
+    expect(wheelZoom(1, -100)).toBeGreaterThan(1)
+    expect(wheelZoom(1, 100)).toBeLessThan(1)
     expect(wheelZoom(1, 0)).toBe(1)
-    expect(wheelZoom(ZOOM_MAX, 100)).toBe(ZOOM_MAX)
-    expect(wheelZoom(ZOOM_MIN, -100)).toBe(ZOOM_MIN)
-    expect(wheelZoom(1, 300)).toBeGreaterThan(wheelZoom(1, 100))
+    expect(wheelZoom(ZOOM_MAX, -100)).toBe(ZOOM_MAX)
+    expect(wheelZoom(ZOOM_MIN, 100)).toBe(ZOOM_MIN)
+    expect(wheelZoom(1, -300)).toBeGreaterThan(wheelZoom(1, -100))
   })
   it('writes a zoom as a percent', () => {
     expect(zoomText(1)).toBe('100%')

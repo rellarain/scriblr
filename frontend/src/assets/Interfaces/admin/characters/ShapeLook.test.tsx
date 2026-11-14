@@ -9,7 +9,7 @@ import { templateBox } from './engine/templates'
 import { addGroup, addObject, addShape } from './modelContent'
 import { pick } from '../../../../test/designerUi'
 
-// The shape editor's templates and the look of a shape (S3): New shape offers the basics and a polygon and a star with a count; a shape made there has a thin outline,
+// The shape editor's templates and the look of a shape (S3; the new-shape form of T1): the form offers the basics and a polygon with a count; a shape made there has a thin outline,
 // which the panel turns off and on and makes thicker, beside the shape's opacity.
 vi.setConfig({ testTimeout: 30000 })
 
@@ -31,27 +31,40 @@ async function open() {
 const canvas = () => screen.getByRole('application')
 const tools = () => within(screen.getByRole('toolbar', { name: 'Designer tools' }))
 
+const form = () => within(screen.getByRole('dialog', { name: 'New shape' }))
+async function make(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(tools().getByRole('button', { name: 'New shape' }))
+  await user.click(form().getByRole('button', { name }))
+  await user.click(form().getByRole('button', { name: 'Create' }))
+}
+
 describe('New shape in the shape editor', () => {
-  it('offers the basics, then a polygon and a star whose count the steppers change', async () => {
+  it('opens the new-shape form: the types, the basics as pictures, and a polygon whose count the stepper changes', async () => {
     const user = await open()
     await user.click(tools().getByRole('button', { name: 'New shape' }))
-    const menu = within(screen.getByRole('menu', { name: 'Template shapes' }))
-    expect(menu.getAllByRole('menuitem').map(b => b.textContent)).toEqual([
-      'Square', 'Rectangle', 'Circle', 'Ellipse', 'Equilateral triangle', 'Right triangle', 'Pentagon', 'Hexagon', 'Polygon, 7 sides', 'Star, 5 points',
+    expect(within(form().getByRole('group', { name: 'Type of the shape' })).getAllByRole('button').map(b => b.textContent)).toEqual(['Base', 'Stretch', 'Shadow', 'Light'])
+    expect(form().getByRole('button', { name: 'Base' })).toHaveAttribute('aria-pressed', 'true')
+    const shapes = within(form().getByRole('group', { name: 'Shape' }))
+    expect(shapes.getAllByRole('button').filter(b => b.classList.contains('cmTpl')).map(b => b.getAttribute('aria-label'))).toEqual([
+      'Square', 'Rectangle', 'Circle', 'Ellipse', 'Equilateral triangle', 'Right triangle', 'Pentagon', 'Hexagon', 'Star, 5 points', 'Polygon of 7 points',
     ])
-    await user.click(menu.getByRole('button', { name: 'Raise Polygon sides' }))
-    await user.click(menu.getByRole('button', { name: 'Lower Star points' }))
-    expect(menu.getByRole('menuitem', { name: 'Polygon, 8 sides' })).toBeInTheDocument()
-    expect(menu.getByRole('menuitem', { name: 'Star, 4 points' })).toBeInTheDocument()
-    expect(menu.getByRole('button', { name: 'Lower Star points' })).toBeDisabled()
+    // the pictures carry no words
+    expect(shapes.getByRole('button', { name: 'Square' }).textContent).toBe('')
+    await user.click(shapes.getByRole('button', { name: 'Raise Polygon points' }))
+    expect(shapes.getByRole('button', { name: 'Polygon of 8 points' })).toHaveAttribute('aria-pressed', 'true')
+    for (let k = 0; k < 6; k++) await user.click(shapes.getByRole('button', { name: 'Lower Polygon points' }))
+    expect(shapes.getByRole('button', { name: 'Lower Polygon points' })).toBeDisabled()
+    // Escape closes it
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'New shape' })).toBeNull()
   })
 
   it('makes the shape with its count of corners and a thin outline, drawn on the canvas', async () => {
     const user = await open()
     await user.click(tools().getByRole('button', { name: 'New shape' }))
-    const menu = within(screen.getByRole('menu', { name: 'Template shapes' }))
-    await user.click(menu.getByRole('button', { name: 'Raise Polygon sides' }))
-    await user.click(menu.getByRole('menuitem', { name: 'Polygon, 8 sides' }))
+    await user.click(form().getByRole('button', { name: 'Raise Polygon points' }))
+    await user.click(form().getByRole('button', { name: 'Create' }))
+    expect(screen.queryByRole('dialog', { name: 'New shape' })).toBeNull()
     expect(screen.getByRole('textbox', { name: 'Shape name' })).toHaveValue('Polygon, 8 sides')
     expect(within(screen.getByRole('group', { name: 'Points' })).getAllByRole('button')).toHaveLength(8)
     const lines = canvas().querySelectorAll('path[data-line]')
@@ -66,8 +79,7 @@ describe('New shape in the shape editor', () => {
 describe('the look of a shape', () => {
   it('turns the outline off and on, makes it thicker, and steps the opacity', async () => {
     const user = await open()
-    await user.click(tools().getByRole('button', { name: 'New shape' }))
-    await user.click(within(screen.getByRole('menu', { name: 'Template shapes' })).getByRole('menuitem', { name: 'Square' }))
+    await make(user, 'Square')
     const look = within(screen.getByRole('group', { name: 'Look of the shape' }))
     const outline = look.getByRole('button', { name: 'Outline' })
     const width = () => within(look.getByRole('group', { name: 'Outline width' })).getByText(/./, { selector: '.cmStepValue' }).textContent

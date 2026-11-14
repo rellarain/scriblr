@@ -89,7 +89,7 @@ describe('the shape editor on the canvas', () => {
     expect(at(dots()[0])).toEqual([100, 100])
   })
 
-  it('zooms with Ctrl and the wheel over the canvas, keeping the point under the pointer still', async () => {
+  it('zooms with Ctrl and the wheel over the canvas, keeping the point under the pointer still, and scrolls the view without Ctrl', async () => {
     await open()
     const zoom = () => Number((screen.getByRole('slider', { name: 'Zoom' }) as HTMLInputElement).value)
     const before = zoom()
@@ -100,9 +100,17 @@ describe('the shape editor on the canvas', () => {
     const [wx1, wy1] = worldOf(spot.x, spot.y)
     expect(wx1).toBeCloseTo(wx0, 3)
     expect(wy1).toBeCloseTo(wy0, 3)
-    // without Ctrl the wheel leaves the zoom alone
+    // without Ctrl the wheel leaves the zoom alone and moves the view down the grid (sideways with Shift)
     const now = zoom()
+    const box = () => canvas().getAttribute('viewBox')!.split(' ').map(Number)
+    const [x0, y0] = box()
     fireEvent.wheel(canvas(), { deltaY: 120, clientX: spot.x, clientY: spot.y })
     expect(zoom()).toBe(now)
+    const [x1, y1] = box()
+    expect(y1).toBeGreaterThan(y0)
+    expect(x1).toBeCloseTo(x0, 6)
+    fireEvent.wheel(canvas(), { deltaY: 120, shiftKey: true, clientX: spot.x, clientY: spot.y })
+    expect(box()[0]).toBeGreaterThan(x1)
+    expect(box()[1]).toBeCloseTo(y1, 6)
   })
 })

@@ -1,6 +1,7 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { ModelContent, ModelEntry, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../../../api/types'
-import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, MannequinIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon } from '../../../icons'
+import { BridgeIcon, CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, MannequinIcon, MoonIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SunIcon, SwapIcon, TrashIcon } from '../../../icons'
+import { actsAs } from './engine/kinds'
 import { ReorderList } from './ReorderList'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import { TemplateMenu } from './TemplateMenu'
@@ -47,6 +48,8 @@ export interface TreeActions {
   onAddGroup: () => void
   onAddObject: (groupId: string) => void
   onAddShape: (objectId: string, templateId: string) => void
+  // the shape editor's new-shape form, for a shape in this object (shape types T1)
+  onShapeForm?: (objectId: string) => void
   onTwin: (kind: Container, id: string) => void
   onReorderShape: (objectId: string, shapeId: string, beforeId: string | null) => void
   onReorderObject: (groupId: string, objectId: string, beforeId: string | null) => void
@@ -81,9 +84,12 @@ function Mark({ label: aria, title, children }: { label: string; title?: string;
 }
 const TWIN = (name: string) => ({ label: `${name} is a twin`, title: `${name} is a twin: it mirrors another and follows it` })
 function ShapeMarks({ content, shape, name }: { content: ModelContent; shape: ModelShape; name: string }) {
-  const pattern = patternOfMark(content, shape.id)
+  const pattern = patternOfMark(content, shape.id), kind = actsAs(shape)
   return (
     <>
+      {kind === 'stretch' && <Mark label={`${name} is a stretch shape`} title={`${name} is a stretch shape: every point follows another shape`}><BridgeIcon size={11} /></Mark>}
+      {kind === 'shadow' && <Mark label={`${name} is a shadow`}><MoonIcon size={11} /></Mark>}
+      {kind === 'light' && <Mark label={`${name} is a light`}><SunIcon size={11} /></Mark>}
       {shape.mirrorOf && <Mark {...TWIN(name)}><SwapIcon size={11} /></Mark>}
       {shape.shade && <Mark label={`${name} is a shading shape`} title={`${name} is a shading shape: a ${shape.shade.kind === 'mid' ? 'mid tone' : shape.shade.kind} kept inside the other shapes of its object`}><LayersIcon size={11} /></Mark>}
       {pattern && <Mark label={`${name} is a mark of the fill pattern ${label(pattern.name, 'Untitled pattern')}`} title={`${name} is a mark of the fill pattern ${label(pattern.name, 'Untitled pattern')}: it is kept inside its base shape`}><GridViewIcon size={11} /></Mark>}
@@ -378,7 +384,9 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
         <section className="dzLevel" aria-label="Shapes">
           <div className="dzLevelHead">
             <span className="dzLevelName">Shapes <span className="cmCount">{object.shapes.length}</span></span>
-            <TemplateMenu label={`Add a shape to ${label(object.name, 'the object')}`} onPick={t => actions.onAddShape(object.id, t)} disabled={object.shapes.length >= max.shapesPerObject} />
+            {simple && actions.onShapeForm
+              ? <button type="button" className="cmIconBtn" aria-label={`Add a shape to ${label(object.name, 'the object')}`} title={`Add a shape to ${label(object.name, 'the object')}`} aria-haspopup="dialog" disabled={object.shapes.length >= max.shapesPerObject} onClick={() => actions.onShapeForm?.(object.id)}><PlusIcon size={14} /></button>
+              : <TemplateMenu label={`Add a shape to ${label(object.name, 'the object')}`} onPick={t => actions.onAddShape(object.id, t)} disabled={object.shapes.length >= max.shapesPerObject} />}
           </div>
           {object.shapes.length === 0 && !simple && <p className="cmInsText">No shape yet: add one from a template.</p>}
           <ReorderList

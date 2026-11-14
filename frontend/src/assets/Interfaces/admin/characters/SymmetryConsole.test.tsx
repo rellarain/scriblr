@@ -5,6 +5,7 @@ import type { ModelContent, ModelShape } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import DesignerConsole from './DesignerConsole'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { enableSymmetry } from './engine/symmetry'
 
 // Symmetry in the shape editor (S6): the Symmetry section's toggle starts choosing the axes (presets, the angle of the first, how many), the canvas draws them through the
 // shape's middle and takes a click on the side to copy; a point of any copy is then dragged and the others follow; the toggle turns it off and the points stay.
@@ -100,5 +101,28 @@ describe('a symmetric shape', () => {
     expect(section().getByRole('button', { name: 'Symmetry' })).toHaveAttribute('aria-pressed', 'false')
     expect(dots().map(at)).toEqual(before)
     expect(canvas().querySelector('[data-sym-axis]')).toBeNull()
+  })
+})
+
+describe('symmetric shapes connected (shape types T1)', () => {
+  it('connects a point of one symmetric shape to a point of another, and its copies follow', async () => {
+    const made = (id: string, x: number, y: number) => { const r = enableSymmetry(sharp(id, [[x, y], [x + 40, y], [x + 40, y + 40], [x, y + 40]]), { a: 0, n: 2 }, 1, 60); if (!r.ok) throw new Error(r.reason); return r.shape }
+    let c = addGroup(blank('Two'), newGroup('g', 'Group'))
+    c = addObject(c, 'g', { id: 'o', name: 'Part', layer: 'body', shapes: [] })
+    c = addShape(addShape(c, 'o', made('a', 60, 100)), 'o', made('b', 120, 60))
+    modelsBackend([draftEntry('m', c)])
+    render(<DesignerConsole tools="shapes" />)
+    await screen.findByRole('region', { name: 'Designer' })
+    select('a', 70, 110)
+    // the top right corner of a (100, 100) dropped on the bottom left corner of b (120, 100)
+    const corner = dots().find(d => at(d)[0] === 100 && at(d)[1] === 100)!
+    pointer(corner, 'pointerdown', pixelOf(100, 100))
+    pointer(canvas(), 'pointermove', pixelOf(110, 100))
+    pointer(canvas(), 'pointermove', pixelOf(120, 100))
+    pointer(canvas(), 'pointerup', pixelOf(120, 100))
+    const pts = dots().map(at)
+    // the corner is on b's corner, and the opposite corners moved with it about a's middle (80, 120)
+    for (const p of [[120, 100], [40, 100], [40, 140], [120, 140]]) expect(pts).toContainEqual(p)
+    expect(screen.queryByText(/cannot follow/)).toBeNull()
   })
 })

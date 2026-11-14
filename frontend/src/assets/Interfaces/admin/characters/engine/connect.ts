@@ -4,6 +4,7 @@ import { addPoint, movePoint } from './edit'
 import { apply, bezierAt, build, inverse, nearestEdge, r2, transformList, type BuiltPoint, type Mat } from './geometry'
 import { LIMITS, linkCount } from './limits'
 import { reaches } from './pairEdit'
+import { followSymmetry, orbitOf } from './symmetry'
 import type { Solved } from './rig'
 import { done, fail, type Edit } from './rigEdit'
 
@@ -64,7 +65,8 @@ export function followRefusal(c: ModelContent, shapeId: string, i: number, targe
   const s = shapeById(c, shapeId)
   if (!s) return 'There is no such shape.'
   if (s.mirrorOf) return 'A twin has no points of its own.'
-  if (s.sym) return 'A point of a symmetric shape cannot follow another shape.'
+  // a symmetric shape's point may follow (shape types T1), but only one copy of each point: the copies follow it
+  if (s.sym && orbitOf(s, i).some(j => j !== i && !!s.pts[j]?.bind)) return 'Another copy of this point already follows a shape: the copies of a symmetric shape\'s point follow one shape together.'
   if (!s.pts[i]) return 'There is no such point.'
   if (target === shapeId) return 'A point cannot be connected to its own shape.'
   const t = shapeById(c, target)
@@ -74,8 +76,13 @@ export function followRefusal(c: ModelContent, shapeId: string, i: number, targe
   return null
 }
 
+// One point changed; a symmetric shape's copies follow it (shape types T1: its points may be connected).
 const setPoint = (c: ModelContent, shapeId: string, i: number, change: (p: ModelPoint) => ModelPoint): ModelContent =>
-  ({ ...c, shapes: c.shapes.map(s => (s.id === shapeId ? { ...s, pts: s.pts.map((p, k) => (k === i ? change(p) : p)) } : s)) })
+  ({ ...c, shapes: c.shapes.map(s => {
+    if (s.id !== shapeId) return s
+    const next = { ...s, pts: s.pts.map((p, k) => (k === i ? change(p) : p)) }
+    return s.sym ? followSymmetry(s, next).shape : next
+  }) })
 
 // A place in canvas space, in a shape's own space.
 const into = (solved: Solved, shapeId: string, x: number, y: number): [number, number] => {

@@ -1316,6 +1316,9 @@ ModelBindKind = Literal["point", "edge"]
 ModelTintKind = Literal["shadow", "mid", "highlight"]
 ModelGradDir = Literal["down", "up", "left", "right", "radial"]
 ModelBlend = Literal["multiply", "screen", "overlay"]
+# Shape types T1: a base shape (a stretch shape acts as one once every point follows another shape), a pivot circle, a shadow or a light (black and white, see-through, drawn
+# above every other shape and kept inside them).
+ModelShapeKind = Literal["base", "stretch", "pivot", "shadow", "light"]
 
 
 def _keep_valid(cls: Any, value: Any) -> list[Any]:
@@ -1699,11 +1702,18 @@ class ModelShape(BaseModel):
     over: list[str] = Field(default_factory=list, max_length=MODEL_OVER_MAX)
     # Phase A1: how the shape turns with the figure (depth, roundness, per-point depth, outlines at key angles). None: it stands at its group's depth with its layer's roundness.
     turn: Optional[ModelTurn] = None
+    # Shape types T1: what the shape is (see ModelShapeKind); anything else is read as a base shape.
+    kind: ModelShapeKind = "base"
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> str:
+        return value if value in ("base", "stretch", "pivot", "shadow", "light") else "base"
 
     @field_validator("turn", mode="before")
     @classmethod

@@ -1,6 +1,7 @@
 import type { ModelBlend, ModelContent, ModelGradDir } from '../../../../../api/types'
 import { mix } from '../../../writer/characters/portrait/colour'
 import { paintLayer, type Colouring, type PaintLayer } from './colour'
+import type { CastKind } from './kinds'
 import type { Mat } from './geometry'
 import type { Solved } from './rig'
 import { coveringObjects } from './wear'
@@ -32,6 +33,8 @@ export interface PaintItem {
   wear: { key: string; ds: string[] } | null
   // something it must be kept inside is not there (a clip to a shape a form hides, a shading shape with no base shape to lie on): nothing is drawn
   blank: boolean
+  // a shadow or a light (shape types T1): kept inside every other shape that is drawn (its `compDs`)
+  cast?: CastKind | null
 }
 
 // The one ink every outline is drawn in (shape editor S3): a dark neutral gray, part of the model's picture like its fills.
@@ -68,7 +71,7 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     for (const t of coveringObjects(c, o)) {
       for (const sid of t.shapes) {
         const r = solved.shapes[sid], b = layerOf(sid)
-        if (r?.visible && r.d && b && !b.helper && !b.shading) ds.push(r.d)
+        if (r?.visible && r.d && b && !b.helper && !b.shading && !b.cast) ds.push(r.d)
       }
     }
     const made = ds.length > 0 ? { key: o.id, ds } : null
@@ -84,25 +87,36 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     if (!orig || orig.mirrorOf || !(orig.over ?? []).length) return []
     return orig.over!.map(oid => c.objects.find(o => o.mirrorOf === oid)?.id ?? objects.get(oid)?.mirrorOf ?? oid)
   }
+  // what a shadow or a light is kept inside: every other shape that is drawn (not a helper, a shading shape, a shadow or a light), worked out once
+  let below: string[] | null = null
+  const belowAll = (): string[] => {
+    if (below) return below
+    below = solved.order.filter(sid => {
+      const b = layerOf(sid)
+      return !!b && !b.cast && !b.shading && !b.helper && !!solved.shapes[sid]?.visible && !!solved.shapes[sid]?.d
+    }).map(sid => solved.shapes[sid].d)
+    return below
+  }
   const items: PaintItem[] = []
   for (const id of ids) {
     const r = solved.shapes[id], layer = layerOf(id)
     if (!r?.d || !layer) continue
     const clipD = layer.clip ? outline(layer.clip) : ''
     let compDs: string[] = []
-    if (layer.shading) {
+    if (layer.cast) compDs = belowAll()
+    else if (layer.shading) {
       // the base shapes of its own object, and of the other objects it lies on (phase O2: one shadow down the chest and the pelvis)
       const home = c.objects.find(o => o.shapes.includes(id))
       const lying = [home, ...overOf(id).map(oid => objects.get(oid))].filter((o, k, all): o is NonNullable<typeof o> => !!o && all.indexOf(o) === k)
       compDs = lying.flatMap(o => o.shapes).filter(sid => {
         const b = layerOf(sid)
-        return sid !== id && !!b && !b.shading && !b.helper && !!solved.shapes[sid]?.visible && !!solved.shapes[sid]?.d
+        return sid !== id && !!b && !b.shading && !b.cast && !b.helper && !!solved.shapes[sid]?.visible && !!solved.shapes[sid]?.d
       }).map(sid => solved.shapes[sid].d)
     }
     const cutDs = layer.cuts.map(outline).filter(Boolean)
     items.push({
       id, d: r.d, fill: layer.fill, opacity: layer.opacity * (r.fade ?? 1), gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading, wear: anyWear && !layer.helper ? wearOf(id) : null,
-      blank: (!!layer.clip && !clipD) || (layer.shading && compDs.length === 0),
+      blank: (!!layer.clip && !clipD) || ((layer.shading || !!layer.cast) && compDs.length === 0), cast: layer.cast,
       line: layer.line ? { w: Math.round(layer.line * scaleOf(r.matrix) * 1000) / 1000, alpha: r.fade ?? 1 } : null,
     })
   }
