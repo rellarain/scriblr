@@ -65,6 +65,7 @@ export function toggleAnchor(s: ModelShape, i: number, id = freshMarkId(s)): Mad
   if (on) return { ok: true, shape: { ...s, marks: marksOf(s).filter(m => m.id !== on.id) } }
   if (!p) return { ok: false, reason: 'There is no such point.' }
   if (p.bind) return { ok: false, reason: 'A point that follows a shape cannot be an anchor: disconnect it first.' }
+  if (marksOf(s).some(m => m.kind === 'pose' && markPoint(s, m) === i)) return { ok: false, reason: 'A posable point cannot also be an anchor: take it off first.' }
   if (marksOf(s).length >= MARKS_MAX) return { ok: false, reason: `A shape may have at most ${MARKS_MAX} marks.` }
   return { ok: true, shape: { ...s, marks: [...marksOf(s), { id, kind: 'anchor', x: p.x, y: p.y, i, name: '' }] } }
 }
@@ -72,6 +73,21 @@ export function toggleAnchor(s: ModelShape, i: number, id = freshMarkId(s)): Mad
 export function addFreeAnchor(s: ModelShape, x: number, y: number, id = freshMarkId(s)): Made {
   if (marksOf(s).length >= MARKS_MAX) return { ok: false, reason: `A shape may have at most ${MARKS_MAX} marks.` }
   return { ok: true, shape: { ...s, marks: [...marksOf(s), { id, kind: 'anchor', x: r2(x), y: r2(y), i: null, name: '' }] } }
+}
+// A posable point on point i (shape types T5), or the one there taken away. A point has one mark at most.
+export function togglePosable(s: ModelShape, i: number, id = freshMarkId(s)): Made {
+  const on = marksOf(s).find(m => m.kind === 'pose' && markPoint(s, m) === i), p = s.pts[i]
+  if (on) return { ok: true, shape: { ...s, marks: marksOf(s).filter(m => m.id !== on.id) } }
+  if (!p) return { ok: false, reason: 'There is no such point.' }
+  if (anchorOn(s, i)) return { ok: false, reason: 'An anchored point cannot also be posable: take its anchor off first.' }
+  if (marksOf(s).length >= MARKS_MAX) return { ok: false, reason: `A shape may have at most ${MARKS_MAX} marks.` }
+  return { ok: true, shape: { ...s, marks: [...marksOf(s), { id, kind: 'pose', x: p.x, y: p.y, i, name: '' }] } }
+}
+export const posableOn = (s: ModelShape, i: number): ModelMark | undefined => marksOf(s).find(m => m.kind === 'pose' && markPoint(s, m) === i)
+// A posable point inside the shape (in its own drawing space).
+export function addFreePosable(s: ModelShape, x: number, y: number, id = freshMarkId(s)): Made {
+  if (marksOf(s).length >= MARKS_MAX) return { ok: false, reason: `A shape may have at most ${MARKS_MAX} marks.` }
+  return { ok: true, shape: { ...s, marks: [...marksOf(s), { id, kind: 'pose', x: r2(x), y: r2(y), i: null, name: '' }] } }
 }
 export const removeMark = (s: ModelShape, id: string): ModelShape => ({ ...s, marks: marksOf(s).filter(m => m.id !== id) })
 export const renameMark = (s: ModelShape, id: string, name: string): ModelShape => ({ ...s, marks: marksOf(s).map(m => (m.id === id ? { ...m, name: name.slice(0, 40) } : m)) })

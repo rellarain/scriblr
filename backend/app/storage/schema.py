@@ -1348,6 +1348,38 @@ def _optional_id(value: Any) -> Optional[str]:
     return value if isinstance(value, str) and re.fullmatch(_MODEL_ID, value) else None
 
 
+class ModelSlide(BaseModel):
+    """A slider (shape types T5): an edge link that moves along the other shape's outline between two stops. A place along an outline is its edge and how far
+    along it (e + t), so the stops may lie on different segments (an arc of a pivot circle). `at` is where it has been posed (None: where it is drawn); it is
+    held between the stops."""
+
+    lo: float = 0.0
+    hi: float = 1.0
+    at: Optional[float] = None
+
+    @field_validator("lo", "hi", mode="before")
+    @classmethod
+    def _stop(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("a place")
+        return round(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX)), 3)
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> Optional[float]:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return round(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX)), 3)
+
+    @model_validator(mode="after")
+    def _held(self) -> "ModelSlide":
+        if self.lo > self.hi:
+            self.lo, self.hi = self.hi, self.lo
+        if self.at is not None:
+            self.at = min(self.hi, max(self.lo, self.at))
+        return self
+
+
 class ModelBind(BaseModel):
     """A point link, kept on the point that follows. `kind` "point": the point sits on point `i` of shape `s` plus the offset `d` (a weld has none); kind
     "edge": it sits at `t` (0..1) along the edge from point `e` of shape `s`, `o` units outward (a clothes point locked to the edge of a body part). A
@@ -1366,6 +1398,20 @@ class ModelBind(BaseModel):
     # Shape editor S5: the name of the connection, and of the shared segment that starts at this point (at most MODEL_BIND_NAME_MAX characters each; empty: none).
     name: str = ""
     segName: str = ""
+    # Shape types T5: an edge link that slides between two stops (None: it stays where it is put).
+    slide: Optional[ModelSlide] = None
+
+    @field_validator("slide", mode="before")
+    @classmethod
+    def _slide(cls, value: Any) -> Any:
+        return _optional_model(ModelSlide, value)
+
+    @model_validator(mode="after")
+    def _slides_on_an_edge(self) -> "ModelBind":
+        # only a point locked onto a segment slides
+        if self.kind != "edge":
+            self.slide = None
+        return self
 
     @field_validator("name", "segName", mode="before")
     @classmethod

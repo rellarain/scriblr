@@ -61,6 +61,10 @@ export interface PivotMarker {
 // Pose mode: the figure is grabbed instead of edited. The page decides what a grab does (turn a group, scale one, slide an anchor, reach with a limb) and
 // answers whether a drag began; the canvas only passes the pointer on, and draws the markers it is given (in canvas space).
 export type PoseGrab = { kind: 'part'; shapeId: string } | { kind: 'scale'; groupId: string } | { kind: 'slide'; groupId: string } | { kind: 'grip'; gripId: string }
+  // the shape editor's Pose mode (shape types T5): a posable point, and a slider
+  | { kind: 'mark'; shapeId: string; markId: string } | { kind: 'slider'; shapeId: string; i: number }
+// A slider (shape types T5): the point where it is drawn now, its two stops on the outline it runs along, and whether the stops are shown to drag (its shape is edited).
+export interface SliderMark { id: string; shapeId: string; i: number; x: number; y: number; lo: [number, number]; hi: [number, number]; name: string; stops: boolean }
 // A grip point of a hand (phase 5c), where a held item is taken: its place and the end of the short line showing the way the item points (canvas space). In Pose mode
 // it is grabbed: dragging it reaches with the arm.
 export interface GripMark { id: string; name: string; x: number; y: number; tx: number; ty: number; active: boolean }
@@ -216,6 +220,10 @@ export interface CanvasProps {
   pivotPoints?: Array<{ id: string; x: number; y: number; name: string }>
   // the anchors of the shapes (shape types T4), where they are drawn now, on the Pivots and anchors layer
   anchorMarks?: Array<{ id: string; x: number; y: number; name: string }>
+  // the posable points (T5), grabbed in Pose mode; the sliders, grabbed in Pose mode, and their stops, dragged while their shape is edited
+  poseMarks?: Array<{ id: string; shapeId: string; markId: string; x: number; y: number; name: string }>
+  sliders?: SliderMark[]
+  onStop?: (shapeId: string, i: number, which: 'lo' | 'hi', world: [number, number]) => void
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -229,6 +237,7 @@ type Drag =
   | { kind: 'pivot' }
   | { kind: 'pose' }
   | { kind: 'posePress'; shapeId: string; x0: number; y0: number; world: [number, number] }
+  | { kind: 'stop'; shapeId: string; i: number; which: 'lo' | 'hi'; x0: number; y0: number; moved: boolean }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
   // the box of the selected shape (shape editor S4): a resize from one of its handles, or a turn by its round handle, worked out from the shape as it was when it began
   | { kind: 'resize'; shapeId: string; handle: BoxHandle; from: ModelShape; frame: Frame; x0: number; y0: number; moved: boolean }
@@ -753,6 +762,13 @@ export function DesignerCanvas(p: CanvasProps) {
     if (e.button !== 0 || !p.pose) return
     if (p.pose.onDown(grab, toWorld(e), false)) { dragRef.current = { kind: 'pose' }; capture(e) }
   }
+  // A stop of a slider (T5): dragged along the outline the slider runs on.
+  function onStopDown(e: ReactPointerEvent, m: SliderMark, which: 'lo' | 'hi') {
+    e.stopPropagation()
+    if (e.button !== 0) return
+    dragRef.current = { kind: 'stop', shapeId: m.shapeId, i: m.i, which, x0: e.clientX, y0: e.clientY, moved: false }
+    capture(e)
+  }
   function onGripDown(e: ReactPointerEvent, grab: PoseGrab) {
     if (!p.pose) return
     onPoseHandleDown(e, grab)
@@ -794,6 +810,15 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
+    if (d.kind === 'stop') {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+        d.moved = true
+        p.onGesture()
+      }
+      p.onStop?.(d.shapeId, d.i, d.which, toWorld(e))
+      return
+    }
     if (d.kind === 'posePress') {
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
       if (p.pose?.onDown({ kind: 'part', shapeId: d.shapeId }, d.world, false)) { dragRef.current = { kind: 'pose' }; p.pose.onMove(toWorld(e)) } else dragRef.current = null
@@ -1281,6 +1306,22 @@ export function DesignerCanvas(p: CanvasProps) {
           <circle cx={g.x} cy={g.y} r={9 * u} className="cmPickGroupHit" />
           <circle cx={g.x} cy={g.y} r={4.5 * u} className="cmPickGroupDot" />
         </g>
+      ))}
+      {(p.poseMarks ?? []).map(m => (p.pose?.light ? (
+        <circle key={m.id} cx={m.x} cy={m.y} r={5 * u} className="cmPoseMark cmPoseMark--live" data-pose-mark={m.id} role="button" tabIndex={-1} aria-label={`Pose with ${m.name || 'the posable point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'mark', shapeId: m.shapeId, markId: m.markId })} />
+      ) : p.layers.includes('pivots') ? (
+        <circle key={m.id} cx={m.x} cy={m.y} r={4 * u} className="cmPoseMark" data-pose-mark={m.id} aria-hidden="true"><title>{m.name || 'Posable point'}</title></circle>
+      ) : null))}
+      {(p.sliders ?? []).map(m => (
+        <Fragment key={m.id}>
+          {p.pose?.light && <circle cx={m.x} cy={m.y} r={5 * u} className="cmSlideHandle cmSlider" data-slider={m.id} role="button" tabIndex={-1} aria-label={`Slide ${m.name || 'the point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'slider', shapeId: m.shapeId, i: m.i })} />}
+          {m.stops && !p.pose && ([['lo', m.lo, 'First stop'], ['hi', m.hi, 'Second stop']] as const).map(([which, at, word]) => (
+            <rect
+              key={which} x={at[0] - 2.5 * u} y={at[1] - 2.5 * u} width={5 * u} height={5 * u} className="cmSlideStop" data-stop={`${m.id}:${which}`} role="button" tabIndex={-1}
+              aria-label={`${word} of ${m.name || 'the slider'}`} onPointerDown={e => onStopDown(e, m, which)}
+            />
+          ))}
+        </Fragment>
       ))}
       {p.pose && p.pose.joints.map(j => (
         <g key={j.id} className={`cmJoint${j.active ? ' cmJoint--on' : ''}`} aria-hidden="true">

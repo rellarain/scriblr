@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ModelBind, ModelContent, ModelShape } from '../../../../../api/types'
 import { content as blank } from '../../../../../test/characterModelsBackend'
 import { addGroup, addObject, addShape, newGroup } from '../modelContent'
-import { addFreeAnchor, guardAnchors, placeMat, placeOf, repairMarks, toggleAnchor } from './anchors'
+import { addFreeAnchor, guardAnchors, placeMat, placeOf, repairMarks, toggleAnchor, togglePosable } from './anchors'
 import { apply, rotate, translate } from './geometry'
 import { addPivot, poseOf, setPivotSetting } from './pivots'
-import { beginPose, isPosed, movePose, resetPose, type PoseDrag } from './posing'
+import { beginPose, beginReach, isPosed, movePose, resetPose, type PoseDrag } from './posing'
 import { solve, type Solved } from './rig'
 import { transformShape } from './transform'
 
@@ -190,5 +190,53 @@ describe('Reset pose', () => {
     const back = resetPose(with_(c, 'body', s => ({ ...s, place: { dx: 4, dy: 0, turn: 0 } })))
     expect(isPosed(back)).toBe(false)
     expect(back.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBe(0)
+  })
+})
+
+describe('a posable point (T5)', () => {
+  const posable = (c: ModelContent, id: string, i: number): ModelContent => with_(c, id, s => { const r = togglePosable(s, i); if (!r.ok) throw new Error(r.reason); return r.shape })
+  const markOf = (c: ModelContent, id: string) => { const s = solve(c).shapes[id], m = c.shapes.find(x => x.id === id)!.marks!.find(k => k.kind === 'pose')!; const [x, y] = apply(s.matrix, m.x, m.y); return { x, y } }
+  const reachTo = (c: ModelContent, id: string, to: [number, number]) => {
+    const m = c.shapes.find(x => x.id === id)!.marks!.find(k => k.kind === 'pose')!
+    const r = beginReach(c, id, m.id, [0, 0])
+    if (!r.ok) throw new Error(r.reason)
+    return movePose(c, r.drag, to)
+  }
+
+  it('turns the pivots to reach, and the shape holding it keeps its angle', () => {
+    const c = posable(anchor(figure(), 'body', 0), 'fore', 2)
+    // the elbow's place a sixth of a turn round the shoulder, the forearm still hanging straight from it
+    const [ex, ey] = apply(rotate(60, 80, 100), 80, 160), target: [number, number] = [ex + 6, ey + 40]
+    const posed = reachTo(c, 'fore', target)
+    near(markOf(posed, 'fore'), target[0], target[1], 0)
+    const m = solve(posed).shapes.fore.matrix
+    expect(Math.abs((Math.atan2(m[1], m[0]) * 180) / Math.PI)).toBeLessThan(1)
+  })
+
+  it('on a shape with one pivot to the anchor, swings it to reach', () => {
+    const c = posable(anchor(figure(), 'body', 0), 'arm', 2)
+    const [tx, ty] = apply(rotate(45, 80, 100), 86, 160)
+    const posed = reachTo(c, 'arm', [tx, ty])
+    near(markOf(posed, 'arm'), tx, ty, 0)
+    expect(posed.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBeCloseTo(45, 0)
+  })
+
+  it('within the limits of each pivot', () => {
+    const c = setPivotSetting(posable(anchor(figure(), 'body', 0), 'arm', 2), 'c2', 'hi', 20)
+    const posed = reachTo(c, 'arm', apply(rotate(80, 80, 100), 86, 160))
+    expect(posed.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBeLessThanOrEqual(20)
+  })
+
+  it('with no anchor lets the figure hang from it', () => {
+    const c = posable(figure(), 'fore', 2)
+    const m = c.shapes.find(x => x.id === 'fore')!.marks![0]
+    expect(beginReach(c, 'fore', m.id, [86, 200])).toMatchObject({ ok: true, drag: { kind: 'dangle' } })
+  })
+
+  it('is not put on an anchored point, nor an anchor on it', () => {
+    const s = anchor(figure(), 'body', 0).shapes.find(x => x.id === 'body')!
+    expect(togglePosable(s, 0)).toMatchObject({ ok: false })
+    const t = posable(figure(), 'body', 1).shapes.find(x => x.id === 'body')!
+    expect(toggleAnchor(t, 1)).toMatchObject({ ok: false })
   })
 })

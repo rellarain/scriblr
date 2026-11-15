@@ -471,6 +471,9 @@ described, now stale, in `docs/data-model.md`).
   space, `i` the point it lies on or null inside the shape, `name`; at most 8; a mark on a point that is not there lies inside) and
   `place` (`ModelPlace`: `dx`, `dy`, `turn` in -180..180; null: as drawn), where a figure's first shape has been posed. An
   anchored body is a figure's root; Pose mode keeps what it does as the circles' turns and the root's place.
+  Shape types T5 adds, with a default: on an edge link `slide` (`ModelSlide`: `lo`, `hi` the stops as places along the other shape's
+  outline, e + t, so they may lie on different segments; `at` where it has been posed, held between them, null as drawn; only on
+  an edge link). A mark of kind `pose` is a posable point, dragged in Pose mode to reach.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

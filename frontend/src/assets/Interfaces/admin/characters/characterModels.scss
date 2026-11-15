@@ -267,6 +267,10 @@
 .cmPivotPt { pointer-events: none; .cmPivotRing { stroke: var(--ink); } }
 // an anchor (shape types T4): a small diamond in the ink, edged in the raised surface so it reads on any shape
 .cmAnchorMark { fill: var(--ink); stroke: var(--surface-raised); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+// a posable point (T5): a ring in the accent, grabbed in Pose mode; a slider's stops: small squares in the ink on the outline it runs along
+.cmPoseMark { fill: var(--surface-raised); fill-opacity: 0.6; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmPoseMark--live { pointer-events: auto; cursor: grab; }
+.cmSlideStop { fill: var(--ink); stroke: var(--surface-raised); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; }
 .cmMarkRow { align-items: flex-end; .cmField { flex: 1 1 auto; min-width: 0; } }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }

@@ -1,6 +1,7 @@
 import type { ModelContent, ModelPlace } from '../../../../../api/types'
-import { anchorsOf, placeMat, placeOf } from './anchors'
-import { IDENTITY, apply, inverse, mul, rotate, translate, type Mat } from './geometry'
+import { anchorsOf, marksOf, placeMat, placeOf } from './anchors'
+import { IDENTITY, apply, inverse, mul, rotate, translate, type BuiltPoint, type Mat } from './geometry'
+import { nearestPlace, slideAt } from './sliders'
 import { circlesOf, isPivotCircle, poseOf, setPivotSetting, type Pose } from './pivots'
 
 // Posing by dragging (shape types T4). What is posed is kept as each pivot circle's turn and where a figure's first shape has been placed; the drawing never changes, so Reset
@@ -10,11 +11,15 @@ import { circlesOf, isPivotCircle, poseOf, setPivotSetting, type Pose } from './
 // - with no anchor: the shape follows the pointer and the rest of the figure hangs from it, each pivot turned (within its limits) so the weight beyond it hangs straight down,
 //   like a doll held by one part.
 // A drag on a pivot circle (not the one on the root's side) swings it.
+// T5: a posable point is dragged to reach: the pivots between it and the anchor turn (each within its limits) to bring it to the pointer, and the shape holding it keeps
+// its own angle when there is more than one pivot to turn; with no anchor the figure hangs from it. A slider is dragged along its outline between its stops.
 
 export type PoseDrag =
   | { kind: 'swing'; circle: string; at: [number, number]; from: [number, number]; turn0: number }
   | { kind: 'turn'; root: string; at: [number, number]; from: [number, number]; place0: Mat }
   | { kind: 'dangle'; root: string; from: [number, number]; k: Mat; base: ModelContent }
+  | { kind: 'reach'; shape: string; mark: string; body: string; chain: Array<{ pivot: string; circle: string }>; angle0: number }
+  | { kind: 'slide'; shape: string; i: number; outline: BuiltPoint[]; lo: number; hi: number }
 export type PoseStart = { ok: true; drag: PoseDrag; content: ModelContent } | { ok: false; reason: string }
 
 const no = (reason: string): PoseStart => ({ ok: false, reason })
@@ -37,11 +42,19 @@ export function swingOf(pose: Pose, body: string): { pivot: string; circle: stri
 }
 
 export const canPose = (c: ModelContent, shapeId: string): boolean => poseOf(c).posable.has(shapeId)
-export const isPosed = (c: ModelContent): boolean => c.shapes.some(s => !!s.place || (!!s.pivot && (s.pivot.turn ?? 0) !== 0))
+export const isPosed = (c: ModelContent): boolean => c.shapes.some(s => !!s.place || (!!s.pivot && (s.pivot.turn ?? 0) !== 0) || s.pts.some(p => p.bind?.slide?.at != null))
 
 // Every turn back to 0 and every figure where it was drawn.
 export const resetPose = (c: ModelContent): ModelContent => ({
-  ...c, shapes: c.shapes.map(s => (s.place || (s.pivot && s.pivot.turn) ? { ...s, place: null, ...(s.pivot ? { pivot: { ...s.pivot, turn: 0 } } : {}) } : s)),
+  ...c,
+  shapes: c.shapes.map(s => {
+    const slid = s.pts.some(p => p.bind?.slide?.at != null)
+    if (!s.place && !(s.pivot && s.pivot.turn) && !slid) return s
+    return {
+      ...s, place: null, ...(s.pivot ? { pivot: { ...s.pivot, turn: 0 } } : {}),
+      ...(slid ? { pts: s.pts.map(p => (p.bind?.slide?.at != null ? { ...p, bind: { ...p.bind, slide: { ...p.bind.slide, at: null } } } : p)) } : {}),
+    }
+  }),
 })
 
 const setPlace = (c: ModelContent, root: string, place: ModelPlace | null): ModelContent => ({ ...c, shapes: c.shapes.map(s => (s.id === root ? { ...s, place } : s)) })
@@ -81,7 +94,67 @@ export function beginPose(c: ModelContent, shapeId: string, at: [number, number]
 export function movePose(start: ModelContent, d: PoseDrag, at: [number, number]): ModelContent {
   if (d.kind === 'swing') return setPivotSetting(start, d.circle, 'turn', d.turn0 + sweep(d.at, d.from, at))
   if (d.kind === 'turn') return setPlace(start, d.root, placeOf(mul(rotate(sweep(d.at, d.from, at), d.at[0], d.at[1]), d.place0)))
+  if (d.kind === 'reach') return reach(start, d, at)
+  if (d.kind === 'slide') {
+    const u = nearestPlace(d.outline, d.lo, d.hi, at[0], at[1])
+    return { ...start, shapes: start.shapes.map(s => (s.id === d.shape ? slideAt(s, d.i, u) : s)) }
+  }
   return setPlace(d.base, d.root, placeOf(mul(translate(at[0] - d.from[0], at[1] - d.from[1]), d.k)))
+}
+
+// ---- reaching with a posable point, sliding ----
+
+const angleOfMat = (m: Mat): number => deg(Math.atan2(m[1], m[0]))
+// The pivots from a body toward its root that can turn (it stops at one that cannot: an anchor holds the rest).
+function chainOf(pose: Pose, body: string): Array<{ pivot: string; circle: string }> {
+  const out: Array<{ pivot: string; circle: string }> = []
+  let x = body
+  while (pose.parentOf.has(x)) {
+    const p = pose.parentOf.get(x)!
+    if (pose.blocked.has(p.pivot)) break
+    if (p.circle !== p.held) out.push({ pivot: p.pivot, circle: p.circle })
+    x = p.parent
+  }
+  return out
+}
+const markAt = (c: ModelContent, pose: Pose, shapeId: string, markId: string): [number, number] | null => {
+  const m = marksOf(c.shapes.find(s => s.id === shapeId)).find(k => k.id === markId)
+  return m ? apply(matOf(pose, shapeId), m.x, m.y) : null
+}
+
+// A drag begun on a posable point.
+export function beginReach(c: ModelContent, shapeId: string, markId: string, at: [number, number]): PoseStart {
+  const pose = poseOf(c), body = pose.bodyOf.get(shapeId)
+  if (!body || !pose.posable.has(shapeId)) return no('A posable point poses a shape that swings on a pivot: put it on one.')
+  const root = pose.rootOf.get(body) ?? body
+  if ((pose.figureAnchors.get(root) ?? 0) === 0) return dangle(c, pose, body, root, at)
+  const chain = chainOf(pose, body)
+  if (!chain.length) return no('Nothing turns between this point and the anchor.')
+  return { ok: true, drag: { kind: 'reach', shape: shapeId, mark: markId, body, chain, angle0: angleOfMat(matOf(pose, body)) }, content: c }
+}
+// A drag begun on a slider: it moves along `outline` (canvas space) between its stops.
+export function beginSlide(c: ModelContent, shapeId: string, i: number, outline: BuiltPoint[]): PoseStart {
+  const b = c.shapes.find(s => s.id === shapeId)?.pts[i]?.bind
+  if (!b?.slide || outline.length < 2) return no('This point does not slide.')
+  return { ok: true, drag: { kind: 'slide', shape: shapeId, i, outline, lo: b.slide.lo, hi: b.slide.hi }, content: c }
+}
+
+// The pivots turned (a few rounds, innermost first) to bring the posable point to t; with two or more, the shape holding it turned back at its own pivot to its angle.
+function reach(start: ModelContent, d: Extract<PoseDrag, { kind: 'reach' }>, t: [number, number]): ModelContent {
+  const keep = d.chain.length >= 2, joints = keep ? d.chain.slice(1) : d.chain
+  let w = start
+  for (let round = 0; round < 12; round++) {
+    for (const j of joints) {
+      const pose = poseOf(w), pj = pose.points.get(j.pivot), e = markAt(w, pose, d.shape, d.mark)
+      if (!pj || !e || Math.hypot(e[0] - pj[0], e[1] - pj[1]) < 1e-6 || Math.hypot(t[0] - pj[0], t[1] - pj[1]) < 1e-6) continue
+      const by = wrap(angleAt(pj, t) - angleAt(pj, e))
+      if (Math.abs(by) > 0.01) w = addTurn(w, j.circle, by)
+    }
+    if (keep) w = addTurn(w, d.chain[0].circle, wrap(d.angle0 - angleOfMat(matOf(poseOf(w), d.body))))
+    const e = markAt(w, poseOf(w), d.shape, d.mark)
+    if (e && Math.hypot(e[0] - t[0], e[1] - t[1]) < 0.5) break
+  }
+  return w
 }
 
 // ---- hanging from one body ----

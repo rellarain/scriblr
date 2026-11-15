@@ -1,5 +1,6 @@
 import type { ModelBind, ModelContent, ModelPoint, ModelShape } from '../../../../../api/types'
 import { isAnchored } from './anchors'
+import { edgeOf, nearestPlace } from './sliders'
 import { outlineSize, shapeById } from '../modelContent'
 import { addPoint, movePoint } from './edit'
 import { apply, bezierAt, build, inverse, nearestEdge, r2, transformList, type BuiltPoint, type Mat } from './geometry'
@@ -23,7 +24,7 @@ const ZERO = 1e-6
 export const isWeld = (b: ModelBind | null | undefined): boolean => !!b && b.kind === 'point' && Math.abs(b.d[0]) < ZERO && Math.abs(b.d[1]) < ZERO
 
 // The outline of a solved shape in canvas space (with its curve handles).
-const drawnOf = (c: ModelContent, solved: Solved, shapeId: string): BuiltPoint[] => {
+export const drawnOf = (c: ModelContent, solved: Solved, shapeId: string): BuiltPoint[] => {
   const r = solved.shapes[shapeId], s = shapeById(c, shapeId)
   return r && s && r.local.length >= 3 ? build(r.local, s.closed, r.matrix) : []
 }
@@ -88,7 +89,7 @@ const setPoint = (c: ModelContent, shapeId: string, i: number, change: (p: Model
   }) })
 
 // A place in canvas space, in a shape's own space.
-const into = (solved: Solved, shapeId: string, x: number, y: number): [number, number] => {
+export const into = (solved: Solved, shapeId: string, x: number, y: number): [number, number] => {
   const m: Mat | undefined = solved.shapes[shapeId]?.matrix
   const [lx, ly] = m ? apply(inverse(m), x, y) : [x, y]
   return [r2(lx), r2(ly)]
@@ -133,6 +134,11 @@ export function slideOnEdge(c: ModelContent, solved: Solved, shapeId: string, i:
   if (!s || !b || b.kind !== 'edge') return null
   const a = drawnOf(c, solved, b.s), n = a.length
   if (n < 3) return null
+  // a slider (shape types T5) goes anywhere between its stops, from one segment to the next
+  if (b.slide) {
+    const u = nearestPlace(a, b.slide.lo, b.slide.hi, x, y), [se, st] = edgeOf(u, n), q = bezierAt(a, se, st), [sx, sy] = into(solved, shapeId, q.x, q.y)
+    return { ...s, pts: s.pts.map((p, k) => (k === i ? { ...p, x: sx, y: sy, bind: { ...b, e: se, t: r2(st) } } : p)) }
+  }
   const e = b.e % n
   let best = b.t, bd = Infinity
   const look = (t: number) => { const q = bezierAt(a, e, t), d = Math.hypot(q.x - x, q.y - y); if (d < bd) { bd = d; best = t } }

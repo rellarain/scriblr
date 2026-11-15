@@ -79,8 +79,10 @@ import {
 import { LIMITS } from './engine/limits'
 import type { ArrangeActions, ConnectionActions, PivotActions, SymmetryActions } from './ShapePanels'
 import { addCircle, addPivot, isPivotCircle, movePivotBy, pivotById, poseOf, radiusOf, renamePivot, setPivotSetting, setRadius } from './engine/pivots'
-import { addFreeAnchor, anchorOn, anchorsOf, guardAnchors, toggleAnchor } from './engine/anchors'
-import { beginPose, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag } from './engine/posing'
+import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, guardAnchors, marksOf, posableOn, toggleAnchor, togglePosable } from './engine/anchors'
+import { isSlider, makeSlider, nearestPlace, placeAt, setStop, stopSlider } from './engine/sliders'
+import { drawnOf } from './engine/connect'
+import { beginPose, beginReach, beginSlide, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag } from './engine/posing'
 import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
 import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
 import { PointForm } from './PointForm'
@@ -952,6 +954,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function poseBegin(grab: PoseGrab, world: [number, number], alt: boolean): boolean {
     if (recording) return false
     const sv = solved, p = toModel(sv, world[0], world[1]), start = valuesRef.current
+    // (a posable point and a slider are grabbed only in the shape editor's Pose mode)
+    if (grab.kind === 'mark' || grab.kind === 'slider') return false
     const gid = grab.kind === 'part' ? groupOfShape(content, grab.shapeId) : grab.kind === 'grip' ? undefined : grab.groupId
     const name = content.groups.find(g => g.id === gid)?.name.trim() || 'the group'
     // A twin whose original moves only its own side is given the slider it lacks the moment it is grabbed, so either side can be posed: the new sliders are one
@@ -1648,8 +1652,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // poses it (with a group selected, only that group's shapes); one that stays put selects as usual, which leaves Pose mode. Each drag is one undo step.
   const posingOn = shapesOnly && !recording && !through && (sel.kind === 'none' || sel.kind === 'group')
   function shapePoseBegin(grab: PoseGrab, world: [number, number]): boolean {
-    if (grab.kind !== 'part') return false
-    const r = beginPose(content, grab.shapeId, toModel(solved, world[0], world[1]))
+    const at = toModel(solved, world[0], world[1])
+    const target = grab.kind === 'slider' ? shapeById(content, grab.shapeId)?.pts[grab.i]?.bind?.s : undefined
+    const r = grab.kind === 'part' ? beginPose(content, grab.shapeId, at)
+      : grab.kind === 'mark' ? beginReach(content, grab.shapeId, grab.markId, at)
+      : grab.kind === 'slider' && target ? beginSlide(content, grab.shapeId, grab.i, drawnOf(content, canvasSolved, target))
+      : null
+    if (!r) return false
     if (!r.ok) { setNote(r.reason); return false }
     shapePoseRef.current = { drag: r.drag, start: content, changed: r.content !== content }
     if (r.content !== content) { setHistory(h => remember(h, content)); models.edit(entry.id, () => r.content, false) }
@@ -1668,11 +1677,33 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     shapePoseRef.current = null
     if (d?.changed) models.edit(entry.id, () => d.start, false)
   }
-  const shapePose: PoseCanvas | null = posingOn && poseOf(content).posable.size > 0 ? {
+  // what Pose mode can grab: the shapes of a figure with a pivot, a posable point, a slider
+  const poseHandles = content.shapes.some(s => marksOf(s).some(m => m.kind === 'pose') || s.pts.some(isSlider))
+  const shapePose: PoseCanvas | null = posingOn && (poseOf(content).posable.size > 0 || poseHandles) ? {
     joints: [], scales: [], slides: [], light: true,
     canPose: id => poseOf(content).posable.has(id) && (sel.kind !== 'group' || groupOfShape(content, id) === sel.id),
     onDown: shapePoseBegin, onMove: shapePoseMove, onUp: () => { shapePoseRef.current = null }, onCancel: shapePoseCancel,
   } : null
+  // the posable points and the sliders where they are drawn now (T5); a slider's stops are shown while its shape is edited
+  const poseMarks = shapesOnly ? content.shapes.flatMap(s => marksOf(s).filter(m => m.kind === 'pose').map(m => {
+    const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
+    return { id: `${s.id}:${m.id}`, shapeId: s.id, markId: m.id, x, y, name: m.name }
+  })) : undefined
+  const sliderMarks = shapesOnly ? content.shapes.flatMap(s => s.pts.flatMap((p, i) => {
+    const b = p.bind, r = canvasSolved.shapes[s.id], q = r?.local[i]
+    if (!b?.slide || !r || !q) return []
+    const a = drawnOf(content, canvasSolved, b.s)
+    if (a.length < 2) return []
+    const [x, y] = apply(r.matrix, q.x, q.y)
+    return [{ id: `${s.id}:${i}`, shapeId: s.id, i, x, y, lo: placeAt(a, b.slide.lo), hi: placeAt(a, b.slide.hi), name: b.name ?? '', stops: sel.kind === 'shape' && sel.id === s.id }]
+  })) : undefined
+  function moveStop(shapeId: string, i: number, which: 'lo' | 'hi', world: [number, number]) {
+    const s = shapeById(content, shapeId), b = s?.pts[i]?.bind
+    if (!s || !b?.slide) return
+    const a = drawnOf(content, canvasSolved, b.s)
+    if (a.length < 2) return
+    live(shapeId, setStop(s, i, which, nearestPlace(a, 0, a.length, world[0], world[1]), a.length))
+  }
   // the anchors where they are drawn now
   const anchorMarks = shapesOnly ? content.shapes.flatMap(s => anchorsOf(s).map(m => {
     const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
@@ -1720,7 +1751,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onShape={live} onEditShape={editShape}
             onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
             onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
-            rigid={!!selPivot} pivotPoints={pivotPoints} anchorMarks={anchorMarks}
+            rigid={!!selPivot} pivotPoints={pivotPoints} anchorMarks={anchorMarks} poseMarks={poseMarks} sliders={sliderMarks} onStop={shapesOnly ? moveStop : undefined}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
@@ -1741,6 +1772,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const r = addFreeAnchor(s, spot[0], spot[1])
                 if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape)
               }}
+              onPosable={() => {
+                const s = shapeById(content, pointForm.id), spot = pointForm.inside
+                setPointForm(null)
+                if (!s || !spot) return
+                const r = addFreePosable(s, spot[0], spot[1])
+                if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape)
+              }}
               onClose={closePointForm}
             />
           )}
@@ -1757,6 +1795,23 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const r = toggleAnchor(s, i)
                 if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape, i)
               }}
+              posable={!!posableOn(shapeById(content, pointForm.id)!, pointForm.i)}
+              onPosable={() => {
+                const s = shapeById(content, pointForm.id), i = pointForm.i
+                setPointForm(null)
+                if (!s) return
+                const r = togglePosable(s, i)
+                if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape, i)
+              }}
+              slider={isSlider(shapeById(content, pointForm.id)!.pts[pointForm.i])}
+              onSlider={shapeById(content, pointForm.id)!.pts[pointForm.i].bind?.kind === 'edge' ? () => {
+                const s = shapeById(content, pointForm.id), i = pointForm.i
+                setPointForm(null)
+                if (!s) return
+                if (isSlider(s.pts[i])) { editShape(s.id, stopSlider(s, i), i); return }
+                const r = makeSlider(s, i)
+                if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape, i)
+              } : undefined}
               onClose={closePointForm}
             />
           )}

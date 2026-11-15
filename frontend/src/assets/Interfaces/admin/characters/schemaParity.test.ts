@@ -57,6 +57,8 @@ describe('the model types match the backend schema', () => {
     ['ModelPivot', 'ModelPivot'], ['ModelShapePivot', 'ModelShapePivot'],
     // anchors and the posed place (shape types T4)
     ['ModelMark', 'ModelMark'], ['ModelPlace', 'ModelPlace'],
+    // sliders (shape types T5)
+    ['ModelSlide', 'ModelSlide'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {

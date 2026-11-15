@@ -7,6 +7,7 @@ import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { repairPivot, repairShapePivot } from './engine/pivots'
 import { repairMarks, repairPlace } from './engine/anchors'
+import { repairSlide } from './engine/sliders'
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
 import { roundWeight } from './engine/skin'
@@ -62,7 +63,7 @@ function bind(v: unknown): ModelBind | null {
   const s = idOf(v.s)
   if (!s) return null
   const at = (x: unknown) => Math.round(num(x, 0, 0, LIMITS.pointsMax - 1))
-  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName) }
+  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName), ...(repairSlide(v.slide, v.kind === 'edge' ? 'edge' : 'point') ? { slide: repairSlide(v.slide, 'edge') } : {}) }
 }
 
 function point(v: unknown): ModelPoint {

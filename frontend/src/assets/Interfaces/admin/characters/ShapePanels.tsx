@@ -81,15 +81,23 @@ export function TypeSection({ shape, onEditShape }: { shape: ModelShape; onEditS
 
 // The shape's anchors (shape types T4): each with a name and a Delete. They are placed from the point form (a right-click on a point, or inside the shape).
 export function MarksSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: (id: string, next: ModelShape) => void }) {
-  const marks = (shape.marks ?? []).filter(m => m.kind === 'anchor')
+  return (
+    <>
+      <MarkList shape={shape} kind="anchor" group="Anchors" one="anchor" onEditShape={onEditShape} />
+      <MarkList shape={shape} kind="pose" group="Posable points" one="posable point" onEditShape={onEditShape} />
+    </>
+  )
+}
+function MarkList({ shape, kind, group, one, onEditShape }: { shape: ModelShape; kind: 'anchor' | 'pose'; group: string; one: string; onEditShape: (id: string, next: ModelShape) => void }) {
+  const marks = (shape.marks ?? []).filter(m => m.kind === kind)
   if (!marks.length) return null
   return (
-    <div className="cmMarksPanel" role="group" aria-label="Anchors">
-      <h3 className="cmInsSub">Anchors</h3>
+    <div className="cmMarksPanel" role="group" aria-label={group}>
+      <h3 className="cmInsSub">{group}</h3>
       {marks.map((m, k) => (
         <div key={m.id} className="cmInline cmMarkRow">
-          <label className="cmField"><span>{`Name of anchor ${k + 1}`}</span><input value={m.name} maxLength={NAME_LIMIT} placeholder={m.i === null ? 'Inside the shape' : `On point ${m.i + 1}`} onChange={e => onEditShape(shape.id, renameMark(shape, m.id, e.target.value))} /></label>
-          <button type="button" className="cmIconBtn" aria-label={`Delete anchor ${k + 1}`} title="Delete the anchor" onClick={() => onEditShape(shape.id, removeMark(shape, m.id))}><CloseIcon size={14} /></button>
+          <label className="cmField"><span>{`Name of ${one} ${k + 1}`}</span><input value={m.name} maxLength={NAME_LIMIT} placeholder={m.i === null ? 'Inside the shape' : `On point ${m.i + 1}`} onChange={e => onEditShape(shape.id, renameMark(shape, m.id, e.target.value))} /></label>
+          <button type="button" className="cmIconBtn" aria-label={`Delete ${one} ${k + 1}`} title={`Delete the ${one}`} onClick={() => onEditShape(shape.id, removeMark(shape, m.id))}><CloseIcon size={14} /></button>
         </div>
       ))}
     </div>

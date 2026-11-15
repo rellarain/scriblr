@@ -8,6 +8,7 @@ import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, ty
 import { texturedPath } from './texture'
 import { followBound } from './symmetry'
 import { poseOf } from './pivots'
+import { slidPlace } from './sliders'
 import { isCast } from './kinds'
 import { angleOf, fromBehind, wrapAngle, type View } from './angles'
 import { LAYER_THICK, carryKey, facing, facingFade, handleDepths, inSeen, isKeySpot, keyAt, mixBuilt, pickKeys, shiftOf, shifted, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turnedX, turningOf, twinKeys, unbuild, usesKeys, viewZ, type Key, type KeyPick, type Moved, type Spin, type Surface } from './turn'
@@ -677,12 +678,12 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         const at = (i: number): PointSkin => target.skin!.pts[i % m] ?? { base: target.group, inf: [] }
         let x: number, y: number, held: PointSkin
         if (b.kind === 'point') { const q = rest[b.i % m]; x = q.x + b.d[0] * f; y = q.y + b.d[1] * f; held = at(b.i) }
-        else { [x, y] = edgeAt(rest, windSign(rest), b.e % m, b.t, b.o * f); held = mixSkin(at(b.e), at(b.e + 1), b.t) }
+        else { const [se, st] = slidPlace(b, m); [x, y] = edgeAt(rest, windSign(rest), se, st, b.o * f); held = mixSkin(at(se), at(se + 1), st) }
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue
         p.x = x; p.y = y
         ;(carried ??= new Map()).set(k, held)
         if (b.kind === 'edge' && b.tan) {
-          const e = bezierAt(rest, b.e % m, b.t), tl = Math.hypot(e.tx, e.ty)
+          const [se, st] = slidPlace(b, m), e = bezierAt(rest, se, st), tl = Math.hypot(e.tx, e.ty)
           if (tl > 1e-9) leaves.set(k, [e.tx / tl, e.ty / tl])
         }
         continue
@@ -690,7 +691,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const n = a.length
       let wx: number, wy: number
       if (b.kind === 'point') { const q = a[b.i % n]; wx = q.x; wy = q.y }
-      else [wx, wy] = edgeAt(a, windSign(a), b.e % n, b.t, b.o * f)
+      else { const [se, st] = slidPlace(b, n); [wx, wy] = edgeAt(a, windSign(a), se, st, b.o * f) }
       inv = inv ?? inverse(Mg)
       const [lx, ly] = apply(inv, wx, wy)
       const x = lx + (b.kind === 'point' ? b.d[0] * f : 0), y = ly + (b.kind === 'point' ? b.d[1] * f : 0)
@@ -698,7 +699,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         p.x = x; p.y = y
         if (b.kind === 'point' && Math.abs(b.d[0]) < 1e-6 && Math.abs(b.d[1]) < 1e-6) welded.set(k, { s: b.s, i: b.i, a })
         if (b.kind === 'edge' && b.tan) {
-          const e = bezierAt(a, b.e % n, b.t), tx = inv[0] * e.tx + inv[2] * e.ty, ty = inv[1] * e.tx + inv[3] * e.ty, tl = Math.hypot(tx, ty)
+          const [se, st] = slidPlace(b, n), e = bezierAt(a, se, st), tx = inv[0] * e.tx + inv[2] * e.ty, ty = inv[1] * e.tx + inv[3] * e.ty, tl = Math.hypot(tx, ty)
           if (tl > 1e-9) leaves.set(k, [tx / tl, ty / tl])
         }
       }
