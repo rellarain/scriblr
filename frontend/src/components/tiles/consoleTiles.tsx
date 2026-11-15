@@ -21,22 +21,25 @@ export type RailSlots = ReturnType<typeof useRailSlots>
 // A tile of a console: its icon in the console's rail, its title, and what it shows.
 export interface ConsolePage { id: string; label: string; Icon: ComponentType<IconProps>; children: ReactNode; bodyClassName?: string }
 
-// A console tile whose body is an area of its own tiles, with their rail in the console tile's title bar.
-export function consoleTile(slots: RailSlots, { panel, id, title, Icon, pages, label }: {
+// A console tile whose body is an area of its own tiles, with their rail in the console tile's title bar. With a `gutter` (the Admin consoles, the user,
+// 2026-11-15) the tiles sit that far apart and that far from the console's edge, the console's body takes the colour of its title bar (one frame round
+// them), and each tile is one colour, its title bar and its body alike.
+export function consoleTile(slots: RailSlots, { panel, id, title, Icon, pages, label, gutter }: {
   panel: string
   id: string
   title: string
   Icon: ComponentType<IconProps>
   pages: ConsolePage[]
   label?: string
+  gutter?: number
 }): AreaTile {
   return {
-    id, title, Icon, bodyClassName: 'gtBody--area',
+    id, title, Icon, bodyClassName: gutter === undefined ? 'gtBody--area' : 'gtBody--area gtBody--framed',
     titleExtras: <span ref={slots.ref(id)} className="gtRailSlot" />,
     children: (
       <TileArea
-        gridId={`${panel}.${id}`} label={label ?? `${title} tiles`} bar barHost={slots.host(id)}
-        tiles={pages.map(p => ({ id: p.id, title: p.label, Icon: p.Icon, children: p.children, bodyClassName: p.bodyClassName }))}
+        gridId={`${panel}.${id}`} label={label ?? `${title} tiles`} bar barHost={slots.host(id)} gutter={gutter}
+        tiles={pages.map(p => ({ id: p.id, title: p.label, Icon: p.Icon, children: p.children, bodyClassName: p.bodyClassName, className: gutter === undefined ? undefined : 'gtTile--even' }))}
       />
     ),
   }

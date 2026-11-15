@@ -53,6 +53,22 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(within(bar).getByRole('button', { name: 'Project Plan' }).querySelectorAll('rect')).toHaveLength(3)
   })
 
+  it('sets the tiles of a console 10px apart and 10px from its edge, in a frame of the title bar colour, each tile one colour', () => {
+    render(<AUI />)
+    const office = tile('office'), body = office.querySelector(':scope > .gtBody') as HTMLElement
+    expect(body.classList.contains('gtBody--framed')).toBe(true)
+    const pages = [...office.querySelectorAll<HTMLElement>('.gtBody [data-tile-id]')]
+    expect(pages.length).toBeGreaterThan(1)
+    expect(pages.every(p => p.classList.contains('gtTile--even'))).toBe(true)
+    // the first tile starts 10px in from the console's edge, and the stage leaves 10px past the last one
+    expect(pages[0].style.left).toBe('10px')
+    expect(pages[0].style.top).toBe('10px')
+    const stage = office.querySelector('.gtStage') as HTMLElement, last = pages[pages.length - 1]
+    expect(parseFloat(stage.style.height) - (parseFloat(last.style.top) + parseFloat(last.style.height))).toBe(10)
+    // the Designer, Resources and Instructor are not consoles of tiles, and other panels keep the grid as it was
+    expect(tile('designer').querySelector('.gtBody--framed')).toBeNull()
+  })
+
   it('shows the role assignment editor in the Office tile', () => {
     render(<AUI />)
     expect(within(tile('office')).getByText('role assignment')).toBeTruthy()

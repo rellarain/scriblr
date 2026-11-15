@@ -97,4 +97,8 @@
 
 // A console tile that holds an area of tiles: the area fills its body, and the rail of those tiles is in the title bar.
 .gtBody--area { padding: 0; gap: 0; overflow: hidden; }
+// ... framed (the Admin consoles): the body round the tiles is the title bar's colour, so the console is one frame, and each tile in it is one colour,
+// its title bar as its body
+.gtBody--framed { background: var(--gt-title-fill, color-mix(in srgb, var(--ink) 10%, var(--surface-raised))); }
+.gtTile--even > .gtTitle { background: transparent; }
 .gtRailSlot { margin-left: auto; display: inline-flex; align-items: center; min-width: 0; }

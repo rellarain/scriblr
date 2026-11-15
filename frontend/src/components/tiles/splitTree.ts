@@ -56,17 +56,18 @@ function setAtPath(node: SplitNode, path: Path, fn: (n: SplitBranch) => SplitBra
 // axis). A fully-fixed subtree (every leaf in it minimized) contributes nothing --
 // it is an icon in the console's tab bar, not in this geometry, so it costs no space
 // and no gap (its slot in the tree is kept, to restore it to).
-export function minSize(node: SplitNode): { w: number; h: number } {
+// `gap` is the space between two tiles (the grid's own unless an area asks for another).
+export function minSize(node: SplitNode, gap: number = GRID_GAP): { w: number; h: number } {
   if (isAllFixed(node)) return { w: 0, h: 0 }
   if (isLeaf(node)) return { w: MIN_LEAF_W, h: MIN_LEAF_H }
   const aFixed = isAllFixed(node.a)
   const bFixed = isAllFixed(node.b)
-  if (aFixed) return minSize(node.b)
-  if (bFixed) return minSize(node.a)
-  const ma = minSize(node.a)
-  const mb = minSize(node.b)
-  if (node.dir === 'row') return { w: ma.w + mb.w + GRID_GAP, h: Math.max(ma.h, mb.h) }
-  return { w: Math.max(ma.w, mb.w), h: ma.h + mb.h + GRID_GAP }
+  if (aFixed) return minSize(node.b, gap)
+  if (bFixed) return minSize(node.a, gap)
+  const ma = minSize(node.a, gap)
+  const mb = minSize(node.b, gap)
+  if (node.dir === 'row') return { w: ma.w + mb.w + gap, h: Math.max(ma.h, mb.h) }
+  return { w: Math.max(ma.w, mb.w), h: ma.h + mb.h + gap }
 }
 
 // Whether a subtree is nothing but minimized (fixed) tiles -- such a subtree lives
@@ -82,16 +83,16 @@ export function isAllFixed(node: SplitNode): boolean {
 // a neighbour that isn't on the stage); otherwise the ratio is clamped so neither
 // side goes below its minimum (when the container is smaller than both minimums
 // combined, the ratio is used as-is and the area scrolls instead).
-export function splitSizes(branch: SplitBranch, total: number): [number, number] {
+export function splitSizes(branch: SplitBranch, total: number, gap: number = GRID_GAP): [number, number] {
   const { a, b, dir, ratio } = branch
   const aFixed = isAllFixed(a)
   const bFixed = isAllFixed(b)
   if (aFixed && bFixed) return [total, 0]
   if (aFixed) return [0, total]
   if (bFixed) return [total, 0]
-  const inner = total - GRID_GAP
-  const minA = dir === 'row' ? minSize(a).w : minSize(a).h
-  const minB = dir === 'row' ? minSize(b).w : minSize(b).h
+  const inner = total - gap
+  const minA = dir === 'row' ? minSize(a, gap).w : minSize(a, gap).h
+  const minB = dir === 'row' ? minSize(b, gap).w : minSize(b, gap).h
   const lo = inner > 0 ? minA / inner : 0
   const hi = inner > 0 ? 1 - minB / inner : 1
   const clamped = lo <= hi ? Math.min(hi, Math.max(lo, ratio)) : ratio
@@ -101,10 +102,10 @@ export function splitSizes(branch: SplitBranch, total: number): [number, number]
 
 // The two sides' rects a branch splits `rect` into -- shared by computeGeometry and
 // rectAtPath so they can't drift apart on the fully-fixed, no-gap case above.
-function splitRect(branch: SplitBranch, rect: Rect): [Rect, Rect] {
+function splitRect(branch: SplitBranch, rect: Rect, between: number): [Rect, Rect] {
   const total = branch.dir === 'row' ? rect.w : rect.h
-  const [av, bv] = splitSizes(branch, total)
-  const gap = isAllFixed(branch.a) || isAllFixed(branch.b) ? 0 : GRID_GAP
+  const [av, bv] = splitSizes(branch, total, between)
+  const gap = isAllFixed(branch.a) || isAllFixed(branch.b) ? 0 : between
   const aRect: Rect = branch.dir === 'row' ? { ...rect, w: av } : { ...rect, h: av }
   const bRect: Rect = branch.dir === 'row'
     ? { ...rect, x: rect.x + av + gap, w: bv }
@@ -119,18 +120,18 @@ export interface DividerGeometry { path: Path; dir: SplitDir; rect: Rect }
 // drag axis, laid out to fill `rect` exactly (or overflow it when below the tree's
 // minimum, so the container can scroll). A fixed (minimized) leaf gets no rect at
 // all here -- it is an icon in the console's tab bar instead (see fixedLeafIds).
-export function computeGeometry(node: SplitNode, rect: Rect, path: Path = []): { tiles: TileGeometry[]; dividers: DividerGeometry[] } {
+export function computeGeometry(node: SplitNode, rect: Rect, path: Path = [], gap: number = GRID_GAP): { tiles: TileGeometry[]; dividers: DividerGeometry[] } {
   if (isLeaf(node)) return node.fixed ? { tiles: [], dividers: [] } : { tiles: [{ id: node.id, rect }], dividers: [] }
-  const [aRect, bRect] = splitRect(node, rect)
-  const left = computeGeometry(node.a, aRect, [...path, 'a'])
-  const right = computeGeometry(node.b, bRect, [...path, 'b'])
+  const [aRect, bRect] = splitRect(node, rect, gap)
+  const left = computeGeometry(node.a, aRect, [...path, 'a'], gap)
+  const right = computeGeometry(node.b, bRect, [...path, 'b'], gap)
   const dividers = [...left.dividers, ...right.dividers]
   if (!isAllFixed(node.a) && !isAllFixed(node.b)) {
     const total = node.dir === 'row' ? rect.w : rect.h
-    const [av] = splitSizes(node, total)
+    const [av] = splitSizes(node, total, gap)
     const divRect: Rect = node.dir === 'row'
-      ? { x: rect.x + av, y: rect.y, w: GRID_GAP, h: rect.h }
-      : { x: rect.x, y: rect.y + av, w: rect.w, h: GRID_GAP }
+      ? { x: rect.x + av, y: rect.y, w: gap, h: rect.h }
+      : { x: rect.x, y: rect.y + av, w: rect.w, h: gap }
     dividers.push({ path, dir: node.dir, rect: divRect })
   }
   return { tiles: [...left.tiles, ...right.tiles], dividers }
@@ -138,12 +139,12 @@ export function computeGeometry(node: SplitNode, rect: Rect, path: Path = []): {
 
 // The rect a branch (its two sides combined, before splitting) occupies -- what a
 // divider drags against, since its own rect is just the thin gap between them.
-export function rectAtPath(node: SplitNode, rect: Rect, path: Path): Rect {
+export function rectAtPath(node: SplitNode, rect: Rect, path: Path, gap: number = GRID_GAP): Rect {
   let cur = node
   let r = rect
   for (const step of path) {
     if (isLeaf(cur)) break
-    const [aRect, bRect] = splitRect(cur, r)
+    const [aRect, bRect] = splitRect(cur, r, gap)
     r = step === 'a' ? aRect : bRect
     cur = cur[step]
   }

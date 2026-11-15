@@ -426,3 +426,18 @@ describe('reconcile', () => {
     expect(leafIds(built).sort()).toEqual(['a', 'b'])
   })
 })
+
+describe('a gap of its own', () => {
+  // the Admin consoles' tiles are 10px apart (the user, 2026-11-15); every other area keeps the grid's 8px
+  const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a' }, b: { dir: 'col', ratio: 0.5, a: { id: 'b' }, b: { id: 'c' } } }
+  it('puts that space between the tiles, and in the minimum size', () => {
+    const g = computeGeometry(tree, { x: 10, y: 10, w: 810, h: 610 }, [], 10)
+    const r = Object.fromEntries(g.tiles.map(t => [t.id, t.rect]))
+    expect(r.a).toEqual({ x: 10, y: 10, w: 400, h: 610 })
+    expect(r.b).toEqual({ x: 420, y: 10, w: 400, h: 300 })
+    expect(r.c).toEqual({ x: 420, y: 320, w: 400, h: 300 })
+    expect(g.dividers.find(d => d.path.length === 0)?.rect).toEqual({ x: 410, y: 10, w: 10, h: 610 })
+    expect(minSize(tree, 10).w - minSize(tree).w).toBe(2)
+    expect(rectAtPath(tree, { x: 10, y: 10, w: 810, h: 610 }, ['b'], 10)).toEqual({ x: 420, y: 10, w: 400, h: 610 })
+  })
+})

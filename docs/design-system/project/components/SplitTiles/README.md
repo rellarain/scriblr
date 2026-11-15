@@ -11,7 +11,7 @@ Code: `components/tiles/TileArea.tsx` (the Writer imports it as `writer/SplitAre
 - **Rails** `.tileTabBar`: 30px icon buttons (24px in a title bar), one per tile, pressed while the tile is open (a pressed icon is filled with the user's own accent, `--user-accent`, with `--user-on-accent` ink, in a level too). A minimized tile is an icon here that is not pressed. There are two tiers: the **console tabs** of a panel or level (Settings and Help always among them, last, never in a tile rail) and the **tile tabs** of a console, which sit in the console tile's own title bar (`barHost`); a tile area always has a rail.
 - **Gap** `.gtGap`: the dashed, accent-tinted slot a dragged tile would land in.
 - **Divider** `.tileDivider` between two tiles: a 2px line, shown on hover and focus; row dividers resize columns, column dividers rows.
-- **Spacing** 8px between tiles, nowhere else (`space-grid`).
+- **Spacing** 8px between tiles, nowhere else (`space-grid`). **The Admin consoles** are the one exception (the user, 2026-11-15): their tiles are **10px apart and 10px from the console's edge** (`TileArea`'s `gutter`, given by `consoleTile`), the console's body round them takes **the colour of its title bar**, so the console reads as one frame (`.gtBody--framed`), and **each tile in it is one colour**, its title bar the same as its body (`.gtTile--even`).
 
 ## Behaviour
 
@@ -39,6 +39,6 @@ While dragging, the others **slide** (0.16s, none under reduced motion) to open 
 ## Don't
 
 - Don't make the whole tile draggable: it holds fields and text.
-- Don't put padding on the area or gaps between tiles beyond `space-grid`; the grid is exact.
+- Don't put padding on the area or gaps between tiles beyond `space-grid` (the Admin consoles' 10px gutter is the one exception, set through `gutter`); the grid is exact.
 - Don't use it for a list: a tile is a panel of a screen, not a row.
 - Don't add a keyboard way to rearrange tiles, or a second tile look: every console uses this one.

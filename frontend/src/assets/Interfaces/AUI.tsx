@@ -183,13 +183,16 @@ function designerTile(slots: ReturnType<typeof useRailSlots>): AreaTile {
   }
 }
 
+// The space between the tiles of an Admin console and round them, to the console's edge (the user, 2026-11-15).
+const AUI_GUTTER = 10
+
 function AUI() {
   const slots = useRailSlots()
   const [rail, setRail] = useState<HTMLElement | null>(null)
   // Each section is a console holding its pages as tiles (their rail is in its title bar). Help is a console of its own, last in the panel's rail,
   // with each section's help under its name (the sections' own Help sub-pages).
   const tiles: AreaTile[] = SECTIONS.map(section => section.key === 'designer' ? designerTile(slots) : consoleTile(slots, {
-    panel: 'aui', id: section.key, title: section.label, Icon: section.Icon,
+    panel: 'aui', id: section.key, title: section.label, Icon: section.Icon, gutter: AUI_GUTTER,
     pages: section.subSections.filter(s => s.label !== 'Help').map(page => ({
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />

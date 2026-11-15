@@ -68,7 +68,7 @@ interface Session {
 // it (the bar shows one icon per tile; press one to bring the tile back, or drag it out into the layout). Drag a divider
 // (or focus it and use the arrow keys) to resize the two tiles it separates. Where each tile sits, and which are minimized,
 // is remembered per `gridId` with the other saved settings. Under 400px the tiles stack.
-export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize, minimized, onMinimizedChange, maximized, onMaximizedChange, onReorderTabs, bar = false, barHost, columns = 'auto' }: {
+export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize, minimized, onMinimizedChange, maximized, onMaximizedChange, onReorderTabs, bar = false, barHost, columns = 'auto', gutter }: {
   gridId: string
   tiles: AreaTile[]
   label?: string
@@ -92,6 +92,9 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
   barHost?: HTMLElement | null
   // 'one' stacks the tiles in one column at any width (the console in a level beside the focused one); 'auto' does so only when the area is narrow.
   columns?: 'auto' | 'one'
+  // The space between the tiles and round them, to the area's edge (the Admin consoles: 10px); without it the tiles are the grid's 8px apart and
+  // reach the edge.
+  gutter?: number
 }) {
   const layout = useSplitLayout(gridId, tiles.map(t => ({ id: t.id, defaultShape: t.defaultMinimized ? 'mini' as const : 'mid' as const })), { defaultTree, minimized, onMinimizedChange, maximized, onMaximizedChange })
   const [scrollRef, size] = useContainerSize<HTMLDivElement>()
@@ -104,12 +107,15 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
   const stored: SplitNode | null = tiles.length > 0 ? (maxId ? { id: maxId } : layout.tree) : null
   const flat = (t: SplitNode) => (columns === 'one' ? evenColumn(t) : oneColumn ? flattenOneColumn(t) : t)
   const baseTree = stored ? flat(stored) : null
-  const min = baseTree ? minSize(baseTree) : { w: 0, h: 0 }
+  const between = gutter ?? GRID_GAP, edge = gutter ?? 0
+  const min = baseTree ? minSize(baseTree, between) : { w: 0, h: 0 }
   // A console held to one column keeps each open tile tall enough to use (the area scrolls when they do not all fit).
   const stacked = baseTree && columns === 'one' ? leafIds(baseTree).length - fixedLeafIds(baseTree).length : 0
-  const minHeight = Math.max(min.h, stacked > 0 ? stacked * STACKED_TILE_H + (stacked - 1) * GRID_GAP : 0)
-  const stage: Rect = { x: 0, y: 0, w: Math.max(size.width, min.w), h: Math.max(size.height, minHeight) }
-  const baseGeometry = baseTree ? computeGeometry(baseTree, stage) : { tiles: [], dividers: [] }
+  const minHeight = Math.max(min.h, stacked > 0 ? stacked * STACKED_TILE_H + (stacked - 1) * between : 0)
+  // the whole stage, and the part of it the tiles fill (inside the gutter)
+  const full = { w: Math.max(size.width, min.w + 2 * edge), h: Math.max(size.height, minHeight + 2 * edge) }
+  const stage: Rect = { x: edge, y: edge, w: full.w - 2 * edge, h: full.h - 2 * edge }
+  const baseGeometry = baseTree ? computeGeometry(baseTree, stage, [], between) : { tiles: [], dividers: [] }
 
   // While a tile is dragged, the tree it would make: laid out in place of the real one so the others slide aside.
   let previewTree = baseTree
@@ -119,7 +125,7 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
     else if (session.plan) previewTree = flat(applyDrop(open, session.id, session.plan))
     else previewTree = flat(open)
   }
-  const geometry = previewTree ? computeGeometry(previewTree, stage) : { tiles: [], dividers: [] }
+  const geometry = previewTree ? computeGeometry(previewTree, stage, [], between) : { tiles: [], dividers: [] }
   const rectOf = new Map(geometry.tiles.map(g => [g.id, g.rect]))
   const gap = session && !session.overBar ? rectOf.get(session.id) ?? null : null
 
@@ -268,11 +274,11 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
     const stageEl = stageRef.current
     if (!stageEl || !baseTree) return
     const box = stageEl.getBoundingClientRect()
-    const branch = rectAtPath(baseTree, stage, path)
+    const branch = rectAtPath(baseTree, stage, path, between)
     const local = dir === 'row' ? clientX - box.left - branch.x : clientY - box.top - branch.y
-    const total = (dir === 'row' ? branch.w : branch.h) - GRID_GAP
+    const total = (dir === 'row' ? branch.w : branch.h) - between
     if (total <= 0) return
-    layout.resize(path, (local - GRID_GAP / 2) / total)
+    layout.resize(path, (local - between / 2) / total)
   }
 
   const isOpen = (id: string) => !layout.minimized.has(id)
@@ -284,7 +290,7 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
   if (tiles.length === 0) return null
   const area = (
     <div className="gtScroll wrSplit" ref={scrollRef} onKeyDown={onKeyDown}>
-      <div ref={stageRef} className="gtStage wrSplitStage" role="group" aria-label={label ?? 'Tiles'} style={{ position: 'relative', width: stage.w, height: stage.h }}>
+      <div ref={stageRef} className="gtStage wrSplitStage" role="group" aria-label={label ?? 'Tiles'} style={{ position: 'relative', width: full.w, height: full.h }}>
         {/* In the tiles' own order, so a move shifts a box and never the element (what is typed in it stays). */}
         {tiles.map(t => {
           const lifted = session?.id === t.id
