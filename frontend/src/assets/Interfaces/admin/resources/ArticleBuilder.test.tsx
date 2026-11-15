@@ -92,30 +92,18 @@ describe('ArticleBuilder', () => {
     ]))
   })
 
-  it('preview as Help renders the guide and offers a feedback form that really submits', async () => {
-    const submit = vi.spyOn(resourcesApi, 'submitFeedback').mockResolvedValue({ id: 'fb-9', submittedAt: 'now' })
+  it('preview as Help renders the guide with no feedback form of its own (the Help tile sends feedback)', async () => {
     await renderReady()
     fireEvent.click(screen.getByRole('button', { name: 'Preview ▸' }))
     expect(screen.getByText('Existing guide')).toBeTruthy()
-    expect(screen.getByText('Chat with an admin — coming soon')).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Submit feedback' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Unpleasant' }))
-    fireEvent.change(screen.getByPlaceholderText(/explicated intention/), { target: { value: 'Please add a warning.' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
-
-    await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({
-      text: 'Please add a warning.', senderTone: 'unpleasant',
-      openPage: 'Writer', openConsole: 'Shelf', selectedComponent: 'Plot',
-    })))
-    expect(await screen.findByText(/your feedback was sent/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Submit feedback' })).toBeNull()
+    expect(screen.queryByText('Check your understanding')).toBeNull()
   })
 
-  it('preview as Training has no feedback section', async () => {
+  it('preview as Training shows the assessment line', async () => {
     await renderReady()
     fireEvent.click(screen.getByRole('button', { name: 'Preview ▸' }))
     fireEvent.click(screen.getByRole('button', { name: 'Preview as Training' }))
-    expect(screen.queryByText('Chat with an admin — coming soon')).toBeNull()
     expect(screen.getByText('Check your understanding')).toBeTruthy()
   })
 

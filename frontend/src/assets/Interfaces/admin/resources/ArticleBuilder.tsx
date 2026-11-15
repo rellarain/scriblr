@@ -1,19 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { getPromotableFeedback, submitFeedback } from '../../../../api/resourcesApi'
+import { getPromotableFeedback } from '../../../../api/resourcesApi'
 import type { PromotableFeedbackMessage, ResourceFaqEntry, ResourceTutorial } from '../../../../api/types'
-import { CURRENT_USER } from '../../../../userSeed'
 import ResourceTree from './ResourceTree'
 import type { ResourcesWorkspace } from './useResources'
 import './resources.scss'
-
-const TONE_OPTIONS = [
-  { value: 'pleasant', label: 'Pleasant' },
-  { value: 'unpleasant', label: 'Unpleasant' },
-  { value: 'mixed', label: 'Mixed' },
-  { value: 'neutral', label: 'Neutral' },
-] as const
-type ToneValue = typeof TONE_OPTIONS[number]['value']
 
 function newLocalId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -34,11 +25,6 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
   const [guideView, setGuideView] = useState<'write' | 'rendered'>('write')
   const [previewOn, setPreviewOn] = useState(false)
   const [previewAs, setPreviewAs] = useState<'help' | 'training'>('help')
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
-  const [feedbackTone, setFeedbackTone] = useState<ToneValue | null>(null)
-  const [feedbackText, setFeedbackText] = useState('')
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
-  const [feedbackError, setFeedbackError] = useState<string | undefined>(undefined)
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [promoteCandidates, setPromoteCandidates] = useState<PromotableFeedbackMessage[]>([])
 
@@ -56,7 +42,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
   const savingForId = useRef<string | null>(null)
 
   useEffect(() => {
-    setPreviewOn(false); setFeedbackOpen(false); setFeedbackSubmitted(false); setFeedbackError(undefined)
+    setPreviewOn(false)
     setPromoteOpen(false); setContentTab('guide'); setGuideView('write')
   }, [selectedId])
 
@@ -115,20 +101,6 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
       { id: newLocalId('faq'), question: candidate.text, answer: '', source: 'feedback', sourceMessageId: candidate.id },
     ])
     setPromoteOpen(false)
-  }
-
-  async function submit() {
-    if (!selectedId) return
-    setFeedbackError(undefined)
-    try {
-      await submitFeedback({
-        author: CURRENT_USER.displayName, text: feedbackText, senderTone: feedbackTone,
-        openPage: path[0]?.name ?? null, openConsole: path[1]?.name ?? null, selectedComponent: path[2]?.name ?? null,
-      })
-      setFeedbackOpen(false); setFeedbackSubmitted(true); setFeedbackText(''); setFeedbackTone(null)
-    } catch (err) {
-      setFeedbackError(err instanceof Error ? err.message : 'Could not submit feedback')
-    }
   }
 
   const tree = (
@@ -198,45 +170,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                 </>
               )}
 
-              {previewAs === 'help' ? (
-                <div className="resFeedbackSection">
-                  <div className="resFeedbackSectionHead">
-                    <h3 className="resSubheading">Still stuck?</h3>
-                    <span className="resComingSoon">Chat with an admin — coming soon</span>
-                  </div>
-                  {feedbackSubmitted ? (
-                    <p className="resFeedbackThanks">Thanks — your feedback was sent, tagged to {breadcrumb}.</p>
-                  ) : feedbackOpen ? (
-                    <div className="resFeedbackForm">
-                      <div className="resFeedbackMeta">Element channel: <strong>{breadcrumb}</strong></div>
-                      <div className="resFeedbackMeta">Tone</div>
-                      <div className="resPillGroup">
-                        {TONE_OPTIONS.map(t => (
-                          <button
-                            key={t.value} type="button"
-                            className={feedbackTone === t.value ? 'resPill resPill--active' : 'resPill'}
-                            onClick={() => setFeedbackTone(t.value)}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-                      <textarea
-                        className="resTextarea" rows={3} value={feedbackText}
-                        placeholder="Your explicated intention — what should change, and why…"
-                        onChange={e => setFeedbackText(e.target.value)}
-                      />
-                      {feedbackError && <p className="resError">{feedbackError}</p>}
-                      <div className="resButtonRow">
-                        <button type="button" className="resPrimaryBtn" disabled={!feedbackText.trim()} onClick={() => { void submit() }}>Submit</button>
-                        <button type="button" className="resLinkBtn" onClick={() => setFeedbackOpen(false)}>Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button type="button" className="resPrimaryBtn" onClick={() => setFeedbackOpen(true)}>Submit feedback</button>
-                  )}
-                </div>
-              ) : (
+              {previewAs === 'training' && (
                 <div className="resFeedbackSection">
                   <div className="resFeedbackSectionHead">
                     <h3 className="resSubheading">Check your understanding</h3>

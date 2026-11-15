@@ -6,12 +6,20 @@ from pydantic import BaseModel, Field
 
 from ..deps import get_app_data_storage_root
 from ..storage import feedback as store
+from ..storage import resources
 
-# The Helper Inbox: validating feedback messages and processing the statement cases
-# they form (votes, notes, solutions), and the roles admins hold per console. Every call acts as the signed-in admin named
-# in the X-Admin-Id header (no login yet: the id is trusted); each one returns the
-# whole Inbox bundle for that admin, so the interface always shows current state.
+# The feedback pipeline. A user sends feedback from a Help tile (a subject and a verb) and follows it in "mine"; staff
+# check it (Helper > Inbox), vote on and correct statements (Office > Voting, Channel Management) and decide them
+# (Project Plan). Every staff call acts as the admin named in the X-Admin-Id header (no login yet: the id is trusted)
+# and returns the whole staff bundle, so the interface always shows current state. The user's routes need no admin.
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
+
+# What the plan says of a statement's work, set by the Project Plan store (None: no plan yet).
+WORK_OF: Optional[Callable[[Path], store.WorkOf]] = None
+
+
+def _work(root: Path) -> Optional[store.WorkOf]:
+    return WORK_OF(root) if WORK_OF else None
 
 
 def current_admin(
@@ -20,21 +28,55 @@ def current_admin(
 ) -> str:
     if x_admin_id:
         return x_admin_id
-    return store.load(root).admins[0].id
+    admins = store.load(root).admins
+    if not admins:
+        raise HTTPException(status_code=403, detail="No admin to act as.")
+    return admins[0].id
 
 
-def _run(root: Path, admin_id: str, fn: Callable[[store.FeedbackFile], None]) -> dict:
+def _known(root: Path) -> set[str]:
+    return {n.id for n in resources.load_resources(root).nodes}
+
+
+def _scopes(root: Path) -> set[str]:
+    return {n.id for n in resources.load_resources(root).nodes if n.kind in ("interface", "console")}
+
+
+def _guard(fn):
     try:
-        file = store.mutate(root, fn)
-        return store.bundle(file, admin_id)
+        return fn()
     except store.FeedbackError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
 
-class ValidationBody(BaseModel):
+def _run(root: Path, admin_id: str, fn: Callable[[store.FeedbackFile], None]) -> dict:
+    return _guard(lambda: store.bundle(store.mutate(root, fn), admin_id, _work(root)))
+
+
+class SubmitBody(BaseModel):
+    author: str = Field(default="", max_length=120)
+    authorId: str = Field(default="", max_length=120)
+    text: str = Field(max_length=store.TEXT_MAX)
+    senderTone: Optional[store.Tone] = None
+    channelId: str
+    verbId: str
+    fromChannel: Optional[str] = None
+
+
+class EditBody(BaseModel):
+    channelId: Optional[str] = None
+    verbId: Optional[str] = None
     tone: Optional[store.Tone] = None
-    channels: Optional[list[store.ChannelTag]] = None
-    statements: Optional[list[store.Statement]] = None
+    checked: Optional[bool] = None
+
+
+class TextBody(BaseModel):
+    text: str = Field(max_length=store.NOTE_MAX)
+
+
+class AnswerBody(BaseModel):
+    authorId: str = Field(max_length=120)
+    answer: str = Field(max_length=store.NOTE_MAX)
 
 
 class VoteBody(BaseModel):
@@ -46,29 +88,14 @@ class VoteBody(BaseModel):
     passNote: str = Field(default="", max_length=store.NOTE_MAX)
 
 
-class RolesBody(BaseModel):
-    console: str
-    roles: list[str] = Field(default_factory=list)
-
-
-class SolutionBody(BaseModel):
-    title: str = Field(max_length=store.TITLE_MAX)
-    description: str = Field(default="", max_length=store.SOLUTION_MAX)
-    target: store.ChannelTag
-
-
-class CloseBody(BaseModel):
-    outcome: Literal["approved", "rejected"]
+class DecisionBody(BaseModel):
+    decision: Optional[Literal["accepted", "vetoed"]] = None
     note: str = Field(default="", max_length=store.NOTE_MAX)
 
 
-class SubmitMessageBody(BaseModel):
-    author: str = Field(max_length=120)
-    text: str = Field(max_length=store.NOTE_MAX)
-    senderTone: Optional[store.Tone] = None
-    openPage: Optional[str] = None
-    openConsole: Optional[str] = None
-    selectedComponent: Optional[str] = None
+class RolesBody(BaseModel):
+    scope: str
+    roles: list[str] = Field(default_factory=list)
 
 
 class VerbBody(BaseModel):
@@ -81,74 +108,85 @@ class VerbPatch(BaseModel):
     keywords: Optional[list[str]] = None
 
 
-@router.get("")
-def get_inbox(admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
-    try:
-        return store.bundle(store.load(root), admin_id)
-    except store.FeedbackError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+# --- the user's side (no admin) ----------------------------------------------
+
+
+@router.get("/mine")
+def get_mine(authorId: str = "", root: Path = Depends(get_app_data_storage_root)) -> dict:
+    """What one user sent, with where each stands and the questions asked of them."""
+    return _guard(lambda: store.mine(store.load(root), authorId, _work(root)))
+
+
+@router.get("/verbs")
+def get_verbs(root: Path = Depends(get_app_data_storage_root)) -> list[dict]:
+    """The verbs a user picks from when sending feedback."""
+    return [v.model_dump(mode="json") for v in store.load(root).verbCategories]
 
 
 @router.post("/messages")
-def post_message(body: SubmitMessageBody, root: Path = Depends(get_app_data_storage_root)) -> dict:
-    """Anyone using the app can submit feedback -- unlike every other route
-    here, this one needs no signed-in admin (no X-Admin-Id)."""
-    try:
-        file = store.mutate(root, lambda f: store.create_message(
-            f, body.author, body.text, body.senderTone, body.openPage, body.openConsole, body.selectedComponent))
-        created = file.messages[-1]
-        return {"id": created.id, "submittedAt": created.submittedAt}
-    except store.FeedbackError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+def post_message(body: SubmitBody, root: Path = Depends(get_app_data_storage_root)) -> dict:
+    known = _known(root)
+    file = _guard(lambda: store.mutate(root, lambda f: store.create_message(
+        f, body.author, body.authorId, body.text, body.senderTone, body.channelId, body.verbId, body.fromChannel, known)))
+    created = file.messages[-1]
+    return {"id": created.id, "submittedAt": created.submittedAt}
 
 
-@router.put("/messages/{message_id}/validation")
-def put_validation(
-    message_id: str, body: ValidationBody,
+@router.put("/messages/{message_id}/questions/{question_id}/answer")
+def put_answer(message_id: str, question_id: str, body: AnswerBody, root: Path = Depends(get_app_data_storage_root)) -> dict:
+    file = _guard(lambda: store.mutate(root, lambda f: store.answer_question(f, body.authorId, message_id, question_id, body.answer)))
+    return store.mine(file, body.authorId, _work(root))
+
+
+# --- the staff side -------------------------------------------------------------
+
+
+@router.get("")
+def get_bundle(admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _guard(lambda: store.bundle(store.load(root), admin_id, _work(root)))
+
+
+@router.put("/messages/{message_id}")
+def put_message(
+    message_id: str, body: EditBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.set_validation(f, admin_id, message_id, body.tone, body.channels, body.statements))
+    known = _known(root)
+    return _run(root, admin_id, lambda f: store.edit_message(
+        f, admin_id, message_id, known, body.channelId, body.verbId, body.tone, body.checked))
 
 
-@router.put("/cases/{case_id}/vote")
-def put_case_vote(
-    case_id: str, body: VoteBody,
+@router.post("/messages/{message_id}/questions")
+def post_question(
+    message_id: str, body: TextBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.vote_on_case(
-        f, admin_id, case_id, body.approve, body.deny, body.passed, body.approveNote, body.denyNote, body.passNote))
+    return _run(root, admin_id, lambda f: store.ask_question(f, admin_id, message_id, body.text))
 
 
-@router.post("/cases/{case_id}/solutions")
-def post_solution(
-    case_id: str, body: SolutionBody,
+@router.post("/messages/{message_id}/comments")
+def post_comment(
+    message_id: str, body: TextBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.propose_solution(f, admin_id, case_id, body.title, body.description, body.target))
+    return _run(root, admin_id, lambda f: store.add_comment(f, admin_id, message_id, body.text))
 
 
-@router.put("/cases/{case_id}/solutions/{solution_id}/vote")
-def put_solution_vote(
-    case_id: str, solution_id: str, body: VoteBody,
+@router.put("/statements/{statement_id}/vote")
+def put_vote(
+    statement_id: str, body: VoteBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.vote_on_solution(
-        f, admin_id, case_id, solution_id, body.approve, body.deny, body.passed, body.approveNote, body.denyNote, body.passNote))
+    return _run(root, admin_id, lambda f: store.vote(
+        f, admin_id, statement_id, body.approve, body.deny, body.passed, body.approveNote, body.denyNote, body.passNote))
 
 
-@router.post("/cases/{case_id}/close")
-def post_close(
-    case_id: str, body: CloseBody,
+@router.post("/statements/{statement_id}/decision")
+def post_decision(
+    statement_id: str, body: DecisionBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.close_case(f, admin_id, case_id, body.outcome, body.note))
-
-
-@router.post("/cases/{case_id}/reopen")
-def post_reopen(
-    case_id: str, admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
-) -> dict:
-    return _run(root, admin_id, lambda f: store.reopen_case(f, admin_id, case_id))
+    return _run(root, admin_id, lambda f: store.decide(f, admin_id, statement_id, body.decision, body.note))
 
 
 @router.put("/admins/{target_id}/roles")
@@ -156,7 +194,8 @@ def put_roles(
     target_id: str, body: RolesBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.set_roles(f, admin_id, target_id, body.console, body.roles))
+    scopes = _scopes(root)
+    return _run(root, admin_id, lambda f: store.set_roles(f, admin_id, target_id, body.scope, body.roles, scopes))
 
 
 @router.post("/verb-categories")

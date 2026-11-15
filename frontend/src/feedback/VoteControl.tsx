@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckIcon, CloseIcon, QuestionIcon } from '../../../icons'
+import { CheckIcon, CloseIcon, QuestionIcon } from '../assets/icons'
 import type { FeedbackVote, VoteInput } from './feedbackTypes'
 
 const NOTE_MAX = 500

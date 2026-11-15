@@ -6,6 +6,7 @@ import AUI from './AUI'
 import { mockFetch } from '../../test/mockFetch'
 
 vi.mock('./admin/RoleAssignment', () => ({ default: () => <div>role assignment</div> }))
+vi.mock('./admin/office/StatementPages', () => ({ VotingPage: () => <div>voting page</div>, ChannelManagementPage: () => <div>channel management page</div> }))
 // Resources' own internals (its tree, backend calls) are covered by
 // useResources.test.ts and its own component tests -- mocked here so this
 // file only exercises AUI's own section/page tile layout.
@@ -28,13 +29,13 @@ const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as
 const SECTIONS = ['dashboard', 'projectPlan', 'organizer', 'office', 'configuration', 'designer', 'resources', 'instructor']
 
 describe('AUI (the Admin panel as tiles)', () => {
-  it('shows the eight sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
+  it('shows the eight sections as consoles with their pages as tiles, and every section Help text in the Help console', async () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('office')).getByText('Assignment')).toBeTruthy()
     // Help is a console of its own, not a tile of a section.
     expect(within(tile('office')).queryByText(/using the Office console/)).toBeNull()
-    expect(within(tile('help')).getByText(/using the Office console/)).toBeTruthy()
+    expect(await within(tile('help')).findByText(/using the Office console/)).toBeTruthy()
     expect(within(tile('help')).getByText(/using the Project Plan console/)).toBeTruthy()
   })
 
@@ -48,11 +49,11 @@ describe('AUI (the Admin panel as tiles)', () => {
       'Allotment', 'Assignment', 'Team Schedule', 'Department Details', 'Department Roster', 'Department Analytics', 'Department', 'Monitor Training', 'Department Schedules', 'Hire/Term Admin',
       'Voting', 'Channel Management',
     ])
-    expect(within(tile('office')).getByText(/Approve and\/or deny explicated/)).toBeTruthy()
-    expect(within(tile('office')).getByText(/a second processing pass after Voting/)).toBeTruthy()
+    expect(within(tile('office')).getByText('voting page')).toBeTruthy()
+    expect(within(tile('office')).getByText('channel management page')).toBeTruthy()
     // the Organizer keeps only Bookclub Management
-    expect(within(tile('organizer')).queryByText(/Approve and\/or deny explicated/)).toBeNull()
-    expect(within(tile('organizer')).queryByText(/second processing pass/)).toBeNull()
+    expect(within(tile('organizer')).queryByText('voting page')).toBeNull()
+    expect(within(tile('organizer')).queryByText('channel management page')).toBeNull()
     expect(within(tile('organizer')).getByText('Manage bookclubs here.')).toBeTruthy()
     expect(within(tile('projectPlan')).getByRole('heading', { name: /Project Plan/ })).toBeTruthy()
     expect(within(tile('projectPlan')).getByText(/its phases, milestones and tasks on a timeline/)).toBeTruthy()

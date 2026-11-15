@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CatalogBook } from '../../api/reader'
-import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, MapIcon, NoteIcon, PagesIcon, PlotIcon, RevisionIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TeamIcon, TicketIcon, TreeIcon } from '../icons'
+import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HelpIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, MapIcon, NoteIcon, PagesIcon, PlotIcon, RevisionIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TeamIcon, TicketIcon, TreeIcon } from '../icons'
 import { fillColorCss } from '../../theme/bookColors'
 import { useThemeState } from '../../theme/useTheme'
 import { useStoredState } from './writer/storage'
@@ -23,6 +23,8 @@ import type { ReaderCtx } from './reader/readerContext'
 import { parseReaderPath, readerPath, type ReaderLocation, type ReaderPage } from './reader/readerRoutes'
 import { loadBook, loadReader, useReader } from './reader/readerStore'
 import './reader/reader.scss'
+import HelpTile from '../../components/help/HelpTile'
+import { HELP_TARGETS } from '../../channels/helpTargets'
 
 // The Reader (RUI): four pages that open one from the next, as the Writer's levels do. The Nook (home) holds the Reader's own things (the Stack,
 // the Journal, Analytics, the Feed); the Library the shelves and the catalog; the Book one book and its cover; Pages reads it. The earlier
@@ -32,16 +34,21 @@ import './reader/reader.scss'
 const PAGE_LABEL: Record<ReaderPage, string> = { nook: 'Nook', library: 'Library', book: 'Book', pages: 'Pages' }
 const PAGE_ICON = { nook: HomeIcon, library: LibraryIcon, book: BookFaceIcon, pages: PagesIcon }
 
-const NOOK_IDS = ['stack', 'journal', 'analytics', 'feed']
+const NOOK_IDS = ['stack', 'journal', 'analytics', 'feed', 'help']
 const NOOK_DEFAULTS: ConsoleStates = { stack: 'tile', journal: 'tile', analytics: 'tile' }
-const LIBRARY_IDS = ['catalog', 'shelves', 'shelf', 'history']
+const LIBRARY_IDS = ['catalog', 'shelves', 'shelf', 'history', 'help']
 const LIBRARY_DEFAULTS: ConsoleStates = { catalog: 'tile', shelves: 'tile' }
-const BOOK_IDS = ['cover', 'face', 'card', 'front', 'back', 'maps', 'cast']
+const BOOK_IDS = ['cover', 'face', 'card', 'front', 'back', 'maps', 'cast', 'help']
 // An alpha reader is also given the author's planning, read-only.
-const ALPHA_IDS = [...BOOK_IDS, 'outline', 'plot', 'plan', 'revisions']
+const ALPHA_IDS = [...BOOK_IDS.filter(id => id !== 'help'), 'outline', 'plot', 'plan', 'revisions', 'help']
 const BOOK_DEFAULTS: ConsoleStates = { cover: 'tile' }
-const PAGES_IDS = ['flags', 'reactions', 'body', 'footnotes', 'annotations', 'settings']
+const PAGES_IDS = ['flags', 'reactions', 'body', 'footnotes', 'annotations', 'settings', 'help']
 const PAGES_DEFAULTS: ConsoleStates = { body: 'tile' }
+
+// Each page's Help console (closed until opened): its guides, Send feedback and My feedback.
+const helpConsole = (target: (typeof HELP_TARGETS)[keyof typeof HELP_TARGETS]): ConsoleDef => ({
+  id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={target} fallback="Guides for this page are on the way." />,
+})
 
 // The page's consoles: what is stored for them (and the URL's full console on top), and how a change is stored and written to the URL.
 function usePageStates(loc: ReaderLocation, ids: string[], defaults: ConsoleStates) {
@@ -154,6 +161,7 @@ function NookPage({ loc, ctx, color, right }: PageProps) {
     { id: 'journal', label: 'Journal', Icon: JournalIcon, render: size => <JournalConsole ctx={ctx} size={size} /> },
     { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: size => <AnalyticsConsole ctx={ctx} size={size} /> },
     { id: 'feed', label: 'Feed', Icon: FeedIcon, render: size => <FeedConsole ctx={ctx} size={size} /> },
+    helpConsole(HELP_TARGETS.readerNook),
   ]
   return <ReaderPanel gridId="reader.nook" title="Nook" Icon={HomeIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
 }
@@ -165,6 +173,7 @@ function LibraryPage({ loc, ctx, color, right }: PageProps) {
     { id: 'shelves', label: 'Shelves', Icon: ShelvesIcon, render: size => <ShelvesConsole ctx={ctx} size={size} /> },
     { id: 'shelf', label: 'Shelf', Icon: ShelfIcon, render: size => <ShelfConsole ctx={ctx} size={size} /> },
     { id: 'history', label: 'History', Icon: HistoryIcon, render: size => <HistoryConsole ctx={ctx} size={size} /> },
+    helpConsole(HELP_TARGETS.readerLibrary),
   ]
   return <ReaderPanel gridId="reader.library" title="Library" Icon={LibraryIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
 }
@@ -190,6 +199,7 @@ function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogB
       { id: 'revisions', label: 'Revisions', Icon: RevisionIcon, render: () => <RevisionsConsole ctx={ctx} book={book} /> },
     )
   }
+  consoles.push(helpConsole(HELP_TARGETS.readerBook))
   return (
     <ReaderPanel gridId="reader.book" title={book.title} Icon={BookFaceIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
       notice={<div className="rdNotice"><LevelBadge ctx={ctx} book={book} /></div>} edge={<EdgeTabs ctx={ctx} book={book} />} className="rdLevel--book" />
@@ -213,6 +223,7 @@ function PagesBook({ loc, ctx, color, right, book }: PageProps & { book: Catalog
     { id: 'footnotes', label: 'Footnotes', Icon: FootnoteIcon, render: () => <FootnotesConsole ctx={ctx} session={session} /> },
     { id: 'annotations', label: 'Annotations', Icon: NoteIcon, render: () => <AnnotationsConsole ctx={ctx} session={session} /> },
     { id: 'settings', label: 'Settings', Icon: SlidersIcon, render: () => <SettingsConsole ctx={ctx} session={session} /> },
+    helpConsole(HELP_TARGETS.readerPages),
   ]
   return (
     <ReaderPanel gridId="reader.pages" title={book.title} Icon={PagesIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}

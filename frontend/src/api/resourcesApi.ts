@@ -44,18 +44,3 @@ export function putResourceAssessment(nodeId: string, questions: ResourceQuestio
 export function getPromotableFeedback(nodeId: string): Promise<PromotableFeedbackMessage[]> {
   return api.get<PromotableFeedbackMessage[]>(`/resources/nodes/${id(nodeId)}/promotable-feedback`)
 }
-
-export interface SubmitFeedbackInput {
-  author: string
-  text: string
-  senderTone: 'pleasant' | 'unpleasant' | 'mixed' | 'neutral' | null
-  openPage?: string | null
-  openConsole?: string | null
-  selectedComponent?: string | null
-}
-
-// Reuses the Helper Inbox's own submission endpoint (backend/app/api/feedback.py) --
-// unlike every other /api/feedback route, it needs no signed-in admin.
-export function submitFeedback(input: SubmitFeedbackInput): Promise<{ id: string; submittedAt: string }> {
-  return api.post<{ id: string; submittedAt: string }>('/feedback/messages', input)
-}

@@ -27,14 +27,17 @@ export function detailText(detail: unknown, fallback: string): string {
   return unique.length > 3 ? `${unique.slice(0, 3).join('; ')} (and ${unique.length - 3} more)` : unique.join('; ')
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Extra request headers (the feedback pipeline's X-Admin-Id: the staff member acting, no login yet).
+export type ApiHeaders = Record<string, string>
+
+async function request<T>(path: string, init?: RequestInit, headers?: ApiHeaders): Promise<T> {
   // A request with a body outlives the page (a save started as the window closes
   // still completes); the browser caps keepalive bodies at 64KB.
   const keepalive = typeof init?.body === 'string' && init.body.length < 60_000
   const response = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     keepalive,
     ...init,
+    headers: { 'Content-Type': 'application/json', ...headers },
   })
 
   if (!response.ok) {
@@ -57,12 +60,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined }),
-  put: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-  patch: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  get: <T>(path: string, headers?: ApiHeaders) => request<T>(path, undefined, headers),
+  post: <T>(path: string, body?: unknown, headers?: ApiHeaders) =>
+    request<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined }, headers),
+  put: <T>(path: string, body: unknown, headers?: ApiHeaders) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }, headers),
+  patch: <T>(path: string, body: unknown, headers?: ApiHeaders) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, headers),
+  delete: <T>(path: string, headers?: ApiHeaders) => request<T>(path, { method: 'DELETE' }, headers),
 }

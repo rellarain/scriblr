@@ -31,7 +31,7 @@ afterEach(() => { vi.unstubAllGlobals() })
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 
 describe('UUI (the User panel as tiles)', () => {
-  it('shows Dashboard and Account as consoles holding their pages as tiles, with Settings and Help as consoles of their own', () => {
+  it('shows Dashboard and Account as consoles holding their pages as tiles, with Settings and Help as consoles of their own', async () => {
     render(<UUI />)
     const top = Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).filter(id => ['dashboard', 'account', 'training', 'settings', 'help'].includes(id!))
     expect(top).toEqual(['dashboard', 'account', 'settings', 'help']) // Training is an interface of its own now (TUI)
@@ -39,7 +39,7 @@ describe('UUI (the User panel as tiles)', () => {
     expect(within(tile('account')).getByText('Manage your profile details here.')).toBeTruthy()
     // Settings and Help are not tiles of a section: they are the panel's own consoles.
     expect(within(tile('dashboard')).queryByText(/using the Dashboard console/)).toBeNull()
-    expect(within(tile('help')).getByText(/using the Dashboard console/)).toBeTruthy()
+    expect(await within(tile('help')).findByText(/using the Dashboard console/)).toBeTruthy()
     expect(within(tile('help')).queryByText(/Training/)).toBeNull()
     expect(within(tile('settings')).getByRole('heading', { name: 'Account' })).toBeTruthy()
   })

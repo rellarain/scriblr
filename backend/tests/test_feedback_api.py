@@ -1,348 +1,300 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.storage import feedback as fb
+from app.storage import feedback as store
 
-# Sample admins (see feedback._seed_admins):
-DANA = {"X-Admin-Id": "adm-dana"}  # processor everywhere but Reader plan; configurer + planner on Writer; configurer on Helper > Inbox
-LEE = {"X-Admin-Id": "adm-lee"}  # processor on Writer and Reader; configurer on Reader only
-SAM = {"X-Admin-Id": "adm-sam"}  # processor and planner on Reader; processor on Helper > Inbox; no configurer
-
-SPINES = {"page": "Writer", "console": "Shelf", "component": "Sidebar Shelf", "feature": "Book Spines"}
-SEARCH = {"page": "Reader", "console": "Library", "component": "Browse", "feature": "Search"}
-SHELVES = {"page": "Reader", "console": "Library", "component": "Browse", "feature": "Shelves"}
-ADMIN_VOTING = {"page": "Admin", "console": "Processor", "component": "Voting", "feature": "Approve"}
+DANA = {"X-Admin-Id": "adm-dana"}
+LEE = {"X-Admin-Id": "adm-lee"}
+SAM = {"X-Admin-Id": "adm-sam"}
+SHELF = "writer/dashboard/project"
 
 
-def inbox(client: TestClient, who=DANA) -> dict:
+def bundle(client: TestClient, who=DANA) -> dict:
     resp = client.get("/api/feedback", headers=who)
     assert resp.status_code == 200, resp.text
     return resp.json()
 
 
-def case_for(bundle: dict, feature: str, verb: str) -> dict:
-    return next(c for c in bundle["cases"] if c["channel"]["feature"] == feature and c["verbName"] == verb)
+def statement(b: dict, channel: str, verb: str) -> dict:
+    return next(s for s in b["statements"] if s["channelId"] == channel and s["verbId"] == verb)
 
 
-def message_view(bundle: dict, message_id: str) -> dict:
-    return next(m for m in bundle["messages"] if m["message"]["id"] == message_id)
+def message(b: dict, mid: str) -> dict:
+    return next(m for m in b["messages"] if m["id"] == mid)
 
 
-def validate(client: TestClient, who, message_id: str, body: dict):
-    return client.put(f"/api/feedback/messages/{message_id}/validation", headers=who, json=body)
+def send(client: TestClient, channel="writer/draft/draft", verb="verb-fix", text="It breaks.", author="u-1") -> str:
+    resp = client.post("/api/feedback/messages", json={
+        "author": "Jordan", "authorId": author, "text": text, "senderTone": "unpleasant",
+        "channelId": channel, "verbId": verb, "fromChannel": "writer/draft",
+    })
+    assert resp.status_code == 200, resp.text
+    return resp.json()["id"]
 
 
-# ---- the seed, identity and anonymity ---------------------------------------------------------
+def mine(client: TestClient, author="u-1") -> dict:
+    return client.get("/api/feedback/mine", params={"authorId": author}).json()
 
 
-def test_seeded_inbox_has_admins_roles_and_a_case_for_every_completed_selection(client: TestClient) -> None:
-    b = inbox(client)
-    assert [a["id"] for a in b["admins"]] == ["adm-dana", "adm-lee", "adm-sam"]
-    assert b["admins"][2]["roles"]["Helper/Inbox"] == ["processor"]
-    assert "Helper/Inbox" in b["consoles"] and "Admin/Manager" in b["consoles"]
-    assert b["can"] == {"validate": True, "manageVerbs": True, "seeTones": True}
-    # No quorum: a message with a single completed validation already has its case.
-    assert sorted((c["verbName"], c["channel"]["feature"]) for c in b["cases"]) == [
-        ("Fix", "Autosave"), ("Improve", "Search"), ("Increase", "Book Spines"), ("Keep", "Progress Tracker")]
-    assert len(case_for(b, "Book Spines", "Increase")["messages"]) == 3
-    assert case_for(b, "Progress Tracker", "Keep")["validators"] == 1
-    assert case_for(b, "Book Spines", "Increase")["validators"] == 3
-    assert message_view(b, "fb-5")["joined"] is False and message_view(b, "fb-4")["joined"] is True
+def check(client: TestClient, mid: str, who=DANA, **body) -> object:
+    return client.put(f"/api/feedback/messages/{mid}", headers=who, json=body)
 
 
-def test_unknown_admin_is_refused(client: TestClient) -> None:
+# --- the seed -----------------------------------------------------------------
+
+
+def test_the_seed_has_admins_with_roles_per_scope_and_statements_from_checked_messages(client: TestClient) -> None:
+    b = bundle(client)
+    assert b["me"] == "adm-dana"
+    dana = next(a for a in b["admins"] if a["id"] == "adm-dana")
+    assert dana["roles"]["helper/inbox"] == ["checker", "channelManager"]
+    assert "planner" in dana["roles"]["writer/draft"]
+    shelf = statement(b, SHELF, "verb-increase")
+    assert shelf["messageIds"] == ["fb-2", "fb-6"]  # fb-7 is not checked yet
+    assert shelf["tally"] == {"approve": 1, "deny": 1, "pass": 0}
+    assert {m["id"] for m in b["messages"] if not m["checked"]} == {"fb-5", "fb-7"}
+    assert b["can"] == {"check": True, "manageVerbs": True}
+
+
+def test_an_unknown_admin_is_refused(client: TestClient) -> None:
     assert client.get("/api/feedback", headers={"X-Admin-Id": "nobody"}).status_code == 403
 
 
-def test_the_inbox_names_nobody(client: TestClient) -> None:
-    b = inbox(client, SAM)
-    body = json.dumps({"messages": b["messages"], "cases": b["cases"]})
-    for author in ("j.rivera", "a.kim", "m.okafor"):
-        assert author not in body
-    assert "author" not in body and "adminId" not in body and "proposedBy" not in body
-    for other in ("adm-dana", "adm-lee", "Dana", "Lee"):
-        assert other not in body
-    # your own things are marked as yours
-    v = message_view(b, "fb-4")["validations"][0]
-    assert v["mine"] is True
-    assert any(vote["mine"] is False for vote in case_for(b, "Book Spines", "Increase")["votes"])
-
-
-# ---- tone -----------------------------------------------------------------------------------------
+def test_the_staff_bundle_names_no_user_and_no_other_admin(client: TestClient) -> None:
+    b = bundle(client)
+    text = json.dumps({"messages": b["messages"], "statements": b["statements"]})
+    for name in ("j.rivera", "a.kim", "m.okafor", "adm-lee", "adm-sam"):
+        assert name not in text
+    fb2 = message(b, "fb-2")
+    assert fb2["comments"][0]["mine"] is True
+    assert message(bundle(client, LEE), "fb-2")["comments"][0]["mine"] is False
 
 
 @pytest.mark.parametrize("labels,expected", [
-    (["pleasant"], "pleasant"),
-    (["unpleasant"], "unpleasant"),
-    (["mixed"], "mixed"),
-    (["neutral"], "neutral"),
-    (["pleasant", "pleasant", "pleasant"], "pleasant"),
-    (["pleasant", "pleasant", "neutral"], "mixedPleasant"),       # 67% pleasant votes, under 75%
-    (["pleasant", "pleasant", "pleasant", "neutral"], "pleasant"),  # 75%
-    (["unpleasant", "unpleasant", "neutral"], "mixedUnpleasant"),
-    (["unpleasant", "unpleasant", "unpleasant", "neutral"], "unpleasant"),
-    (["pleasant", "mixed", "mixed"], "mixed"),                    # pleasant votes 100%, unpleasant votes 67%
-    (["pleasant", "unpleasant", "neutral"], "mixed"),             # fits none of the others
-    (["pleasant", "neutral"], "neutral"),                         # half neutral wins
-    (["mixed", "neutral", "neutral"], "neutral"),
-    (["mixed", "mixed", "mixed"], "mixed"),
-    (["pleasant", "pleasant", "unpleasant"], "mixedPleasant"),    # 67% pleasant, 33% unpleasant
+    ([], None), (["neutral"], "neutral"), (["neutral", "pleasant"], "neutral"), (["pleasant"], "pleasant"),
+    (["unpleasant"], "unpleasant"), (["mixed"], "mixed"), (["pleasant", "unpleasant"], "mixed"),
+    (["pleasant", "pleasant", "pleasant", "unpleasant"], "pleasant"), (["pleasant", "pleasant", "unpleasant"], "mixedPleasant"),
+    (["unpleasant", "unpleasant", "pleasant"], "mixedUnpleasant"), (["unpleasant", "unpleasant", "unpleasant", "pleasant"], "unpleasant"),
 ])
 def test_tone_categories(labels: list[str], expected: str) -> None:
-    assert fb.tone_category(labels) == expected
-
-
-def test_tone_summary_counts_a_mixed_label_on_both_sides_and_ignores_no_one() -> None:
-    assert fb.tone_category([]) is None
-    s = fb.tone_summary(["pleasant", "mixed", "neutral"])
-    assert (s["pleasant"], s["unpleasant"], s["neutral"], s["n"], s["category"]) == (2, 1, 1, 3, "mixedPleasant")
-
-
-def test_the_sender_is_shown_but_not_counted(client: TestClient) -> None:
-    b = inbox(client)
-    fb2 = message_view(b, "fb-2")
-    assert fb2["message"]["senderTone"] == "unpleasant"
-    assert fb2["tone"]["n"] == 3  # the three validators only
-    assert fb2["tone"]["category"] == "mixed"  # mixed, mixed, unpleasant: pleasant votes 67%, unpleasant votes 100%
+    assert store.tone_category(labels) == expected
 
 
 def test_keywords_flag_possible_verbs_from_a_word_start() -> None:
-    cats = [fb.VerbCategory(id="v1", name="Fix", keywords=["freezes", "bug"]), fb.VerbCategory(id="v2", name="Increase", keywords=["increase"])]
-    flags = fb.flags_for("It freezes and I would increase the size. Bugs everywhere", cats)
-    assert [(f["categoryId"], f["keyword"]) for f in flags] == [("v1", "freezes"), ("v2", "increase"), ("v1", "bug")]
-    assert flags[2]["end"] - flags[2]["start"] == len("Bugs")
+    cats = [store.VerbCategory(id="v", name="Increase", keywords=["increase"])]
+    assert [f["keyword"] for f in store.flags_for("Please increased it, not reincrease", cats)] == ["increase"]
 
 
-# ---- validation: two stages, no quorum, every selection kept -----------------------------------
+# --- sending and following feedback ---------------------------------------------
 
 
-def test_one_completed_validation_puts_a_message_in_its_case(client: TestClient) -> None:
-    assert not any(c["channel"]["feature"] == "Approve" for c in inbox(client)["cases"])
-    resp = validate(client, SAM, "fb-5", {"tone": "neutral", "channels": [ADMIN_VOTING],
-                                          "statements": [{"channel": ADMIN_VOTING, "verbId": "verb-simplify"}]})
-    assert resp.status_code == 200, resp.text
-    b = resp.json()
-    assert case_for(b, "Approve", "Simplify")["messages"][0]["messageId"] == "fb-5"
-    assert message_view(b, "fb-5")["validationCount"] == 1
-    assert [e["kind"] for e in message_view(b, "fb-5")["history"]] == ["validated"]
+def test_a_user_sends_a_statement_and_follows_it_without_an_admin(client: TestClient) -> None:
+    mid = send(client)
+    view = mine(client)
+    assert view["messages"][0]["id"] == mid
+    assert view["messages"][0]["status"] == "received"
+    assert view["messages"][0]["verbName"] == "Fix"
+    assert mine(client, "someone-else")["messages"] == []
+    assert mine(client, "")["messages"] == []
 
 
-def test_every_selection_of_every_validator_is_kept_most_common_first(client: TestClient) -> None:
-    # fb-3: Dana and Lee chose Search/Improve; Sam adds Shelves/Fix, which only he chose.
-    validate(client, SAM, "fb-3", {"tone": "unpleasant", "channels": [SEARCH, SHELVES], "statements": [
-        {"channel": SEARCH, "verbId": "verb-improve"}, {"channel": SEARCH, "verbId": "verb-fix"}, {"channel": SHELVES, "verbId": "verb-fix"}]})
-    b = inbox(client)
-    assert {(c["channel"]["feature"], c["verbName"]) for c in b["cases"] if c["channel"]["console"] == "Library"} == {
-        ("Search", "Improve"), ("Search", "Fix"), ("Shelves", "Fix")}
-    sel = message_view(b, "fb-3")["selections"]
-    assert [s["channel"]["feature"] for s in sel] == ["Search", "Shelves"]   # 3 validators chose Search, 1 chose Shelves
-    assert sel[0]["chosenBy"] == 3 and [(v["verbId"], v["chosenBy"]) for v in sel[0]["verbs"]] == [("verb-improve", 3), ("verb-fix", 1)]
+def test_sending_checks_the_subject_and_the_verb(client: TestClient) -> None:
+    base = {"author": "J", "authorId": "u", "text": "x", "verbId": "verb-fix", "channelId": "writer/draft/draft"}
+    assert client.post("/api/feedback/messages", json={**base, "channelId": "nowhere"}).status_code == 400
+    assert client.post("/api/feedback/messages", json={**base, "verbId": "verb-nope"}).status_code == 400
+    assert client.post("/api/feedback/messages", json={**base, "text": "  "}).status_code == 400
+    assert client.get("/api/feedback/verbs").json()[0]["name"] == "Increase"
 
 
-def test_the_stages_run_in_order(client: TestClient) -> None:
-    assert validate(client, SAM, "fb-5", {"channels": [SEARCH]}).status_code == 400          # no tone yet
-    assert validate(client, SAM, "fb-5", {"tone": "neutral", "channels": [SEARCH]}).status_code == 200
-    # a verb needs its subject first, and must exist; a subject needs all four levels
-    assert validate(client, SAM, "fb-5", {"statements": [{"channel": SHELVES, "verbId": "verb-fix"}]}).status_code == 400
-    assert validate(client, SAM, "fb-5", {"statements": [{"channel": SEARCH, "verbId": "nope"}]}).status_code == 400
-    assert validate(client, SAM, "fb-5", {"channels": [{**SEARCH, "feature": ""}]}).status_code == 400
-    assert validate(client, SAM, "fb-5", {"channels": [{"page": "Writer", "console": "Nope", "component": "X", "feature": "Y"}]}).status_code == 400
-    assert validate(client, SAM, "nope", {"tone": "neutral"}).status_code == 404
+def test_a_helper_checks_a_message_and_it_joins_the_statement_of_its_subject_and_verb(client: TestClient) -> None:
+    assert check(client, "fb-7", checked=True).status_code == 400  # a tone first
+    assert check(client, "fb-7", SAM, tone="mixed", checked=True).status_code == 200  # Sam is a checker too
+    shelf = statement(bundle(client), SHELF, "verb-increase")
+    assert shelf["messageIds"] == ["fb-2", "fb-6", "fb-7"]
+    m = message(bundle(client, SAM), "fb-7")
+    assert m["checked"] and m["checkedByMe"] and m["statementId"] == shelf["id"]
 
 
-def test_removing_a_subject_drops_its_verbs_and_a_later_tone_change_keeps_the_rest(client: TestClient) -> None:
-    validate(client, SAM, "fb-5", {"tone": "neutral", "channels": [SEARCH], "statements": [{"channel": SEARCH, "verbId": "verb-fix"}]})
-    b = validate(client, SAM, "fb-5", {"tone": "pleasant"}).json()
-    mine = message_view(b, "fb-5")["validations"][0]
-    assert mine["tone"] == "pleasant" and len(mine["channels"]) == 1 and mine["complete"] is True
-    b = validate(client, SAM, "fb-5", {"channels": []}).json()
-    mine = message_view(b, "fb-5")["validations"][0]
-    assert mine["channels"] == [] and mine["statements"] == [] and mine["complete"] is False
+def test_checking_needs_the_checker_role_on_the_inbox(client: TestClient) -> None:
+    client.put("/api/feedback/admins/adm-lee/roles", headers=DANA, json={"scope": "helper/inbox", "roles": []})
+    resp = check(client, "fb-5", LEE, tone="neutral")
+    assert resp.status_code == 403
+    assert "Checker role on Helper > Inbox" in resp.json()["detail"]
 
 
-def test_validating_needs_the_processor_role_on_the_inbox(client: TestClient) -> None:
-    client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"console": "Helper/Inbox", "roles": []})
-    resp = validate(client, SAM, "fb-5", {"tone": "neutral"})
-    assert resp.status_code == 403 and "Processor role on Helper > Inbox" in resp.json()["detail"]
+def test_the_helper_can_correct_the_subject_and_verb_before_checking(client: TestClient) -> None:
+    mid = send(client, channel="writer/draft", verb="verb-improve")
+    assert check(client, mid, channelId="writer/draft/draft", verbId="verb-fix", tone="unpleasant", checked=True).status_code == 200
+    autosave = statement(bundle(client), "writer/draft/draft", "verb-fix")
+    assert autosave["messageIds"] == ["fb-1", mid]  # lumped with the seeded one
 
 
-def test_other_validators_tone_labels_are_for_configurers_only(client: TestClient) -> None:
-    def labels(who):
-        return [(v["mine"], v["tone"]) for v in message_view(inbox(client, who), "fb-1")["validations"]]
-    assert labels(SAM) == [(True, "neutral"), (False, None), (False, None)]      # your own only
-    assert sorted(labels(DANA), key=str) == sorted([(True, "unpleasant"), (False, "unpleasant"), (False, "neutral")], key=str)
-    assert inbox(client, SAM)["can"]["seeTones"] is False
-    # everyone still sees who chose which subjects and verbs, and the resulting category
-    assert message_view(inbox(client, SAM), "fb-1")["tone"]["category"] == "mixedUnpleasant"
+def test_channel_management_moves_a_checked_message_to_another_statement(client: TestClient) -> None:
+    # Dana manages the Writer consoles: moving fb-6 to Improve leaves the Increase statement and starts another.
+    assert check(client, "fb-6", verbId="verb-improve").status_code == 200
+    b = bundle(client)
+    assert statement(b, SHELF, "verb-increase")["messageIds"] == ["fb-2"]
+    assert statement(b, SHELF, "verb-improve")["messageIds"] == ["fb-6"]
+    # Lee manages the Reader consoles only.
+    resp = check(client, "fb-2", LEE, verbId="verb-fix")
+    assert resp.status_code == 403 and "Channel manager role" in resp.json()["detail"]
+    # Moving to a console Dana does not manage is refused.
+    assert check(client, "fb-6", channelId="reader/nook/stack").status_code == 403
+    assert check(client, "fb-6", channelId="writer/draft/nowhere").status_code == 400
 
 
-# ---- votes: check, x and pass ----------------------------------------------------------------------
+def test_questions_reach_the_writer_who_answers_them_and_comments_stay_with_staff(client: TestClient) -> None:
+    mid = send(client)
+    assert client.post(f"/api/feedback/messages/{mid}/questions", headers=LEE, json={"text": "Which file?"}).status_code == 200
+    assert client.post(f"/api/feedback/messages/{mid}/comments", headers=LEE, json={"text": "Seen this before."}).status_code == 200
+    view = mine(client)
+    assert view["openQuestions"] == 1
+    q = view["messages"][0]["questions"][0]
+    assert q["text"] == "Which file?" and q["answer"] == ""
+    assert "comments" not in view["messages"][0] and "Seen this before" not in json.dumps(view)
+    path = f"/api/feedback/messages/{mid}/questions/{q['id']}/answer"
+    assert client.put(path, json={"authorId": "intruder", "answer": "x"}).status_code == 403
+    answered = client.put(path, json={"authorId": "u-1", "answer": "chapter-3.md"}).json()
+    assert answered["openQuestions"] == 0 and answered["messages"][0]["questions"][0]["answer"] == "chapter-3.md"
+    staff = message(bundle(client, LEE), mid)
+    assert staff["questions"][0]["answer"] == "chapter-3.md" and staff["questions"][0]["mine"] is True
+    assert client.post(f"/api/feedback/messages/{mid}/questions", headers=LEE, json={"text": " "}).status_code == 400
+
+
+# --- voting and deciding ---------------------------------------------------------------
 
 
 def test_votes_hold_any_combination_with_notes_and_can_be_withdrawn(client: TestClient) -> None:
-    cid = case_for(inbox(client), "Autosave", "Fix")["id"]
-    body = {"approve": True, "deny": True, "passed": True, "approveNote": "  Real freeze  ", "denyNote": "Only on huge pastes", "passNote": "Unsure"}
-    b = client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json=body).json()
-    vote = case_for(b, "Autosave", "Fix")["votes"][0]
-    assert (vote["mine"], vote["approve"], vote["deny"], vote["passed"]) == (True, True, True, True)
-    assert (vote["approveNote"], vote["denyNote"], vote["passNote"]) == ("Real freeze", "Only on huge pastes", "Unsure")
-    # a note is kept only while its side is on
-    b = client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={**body, "deny": False, "passed": False}).json()
-    vote = case_for(b, "Autosave", "Fix")["votes"][0]
-    assert (vote["denyNote"], vote["passNote"], vote["approveNote"]) == ("", "", "Real freeze")
-    b = client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={}).json()
-    case = case_for(b, "Autosave", "Fix")
-    assert case["votes"] == []
-    assert [h["detail"] for h in case["history"]] == ["approved and denied and passed", "approved", "withdrew"]
-    client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={"approve": True})
-    b = client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={"approve": True, "approveNote": "Added later"}).json()
-    assert len(case_for(b, "Autosave", "Fix")["history"]) == 4  # a note is not a new vote
+    sid = statement(bundle(client), SHELF, "verb-increase")["id"]
+    resp = client.put(f"/api/feedback/statements/{sid}/vote", headers=SAM, json={"approve": True})
+    assert resp.status_code == 403  # Sam votes on Reader consoles only
+    b = client.put(f"/api/feedback/statements/{sid}/vote", headers=DANA, json={"approve": True, "passed": True, "passNote": "either way"}).json()
+    mine_vote = next(v for v in statement(b, SHELF, "verb-increase")["votes"] if v["mine"])
+    assert mine_vote["approve"] and mine_vote["passed"] and mine_vote["passNote"] == "either way" and mine_vote["approveNote"] == ""
+    b = client.put(f"/api/feedback/statements/{sid}/vote", headers=DANA, json={}).json()
+    assert not any(v["mine"] for v in statement(b, SHELF, "verb-increase")["votes"])
+    assert client.put(f"/api/feedback/statements/{sid}/vote", headers=DANA, json={"approve": True, "approveNote": "x" * 501}).status_code == 422
 
 
-def test_vote_notes_are_length_limited(client: TestClient) -> None:
-    cid = case_for(inbox(client), "Autosave", "Fix")["id"]
-    for field in ("approveNote", "denyNote", "passNote"):
-        assert client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={field: "x" * 501}).status_code == 422
+def test_the_planner_accepts_or_vetoes_with_or_without_votes_and_the_writer_sees_it(client: TestClient) -> None:
+    mid = send(client)
+    check(client, mid, tone="unpleasant", checked=True)
+    assert mine(client)["messages"][0]["status"] == "voting"
+    sid = statement(bundle(client), "writer/draft/draft", "verb-fix")["id"]
+    assert client.post(f"/api/feedback/statements/{sid}/decision", headers=LEE, json={"decision": "accepted"}).status_code == 403
+    b = client.post(f"/api/feedback/statements/{sid}/decision", headers=DANA, json={"decision": "accepted", "note": "Next release."}).json()
+    st = statement(b, "writer/draft/draft", "verb-fix")
+    assert st["decision"] == "accepted" and st["can"]["vote"] is False
+    view = mine(client)["messages"][0]
+    assert view["status"] == "planned" and [s["step"] for s in view["steps"]] == ["received", "checked", "planned"]
+    assert client.put(f"/api/feedback/statements/{sid}/vote", headers=DANA, json={"approve": True}).status_code == 409
+    client.post(f"/api/feedback/statements/{sid}/decision", headers=DANA, json={"decision": "vetoed", "note": "Works as designed."})
+    view = mine(client)["messages"][0]
+    assert view["status"] == "declined" and view["note"] == "Works as designed."
+    client.post(f"/api/feedback/statements/{sid}/decision", headers=DANA, json={"decision": None})
+    assert mine(client)["messages"][0]["status"] == "voting"
 
 
-def test_voting_needs_the_processor_role_on_the_cases_console(client: TestClient) -> None:
-    cid = case_for(inbox(client), "Book Spines", "Increase")["id"]  # a Writer case
-    resp = client.put(f"/api/feedback/cases/{cid}/vote", headers=SAM, json={"approve": True})
-    assert resp.status_code == 403 and "Processor role on Writer > Shelf" in resp.json()["detail"]
-    assert client.put(f"/api/feedback/cases/{cid}/vote", headers=LEE, json={"passed": True}).status_code == 200
-    assert case_for(inbox(client, SAM), "Book Spines", "Increase")["can"]["vote"] is False
+def test_plan_work_moves_the_writers_status_on() -> None:
+    file = store._build_seed()
+    m = next(x for x in file.messages if x.id == "fb-1")
+    sid = store.statement_id(store.statement_key(m.channelId, m.verbId))
+    store.decide(file, "adm-dana", sid, "accepted", "")
+    assert store.message_status(file, m, lambda s: "inProgress" if s == sid else None)["status"] == "inProgress"
+    done = store.message_status(file, m, lambda s: "done")
+    assert done["status"] == "done" and [s["step"] for s in done["steps"]][-2:] == ["inProgress", "done"]
 
 
-def test_solutions_need_the_configurer_role_and_anyone_with_the_processor_role_can_vote(client: TestClient) -> None:
-    cid = case_for(inbox(client), "Book Spines", "Increase")["id"]
-    sol = {"title": "Label the spines", "description": "Show titles.", "target": {"page": "Writer", "console": "Shelf", "component": "Sidebar Shelf"}}
-    assert client.post(f"/api/feedback/cases/{cid}/solutions", headers=LEE, json=sol).status_code == 403  # Lee configures Reader only
-    assert client.post(f"/api/feedback/cases/{cid}/solutions", headers=DANA, json={**sol, "title": "  "}).status_code == 400
-    b = client.post(f"/api/feedback/cases/{cid}/solutions", headers=DANA, json=sol).json()
-    mine = next(s for s in case_for(b, "Book Spines", "Increase")["solutions"] if s["title"] == "Label the spines")
-    assert mine["mine"] is True
-    client.put(f"/api/feedback/cases/{cid}/solutions/{mine['id']}/vote", headers=DANA, json={"approve": True})
-    b = client.put(f"/api/feedback/cases/{cid}/solutions/{mine['id']}/vote", headers=LEE, json={"deny": True, "denyNote": "Too wide"}).json()
-    sol_now = next(s for s in case_for(b, "Book Spines", "Increase")["solutions"] if s["id"] == mine["id"])
-    assert sorted((v["mine"], v["approve"], v["deny"]) for v in sol_now["votes"]) == [(False, True, False), (True, False, True)]
-    assert client.put(f"/api/feedback/cases/{cid}/solutions/nope/vote", headers=DANA, json={"approve": True}).status_code == 404
+# --- verbs and roles ---------------------------------------------------------------------
 
 
-# ---- closing and reopening ---------------------------------------------------------------------
+def test_verbs_are_managed_by_the_inbox_channel_manager_and_a_used_verb_stays(client: TestClient) -> None:
+    assert client.post("/api/feedback/verb-categories", headers=LEE, json={"name": "Clarify"}).status_code == 403
+    b = client.post("/api/feedback/verb-categories", headers=DANA, json={"name": "Clarify", "keywords": [" Unclear "]}).json()
+    clarify = next(v for v in b["verbCategories"] if v["name"] == "Clarify")
+    assert clarify["keywords"] == ["unclear"]
+    assert client.post("/api/feedback/verb-categories", headers=DANA, json={"name": "clarify"}).status_code == 409
+    assert client.delete("/api/feedback/verb-categories/verb-fix", headers=DANA).status_code == 409
+    assert client.delete(f"/api/feedback/verb-categories/{clarify['id']}", headers=DANA).status_code == 200
 
 
-def test_only_the_planner_role_closes_and_the_configurer_role_reopens(client: TestClient) -> None:
-    cid = case_for(inbox(client), "Book Spines", "Increase")["id"]
-    assert client.post(f"/api/feedback/cases/{cid}/close", headers=LEE, json={"outcome": "approved"}).status_code == 403
-    assert client.post(f"/api/feedback/cases/{cid}/close", headers=SAM, json={"outcome": "approved"}).status_code == 403
-    b = client.post(f"/api/feedback/cases/{cid}/close", headers=DANA, json={"outcome": "approved", "note": "  Ship it "}).json()
-    case = case_for(b, "Book Spines", "Increase")
-    assert (case["status"], case["closeNote"]) == ("approved", "Ship it") and case["closedAt"]
-    assert client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={"approve": True}).status_code == 409
-    assert client.post(f"/api/feedback/cases/{cid}/close", headers=DANA, json={"outcome": "rejected"}).status_code == 409
-    assert client.post(f"/api/feedback/cases/{cid}/reopen", headers=LEE, json={}).status_code == 403
-    b = client.post(f"/api/feedback/cases/{cid}/reopen", headers=DANA).json()
-    case = case_for(b, "Book Spines", "Increase")
-    assert case["status"] == "open" and [h["kind"] for h in case["history"]][-2:] == ["closed", "reopened"]
-    assert client.post(f"/api/feedback/cases/{cid}/reopen", headers=DANA).status_code == 409
+def test_roles_are_assigned_per_scope_and_recorded(client: TestClient) -> None:
+    b = client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"scope": "writer/draft", "roles": ["planner", "voter"]}).json()
+    sam = next(a for a in b["admins"] if a["id"] == "adm-sam")
+    assert sam["roles"]["writer/draft"] == ["voter", "planner"]
+    assert "Sam Ortiz: writer/draft set to voter, planner" in b["roleHistory"][-1]["detail"]
+    assert client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"scope": "nowhere", "roles": []}).status_code == 400
+    assert client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"scope": "writer/draft", "roles": ["boss"]}).status_code == 400
+    resp = client.put("/api/feedback/admins/adm-dana/roles", headers=DANA, json={"scope": "helper/inbox", "roles": ["checker"]})
+    assert resp.status_code == 403
 
 
-def test_a_planner_alone_can_close_on_a_console_where_they_hold_no_other_role(client: TestClient) -> None:
-    cid = case_for(inbox(client), "Search", "Improve")["id"]  # Reader case: Sam is planner and processor there, not configurer
-    assert case_for(inbox(client, SAM), "Search", "Improve")["can"] == {"vote": True, "propose": False, "close": True, "reopen": False}
-    assert client.post(f"/api/feedback/cases/{cid}/close", headers=SAM, json={"outcome": "rejected"}).status_code == 200
+# --- the file -------------------------------------------------------------------------------
 
 
-def test_the_can_flags_follow_the_roles_of_the_signed_in_admin(client: TestClient) -> None:
-    assert case_for(inbox(client, DANA), "Book Spines", "Increase")["can"] == {"vote": True, "propose": True, "close": True, "reopen": True}
-    assert case_for(inbox(client, LEE), "Book Spines", "Increase")["can"] == {"vote": True, "propose": False, "close": False, "reopen": False}
-    assert case_for(inbox(client, SAM), "Book Spines", "Increase")["can"] == {"vote": False, "propose": False, "close": False, "reopen": False}
-
-
-# ---- verb categories -------------------------------------------------------------------------------
-
-
-def test_verb_categories_are_managed_with_the_configurer_role_on_the_inbox(client: TestClient) -> None:
-    assert client.post("/api/feedback/verb-categories", headers=LEE, json={"name": "Rename"}).status_code == 403
-    b = client.post("/api/feedback/verb-categories", headers=DANA, json={"name": " Rename  it ", "keywords": ["Rename", " rename ", "", "call it"]}).json()
-    verb = next(v for v in b["verbCategories"] if v["name"] == "Rename it")
-    assert verb["keywords"] == ["rename", "call it"]
-    assert client.post("/api/feedback/verb-categories", headers=DANA, json={"name": "rename IT"}).status_code == 409
-    b = client.patch(f"/api/feedback/verb-categories/{verb['id']}", headers=DANA, json={"keywords": ["retitle", "retitle"]}).json()
-    assert next(v for v in b["verbCategories"] if v["id"] == verb["id"])["keywords"] == ["retitle"]
-    assert client.patch(f"/api/feedback/verb-categories/{verb['id']}", headers=DANA, json={"name": "Fix"}).status_code == 409
-    assert client.delete(f"/api/feedback/verb-categories/{verb['id']}", headers=DANA).status_code == 200
-
-
-def test_a_verb_category_with_open_cases_cannot_be_deleted_until_they_close(client: TestClient) -> None:
-    resp = client.delete("/api/feedback/verb-categories/verb-increase", headers=DANA)
-    assert resp.status_code == 409 and "open cases" in resp.json()["detail"]
-    cid = case_for(inbox(client), "Book Spines", "Increase")["id"]
-    client.post(f"/api/feedback/cases/{cid}/close", headers=DANA, json={"outcome": "rejected"})
-    b = client.delete("/api/feedback/verb-categories/verb-increase", headers=DANA).json()
-    assert all(v["id"] != "verb-increase" for v in b["verbCategories"])
-    assert not any(c["verbName"] == "Increase" for c in b["cases"])
-
-
-# ---- roles (Admin > Manager > Assignment) ----------------------------------------------------------
-
-
-def test_roles_are_assigned_per_console_and_the_change_is_recorded(client: TestClient) -> None:
-    assert not inbox(client, SAM)["can"]["manageVerbs"]
-    b = client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"console": "Helper/Inbox", "roles": ["configurer", "processor"]}).json()
-    assert next(a for a in b["admins"] if a["id"] == "adm-sam")["roles"]["Helper/Inbox"] == ["processor", "configurer"]
-    assert inbox(client, SAM)["can"] == {"validate": True, "manageVerbs": True, "seeTones": True}
-    assert b["roleHistory"][-1]["detail"] == "Sam Ortiz: Helper > Inbox set to processor, configurer"
-    assert b["roleHistory"][-1]["mine"] is True
-    # no change, no history line
-    n = len(b["roleHistory"])
-    b = client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"console": "Helper/Inbox", "roles": ["processor", "configurer"]}).json()
-    assert len(b["roleHistory"]) == n
-    # removing every role removes the console entry
-    b = client.put("/api/feedback/admins/adm-sam/roles", headers=DANA, json={"console": "Reader/Nook", "roles": []}).json()
-    assert "Reader/Nook" not in next(a for a in b["admins"] if a["id"] == "adm-sam")["roles"]
-
-
-def test_role_input_is_checked_and_nobody_removes_their_own_inbox_configurer_role(client: TestClient) -> None:
-    put = lambda who, target, body: client.put(f"/api/feedback/admins/{target}/roles", headers=who, json=body)  # noqa: E731
-    assert put(DANA, "adm-sam", {"console": "Nope/Nope", "roles": ["processor"]}).status_code == 400
-    assert put(DANA, "adm-sam", {"console": "Helper/Inbox", "roles": ["boss"]}).status_code == 400
-    assert put(DANA, "nobody", {"console": "Helper/Inbox", "roles": []}).status_code == 403
-    resp = put(DANA, "adm-dana", {"console": "Helper/Inbox", "roles": ["processor"]})
-    assert resp.status_code == 403 and "own Configurer role" in resp.json()["detail"]
-    assert put(DANA, "adm-dana", {"console": "Helper/Inbox", "roles": ["processor", "configurer", "planner"]}).status_code == 200
-    assert put(DANA, "adm-dana", {"console": "Writer/Shelf", "roles": []}).status_code == 200  # other consoles are free
-
-
-# ---- storage and migration ----------------------------------------------------------------------------
-
-
-def test_feedback_is_stored_in_one_app_level_file(client: TestClient, app_data_root) -> None:
-    inbox(client)
+def test_feedback_is_one_app_level_file_and_a_corrupt_one_is_quarantined(client: TestClient, app_data_root: Path) -> None:
+    send(client)
     assert (app_data_root / "feedback.json").exists()
-    cid = case_for(inbox(client), "Autosave", "Fix")["id"]
-    client.put(f"/api/feedback/cases/{cid}/vote", headers=DANA, json={"approve": True})
-    assert case_for(inbox(client), "Autosave", "Fix")["votes"][0]["mine"] is True  # a fresh read still has the vote
+    (app_data_root / "feedback.json").write_text("{not json", encoding="utf-8")
+    assert client.get("/api/feedback", headers=DANA).status_code == 409
+    assert list(app_data_root.glob("feedback.corrupt-*.json"))
 
 
-def test_a_version_1_file_is_migrated_to_roles_and_keeps_its_votes(client: TestClient, app_data_root) -> None:
-    space = {"page": "Writer", "console": "Shelf", "component": "Sidebar Shelf", "feature": "Book Spines"}
-    v1 = {
-        "schemaVersion": 1,
-        "admins": [{"id": "adm-old", "name": "Old Admin", "processing": ["Helper/Inbox", "Writer/*"], "configuration": ["Reader/Library"], "projectPlan": ["Writer/Shelf"]}],
-        "verbCategories": [{"id": "verb-fix", "name": "Fix", "keywords": []}],
-        "messages": [{"id": "m1", "text": "It is broken", "author": "someone", "submittedAt": "2026-08-01", "senderTone": "unpleasant"}],
-        "validations": {"m1": [{"adminId": "adm-old", "tone": "unpleasant", "channels": [space], "statements": [{"channel": space, "verbId": "verb-fix"}]}]},
-        "cases": {},
+def test_a_node_feedback_points_at_cannot_be_deleted(client: TestClient) -> None:
+    resp = client.delete("/api/resources/nodes/reader/library")
+    assert resp.status_code == 409 and "feedback message" in resp.json()["detail"]
+    assert client.delete("/api/resources/nodes/training/lesson").status_code == 200
+
+
+def _v2_file() -> dict:
+    spines = {"page": "Writer", "console": "Shelf", "component": "Sidebar Shelf", "feature": "Book Spines"}
+    return {
+        "schemaVersion": 2,
+        "admins": [{"id": "adm-old", "name": "Old Admin", "roles": {
+            "Helper/Inbox": ["processor", "configurer"], "Writer/Shelf": ["processor", "planner"], "Reader/*": ["configurer"]}}],
+        "verbCategories": [{"id": "verb-fix", "name": "Fix", "keywords": ["broken"]}, {"id": "verb-add", "name": "Add", "keywords": []}],
+        "messages": [
+            {"id": "m1", "text": "The spines are broken", "author": "someone", "submittedAt": "2026-08-01", "senderTone": "unpleasant",
+             "openPage": "Writer", "openConsole": "Shelf", "selectedComponent": "Sidebar Shelf"},
+            {"id": "m2", "text": "It is broken somewhere", "author": "other", "submittedAt": "2026-08-02", "senderTone": None},
+        ],
+        "validations": {"m1": [{"adminId": "adm-old", "tone": "unpleasant", "channels": [spines], "statements": [{"channel": spines, "verbId": "verb-fix"}]}]},
+        "messageHistory": {},
+        "cases": {"case-x": {"id": "case-x", "key": "Writer|Shelf|Sidebar Shelf|Book Spines::verb-fix", "status": "approved",
+                             "votes": [{"adminId": "adm-old", "approve": True}], "solutions": [{"id": "s", "title": "t", "target": spines, "proposedBy": "adm-old"}],
+                             "closedBy": "adm-old", "closeNote": "Do it.", "history": [{"adminId": "adm-old", "kind": "vote", "detail": "approved"}]}},
+        "roleHistory": [],
     }
-    (app_data_root / "feedback.json").write_text(json.dumps(v1), encoding="utf-8")
-    b = inbox(client, {"X-Admin-Id": "adm-old"})
+
+
+def test_a_version_2_file_moves_to_channel_ids_once_keeping_a_copy(client: TestClient, app_data_root: Path) -> None:
+    (app_data_root / "feedback.json").write_text(json.dumps(_v2_file()), encoding="utf-8")
+    b = bundle(client, {"X-Admin-Id": "adm-old"})
     roles = b["admins"][0]["roles"]
-    assert roles["Helper/Inbox"] == ["processor"]
-    assert roles["Writer/Shelf"] == ["processor", "planner"] and roles["Writer/Page"] == ["processor"]   # Writer/* expanded
-    assert roles["Reader/Library"] == ["configurer"]
-    assert len(b["cases"]) == 1 and b["cases"][0]["messages"][0]["messageId"] == "m1"  # no quorum: one validator is enough
-    stored = json.loads((app_data_root / "feedback.json").read_text(encoding="utf-8"))
-    assert stored["schemaVersion"] == 2 and "processing" not in stored["admins"][0]
+    assert roles["helper/inbox"] == ["checker", "channelManager"]
+    assert roles["writer/shelf"] == ["voter", "planner"]
+    assert all(roles[c] == ["channelManager"] for c in ("reader/nook", "reader/library", "reader/book", "reader/pages"))
+    m1 = message(b, "m1")
+    assert m1["channelId"] == "writer/shelf/sidebar-shelf/book-spines" and m1["checked"] and m1["tone"] == "unpleasant"
+    assert m1["fromChannel"] == "writer/shelf/sidebar-shelf"
+    m2 = message(b, "m2")
+    assert m2["checked"] is False and m2["verbId"] == "verb-fix" and m2["channelId"] == "writer"  # guessed from its words
+    st = statement(b, m1["channelId"], "verb-fix")
+    assert st["decision"] == "accepted" and st["decisionNote"] == "Do it." and st["tally"]["approve"] == 1
+    tree = {n["id"]: n for n in client.get("/api/channels").json()["nodes"]}
+    assert tree["writer/shelf/sidebar-shelf/book-spines"]["kind"] == "feature"
+    assert (app_data_root / "feedback.v2.json").exists()
+    assert json.loads((app_data_root / "feedback.json").read_text(encoding="utf-8"))["schemaVersion"] == 3
+    assert bundle(client, {"X-Admin-Id": "adm-old"})["messages"] == b["messages"]  # not moved twice
+
+
+def test_a_version_1_file_moves_its_access_patterns_to_scopes(client: TestClient, app_data_root: Path) -> None:
+    v1 = {**_v2_file(), "schemaVersion": 1, "admins": [{"id": "adm-old", "name": "Old", "processing": ["Helper/Inbox", "Writer/*"], "projectPlan": ["Writer/Draft"]}]}
+    (app_data_root / "feedback.json").write_text(json.dumps(v1), encoding="utf-8")
+    roles = bundle(client, {"X-Admin-Id": "adm-old"})["admins"][0]["roles"]
+    assert roles["helper/inbox"] == ["checker"]
+    assert roles["writer/draft"] == ["voter", "planner"] and roles["writer/dashboard"] == ["voter"]
+    assert (app_data_root / "feedback.v1.json").exists()

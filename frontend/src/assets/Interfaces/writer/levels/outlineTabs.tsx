@@ -7,7 +7,7 @@ import BookSettings from '../outline/BookSettings'
 import { nodeLabel } from '../plotTree'
 import { Placeholder } from '../shared'
 import { useWordCounts } from '../useWordCounts'
-import HelpArticles from './HelpArticles'
+import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
@@ -83,7 +83,7 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'details', label: 'Book details', Icon: InfoIcon, render: () => <BookDetails w={w} /> },
     { id: 'publish', label: 'Publish', Icon: ExportIcon, render: () => <BookPublish w={w} /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, render: () => <SettingsPane w={w} /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.writerBook} fallback={OUTLINE_HELP_FALLBACK} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={HELP_TARGETS.writerBook} fallback={OUTLINE_HELP_FALLBACK} /> },
   ]
 }
 

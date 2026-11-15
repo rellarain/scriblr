@@ -9,6 +9,9 @@ import FlagSettings from './FlagSettings'
 import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
 import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
+import HelpTile from '../../components/help/HelpTile'
+import { HELP_TARGETS } from '../../channels/helpTargets'
+import UserNotifications from './user/UserNotifications'
 
 // The User panel (in the header drawer), per scrilbrPlan.md's "User Page (UUI)"
 // section, as tiles (the global tile, components/tiles/TileArea.tsx): the consoles are Dashboard and Account, each holding
@@ -41,7 +44,7 @@ const SECTIONS: UuiSection[] = [
     pages: [
       { key: 'activityLog', label: 'Activity Log', Icon: BarChartIcon, body: 'View your activity log here.' },
       { key: 'dashboardSchedule', label: 'Schedule', Icon: CalendarIcon, body: 'View and manage your schedule here.' },
-      { key: 'notifications', label: 'Notifications', Icon: EnvelopeIcon, body: 'View your notifications here.' },
+      { key: 'notifications', label: 'Notifications', Icon: EnvelopeIcon, body: 'View your notifications here.', Console: UserNotifications },
     ],
   },
   {
@@ -77,9 +80,14 @@ function UUI() {
     {
       id: 'help', title: 'Help', Icon: HelpIcon,
       children: (
-        <div className="uUISection">
-          {SECTIONS.map(s => <section key={s.key} className="uUIPage" aria-label={`${s.label} help`}><h2>{s.label}</h2><p>{s.help}</p></section>)}
-        </div>
+        <HelpTile
+          target={HELP_TARGETS.user}
+          fallback={(
+            <div className="uUISection">
+              {SECTIONS.map(s => <section key={s.key} className="uUIPage" aria-label={`${s.label} help`}><h2>{s.label}</h2><p>{s.help}</p></section>)}
+            </div>
+          )}
+        />
       ),
     },
   ]

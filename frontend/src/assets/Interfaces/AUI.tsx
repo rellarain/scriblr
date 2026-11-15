@@ -1,4 +1,7 @@
 import RoleAssignment from './admin/RoleAssignment'
+import { ChannelManagementPage, VotingPage } from './admin/office/StatementPages'
+import HelpTile from '../../components/help/HelpTile'
+import { HELP_TARGETS } from '../../channels/helpTargets'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon,
@@ -136,9 +139,9 @@ const SECTIONS: AuiSectionDef[] = [
       { key: 'hireTermAdmin', label: 'Hire/Term Admin', Icon: PeopleIcon,
         body: 'Hire or terminate admin users here.' },
       { key: 'voting', label: 'Voting', Icon: VotingIcon,
-        body: 'Approve and/or deny explicated, toned, and sorted feedback, and set the admin-defined processing order for tones and feature sorting, here.' },
+        body: 'Vote yes, no or pass on the statements in voting (advice for the planner).' },
       { key: 'channelManagement', label: 'Channel Management', Icon: SortingIcon,
-        body: 'Review processed feedback here, as a second processing pass after Voting.' },
+        body: 'Correct the subject, verb and tone of the messages in voting, and ask the writer or comment.' },
       { key: 'officeHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Office console here.' },
     ],
@@ -201,6 +204,8 @@ function AUI() {
     pages: section.subSections.filter(s => s.label !== 'Help').map(page => ({
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />
+        : page.key === 'voting' ? <VotingPage />
+        : page.key === 'channelManagement' ? <ChannelManagementPage />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
         : page.key === 'configMaps' ? <Suspense fallback={null}><MapsConfigConsole /></Suspense>
         : page.key === 'configChannels' ? <Suspense fallback={null}><ChannelsConsole /></Suspense>
@@ -221,14 +226,19 @@ function AUI() {
   tiles.push({
     id: 'help', title: 'Help', Icon: HelpIcon,
     children: (
-      <div className="aUISection">
-        {SECTIONS.map(section => (
-          <section key={section.key} className="aUIPage" aria-label={`${section.label} help`}>
-            <h2>{section.label}</h2>
-            {(section.subSections.find(s => s.label === 'Help')?.body ?? '').split('\n\n').map((para, i) => <p key={i}>{para}</p>)}
-          </section>
-        ))}
-      </div>
+      <HelpTile
+        target={HELP_TARGETS.admin}
+        fallback={(
+          <div className="aUISection">
+            {SECTIONS.map(section => (
+              <section key={section.key} className="aUIPage" aria-label={`${section.label} help`}>
+                <h2>{section.label}</h2>
+                {(section.subSections.find(s => s.label === 'Help')?.body ?? '').split('\n\n').map((para, i) => <p key={i}>{para}</p>)}
+              </section>
+            ))}
+          </div>
+        )}
+      />
     ),
   })
 

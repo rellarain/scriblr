@@ -22,6 +22,11 @@ import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
 import MapsConfigConsole from '../assets/Interfaces/admin/maps/MapsConfigConsole'
 import ChannelsConsole from '../assets/Interfaces/admin/channels/ChannelsConsole'
+import { ChannelManagementPage, VotingPage } from '../assets/Interfaces/admin/office/StatementPages'
+import InboxSection from '../assets/Interfaces/helper/inbox/InboxSection'
+import UserNotifications from '../assets/Interfaces/user/UserNotifications'
+import HelpTile from '../components/help/HelpTile'
+import { HELP_TARGETS } from '../channels/helpTargets'
 import DesignerConsole from '../assets/Interfaces/admin/characters/DesignerConsole'
 import WriterLimitsConsole from '../assets/Interfaces/admin/characters/WriterLimitsConsole'
 import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
@@ -288,6 +293,22 @@ function ChannelsCard() {
   )
 }
 
+// The feedback pipeline, one screen per view, all on the same pretend store (mockFeedback.ts): what is sent in the Help tile shows
+// up in the Inbox, a checked message in Voting, a question asked in the Inbox under the writer's Notifications.
+const FEEDBACK_VIEWS = [{ id: 'help', label: 'Help tile' }, { id: 'inbox', label: 'Inbox' }, { id: 'voting', label: 'Voting' }, { id: 'channels', label: 'Channel Management' }, { id: 'notifications', label: 'Notifications' }]
+function FeedbackCard({ view }: { view: string }) {
+  const pane = (cls: string, width: string, child: ReactNode) => (
+    <div className={cls} style={{ position: 'relative', width, height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className={`${cls}Panel`} style={{ height: '100%', overflow: 'hidden', boxSizing: 'border-box', padding: 14, display: 'flex', flexDirection: 'column' }}>{child}</div>
+    </div>
+  )
+  if (view === 'help') return pane('aUI', 'min(380px, 100%)', <HelpTile target={HELP_TARGETS.writerDraft} fallback="Resources and assistance using the Draft console here." />)
+  if (view === 'inbox') return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex' }}><InboxSection /></div></div>
+  if (view === 'voting') return pane('aUI', '100%', <VotingPage />)
+  if (view === 'channels') return pane('aUI', '100%', <ChannelManagementPage />)
+  return pane('aUI', 'min(520px, 100%)', <UserNotifications />)
+}
+
 function MapBiomesCard() {
   return (
     <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
@@ -440,6 +461,7 @@ export const CARDS: CardDef[] = [
   card('items', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ItemsCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),
   card('channels', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ChannelsCard /> }),
+  card('feedback', { frame: 'plain', views: FEEDBACK_VIEWS, defaults: { view: 'help', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <FeedbackCard key={view} view={view} /> }),
   card('map-biomes', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapBiomesCard /> }),
   card('shelf', { defaults: { zones: ['day', 'night'] }, render: () => <ShelfCard /> }),
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),

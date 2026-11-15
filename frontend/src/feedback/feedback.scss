@@ -1,0 +1,108 @@
+// The feedback pipeline's shared look: the Help tile's feedback, the Inbox's check, the Office's Voting and Channel Management,
+// the Project Plan's statements and the user's dashboard. Theme tokens only. `.fbScope` gives the tone colours (pleasant = the
+// admin accent, unpleasant = the alert colour, neutral = a theme shade) to whatever holds feedback, as `.inboxSection` does.
+
+.fbScope {
+  --tone-yes: var(--accent2);
+  --tone-yes-ink: var(--on-accent2);
+  --tone-no: var(--alert);
+  --tone-no-ink: var(--on-alert);
+  --tone-mid: color-mix(in srgb, var(--ink) 34%, var(--surface-sidebar-2));
+  --tone-mid-ink: var(--ink);
+  --field-bg: var(--ov-sink-2);
+}
+
+.fbMuted { color: var(--ink-muted); font-size: 12px; margin: 0; }
+.fbError { margin: 0; padding: 6px 8px; font-size: 12.5px; color: var(--ink); background: color-mix(in srgb, var(--alert) 22%, transparent); }
+.fbField {
+  flex: 1 1 auto; min-width: 0; box-sizing: border-box; padding: 6px 8px; border: 0; background: var(--field-bg, var(--ov-sink-2));
+  color: var(--ink); font: inherit; font-size: 12.5px;
+  &::placeholder { color: var(--ink-muted); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+}
+textarea.fbField { resize: vertical; min-height: 64px; line-height: 1.4; }
+.fbIconBtn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 28px; height: 28px; padding: 0 6px;
+  border: 0; background: var(--ov-sink-2); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer;
+  &:hover:not(:disabled) { background: var(--ov-sink-3); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  &[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+  &--primary { background: var(--accent); color: var(--on-accent); &:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); } }
+}
+.fbSelect { padding: 5px 6px; border: 0; background: var(--field-bg, var(--ov-sink-2)); color: var(--ink); font: inherit; font-size: 12.5px; max-width: 100%; }
+
+// The subject picker.
+.fbPicker { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fbCrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.fbCrumb {
+  padding: 2px 6px; border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer;
+  &:hover:not(:disabled) { background: var(--ov-sink-2); }
+  &:disabled { cursor: default; }
+  &[aria-current] { background: var(--ov-sink-2); font-weight: 700; }
+  & + &::before { content: ''; }
+}
+
+// Verb chips (the user's form and the check).
+.fbVerbs { display: flex; flex-wrap: wrap; gap: 4px; }
+.fbVerbChip {
+  padding: 4px 8px; border: 0; background: var(--ov-sink-2); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer;
+  &:hover:not(:disabled) { background: var(--ov-sink-3); }
+  &[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+}
+
+// A message card and its replies.
+.fbMessage { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--ov-sink-1); }
+.fbText { margin: 0; font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fbMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-muted); }
+.fbSubject { color: var(--ink); }
+.fbChip {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 2px 8px; border: 0; background: var(--ov-sink-2);
+  color: var(--ink); font: inherit; font-size: 11.5px; cursor: pointer;
+  &:hover { background: var(--ov-sink-3); }
+  &[aria-expanded='true'] { background: var(--ov-sink-3); font-weight: 700; }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+}
+.fbDrawer { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--ov-sink-2); }
+.fbReply { font-size: 12.5px; p { margin: 0; } }
+.fbReply--internal { padding-left: 8px; box-shadow: inset 2px 0 0 var(--ink-muted); }
+.fbReplyKind { font-weight: 700; color: var(--ink-muted); margin-right: 4px; }
+.fbAnswer { display: flex; align-items: center; gap: 4px; padding-left: 12px; }
+.fbReplyForm { display: flex; gap: 4px; }
+
+// A statement.
+.fbStatement { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
+.fbStatementHead { display: flex; flex-direction: column; gap: 4px; }
+.fbStatementTitle { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.fbVerb { font-weight: 800; }
+.fbStatementMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-muted); }
+.fbTally { display: inline-flex; gap: 8px; span { display: inline-flex; align-items: center; gap: 2px; } }
+.fbBadge { padding: 1px 6px; font-size: 11px; font-weight: 700; background: var(--ov-sink-2); color: var(--ink);
+  &--accepted { background: var(--tone-yes, var(--accent2)); color: var(--tone-yes-ink, var(--on-accent2)); }
+  &--vetoed { background: var(--tone-no, var(--alert)); color: var(--tone-no-ink, var(--on-alert)); }
+}
+.fbMessages { display: flex; flex-direction: column; gap: 6px; }
+.fbList { display: flex; flex-direction: column; gap: 10px; }
+.fbRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fbLabel { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.fbPage { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; width: 100%; overflow-y: auto; box-sizing: border-box; }
+.fbBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fbBar .signIn { margin-left: auto; }
+
+// A writer's own feedback: the steps it has passed.
+.fbSteps { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.fbStep { padding: 2px 6px; font-size: 11px; background: var(--ov-sink-2); color: var(--ink);
+  &--current { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+  &--declined { background: var(--tone-no, var(--alert)); color: var(--tone-no-ink, var(--on-alert)); font-weight: 700; }
+}
+
+// Controls under a message (the Inbox's check, Channel Management's corrections): a label column and a control column.
+.fbControls {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: start;
+  > .fbRow { grid-column: 1 / -1; }
+  > .fbLabel { padding-top: 6px; }
+}
+
+// The writer's smile and frown (FeelingPicker): two square faces, not a row-wide set.
+.fbFeelings .toneFace { flex: 0 0 36px; width: 36px; padding: 0; cursor: pointer; }

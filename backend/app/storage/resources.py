@@ -168,6 +168,39 @@ def _descendant_ids(file: ResourcesFile, node_id: str) -> list[str]:
     return ids
 
 
+def ensure_path(root: Path, names: list[str]) -> str:
+    """The id of the node reached by following `names` from the top (an interface's name, then a console's, a
+    component's and a feature's; blanks end the path early), adding any node that is missing under the id its name
+    gives (channels.child_id). Used by one-time migrations of data that named places by their words."""
+    kinds = ["interface", "console", "component", "feature"]
+    names = [n.strip() for n in names[:4]]
+    if "" in names:
+        names = names[: names.index("")]
+    if not names:
+        raise ResourcesError("a place needs at least an interface")
+    with _lock:
+        file = _load(root)
+        parent: Optional[str] = None
+        changed = False
+        for depth, name in enumerate(names):
+            match = next((n for n in file.nodes if n.parentId == parent and n.name.strip().lower() == name.lower()), None)
+            if match is None:
+                taken = {n.id for n in file.nodes}
+                node_id = base = channels.child_id(parent, name)
+                k = 2
+                while node_id in taken:
+                    node_id, k = f"{base}-{k}", k + 1
+                order = max((n.order for n in file.nodes if n.parentId == parent), default=-1) + 1
+                match = ResourceNode(id=node_id, kind=kinds[depth], parentId=parent, order=order, name=name)
+                file.nodes.append(match)
+                changed = True
+            parent = match.id
+        if changed:
+            _save(root, file)
+        assert parent is not None
+        return parent
+
+
 # ---------------------------------------------------------------------------
 # Node mutations
 # ---------------------------------------------------------------------------
@@ -278,35 +311,14 @@ def set_assessment(root: Path, node_id: str, questions: list[Question]) -> Resou
 
 
 # ---------------------------------------------------------------------------
-# Promote-from-feedback: real Feedback messages whose channel matches a
-# node's own ancestor names, offered as FAQ candidates. Matching stops at
-# component granularity -- Message (feedback.py) only ever records
-# openPage/openConsole/selectedComponent, never a feature.
+# Promote-from-feedback: real Feedback messages about this node or anything
+# under it (their subject's channel id), offered as FAQ candidates.
 # ---------------------------------------------------------------------------
 
 
-def _ancestor_names(file: ResourcesFile, node_id: str) -> dict[NodeKind, str]:
-    names: dict[NodeKind, str] = {}
-    cur: Optional[ResourceNode] = _find(file, node_id)
-    while cur is not None:
-        names[cur.kind] = cur.name
-        cur = _find(file, cur.parentId) if cur.parentId else None
-    return names
-
-
 def promotable_messages(file: ResourcesFile, node_id: str, messages: list) -> list:
-    """`messages` is feedback.py's FeedbackFile.messages. Returns the ones
-    whose recorded page/console (and component, if the node has one) match
-    this node's own ancestors by name."""
-    names = _ancestor_names(file, node_id)
-    page, console, component = names.get("interface"), names.get("console"), names.get("component")
-    out = []
-    for m in messages:
-        if page and m.openPage != page:
-            continue
-        if console and m.openConsole != console:
-            continue
-        if component and m.selectedComponent and m.selectedComponent != component:
-            continue
-        out.append(m)
-    return out
+    """`messages` is feedback.py's FeedbackFile.messages. Returns the ones whose subject is this node or a node
+    under it."""
+    _find(file, node_id)
+    under = set(_descendant_ids(file, node_id))
+    return [m for m in messages if getattr(m, "channelId", None) in under]

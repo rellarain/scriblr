@@ -269,9 +269,6 @@ $res-surface: var(--surface-raised);
 .resFeedbackSection { border-top: 1px solid var(--hairline); margin-top: 20px; padding-top: 18px; }
 .resFeedbackSectionHead { display: flex; align-items: center; justify-content: space-between; }
 .resComingSoon { font-size: 11px; color: var(--ink-faint); font-style: italic; }
-.resFeedbackThanks { margin-top: 12px; padding: 12px 14px; background: var(--ov-sink-1); border-radius: 0; font-size: 13px; color: var(--ink); }
-.resFeedbackForm { margin-top: 12px; }
-.resFeedbackMeta { font-size: 12px; color: var(--ink-muted); margin-bottom: 6px; }
 .resError { font-size: 12px; color: var(--alert); margin: 6px 0 0; }
 
 .resOptionRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }

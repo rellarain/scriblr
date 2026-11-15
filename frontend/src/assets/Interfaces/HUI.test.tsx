@@ -38,7 +38,7 @@ describe('HUI (the Helper panel as tiles)', () => {
     const user = userEvent.setup()
     render(<HUI side="right" helper={helper()} panel="inbox" />)
     const bar = screen.getByRole('toolbar', { name: 'Helper tiles tabs' })
-    expect(within(bar).getAllByRole('button').map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([['Inbox', 'true'], ['Queue', 'false'], ['Settings', 'false']])
+    expect(within(bar).getAllByRole('button').map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([['Inbox', 'true'], ['Queue', 'false'], ['Help', 'false'], ['Settings', 'false']])
     await user.click(within(bar).getByRole('button', { name: 'Queue' }))
     expect(tile('inbox')).toBeTruthy()
     expect(tile('queue')).toBeTruthy()

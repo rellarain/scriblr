@@ -11,7 +11,7 @@ import { autosaveModeOf } from '../../../../theme/types'
 import { chapterDatesOf, type ChapterMeta } from '../chapterDates'
 import EdgeTabs from '../EdgeTabs'
 import HueSlider from '../HueSlider'
-import HelpArticles from '../levels/HelpArticles'
+import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { PublishControl } from '../PublishControl'
 import { Placeholder } from '../shared'
@@ -170,7 +170,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                   id: 'help', title: 'Help', Icon: HelpIcon, railless: true, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
                   children: (
                     <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Draft help">
-                      <HelpArticles target={HELP_TARGETS.writerDraft} fallback={DRAFT_HELP_FALLBACK} />
+                      <HelpTile target={HELP_TARGETS.writerDraft} fallback={DRAFT_HELP_FALLBACK} />
                     </div>
                   ),
                 },

@@ -3,7 +3,7 @@ import {
 } from '../../icons'
 import type { TrainingCourse, TrainingLesson, TrainingModule } from '../../../api/types'
 import ThemeSettingsPanel from '../../../theme/ThemeSettingsPanel'
-import HelpArticles from '../writer/levels/HelpArticles'
+import HelpTile from '../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from '../writer/levels/LevelTabs'
 import { TrainingAssessments, TrainingEmpty, TrainingList, TrainingMarkdown, TrainingPage, type DoneAction, type TrainingRow } from './TrainingPage'
@@ -81,7 +81,7 @@ export function deskTabs(t: TrainingState): LevelTab[] {
       ),
     },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.training} fallback={DESK_HELP} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={HELP_TARGETS.training} fallback={DESK_HELP} /> },
   ]
 }
 

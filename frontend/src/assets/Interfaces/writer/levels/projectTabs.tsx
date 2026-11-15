@@ -13,7 +13,7 @@ import ItemsConsole from '../items/ItemsConsole'
 import MapsConsole from '../maps/MapsConsole'
 import ProjectConsole from '../plan/ProjectConsole'
 import ScheduleConsole from '../schedule/ScheduleConsole'
-import HelpArticles from './HelpArticles'
+import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
@@ -101,7 +101,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ProjectEditor w={w} /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.writerProject} fallback={PROJECT_HELP_FALLBACK} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={HELP_TARGETS.writerProject} fallback={PROJECT_HELP_FALLBACK} /> },
   ]
 }
 

@@ -81,8 +81,8 @@ def test_screens_of_a_newer_version_are_merged_in_once(client: TestClient, app_d
     assert "admin/office/voting" in by_id
     assert body["screensVersion"] >= 1
     # Deleting a screen branch is not undone by the next load.
-    assert client.delete("/api/resources/nodes/admin/office").status_code == 200
-    assert not any(n["id"].startswith("admin/office") for n in _tree(client)["nodes"])
+    assert client.delete("/api/resources/nodes/training/lesson").status_code == 200
+    assert not any(n["id"].startswith("training/lesson") for n in _tree(client)["nodes"])
 
 
 def test_a_node_something_points_at_cannot_be_deleted(client: TestClient) -> None:
@@ -96,7 +96,7 @@ def test_a_node_something_points_at_cannot_be_deleted(client: TestClient) -> Non
         resp = client.delete("/api/resources/nodes/writer/draft")
         assert resp.status_code == 409
         assert "1 test item" in resp.json()["detail"]
-        assert client.delete("/api/resources/nodes/writer/dashboard").status_code == 200
+        assert client.delete("/api/resources/nodes/training/course").status_code == 200
     finally:
         channels._use_checks.remove(check)
 
@@ -199,33 +199,28 @@ def test_corrupt_file_is_quarantined_with_409(client: TestClient, app_data_root:
     assert client.get("/api/resources").status_code == 409
 
 
-def test_promotable_feedback_matches_by_channel_name(client: TestClient) -> None:
-    # Seeded Feedback messages (feedback.py's _build_seed) include one on
-    # Writer > Shelf > Sidebar Shelf -- not under Project Plot -- so it
-    # should surface for a Shelf-level node but not for an unrelated one.
-    shelf = _find(_tree(client)["nodes"], "console", "Project")
-    resp = client.get(f"/api/resources/nodes/{shelf['id']}/promotable-feedback")
+def test_promotable_feedback_matches_by_channel_id(client: TestClient) -> None:
+    # The seeded feedback (feedback.py's _build_seed) has one message on Reader > Library > Catalog and none on
+    # Writer > Book: the Library console offers it, the Book console offers nothing.
+    resp = client.get("/api/resources/nodes/reader/library/promotable-feedback")
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
-
-    reader_nook = _find(_tree(client)["nodes"], "console", "Nook")
-    resp = client.get(f"/api/resources/nodes/{reader_nook['id']}/promotable-feedback")
-    assert resp.status_code == 200
+    assert [m["id"] for m in resp.json()] == ["fb-3"]
+    assert client.get("/api/resources/nodes/writer/book/promotable-feedback").json() == []
 
 
 def test_submit_feedback_message_needs_no_admin_id(client: TestClient) -> None:
     resp = client.post("/api/feedback/messages", json={
-        "author": "Jordan Ellis", "text": "Would love a duplicate-plotline action.", "senderTone": "neutral",
-        "openPage": "Writer", "openConsole": "Shelf", "selectedComponent": "Project Plot",
+        "author": "Jordan Ellis", "authorId": "u-1", "text": "Would love a duplicate-plotline action.", "senderTone": "neutral",
+        "channelId": "writer/project/plot", "verbId": "verb-add", "fromChannel": "writer/project",
     })
     assert resp.status_code == 200
     assert resp.json()["id"].startswith("fb-")
 
     # It really landed in the Inbox -- fetch it as an admin (seeded adm-dana) and confirm it's there.
     inbox = client.get("/api/feedback", headers={"X-Admin-Id": "adm-dana"}).json()
-    assert any(m["message"]["text"] == "Would love a duplicate-plotline action." for m in inbox["messages"])
+    assert any(m["text"] == "Would love a duplicate-plotline action." for m in inbox["messages"])
 
 
 def test_submit_feedback_message_rejects_blank_text(client: TestClient) -> None:
-    resp = client.post("/api/feedback/messages", json={"author": "Jordan Ellis", "text": "   "})
+    resp = client.post("/api/feedback/messages", json={"author": "Jordan Ellis", "text": "   ", "channelId": "writer", "verbId": "verb-add"})
     assert resp.status_code == 400

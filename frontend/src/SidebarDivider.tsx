@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react'
 import { BriefcaseIcon, GearIcon, InboxIcon, PlusIcon } from './assets/icons'
-import { useFeedback } from './assets/Interfaces/helper/inbox/feedbackStore'
-import { needsMyVoteCount } from './assets/Interfaces/helper/inbox/inboxLogic'
+import { useStaff } from './feedback/staffStore'
+import { toCheck } from './feedback/feedbackLogic'
 import type { HuiPanel } from './interfaceShellTypes'
 import type { HelperConversation } from './assets/Interfaces/helper/helperTypes'
 
@@ -43,9 +43,9 @@ function SidebarDivider({
   const isSettingsActive = expanded && panel === 'settings'
   const isQueueActive = expanded && panel === 'queue'
   const isInboxActive = expanded && panel === 'inbox' && selectedChatId == null
-  // Statements and solutions the signed-in admin can vote on and has not.
-  const feedback = useFeedback()
-  const needsVote = feedback.bundle ? needsMyVoteCount(feedback.bundle.cases) : 0
+  // Feedback waiting to be checked, for a staff member who checks it.
+  const feedback = useStaff()
+  const needsVote = feedback.bundle?.can.check ? toCheck(feedback.bundle).length : 0
 
   function segmentStyle(count: number) {
     return usesFixedHeight
@@ -106,7 +106,7 @@ function SidebarDivider({
       <button
         type="button"
         className={isInboxActive ? 'dividerToggle dividerToggle--active' : 'dividerToggle'}
-        aria-pressed={isInboxActive} aria-label={needsVote > 0 ? `Inbox, ${needsVote} need your vote` : 'Inbox'} title={needsVote > 0 ? `Inbox: ${needsVote} need your vote` : 'Inbox'}
+        aria-pressed={isInboxActive} aria-label={needsVote > 0 ? `Inbox, ${needsVote} to check` : 'Inbox'} title={needsVote > 0 ? `Inbox: ${needsVote} to check` : 'Inbox'}
         onClick={() => onSelectPanel('inbox')}
       >
         <InboxIcon size={21} />

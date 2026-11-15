@@ -5,7 +5,9 @@ import ChatsSection from './helper/ChatsSection'
 import InboxSection from './helper/inbox/InboxSection'
 import SettingsSection from './helper/SettingsSection'
 import QueueSection from './helper/QueueSection'
-import { ChatBubblesIcon, GearIcon, InboxIcon, QueueIcon } from '../icons'
+import { ChatBubblesIcon, GearIcon, HelpIcon, InboxIcon, QueueIcon } from '../icons'
+import HelpTile from '../../components/help/HelpTile'
+import { HELP_TARGETS } from '../../channels/helpTargets'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
 
 interface HUIProps {
@@ -15,12 +17,12 @@ interface HUIProps {
 }
 
 // The Helper panel (400px wide) as tiles, each a console of its own: Inbox, Queue, the selected chat's conversation
-// while one is open, and Settings last (the global tile, components/tiles/TileArea.tsx). The sidebar divider's buttons choose
+// while one is open, Help, and Settings last (the global tile, components/tiles/TileArea.tsx). The sidebar divider's buttons choose
 // which tile is open (a selected chat head always wins); the tab bar opens the others.
 function HUI({ side, helper, panel }: HUIProps) {
   const chatOpen = helper.selectedChatId != null
   const wanted: string = chatOpen ? 'chat' : panel
-  const ids = chatOpen ? ['inbox', 'queue', 'chat', 'settings'] : ['inbox', 'queue', 'settings']
+  const ids = chatOpen ? ['inbox', 'queue', 'chat', 'help', 'settings'] : ['inbox', 'queue', 'help', 'settings']
   // What the user opened or minimized inside the panel; it gives way whenever the sidebar buttons change the choice.
   const [minimized, setMinimized] = useState<string[] | null>(null)
   useEffect(() => { setMinimized(null) }, [wanted])
@@ -31,6 +33,7 @@ function HUI({ side, helper, panel }: HUIProps) {
     { id: 'queue', title: 'Queue', Icon: QueueIcon, children: <QueueSection /> },
   ]
   if (chatOpen) tiles.push({ id: 'chat', title: 'Conversation', Icon: ChatBubblesIcon, children: <ChatsSection helper={helper} /> })
+  tiles.push({ id: 'help', title: 'Help', Icon: HelpIcon, children: <HelpTile target={HELP_TARGETS.helper} fallback="Resources and assistance using the Helper panel here." /> })
   // Settings is a console like the others, and always the last in the rail.
   tiles.push({ id: 'settings', title: 'Settings', Icon: GearIcon, children: <SettingsSection /> })
 

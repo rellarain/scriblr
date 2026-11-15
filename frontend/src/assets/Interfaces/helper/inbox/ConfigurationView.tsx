@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { CloseIcon, PlusIcon, TrashIcon } from '../../../icons'
-import type { InboxBundle, VerbCategory } from './feedbackTypes'
+import type { StaffBundle, VerbCategory } from '../../../../feedback/feedbackTypes'
 
-// Inbox configuration: the verb categories and their keywords (shared; managed with the Configurer role on
+// Inbox configuration: the verb categories and their keywords (shared; managed with the Channel manager role on
 // Helper > Inbox). A message's words that match a keyword are highlighted as suggested verbs.
 
 export interface ConfigurationActions {
@@ -73,7 +73,7 @@ function VerbRow({ verb, editable, actions }: { verb: VerbCategory; editable: bo
   )
 }
 
-export default function ConfigurationView({ bundle, actions }: { bundle: InboxBundle; actions: ConfigurationActions }) {
+export default function ConfigurationView({ bundle, actions }: { bundle: StaffBundle; actions: ConfigurationActions }) {
   const [name, setName] = useState('')
   const editable = bundle.can.manageVerbs
   const add = async () => {
@@ -83,7 +83,7 @@ export default function ConfigurationView({ bundle, actions }: { bundle: InboxBu
 
   return (
     <div className="settingsView">
-      {!editable && <p className="feedbackCardMeta">Verb categories are managed with the Configurer role on Helper &gt; Inbox.</p>}
+      {!editable && <p className="feedbackCardMeta">Verb categories are managed with the Channel manager role on Helper &gt; Inbox.</p>}
       {bundle.verbCategories.map(verb => <VerbRow key={verb.id} verb={verb} editable={editable} actions={actions} />)}
       {editable && (
         <div className="statementRow">

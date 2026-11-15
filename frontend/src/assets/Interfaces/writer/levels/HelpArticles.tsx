@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { getResources } from '../../../../api/resourcesApi'
 import type { ResourceContent, ResourceNode, ResourcesFile } from '../../../../api/types'
 import type { HelpTarget } from '../../../../channels/helpTargets'
@@ -34,8 +34,8 @@ export function articlesFor(file: ResourcesFile, target: HelpTarget): Article[] 
 }
 
 // A level's Help tab: the resource articles written for it (the Resources builder in the AUI), or its
-// short default text while none are authored.
-export function HelpArticles({ target, fallback }: { target: HelpTarget; fallback: string }) {
+// short default text (or what the panel shows instead) while none are authored.
+export function HelpArticles({ target, fallback }: { target: HelpTarget; fallback: ReactNode }) {
   const [articles, setArticles] = useState<Article[] | null>(null)
   const key = `${target.id}|${target.aliases.join('|')}`
   useEffect(() => {
@@ -45,7 +45,7 @@ export function HelpArticles({ target, fallback }: { target: HelpTarget; fallbac
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (articles === null) return <p className="wrMuted">Loading help…</p>
-  if (articles.length === 0) return <p className="wrHelpText">{fallback}</p>
+  if (articles.length === 0) return typeof fallback === 'string' ? <p className="wrHelpText">{fallback}</p> : <>{fallback}</>
   return (
     <div className="wrHelp">
       {articles.map(({ node, content }) => (
