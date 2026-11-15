@@ -97,7 +97,8 @@ describe('a segment', () => {
   it('gets no point from a double-click unless it is shared', async () => {
     await open(model([box('a', 40, 40, 40, 40)]))
     click(pathOf('a'), [60, 60])
-    fireEvent.doubleClick(canvas(), pixelOf(60, 40))
+    const spot = pixelOf(60, 40)
+    fireEvent.doubleClick(canvas(), { clientX: spot.x, clientY: spot.y })
     expect(dots()).toHaveLength(4)
   })
 

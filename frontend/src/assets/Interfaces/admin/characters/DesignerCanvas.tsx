@@ -7,7 +7,7 @@ import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/
 import { apply, boxOf, build, flatten, inPolygon, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
-import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget, sharesCurve } from './engine/connect'
+import { copyShareAt, copySharesOf, drawnOf, dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, toSourceSpot, weldTree, type DropTarget, sharesCurve } from './engine/connect'
 import { rayAngles, wedgeAt } from './engine/symmetry'
 import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, rotOf, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
@@ -760,7 +760,13 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!shape || e.button !== 0 || !editable) return
     p.onGesture()
     // a handle of a shared segment is the handle of the segment that is drawn (shape editor S5)
-    const home = p.connect && part === 'segment' ? handleHome(content, shape.id, selPoint, index === selPoint ? 'start' : 'end') : null
+    const copy = p.connect && part === 'segment' ? copyShareAt(content, solved, shape.id, selPoint) : null
+    // ... and on a symmetric shape, the handle of a copy of a shared segment is that of the segment it lies along
+    const copyHome = copy?.side === 'follower' && copy.weld ? (() => {
+      const m = shapesById.get(copy.target)?.pts.length ?? 0
+      return copy.forward === (index === selPoint) ? { shapeId: copy.target, index: copy.te, which: 'ho' as const } : { shapeId: copy.target, index: m ? (copy.te + 1) % m : 0, which: 'hi' as const }
+    })() : null
+    const home = copyHome ?? (p.connect && part === 'segment' ? handleHome(content, shape.id, selPoint, index === selPoint ? 'start' : 'end') : null)
     dragRef.current = home ? { kind: 'handle', shapeId: home.shapeId, index: home.index, which: home.which } : { kind: 'handle', shapeId: shape.id, index, which }
     capture(e)
   }
@@ -1065,8 +1071,10 @@ export function DesignerCanvas(p: CanvasProps) {
     dragRef.current = null
     if (!s || !r || s.mirrorOf || s.cloneOf || s.kind === 'pivot') return
     if (d.other) p.onSelect({ kind: 'shape', id: s.id })
-    if (sharedSegment(content, s.id, d.e) || sharersOf(content, s.id, d.e).length > 0) {
-      const home = segmentHome(content, s.id, d.e), hs = shapesById.get(home.shapeId)
+    // a copy of a shared segment on a symmetric shape moves as the segment it lies along
+    const copy = p.connect ? copyShareAt(content, solved, s.id, d.e) : null
+    if (sharedSegment(content, s.id, d.e) || sharersOf(content, s.id, d.e).length > 0 || copy?.weld) {
+      const home = copy?.side === 'follower' ? { shapeId: copy.target, e: copy.te } : segmentHome(content, s.id, d.e), hs = shapesById.get(home.shapeId)
       if (!hs || hs.pts.length < 2) return
       const roots = [home.e, (home.e + 1) % hs.pts.length].flatMap(i => {
         const rt = rootOf(content, home.shapeId, i), q = shapesById.get(rt.shapeId)?.pts[rt.i]
@@ -1118,6 +1126,9 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!h || h.kind !== 'edge') return
     const s = shapesById.get(h.shapeId), r = solved.shapes[h.shapeId]
     if (!s || !r || s.mirrorOf || s.cloneOf || (shape?.id === s.id && !editable)) return
+    // a copy of a shared segment on a symmetric shape gets its point through the copy that is shared, at the same spot along it (the copies follow)
+    const copy = p.connect ? copyShareAt(content, solved, s.id, h.e) : null
+    if (p.connect && copy?.weld) { const [x, y] = toSourceSpot(drawnOf(content, solved, s.id), h.e, copy.source, copy.reversed, h.x, h.y); p.connect.onAddShared(s.id, copy.source, x, y); return }
     // a shared segment gets its point on the segment that is drawn and on every segment that shares it (shape editor S5)
     if (p.connect && (sharedSegment(content, s.id, h.e) || sharersOf(content, s.id, h.e).length)) { p.connect.onAddShared(s.id, h.e, h.x, h.y); return }
     if (p.connect) return
@@ -1222,6 +1233,13 @@ export function DesignerCanvas(p: CanvasProps) {
         const d = segmentPath(b[k], b[(k + 1) % n])
         out.push(<path key={`u${s.id}:${k}`} d={d} className="cmSegShared cmSegShared--under" aria-hidden="true" />, <path key={`o${s.id}:${k}`} d={d} className="cmSegShared" data-shared={`${s.id}:${k}`} aria-hidden="true" />)
       }
+    }
+    // on a symmetric shape the copies of a shared segment that lie along the same shape are shared too
+    for (const cp of copySharesOf(content, solved)) {
+      const s = shapesById.get(cp.shapeId), r = solved.shapes[cp.shapeId]
+      if (cp.side !== 'follower' || !s || !r || !r.visible || r.off || r.local.length !== s.pts.length) continue
+      const b = build(r.local, s.closed, r.matrix), d = segmentPath(b[cp.e], b[(cp.e + 1) % b.length])
+      out.push(<path key={`cu${s.id}:${cp.e}`} d={d} className="cmSegShared cmSegShared--under" aria-hidden="true" />, <path key={`co${s.id}:${cp.e}`} d={d} className="cmSegShared" data-shared={`${s.id}:${cp.e}`} data-shared-copy="" aria-hidden="true" />)
     }
     return out.length ? <g aria-hidden="true">{out}</g> : null
   })() : null

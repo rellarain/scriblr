@@ -1,6 +1,6 @@
 import type { ModelBind, ModelContent, ModelPoint, ModelShape } from '../../../../../api/types'
 import { isAnchored } from './anchors'
-import { edgeOf, nearestPlace } from './sliders'
+import { edgeOf, nearestPlace, placeAt } from './sliders'
 import { outlineSize, shapeById } from '../modelContent'
 import { addPoint, movePoint } from './edit'
 import { apply, bezierAt, build, inverse, nearestEdge, r2, transformList, type BuiltPoint, type Mat } from './geometry'
@@ -296,6 +296,98 @@ export function sharersOf(c: ModelContent, shapeId: string, e: number): Array<{ 
   return out
 }
 
+// ---- shared segments copied by symmetry ----
+
+// The other copies of segment e of a symmetric shape (its images across the axes), each with whether it runs the other way round. None for a shape that is not symmetric.
+export function segmentCopies(s: ModelShape, e: number): Array<{ e: number; reversed: boolean }> {
+  const n = s.pts.length
+  if (!s.sym || !s.closed || n < 3) return []
+  const oa = new Set(orbitOf(s, e)), ob = new Set(orbitOf(s, (e + 1) % n)), out: Array<{ e: number; reversed: boolean }> = []
+  for (let q = 0; q < n; q++) {
+    if (q === e) continue
+    const a = q, b = (q + 1) % n
+    if (oa.has(a) && ob.has(b)) out.push({ e: q, reversed: false })
+    else if (oa.has(b) && ob.has(a)) out.push({ e: q, reversed: true })
+  }
+  return out
+}
+
+const ON_LINE = 0.5
+// The segment of an outline (`ta`, canvas space) that segment q of another drawn outline lies along: its two ends and its middle within half a unit of it, the ends on one
+// segment; with whether it runs the same way. Null when it does not.
+function liesAlong(a: BuiltPoint[], q: number, ta: BuiltPoint[], closed: boolean): { te: number; forward: boolean } | null {
+  const n = a.length, m = ta.length
+  if (n < 2 || m < 2) return null
+  const placeOf = (x: number, y: number): { e: number; t: number } | null => {
+    const u = nearestPlace(ta, 0, closed ? m : m - 1, x, y), [px, py] = placeAt(ta, u)
+    if (Math.hypot(px - x, py - y) > ON_LINE) return null
+    let [e, t] = edgeOf(u, m)
+    if (t > 1 - 1e-3) { e = (e + 1) % m; t = 0 }
+    return { e, t: t < 1e-3 ? 0 : t }
+  }
+  const mid = bezierAt(a, q, 0.5), s0 = placeOf(a[q].x, a[q].y), s1 = placeOf(a[(q + 1) % n].x, a[(q + 1) % n].y), sm = placeOf(mid.x, mid.y)
+  if (!s0 || !s1 || !sm) return null
+  const seg = sameSegment(s0, s1, m, closed)
+  return seg && sm.e === seg.e ? { te: seg.e, forward: seg.ta < seg.tb } : null
+}
+
+// A segment of a symmetric shape that is a copy of a shared segment (the user, 2026-11-15: "shared segments on symmetric shapes are shared on both segments"). Only one copy
+// of each point may follow a shape, so a copy's ends follow nothing; yet when the shape it is shared with is symmetric the same way, the copy lies along that shape's outline
+// too, and so it is drawn and treated as shared, as the copies of a linked point are drawn as linked:
+// - `follower`: segment e of the symmetric shape that follows, a copy of its shared segment `source`, lying along segment `te` of `target` (`forward`: the same way round);
+// - `target`: segment e of the symmetric shape followed, with no sharer of its own, along which a follower's copy lies; `source` is its copy that the follower really shares.
+// `reversed`: the segment runs the other way round from its source. `weld`: the source is welded at both ends (what a drag or a double-click acts on, as for any shared
+// segment); a copy of a segment locked on is only drawn.
+export interface CopyShare { side: 'follower' | 'target'; shapeId: string; e: number; source: number; reversed: boolean; target: string; te: number; forward: boolean; weld: boolean }
+
+const copyCache = new WeakMap<Solved, CopyShare[]>()
+// Every such copy in a model as solved (worked out once per solve).
+export function copySharesOf(c: ModelContent, solved: Solved): CopyShare[] {
+  const hit = copyCache.get(solved)
+  if (hit) return hit
+  const out: CopyShare[] = [], drawn = new Map<string, BuiltPoint[]>()
+  const drawnAt = (id: string): BuiltPoint[] => { let d = drawn.get(id); if (!d) { d = drawnOf(c, solved, id); drawn.set(id, d) } return d }
+  for (const s of c.shapes) {
+    const n = s.pts.length
+    if (!s.sym || n < 3 || !s.pts.some(p => p.bind)) continue
+    const real = new Set<number>()
+    for (let k = 0; k < n; k++) if (sharesCurve(c, s.id, k)) real.add(k)
+    for (const k of real) {
+      const target = curvePlace(s.pts[k].bind)!.s, t = shapeById(c, target)
+      if (!t) continue
+      for (const cp of segmentCopies(s, k)) {
+        if (real.has(cp.e) || out.some(o => o.shapeId === s.id && o.e === cp.e)) continue
+        const on = liesAlong(drawnAt(s.id), cp.e, drawnAt(target), t.closed)
+        if (on) out.push({ side: 'follower', shapeId: s.id, e: cp.e, source: k, reversed: cp.reversed, target, te: on.te, forward: on.forward, weld: !!sharedSegment(c, s.id, k) })
+      }
+    }
+  }
+  // the followed shape's side: a segment the copy lies along that nothing else shares acts as its own copy that is shared
+  for (const o of [...out]) {
+    const t = shapeById(c, o.target)
+    if (!t?.sym || sharersOf(c, t.id, o.te).length || out.some(x => x.shapeId === t.id && x.e === o.te)) continue
+    const src = segmentCopies(t, o.te).find(cp => sharersOf(c, t.id, cp.e).length > 0)
+    if (src) out.push({ side: 'target', shapeId: t.id, e: o.te, source: src.e, reversed: src.reversed, target: t.id, te: o.te, forward: true, weld: o.weld })
+  }
+  copyCache.set(solved, out)
+  return out
+}
+export const copyShareAt = (c: ModelContent, solved: Solved, shapeId: string, e: number): CopyShare | null =>
+  copySharesOf(c, solved).find(o => o.shapeId === shapeId && o.e === e) ?? null
+
+// A spot on a copy segment (x, y, canvas space) as the same spot on its source: how far along the copy it lies, along the source the same way round (or from the other end).
+export function toSourceSpot(a: BuiltPoint[], e: number, source: number, reversed: boolean, x: number, y: number): [number, number] {
+  if (a.length < 2) return [x, y]
+  let best = 0, bd = Infinity
+  for (let k = 0; k <= 64; k++) { const q = bezierAt(a, e, k / 64), d = Math.hypot(q.x - x, q.y - y); if (d < bd) { bd = d; best = k / 64 } }
+  for (const step of [1 / 512, 1 / 8192]) {
+    const from = best
+    for (let k = -16; k <= 16; k++) { const t = Math.min(1, Math.max(0, from + k * step)), q = bezierAt(a, e, t), d = Math.hypot(q.x - x, q.y - y); if (d < bd) { bd = d; best = t } }
+  }
+  const q = bezierAt(a, source, reversed ? 1 - best : best)
+  return [q.x, q.y]
+}
+
 // Where an edit of segment e of a shape belongs: the segment it shares (the one that is drawn), else its own.
 export function segmentHome(c: ModelContent, shapeId: string, e: number): { shapeId: string; e: number } {
   const sh = sharedSegment(c, shapeId, e)
@@ -354,20 +446,33 @@ export function addPointShared(c: ModelContent, solved: Solved, shapeId: string,
   const home = segmentHome(c, shapeId, e), t = shapeById(c, home.shapeId)
   if (!t) return null
   const sharers = sharersOf(c, home.shapeId, home.e)
-  const added = addPoint(t, home.e, { max })
-  if (added.index < 0) return null
   const [lx, ly] = into(solved, home.shapeId, x, y)
-  const placed = movePoint(added.shape, added.index, lx, ly)
-  let next = rebindByPlace(c, solved, { ...c, shapes: c.shapes.map(s => (s.id === t.id ? placed : s)) }, t.id).content
+  const added = addOn(t, home.e, lx, ly, max)
+  if (!added) return null
+  let next = rebindByPlace(c, solved, { ...c, shapes: c.shapes.map(s => (s.id === t.id ? added.shape : s)) }, t.id).content
   for (const sh of sharers) {
     const f = shapeById(next, sh.shapeId)
-    if (!f || f.pts.length >= max) continue
-    const fAdded = addPoint(f, sh.e, { max })
-    if (fAdded.index < 0) continue
+    if (!f) continue
     const [fx, fy] = into(solved, f.id, x, y)
+    const fAdded = addOn(f, sh.e, fx, fy, max)
+    if (!fAdded) continue
     const bind: ModelBind = { kind: 'point', s: t.id, i: added.index, d: [0, 0], e: 0, t: 0, o: 0 }
-    const fShape = { ...fAdded.shape, pts: fAdded.shape.pts.map((p, k) => (k === fAdded.index ? { ...p, x: fx, y: fy, bind } : p)) }
+    const fShape = { ...fAdded.shape, pts: fAdded.shape.pts.map((p, k) => (k === fAdded.index ? { ...p, bind } : p)) }
     next = rebindByPlace(next, solved, { ...next, shapes: next.shapes.map(s => (s.id === f.id ? fShape : s)) }, f.id).content
   }
   return next
+}
+// A point added to segment e of a shape at (lx, ly) in its own space: on a symmetric shape it is added to every copy (shape editor S6), and the new point on the side that was
+// clicked is found again by its place. Null when there is no room.
+function addOn(s: ModelShape, e: number, lx: number, ly: number, max: number): { shape: ModelShape; index: number } | null {
+  if (s.pts.length >= max) return null
+  const added = addPoint(s, e, { max })
+  if (added.index < 0) return null
+  const placed = movePoint(added.shape, added.index, lx, ly)
+  if (!s.sym) return { shape: placed, index: added.index }
+  const f = followSymmetry(s, placed)
+  if (f.refused || f.shape.pts.length > max) return null
+  let index = -1, bd = Infinity
+  f.shape.pts.forEach((p, k) => { const d = Math.hypot(p.x - lx, p.y - ly); if (d < bd) { bd = d; index = k } })
+  return index >= 0 && bd < 0.05 ? { shape: f.shape, index } : null
 }

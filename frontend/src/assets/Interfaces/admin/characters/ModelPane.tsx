@@ -98,7 +98,7 @@ import * as clipboard from './shapeClipboard'
 import { FIRST_CHOICE, ShapeForm, templateOfChoice, type FormKind, type ShapeChoice } from './ShapeForm'
 import { CAST_OPACITY, KIND_NAMES } from './engine/kinds'
 import { castOverlaps, hasBothCasts } from './engine/castOverlap'
-import { addPointShared, connect, connectedSet, disconnect, linkShown, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
+import { addPointShared, connect, connectedSet, copyShareAt, disconnect, linkShown, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
 import type { DrapeActions, FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName, WearActions } from './rigActions'
@@ -721,7 +721,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     } else {
       selectSegment(t.e)
       // a shared segment is the segment that is drawn: it changes there (shape editor S5)
-      const home = shapesOnly && s ? segmentHome(content, s.id, t.e) : null, homeShape = home ? shapeById(content, home.shapeId) : undefined
+      // ... and on a symmetric shape a copy of a shared segment changes as the segment it lies along
+      const copy = shapesOnly && s ? copyShareAt(canvasContent, canvasSolved, s.id, t.e) : null
+      const home = copy?.side === 'follower' && copy.weld ? { shapeId: copy.target, e: copy.te } : shapesOnly && s ? segmentHome(content, s.id, t.e) : null, homeShape = home ? shapeById(content, home.shapeId) : undefined
       if (home && homeShape && home.shapeId !== s!.id) editShape(home.shapeId, toggleSegment(homeShape, home.e))
       else if (s && changeable) editShape(s.id, toggleSegment(s, t.e))
     }
@@ -1774,6 +1776,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const once = disconnect(content, canvasSolved, sid, i)
       commit(both && n ? disconnect(once, canvasSolved, sid, (i + 1) % n) : once, true)
     },
+    copyShare: (sid, e) => copyShareAt(canvasContent, canvasSolved, sid, e),
   } : undefined
 
   // The selected point's pivot section (joints J2): the turn and limits of the pivot point it is (its own link, a symmetric copy's, or a point welded to it).

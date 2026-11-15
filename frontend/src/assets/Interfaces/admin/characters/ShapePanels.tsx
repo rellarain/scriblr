@@ -1,7 +1,7 @@
 import type { ModelCloneAt, ModelContent, ModelJoint, ModelMirrorLine, ModelObject, ModelShape, ModelShapeKind } from '../../../../api/types'
 import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
-import { NAME_LIMIT, isWeld, linkHolder, sharedSegment, sharersOf, weldedTo } from './engine/connect'
+import { NAME_LIMIT, isWeld, linkHolder, sharedSegment, sharersOf, weldedTo, type CopyShare } from './engine/connect'
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { TURN_LIMIT } from './engine/pivots'
@@ -230,9 +230,11 @@ export interface ConnectionActions {
   part: PartKind
   onName: (shapeId: string, i: number, field: 'name' | 'segName', value: string) => void
   onDisconnect: (shapeId: string, i: number, both: boolean) => void
+  // on a symmetric shape, the copy of a shared segment a segment is (it shows the connection of the copy that is shared)
+  copyShare?: (shapeId: string, e: number) => CopyShare | null
 }
 
-interface ConnectionRow { key: string; text: string; shapeId: string; i: number; field: 'name' | 'segName'; value: string; label: string }
+interface ConnectionRow { key: string; text: string; shapeId: string; i: number; field: 'name' | 'segName'; value: string; label: string; with?: string }
 
 // The connections of the selected point (its own, and the points welded to it) or the selected segment (shared with another shape, either way round), each with a name
 // and Disconnect.
@@ -251,11 +253,14 @@ export function ConnectionsSection({ content, shape, selPoint, actions }: { cont
       rows.push({ key: `${f.shapeId}:${f.i}`, text: `Point ${f.i + 1} of ${nameOf(f.shapeId)} is welded to it`, shapeId: f.shapeId, i: f.i, field: 'name', value: fb?.name ?? '', label: `Name of the connection to ${nameOf(f.shapeId)}` })
     }
   } else if (actions.part === 'segment') {
-    const own = sharedSegment(content, shape.id, selPoint)
-    if (own) rows.push({ key: 'seg', text: `Shared with ${nameOf(own.shapeId)}`, shapeId: shape.id, i: selPoint, field: 'segName', value: shape.pts[selPoint]?.bind?.segName ?? '', label: 'Name of the shared segment' })
-    for (const sh of sharersOf(content, shape.id, selPoint)) {
+    // on a symmetric shape a copy of a shared segment shows the connection of the copy that is shared (the user, 2026-11-15: shared on both segments)
+    const copy = !sharedSegment(content, shape.id, selPoint) && !sharersOf(content, shape.id, selPoint).length ? actions.copyShare?.(shape.id, selPoint) ?? null : null
+    const seg = copy?.weld ? copy.source : selPoint, note = copy?.weld ? ` (a copy of segment ${copy.source + 1})` : ''
+    const own = sharedSegment(content, shape.id, seg)
+    if (own) rows.push({ key: 'seg', text: `Shared with ${nameOf(own.shapeId)}${note}`, shapeId: shape.id, i: seg, field: 'segName', value: shape.pts[seg]?.bind?.segName ?? '', label: 'Name of the shared segment', with: nameOf(own.shapeId) })
+    for (const sh of sharersOf(content, shape.id, seg)) {
       const fb = shapeById(content, sh.shapeId)?.pts[sh.e]?.bind
-      rows.push({ key: `${sh.shapeId}:${sh.e}`, text: `Shared with ${nameOf(sh.shapeId)}`, shapeId: sh.shapeId, i: sh.e, field: 'segName', value: fb?.segName ?? '', label: `Name of the segment shared with ${nameOf(sh.shapeId)}` })
+      rows.push({ key: `${sh.shapeId}:${sh.e}`, text: `Shared with ${nameOf(sh.shapeId)}${note}`, shapeId: sh.shapeId, i: sh.e, field: 'segName', value: fb?.segName ?? '', label: `Name of the segment shared with ${nameOf(sh.shapeId)}`, with: nameOf(sh.shapeId) })
     }
   }
   if (!rows.length) return null
@@ -268,7 +273,7 @@ export function ConnectionsSection({ content, shape, selPoint, actions }: { cont
             <span>{r.text}</span>
             <input value={r.value} maxLength={NAME_LIMIT} aria-label={r.label} onChange={e => actions.onName(r.shapeId, r.i, r.field, e.target.value)} />
           </label>
-          <button type="button" className="cmIconBtn" aria-label={r.field === 'segName' ? `Disconnect the segment shared with ${r.key === 'seg' ? nameOf(sharedSegment(content, shape.id, selPoint)?.shapeId ?? '') : nameOf(r.shapeId)}` : r.key === 'own' ? 'Disconnect' : `Disconnect ${nameOf(r.shapeId)}`} title="Disconnect" onClick={() => actions.onDisconnect(r.shapeId, r.i, r.field === 'segName')}><CloseIcon size={14} /></button>
+          <button type="button" className="cmIconBtn" aria-label={r.field === 'segName' ? `Disconnect the segment shared with ${r.with ?? nameOf(r.shapeId)}` : r.key === 'own' ? 'Disconnect' : `Disconnect ${nameOf(r.shapeId)}`} title="Disconnect" onClick={() => actions.onDisconnect(r.shapeId, r.i, r.field === 'segName')}><CloseIcon size={14} /></button>
         </div>
       ))}
     </div>
