@@ -3,7 +3,8 @@ import { objectById, groupById, objectOfShape, shapeById } from './modelContent'
 
 // What is selected in the designer, and how the right button moves through the modes. Pure, so it is tested without the page.
 
-export type SelKind = 'none' | 'group' | 'object' | 'shape'
+// a zone (Z2) is the block of the tree above the groups
+export type SelKind = 'none' | 'zone' | 'group' | 'object' | 'shape'
 export interface Selection { kind: SelKind; id: string }
 export const NONE: Selection = { kind: 'none', id: '' }
 // What of the selected shape is selected (S2 of the shape editor): the shape as a whole, one of its points, or one of its segments (segment e runs from point e to the next).
@@ -11,8 +12,12 @@ export type PartKind = 'shape' | 'point' | 'segment'
 
 export const same = (a: Selection, b: Selection): boolean => a.kind === b.kind && a.id === b.id
 
-// The shapes a selection points at: the shape itself, an object's shapes, a group's objects' shapes, or none.
+// The shapes a selection points at: the shape itself, an object's shapes, a group's objects' shapes, a zone's groups' shapes, or none.
 export function shapesOf(c: ModelContent, sel: Selection): ModelShape[] {
+  if (sel.kind === 'zone') {
+    const z = (c.zones ?? []).find(x => x.id === sel.id)
+    return z ? z.groups.flatMap(gid => shapesOf(c, { kind: 'group', id: gid })) : []
+  }
   if (sel.kind === 'shape') { const s = shapeById(c, sel.id); return s ? [s] : [] }
   if (sel.kind === 'object') { const o = objectById(c, sel.id); return o ? o.shapes.map(id => shapeById(c, id)).filter((s): s is ModelShape => !!s) : [] }
   if (sel.kind === 'group') {
@@ -27,6 +32,7 @@ export function repair(c: ModelContent, sel: Selection): Selection {
   if (sel.kind === 'shape' && !shapeById(c, sel.id)) return NONE
   if (sel.kind === 'object' && !objectById(c, sel.id)) return NONE
   if (sel.kind === 'group' && !groupById(c, sel.id)) return NONE
+  if (sel.kind === 'zone' && !(c.zones ?? []).some(z => z.id === sel.id)) return NONE
   return sel
 }
 

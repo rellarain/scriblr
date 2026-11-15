@@ -3,7 +3,7 @@ import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
 import { repairMarks, repairPlace } from './engine/anchors'
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { DEPTH_MAX, chainOf } from './engine/rig'
@@ -68,7 +68,21 @@ export function normalizeContent(c: ModelContent): ModelContent {
     fieldsets: repairFieldsets(c.fieldsets),
     patterns: repairPatterns(c.patterns),
     pivots: (c.pivots ?? []).map(repairPivot),
+    zones: repairZones(c.zones, c.groups),
   }
+}
+
+// The zones as the server keeps them (Z2): a zone that repeats an id goes, a name is trimmed and cut to length, and a zone keeps only groups that exist and are in no zone before it.
+export function repairZones(zones: ModelZone[] | undefined, groups: ModelGroup[]): ModelZone[] {
+  const known = new Set(groups.map(g => g.id)), taken = new Set<string>(), ids = new Set<string>(), out: ModelZone[] = []
+  for (const z of zones ?? []) {
+    if (ids.has(z.id)) continue
+    ids.add(z.id)
+    const mine = [...new Set(z.groups)].filter(g => known.has(g) && !taken.has(g))
+    for (const g of mine) taken.add(g)
+    out.push({ id: z.id, name: clean(z.name, LIMITS.zoneNameMax), groups: mine })
+  }
+  return out.slice(0, LIMITS.zonesMax)
 }
 
 // The paint effects of a shape as the server keeps them (phase 4b): a tone held to -2..2, amounts to 0.02..0.8 in hundredths, only the real kinds, no repeated or
@@ -469,6 +483,8 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
     classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
     ...(c.grips ? { grips: c.grips.filter(g => !(g.group && gone.groups.has(g.group))) } : {}),
     ...(c.frames ? { frames: c.frames.map(f => (f.hide.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...f, hide: f.hide.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : f)) } : {}),
+    // a zone forgets the groups that went (Z2)
+    ...(c.zones ? { zones: c.zones.map(z => (z.groups.some(g => gone.groups.has(g)) ? { ...z, groups: z.groups.filter(g => !gone.groups.has(g)) } : z)) } : {}),
   }, lost)
   return forgetPatterns(out, gone.shapes)
 }
@@ -481,6 +497,12 @@ export function removeShape(c: ModelContent, id: string): ModelContent {
 // An object goes with its shapes, and with its twin.
 export function removeObject(c: ModelContent, id: string): ModelContent {
   return prunePivots(removeAll(c, goneWith(c, { objects: [id] })))
+}
+
+// Several groups at once (a zone's, Z2), each with what goes with it.
+export function removeGroups(c: ModelContent, ids: string[]): ModelContent {
+  const known = ids.filter(id => groupById(c, id))
+  return known.length === 0 ? c : prunePivots(removeAll(c, goneWith(c, { groups: known })))
 }
 
 // A group goes with its objects and their shapes, and with its twin; a group under it moves up to its parent.
@@ -537,8 +559,8 @@ export function moveObjectWithin(c: ModelContent, groupId: string, objectId: str
 }
 
 // The next free id of a kind ('s', 'o', 'g', 'r', 'b' for a bone, 'f' for a frame) in the content.
-export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f' | 'k' | 'p', make: MakeId = randomId): string {
-  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id), ...(c.grips ?? []).map(k => k.id), ...(c.pivots ?? []).map(k => k.id)])
+export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f' | 'k' | 'p' | 'z', make: MakeId = randomId): string {
+  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id), ...(c.grips ?? []).map(k => k.id), ...(c.pivots ?? []).map(k => k.id), ...(c.zones ?? []).map(z => z.id)])
   for (let i = 0; i < 20; i++) { const id = make(prefix); if (!taken.has(id)) return id }
   return `${prefix}_${taken.size}_${Date.now().toString(36)}`
 }

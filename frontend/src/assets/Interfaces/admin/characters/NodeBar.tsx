@@ -2,6 +2,7 @@ import type { ModelContent } from '../../../../api/types'
 import { CopyIcon, DiceIcon, LockIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import type { Selection } from './designerState'
 import { groupById, objectById, shapeById } from './modelContent'
+import { zoneById } from './engine/zones'
 import { CARD_NAMES } from './treeNav'
 
 // The top of the editor for what is open in the tree: which kind of thing it is and its name, the buttons that act on it as a whole (copy a shape, delete a shape, an object or a
@@ -22,7 +23,7 @@ export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDele
   // the shape editor (designerFeatures.ts): no randomize, lock or reset
   simple?: boolean
 }) {
-  const thing = sel.kind === 'shape' ? shapeById(content, sel.id) : sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'group' ? groupById(content, sel.id) : null
+  const thing = sel.kind === 'shape' ? shapeById(content, sel.id) : sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'group' ? groupById(content, sel.id) : sel.kind === 'zone' ? zoneById(content, sel.id) ?? null : null
   const kind = sel.kind === 'none' ? 'model' : sel.kind
   const name = sel.kind === 'none' ? content.name.trim() || 'Untitled model' : thing?.name.trim() || `Untitled ${kind}`
   const lockable = sel.kind === 'group' || sel.kind === 'object'
@@ -39,7 +40,7 @@ export function NodeBar({ content, sel, locked, away, busy, onToggleLock, onDele
             <button
               type="button" className="cmIconBtn cmIconBtn--small" disabled={busy} onClick={() => onDelete(sel)}
               aria-label={sel.kind === 'shape' ? `Delete ${name}` : `Delete ${sel.kind} ${name}`}
-              title={sel.kind === 'group' ? 'Delete the group with its objects and shapes' : sel.kind === 'object' ? 'Delete the object with its shapes' : 'Delete the shape'}
+              title={sel.kind === 'zone' ? 'Delete the zone with its groups, objects and shapes' : sel.kind === 'group' ? 'Delete the group with its objects and shapes' : sel.kind === 'object' ? 'Delete the object with its shapes' : 'Delete the shape'}
             ><TrashIcon size={12} /></button>
           )}
         </span>

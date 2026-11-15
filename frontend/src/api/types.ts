@@ -752,6 +752,8 @@ export type ModelShapeKind = 'base' | 'stretch' | 'pivot' | 'shadow' | 'light'
 // Shape types T3: what makes a shape a pivot circle (the pivot point it turns about, its turn and the admin's limits, lo <= 0 <= hi), and a pivot point
 export interface ModelShapePivot { at: string; turn: number; lo: number; hi: number }
 export interface ModelPivot { id: string; name: string; x: number; y: number }
+// A zone (Z2): a block of the tree between the model and its groups (Head, Hair, Torso...), its groups listed back to front. A model with zones is drawn in the order of its tree.
+export interface ModelZone { id: string; name: string; groups: string[] }
 // Shape types T4: a mark on a shape, in its own drawing space, on point i or inside it (i null): an anchor pins the shape (T5: a posable point); and where a figure's first
 // shape has been posed (turned about the origin, then moved; null as drawn)
 export type ModelMarkKind = 'anchor' | 'pose'
@@ -866,7 +868,7 @@ export type ModelBoneEndKind = 'group' | 'point'
 export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
 export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
 export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[]; zones?: ModelZone[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

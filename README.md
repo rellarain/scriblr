@@ -474,6 +474,10 @@ described, now stale, in `docs/data-model.md`).
   Shape types T5 adds, with a default: on an edge link `slide` (`ModelSlide`: `lo`, `hi` the stops as places along the other shape's
   outline, e + t, so they may lie on different segments; `at` where it has been posed, held between them, null as drawn; only on
   an edge link). A mark of kind `pose` is a posable point, dragged in Pose mode to reach.
+  Zones (Z2) add, with a default: on the model `zones` (`ModelZone`: `id`, `name` at most 40 characters, `groups` the ids of its
+  groups back to front; at most 24; repaired, never refused: a zone that repeats an id goes, and a zone keeps only groups that
+  exist and are in no zone before it). A model with zones is drawn in the order of its tree (zone, group, object, shape), not by
+  z and layer; the shape editor gives a model the starter zones Head, Hair, Torso, Arms and Legs, its groups in Torso.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

@@ -83,6 +83,17 @@ describe('a segment', () => {
     expect(dotAt(60, 25)).toBeDefined()
   })
 
+  it('is removed with Delete once selected, its two points joined into one', async () => {
+    await open(model([box('a', 40, 40, 40, 40)]))
+    click(pathOf('a'), [60, 60])
+    click(canvas(), [60, 40])
+    expect(canvas().querySelector('.cmSeg--sel')).not.toBeNull()
+    fireEvent.keyDown(canvas(), { key: 'Delete' })
+    expect(dots()).toHaveLength(3)
+    // the joined point is at the middle of the segment
+    expect(dotAt(60, 40)).toBeDefined()
+  })
+
   it('gets no point from a double-click unless it is shared', async () => {
     await open(model([box('a', 40, 40, 40, 40)]))
     click(pathOf('a'), [60, 60])

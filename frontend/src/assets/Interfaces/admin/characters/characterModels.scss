@@ -341,13 +341,14 @@
 .cmJointDot { fill: var(--accent); }
 .cmJoint--on .cmJointRing { fill: var(--accent); fill-opacity: 0.25; stroke-width: 3.5; }
 // a grip point of a hand: a dot where the item is taken and a short line the way it points; live (grabbed) only in Pose mode
-.cmGrip { pointer-events: none; }
-.cmGrip--live { pointer-events: all; cursor: grab; }
+// (an svg group: the drag grips of the lists share the class name, and must stay pressable)
+g.cmGrip { pointer-events: none; }
+g.cmGrip--live { pointer-events: all; cursor: grab; }
 .cmGripHit { fill: transparent; }
 .cmGripLine { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .cmGripDot { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.cmGrip--on .cmGripDot { fill: var(--accent); stroke: var(--accent); }
-.cmGrip--on .cmGripLine { stroke: var(--accent); stroke-width: 3; }
+g.cmGrip--on .cmGripDot { fill: var(--accent); stroke: var(--accent); }
+g.cmGrip--on .cmGripLine { stroke: var(--accent); stroke-width: 3; }
 .cmScaleHandle { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
 .cmSlideHandle { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: ew-resize; }
 
@@ -555,6 +556,33 @@
   small { font-size: var(--text-small); color: var(--ink-muted); }
 }
 .dzHitName { font-size: var(--text-field); }
+// ---- the shape editor's tree (Z2): every card stays listed; the selected one has the accent bar; a card being dragged over shows where the dragged one would go ----
+.dzShapeTree { display: flex; flex-direction: column; min-width: 0; user-select: none; }
+// a narrow tree keeps every card's buttons in view: no counts, a smaller step in
+.dzShapeTree { container-type: inline-size; }
+@container (max-width: 280px) {
+  .dzShapeTree .dzCardSub { display: none; }
+  .dzShapeTree .dzKids { padding-left: var(--space-1); }
+  .dzShapeTree .dzCardTool { margin-left: 0; }
+}
+.dzTreeCard.dzCard--sel { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px var(--hairline); }
+.dzTreeList { gap: var(--space-1); }
+.dzShapeTree .dzKids { gap: var(--space-1); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); }
+.dzCardHead--before { box-shadow: inset 0 2px 0 var(--accent); }
+.dzCardHead--after { box-shadow: inset 0 -2px 0 var(--accent); }
+.dzCardHead--into { box-shadow: inset 0 0 0 2px var(--accent); }
+.dzChevron svg { transition: transform 0.12s ease; }
+.dzChevron--closed svg { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .dzChevron svg { transition: none; } }
+.dzPoints { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.dzPoint {
+  display: flex; align-items: center; gap: var(--space-1); width: 100%; min-height: 26px; padding: 0 var(--space-2); border: 0; background: none; color: var(--ink);
+  font: inherit; font-size: var(--text-small); text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+  &--sel { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); font-weight: 700; }
+}
+.dzPointName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 // ---- the top of the editor: the open thing, delete, and randomize / lock / reset ----
 .dzNode { display: flex; flex-direction: column; gap: var(--space-2); padding-bottom: var(--space-3); border-bottom: 1px solid var(--hairline); }

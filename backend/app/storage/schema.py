@@ -1238,6 +1238,8 @@ MODEL_OUTLINE_NEW = 0.75
 MODEL_BIND_NAME_MAX = 40   # shape editor S5: the name of a connection, and of a shared segment
 MODEL_SYM_AXES_MAX = 6     # shape editor S6: the most axes a symmetric shape has
 MODEL_PIVOTS_MAX = 32      # shape types T3: the most pivot points a model has
+MODEL_ZONES_MAX = 24       # zones (Z2): the most zones a model has
+MODEL_ZONE_NAME_MAX = 40
 MODEL_TURN_LIMIT = 180.0   # shape types T3: a pivot circle turns at most this far each way
 MODEL_MARKS_MAX = 8        # shape types T4: the most marks (anchors, posable points) a shape has
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
@@ -1796,6 +1798,31 @@ class ModelPivot(BaseModel):
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError("a place")
         return round(_finite(value, 0.0, -1e5, 1e5), 2)
+
+
+class ModelZone(BaseModel):
+    """A zone (Z2): a block of the tree between the model and its groups (Head, Hair, Torso...). Its groups are listed back to front, as the model's are; a model
+    with zones is drawn in the order of its tree (zone, group, object, shape), not by z and layer."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_ZONE_NAME_MAX)
+    groups: list[str] = Field(default_factory=list, max_length=MODEL_MAX_GROUPS)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_ZONE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("groups", mode="before")
+    @classmethod
+    def _groups(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        seen: list[str] = []
+        for g in value:
+            if isinstance(g, str) and re.fullmatch(_MODEL_ID, g) and g not in seen:
+                seen.append(g)
+        return seen[:MODEL_MAX_GROUPS]
 
 
 class ModelShape(BaseModel):
@@ -3212,6 +3239,13 @@ class ModelContent(BaseModel):
     patterns: list[ModelPattern] = Field(default_factory=list, max_length=MODEL_PATTERNS_MAX)
     # Shape types T3: the pivot points, each the middle its circles share.
     pivots: list[ModelPivot] = Field(default_factory=list, max_length=MODEL_PIVOTS_MAX)
+    # Zones (Z2): blocks of the tree above the groups; each group is in at most one.
+    zones: list[ModelZone] = Field(default_factory=list, max_length=MODEL_ZONES_MAX)
+
+    @field_validator("zones", mode="before")
+    @classmethod
+    def _zones(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelZone, value)
 
     @field_validator("pivots", mode="before")
     @classmethod
@@ -3299,6 +3333,24 @@ class ModelContent(BaseModel):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")
+        return self
+
+    @model_validator(mode="after")
+    def _zone_groups(self) -> "ModelContent":
+        """Zones repaired, never refused: a zone that repeats an id goes, and a zone keeps only groups that exist and are in no zone before it."""
+        groups = {g.id for g in self.groups}
+        taken: set[str] = set()
+        ids: set[str] = set()
+        kept: list[ModelZone] = []
+        for z in self.zones:
+            if z.id in ids:
+                continue
+            ids.add(z.id)
+            mine = [g for g in z.groups if g in groups and g not in taken]
+            taken.update(mine)
+            kept.append(z if mine == z.groups else z.model_copy(update={"groups": mine}))
+        if kept != self.zones:
+            self.zones = kept
         return self
 
 

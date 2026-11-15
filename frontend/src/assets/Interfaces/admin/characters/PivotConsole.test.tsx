@@ -65,7 +65,8 @@ describe('making a pivot', () => {
     expect(widths).toEqual([24, 36, 48])
     expect(canvas().querySelectorAll('[data-pivot-point]')).toHaveLength(1)
     expect(screen.getByRole('textbox', { name: 'Pivot name' })).toHaveValue('Pivot 1')
-    expect(screen.getByRole('img', { name: /is a pivot circle/ })).toBeInTheDocument()
+    // the tree lists the three circles side by side, each marked
+    expect(screen.getAllByRole('img', { name: /is a pivot circle/ })).toHaveLength(3)
   })
 
   it('starts a pivot of two circles on a point from the point form', async () => {

@@ -399,6 +399,7 @@ export function parseModelFile(source: string): ModelImport {
       fieldsets: withIds(list(m.fieldsets), fieldset),
       patterns: withIds(list(m.patterns), pattern),
       pivots: withIds(list(m.pivots), (v, id) => repairPivot({ id, name: typeof v.name === 'string' ? v.name : '', x: Number(v.x), y: Number(v.y) })),
+      zones: withIds(list(m.zones), (v, id) => ({ id, name: typeof v.name === 'string' ? v.name : '', groups: Array.isArray(v.groups) ? v.groups.filter((g): g is string => typeof g === 'string') : [] })),
       tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
     }))
   })

@@ -7,7 +7,8 @@ import { ArrangeSection, ConnectionsSection, LookSection, MarksSection, PivotSec
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
-import { activeShape, type Selection } from './designerState'
+import { activeShape, shapesOf, type Selection } from './designerState'
+import { zoneById } from './engine/zones'
 import { addPoint, applyTemplate, deletePoint, resetHandles, setMode } from './engine/edit'
 import { weightOf } from './engine/fall'
 import type { Choices } from './engine/forms'
@@ -138,6 +139,25 @@ function ShapeTab(p: InspectorProps) {
           <dt>Groups</dt><dd>{content.groups.length}</dd>
           <dt>Objects</dt><dd>{content.objects.length}</dd>
           <dt>Shapes</dt><dd>{content.shapes.length}</dd>
+        </dl>
+      </div>
+    )
+  }
+  if (sel.kind === 'zone') {
+    // a zone (Z2): its name and what is in it
+    const z = zoneById(content, sel.id), shapes = shapesOf(content, sel)
+    const objects = (z?.groups ?? []).reduce((n, gid) => n + (groupById(content, gid)?.objects.length ?? 0), 0)
+    return (
+      <div className="cmTabBody">
+        <h2 className="cmInsTitle">Zone</h2>
+        <label className="cmField">
+          <span>Name</span>
+          <input value={z?.name ?? ''} maxLength={LIMITS.zoneNameMax} aria-label="Zone name" onChange={e => p.onRename(sel, e.target.value)} />
+        </label>
+        <dl className="cmCounts">
+          <dt>Groups</dt><dd>{z?.groups.length ?? 0}</dd>
+          <dt>Objects</dt><dd>{objects}</dd>
+          <dt>Shapes</dt><dd>{shapes.length}</dd>
         </dl>
       </div>
     )

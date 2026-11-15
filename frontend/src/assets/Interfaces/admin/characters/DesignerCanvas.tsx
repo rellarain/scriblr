@@ -1124,6 +1124,10 @@ export function DesignerCanvas(p: CanvasProps) {
       e.preventDefault()
       const next = deletePoint(shape, selPoint, { mirror, axis })
       if (next) p.onEditShape(shape.id, next, Math.max(0, Math.min(selPoint, next.pts.length - 1)))
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && part === 'segment' && p.onRemove) {
+      // a selected segment is removed as Ctrl + click removes it: its two points join into one
+      e.preventDefault()
+      p.onRemove({ kind: 'segment', id: shape.id, e: selPoint })
     }
   }
   function onPivotKey(e: KeyboardEvent) {
@@ -1147,7 +1151,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const cur = built[selPoint]
   // the point the selected segment ends at (none past the last point of an open shape)
   const segEnd = part === 'segment' && shape && (shape.closed || selPoint < built.length - 1) ? built[(selPoint + 1) % built.length] : undefined
-  const nudgeHint = p.taper ? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : part === 'shape' ? 'Arrow keys move the shape' : part === 'segment' ? 'Arrow keys move the segment' : 'Arrow keys move the point; Delete removes it'
+  const nudgeHint = p.taper ? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : part === 'shape' ? 'Arrow keys move the shape' : part === 'segment' ? (p.onRemove ? 'Arrow keys move the segment; Delete removes it, joining its two points' : 'Arrow keys move the segment') : 'Arrow keys move the point; Delete removes it'
   const hoverShapeId = dragOver ?? (hover ? (hover.kind === 'edge' || hover.kind === 'point' ? hover.shapeId : shape?.id ?? null) : null)
   const hoveredPoint = hover?.kind === 'point' && hover.shapeId === shape?.id ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id

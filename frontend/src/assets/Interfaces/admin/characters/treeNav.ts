@@ -10,8 +10,8 @@ import { groupById, groupOfObject, objectById, objectOfShape, shapeById } from '
 //
 // What a level lists is in the order it is drawn in, topmost first: the order of the stored lists is back to front, so it is shown reversed.
 
-export type CardKind = 'model' | 'variant' | 'group' | 'pose' | 'object' | 'style' | 'expression' | 'shape'
-export const CARD_NAMES: Record<CardKind, string> = { model: 'Model', variant: 'Variant', group: 'Group', pose: 'Pose', object: 'Object', style: 'Style', expression: 'Expression', shape: 'Shape' }
+export type CardKind = 'model' | 'zone' | 'variant' | 'group' | 'pose' | 'object' | 'style' | 'expression' | 'shape'
+export const CARD_NAMES: Record<CardKind, string> = { model: 'Model', zone: 'Zone', variant: 'Variant', group: 'Group', pose: 'Pose', object: 'Object', style: 'Style', expression: 'Expression', shape: 'Shape' }
 
 // The three levels that contain one another under the model.
 export type Container = 'group' | 'object' | 'shape'
@@ -95,6 +95,7 @@ export function expressionsOf(c: ModelContent, o: ModelObject, choices: Choices)
 export type CardMode = 'hide' | 'plus' | 'copy'
 export const CARD_MODES: Record<CardKind, CardMode[]> = {
   model: ['hide', 'plus', 'copy'],
+  zone: ['hide', 'plus'],
   variant: ['plus', 'copy'],
   group: ['hide', 'plus', 'copy'],
   pose: ['plus', 'copy'],
@@ -116,7 +117,7 @@ export function nextMode(modes: CardMode[], now: CardMode | undefined): CardMode
 
 // ---- search ----
 
-export interface Hit { kind: Container; id: string; name: string; crumbs: string }
+export interface Hit { kind: Container | 'zone'; id: string; name: string; crumbs: string }
 // Cards of any level whose name has the text in it, with where each lies (the search lists them flat; a click on one opens its path).
 export function searchHits(c: ModelContent, q: string): Hit[] {
   const text = q.trim().toLowerCase()
@@ -134,6 +135,79 @@ export function searchHits(c: ModelContent, q: string): Hit[] {
       for (const sid of displayed(o.shapes)) {
         const s = shapeById(c, sid)
         if (s && has(s.name)) out.push({ kind: 'shape', id: s.id, name: s.name.trim() || 'Untitled shape', crumbs: `${gname} › ${oname}` })
+      }
+    }
+  }
+  return out
+}
+
+// ---- the shape editor's tree (Z2) ----
+// Nested cards: the model, its zones, their groups, objects and shapes (a shape lists its points). Every card stays listed with its siblings whether or not another is
+// selected; a card's children show while it is expanded. The zones are expanded unless closed; the rest is collapsed unless opened, and selecting something opens the way
+// down to it.
+
+export type TreeKind = 'zone' | 'group' | 'object' | 'shape'
+const DEPTH: Record<TreeKind, number> = { zone: 0, group: 1, object: 2, shape: 3 }
+
+// Is a card expanded: what the author chose for it, else zones yes and the rest no.
+export const isExpanded = (kind: TreeKind | 'model', id: string, chosen: Readonly<Record<string, boolean>>): boolean => chosen[id] ?? (kind === 'zone' || kind === 'model')
+
+// The cards a selection lies in, outermost first: a shape's zone, group and object; an object's zone and group; a group's zone. A selected point's shape is in it too.
+export function pathTo(c: ModelContent, sel: Selection, point = false): string[] {
+  const zoneOf = (groupId: string) => (c.zones ?? []).find(z => z.groups.includes(groupId))?.id
+  const out: string[] = []
+  const group = (id: string | undefined) => { if (!id) return; const z = zoneOf(id); if (z) out.push(z); out.push(id) }
+  if (sel.kind === 'shape') {
+    const o = objectOfShape(c, sel.id)
+    if (o) { group(groupOfObject(c, o.id)?.id); out.push(o.id) }
+    if (point) out.push(sel.id)
+  } else if (sel.kind === 'object') group(groupOfObject(c, sel.id)?.id)
+  else if (sel.kind === 'group') { const z = zoneOf(sel.id); if (z) out.push(z) }
+  return out
+}
+
+// What a card being dragged does over another card: lands beside it when they are of a kind, goes into it when it is of the level above, else nothing.
+export type DropWhere = 'before' | 'after' | 'into'
+export function dropRule(dragged: TreeKind, over: TreeKind): 'beside' | 'into' | null {
+  if (dragged === over) return 'beside'
+  return DEPTH[over] === DEPTH[dragged] - 1 ? 'into' : null
+}
+
+// Where a card dropped beside another (before or after it as listed, topmost first) or into a parent (at the top) goes in the stored order (back to front): the id to
+// put it before, or null for last (the top).
+export function storedSpot(stored: readonly string[], moving: string, target: string | null, where: DropWhere): string | null {
+  if (where === 'into' || target === null) return null
+  const rest = stored.filter(id => id !== moving)
+  if (where === 'after') return rest.includes(target) ? target : null
+  const at = rest.indexOf(target)
+  return at < 0 ? null : rest[at + 1] ?? null
+}
+
+// The cards of the shape editor's search: zones too, with where each lies.
+export function zoneSearchHits(c: ModelContent, q: string): Hit[] {
+  const text = q.trim().toLowerCase()
+  if (!text) return []
+  const zones = c.zones ?? []
+  if (zones.length === 0) return searchHits(c, q)
+  const has = (name: string) => name.toLowerCase().includes(text)
+  const out: Hit[] = []
+  for (const z of displayed(zones)) {
+    const zname = z.name.trim() || 'Untitled zone'
+    if (has(z.name)) out.push({ kind: 'zone', id: z.id, name: zname, crumbs: '' })
+    for (const gid of displayed(z.groups)) {
+      const g = groupById(c, gid)
+      if (!g) continue
+      const gname = g.name.trim() || 'Untitled group'
+      if (has(g.name)) out.push({ kind: 'group', id: g.id, name: gname, crumbs: zname })
+      for (const oid of displayed(g.objects)) {
+        const o = objectById(c, oid)
+        if (!o) continue
+        const oname = o.name.trim() || 'Untitled object'
+        if (has(o.name)) out.push({ kind: 'object', id: o.id, name: oname, crumbs: `${zname} › ${gname}` })
+        for (const sid of displayed(o.shapes)) {
+          const s = shapeById(c, sid)
+          if (s && has(s.name)) out.push({ kind: 'shape', id: s.id, name: s.name.trim() || 'Untitled shape', crumbs: `${zname} › ${gname} › ${oname}` })
+        }
       }
     }
   }

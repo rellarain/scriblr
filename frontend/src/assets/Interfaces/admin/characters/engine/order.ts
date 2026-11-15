@@ -7,7 +7,9 @@ import { isCast } from './kinds'
 const LAYER_ORDER = ['body', 'clothing', 'hair'] as const
 
 // Each shape's place in the tree walk (0 = the first drawn of equal z). Shapes in no object come last, in the order of the content.
+// A model with zones (Z2) walks its tree instead: groups in no zone first (behind), then each zone in its order, its groups, their objects, their shapes.
 export function treeRank(c: ModelContent): Map<string, number> {
+  if ((c.zones ?? []).length > 0) return zoneRank(c)
   const rank = new Map<string, number>()
   const objects = new Map(c.objects.map(o => [o.id, o]))
   const seenObjects = new Set<string>()
@@ -21,6 +23,20 @@ export function treeRank(c: ModelContent): Map<string, number> {
     }
     for (const o of c.objects) if (o.layer === layer && !seenObjects.has(o.id) && !c.groups.some(g => g.objects.includes(o.id))) { seenObjects.add(o.id); take(o.shapes) }
   }
+  for (const s of c.shapes) if (!rank.has(s.id)) rank.set(s.id, rank.size)
+  return rank
+}
+
+function zoneRank(c: ModelContent): Map<string, number> {
+  const rank = new Map<string, number>()
+  const objects = new Map(c.objects.map(o => [o.id, o])), groups = new Map(c.groups.map(g => [g.id, g]))
+  const take = (shapeIds: string[]) => { for (const id of shapeIds) if (!rank.has(id)) rank.set(id, rank.size) }
+  const walk = (groupId: string) => { for (const oid of groups.get(groupId)?.objects ?? []) take(objects.get(oid)?.shapes ?? []) }
+  const zoned = new Set((c.zones ?? []).flatMap(z => z.groups))
+  const grouped = new Set(c.groups.flatMap(g => g.objects))
+  for (const o of c.objects) if (!grouped.has(o.id)) take(o.shapes)
+  for (const g of c.groups) if (!zoned.has(g.id)) walk(g.id)
+  for (const z of c.zones ?? []) for (const gid of z.groups) walk(gid)
   for (const s of c.shapes) if (!rank.has(s.id)) rank.set(s.id, rank.size)
   return rank
 }
@@ -41,11 +57,12 @@ function orderOf(c: ModelContent, o: ModelObject, order: Record<string, string[]
 }
 
 // The shapes in the order they are drawn (back to front). Pass a subset to order just those; a shape with a z of its own sorts by it, ties by the tree.
+// A model with zones (Z2) is drawn in the order of its tree alone: z (and so the view's depth) does not change it.
 // `order` (phase D3a) puts the shapes of an object in an order of its own: they take the drawing places they had between them, in that order (shapes of the object it
 // leaves out go behind the ones it lists, in the order they had), so what lies between them and the other objects' shapes stays where it was.
 export function drawOrder<S extends Pick<ModelShape, 'id' | 'z'>>(c: ModelContent, shapes: S[] = c.shapes as unknown as S[], zOf: (s: S) => number = s => s.z, order?: Record<string, string[]>, zoff?: LayerOffsets): S[] {
-  const rank = treeRank(c)
-  const key = new Map<string, [number, number]>(shapes.map(s => [s.id, [zOf(s), rank.get(s.id) ?? 0]]))
+  const rank = treeRank(c), zoned = (c.zones ?? []).length > 0
+  const key = new Map<string, [number, number]>(shapes.map(s => [s.id, [zoned ? 0 : zOf(s), rank.get(s.id) ?? 0]]))
   const before = (a: string, b: string) => key.get(a)![0] - key.get(b)![0] || key.get(a)![1] - key.get(b)![1]
   if (order && Object.keys(order).length > 0) {
     for (const o of c.objects) {

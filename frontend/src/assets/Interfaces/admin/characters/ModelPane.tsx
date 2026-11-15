@@ -77,6 +77,7 @@ import {
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { LIMITS } from './engine/limits'
+import { addZone, ensureZones, moveGroupTo, moveObjectTo, moveShapeTo, moveZone, needsZones, newGroupIn, removeZone, renameZone, topZone, zoneById, zonesOf } from './engine/zones'
 import type { ArrangeActions, ConnectionActions, PivotActions, SymmetryActions } from './ShapePanels'
 import { addCircle, addPivot, isPivotCircle, movePivotBy, pivotById, poseOf, radiusOf, renamePivot, setPivotSetting, setRadius } from './engine/pivots'
 import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, guardAnchors, marksOf, posableOn, toggleAnchor, togglePosable } from './engine/anchors'
@@ -299,6 +300,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const empty = content.shapes.length === 0
 
   useEffect(() => { setSel(s => repair(content, s)) }, [content])
+  // the shape editor's tree has zones (Z2): a model without them gets the five starter zones, its groups in Torso; a group in no zone goes to the top zone (no undo step)
+  useEffect(() => {
+    if (shapesOnly && needsZones(content)) models.edit(entry.id, c => (needsZones(c) ? ensureZones(c, makeId) : c), false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shapesOnly, content, entry.id])
 
   // while a shape is recorded the canvas shows the copy being dragged, with every slider at rest
   const shown = useMemo(() => (recording ? updateShape(content, recording.shapeId, () => recording.draft) : content), [content, recording])
@@ -1209,12 +1215,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // ---- the tree's actions ----
 
-  // The group a new object goes into: the selection's group, else the first group, else a new one (returned with its content).
+  // The group a new object goes into: the selection's group; else, in a model with zones (Z2), a new group in the selected zone or the top zone; else the first group, else a
+  // new one (returned with its content).
   function groupForNew(c: ModelContent): { content: ModelContent; groupId: string } {
-    if (sel.kind === 'group') return { content: c, groupId: sel.id }
+    if (sel.kind === 'group' && groupById(c, sel.id)) return { content: c, groupId: sel.id }
     const obj = sel.kind === 'object' ? objectById(c, sel.id) : sel.kind === 'shape' ? objectOfShape(c, sel.id) : undefined
     const g = obj ? groupOfObject(c, obj.id) : undefined
     if (g) return { content: c, groupId: g.id }
+    const zone = sel.kind === 'zone' ? zoneById(c, sel.id) ?? topZone(c) : topZone(c)
+    if (zone) return newGroupIn(c, zone.id, makeId)
     if (c.groups[0]) return { content: c, groupId: c.groups[0].id }
     const id = freshId(c, 'g', makeId)
     return { content: addGroup(c, newGroup(id, 'Group 1')), groupId: id }
@@ -1236,6 +1245,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   // Delete what is selected, with what goes with it (a group's objects, an object's shapes, a twin).
   function deleteSelection(s: Selection) {
+    if (s.kind === 'zone') { commit(removeZone(content, s.id), true); setSel(NONE); return }
     if (s.kind === 'shape' && shapeById(content, s.id)?.copyOf) { setNote('A shape that follows the pattern cannot be deleted: hide it in this member instead (the Shape tab).'); return }
     const twins = twinsOf(content, s.kind === 'none' ? 'shape' : s.kind, s.kind === 'none' ? '' : s.id).length
     // the members of a class whose pattern goes keep their look: they are detached first
@@ -1302,6 +1312,30 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (applyEdit(e) && e.ok && e.formId) test.setForm(objectId, axisId, e.formId)
     },
   }
+  // the shape editor's tree of zones (Z2)
+  actions.shapeTree = shapesOnly ? {
+    onSelect: choose,
+    onSelectPoint: (shapeId, i) => { choose({ kind: 'shape', id: shapeId }); selectPoint(i) },
+    onAddZone: () => {
+      const id = freshId(content, 'z', makeId), e = addZone(content, { id, name: `Zone ${zonesOf(content).length + 1}`, groups: [] })
+      if (applyEdit(e)) choose({ kind: 'zone', id })
+    },
+    onAddGroupIn: zoneId => {
+      if (content.groups.length >= policy.max.groups) { setNote(`A model may have at most ${policy.max.groups} groups.`); return }
+      const r = newGroupIn(content, zoneId, makeId)
+      if (commit(r.content, true)) choose({ kind: 'group', id: r.groupId })
+    },
+    onAddObject: actions.onAddObject,
+    onShapeForm: objectId => openShapeFormInView(objectId),
+    onMoveCard: (kind, id, parent, before) => {
+      if (kind === 'zone') { commit(moveZone(content, id, before), true); return }
+      if (!parent) return
+      applyEdit(kind === 'group' ? moveGroupTo(content, id, parent, before) : kind === 'object' ? moveObjectTo(content, id, parent, before, policy.max.objectsPerGroup) : moveShapeTo(content, id, parent, before, policy.max.shapesPerObject))
+    },
+    onToggleHidden: test.toggleHidden,
+    onSetHidden: (ids, hide) => test.setHidden(ids, hide),
+    onToggleModelHidden: actions.onToggleModelHidden,
+  } : undefined
 
   // A new pivot (T3): its point at (x, y) and its circles, into an object (else a new one); the first circle is selected.
   function makePivot(into: string | null, x: number, y: number, count: number) {
@@ -1832,7 +1866,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
           )}
           <ToolbarPanel side="left" title="Tree" label="Tree tools" state={left} min={PANEL_LIMITS.left.min} max={PANEL_LIMITS.left.max} onOpen={open => setPanel('left', { open })} onWidth={onPanelWidth('left')}>
-            <TreeBar content={content} sel={sel} state={test.state} hidden={hiddenSet} models={nav} actions={actions} />
+            <TreeBar content={content} sel={sel} selPoint={part === 'point' ? selPoint : null} state={test.state} hidden={hiddenSet} models={nav} actions={actions} />
           </ToolbarPanel>
 
           <ToolbarPanel side="right" title="Editor" label="Editor tools" state={right} min={PANEL_LIMITS.right.min} max={PANEL_LIMITS.right.max} onOpen={open => setPanel('right', { open })} onWidth={onPanelWidth('right')}>
@@ -1947,7 +1981,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               arrange={arrange} connections={connections} symmetry={symmetry} pivot={pivotActions}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
-              onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
+              onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}
               onSetLayer={(id, layer) => commit({ ...content, objects: content.objects.map(o => (o.id === id ? { ...o, layer } : o)) })}
               onEditShape={editShape} onWeight={(i, dir) => setWeightAt(i, stepWeight(weightAt(i), dir))} bridge={bridgeSpots ? bridgeSpots.length : null}
               tab={tab} onTab={setTab}

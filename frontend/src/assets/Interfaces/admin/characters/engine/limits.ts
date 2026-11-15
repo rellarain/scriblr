@@ -85,6 +85,9 @@ export const LIMITS = {
   // shape types T3: pivot points
   pivotsWarn: 16,
   pivotsMax: 32,
+  // zones (Z2): blocks of the tree above the groups, and the length of a zone's name
+  zonesMax: 24,
+  zoneNameMax: 40,
   // how many of each a model may hold (the server's caps)
   shapesMax: 800,
   objectsMax: 200,

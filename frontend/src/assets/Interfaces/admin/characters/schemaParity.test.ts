@@ -59,6 +59,8 @@ describe('the model types match the backend schema', () => {
     ['ModelMark', 'ModelMark'], ['ModelPlace', 'ModelPlace'],
     // sliders (shape types T5)
     ['ModelSlide', 'ModelSlide'],
+    // zones (Z2)
+    ['ModelZone', 'ModelZone'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -109,6 +111,8 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.gripsWarn).toBe(number('MODEL_GRIPS_WARN'))
     expect(LIMITS.gripsMax).toBe(number('MODEL_GRIPS_MAX'))
     expect(LIMITS.pivotsMax).toBe(number('MODEL_PIVOTS_MAX'))
+    expect(LIMITS.zonesMax).toBe(number('MODEL_ZONES_MAX'))
+    expect(LIMITS.zoneNameMax).toBe(number('MODEL_ZONE_NAME_MAX'))
     expect(TURN_LIMIT).toBe(number('MODEL_TURN_LIMIT'))
     expect(MARKS_MAX).toBe(number('MODEL_MARKS_MAX'))
     expect(ROLE_MAX).toBe(number('MODEL_ROLE_MAX'))

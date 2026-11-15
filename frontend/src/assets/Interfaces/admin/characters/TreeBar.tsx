@@ -1,19 +1,18 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { ModelContent, ModelEntry, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../../../api/types'
-import { BridgeIcon, OrbitIcon, CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, MannequinIcon, MoonIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SunIcon, SwapIcon, TrashIcon } from '../../../icons'
-import { actsAs } from './engine/kinds'
+import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, ImportIcon, ExportIcon, MannequinIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, SwapIcon, TrashIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
+import { ShapeTree, type ShapeTreeActions } from './ShapeTree'
+import { Mark, ObjectMarks, ShapeMarks, TWIN } from './TreeMarks'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import { TemplateMenu } from './TemplateMenu'
-import { classOfObject } from './engine/classEdit'
-import { patternOfMark } from './engine/patterns'
 import { isOn, type TestState } from './engine/presets'
 import { optionIsOn, statesOf } from './engine/states'
 import { useDesignerPolicy } from './designerPolicy'
 import { LIMITS } from './engine/limits'
 import type { Selection } from './designerState'
 import {
-  CARD_NAMES, expressionsOf, levelsOf, modesFor, nextMode, posesOf, searchHits, stepTo, storedBefore, stylesOfObject, variantsOf,
+  CARD_NAMES, expressionsOf, levelsOf, modesFor, nextMode, posesOf, searchHits, stepTo, storedBefore, stylesOfObject, variantsOf, zoneSearchHits,
   type CardKind, type CardMode, type Container,
 } from './treeNav'
 
@@ -73,41 +72,11 @@ export interface TreeActions {
   onChooseOption: (groupId: string, stateId: string, optionId: string) => void
   onChooseForm: (objectId: string, axisId: string, formId: string) => void
   onAddForm: (objectId: string, axisId: string, fromCurrent: boolean) => void
+  // the shape editor's tree of zones (Z2)
+  shapeTree?: ShapeTreeActions
 }
 
 const label = (name: string, fallback: string) => name.trim() || fallback
-
-// ---- the marks on a card ----
-
-function Mark({ label: aria, title, children }: { label: string; title?: string; children: ReactNode }) {
-  return <span className="cmTwin" role="img" title={title ?? aria} aria-label={aria}>{children}</span>
-}
-const TWIN = (name: string) => ({ label: `${name} is a twin`, title: `${name} is a twin: it mirrors another and follows it` })
-function ShapeMarks({ content, shape, name }: { content: ModelContent; shape: ModelShape; name: string }) {
-  const pattern = patternOfMark(content, shape.id), kind = actsAs(shape)
-  return (
-    <>
-      {kind === 'stretch' && <Mark label={`${name} is a stretch shape`} title={`${name} is a stretch shape: every point follows another shape`}><BridgeIcon size={11} /></Mark>}
-      {kind === 'shadow' && <Mark label={`${name} is a shadow`}><MoonIcon size={11} /></Mark>}
-      {kind === 'pivot' && <Mark label={`${name} is a pivot circle`}><OrbitIcon size={11} /></Mark>}
-      {kind === 'light' && <Mark label={`${name} is a light`}><SunIcon size={11} /></Mark>}
-      {shape.mirrorOf && <Mark {...TWIN(name)}><SwapIcon size={11} /></Mark>}
-      {shape.shade && <Mark label={`${name} is a shading shape`} title={`${name} is a shading shape: a ${shape.shade.kind === 'mid' ? 'mid tone' : shape.shade.kind} kept inside the other shapes of its object`}><LayersIcon size={11} /></Mark>}
-      {pattern && <Mark label={`${name} is a mark of the fill pattern ${label(pattern.name, 'Untitled pattern')}`} title={`${name} is a mark of the fill pattern ${label(pattern.name, 'Untitled pattern')}: it is kept inside its base shape`}><GridViewIcon size={11} /></Mark>}
-      {shape.helper && <Mark label={`${name} is a helper shape`} title={`${name} is a helper shape: it is not drawn in the previews`}><EyeOffIcon size={11} /></Mark>}
-      {shape.copyOf && <Mark label={`${name} follows the pattern`} title={`${name} follows the pattern${shape.pts.length >= 3 ? ' (it has an outline of its own)' : ''}`}><LinkIcon size={11} /></Mark>}
-    </>
-  )
-}
-function ObjectMarks({ content, object, name }: { content: ModelContent; object: ModelObject; name: string }) {
-  const k = classOfObject(content, object)
-  return (
-    <>
-      {object.mirrorOf && <Mark {...TWIN(name)}><SwapIcon size={11} /></Mark>}
-      {k && <Mark label={k.template === object.id ? `${name} is the pattern of class ${k.name.trim() || 'Untitled class'}` : `${name} is a member of class ${k.name.trim() || 'Untitled class'}`}>{k.template === object.id ? <StampIcon size={11} /> : <LinkIcon size={11} />}</Mark>}
-    </>
-  )
-}
 
 // ---- one card ----
 
@@ -176,9 +145,11 @@ function Card(p: CardProps) {
 
 // ---- the tree ----
 
-export function TreeBar({ content, sel, state, hidden, models, actions }: {
+export function TreeBar({ content, sel, selPoint = null, state, hidden, models, actions }: {
   content: ModelContent
   sel: Selection
+  // the selected point of the selected shape (the shape editor's tree lists points)
+  selPoint?: number | null
   state: TestState
   hidden: ReadonlySet<string>
   models: ModelsNav
@@ -188,7 +159,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
   const [query, setQuery] = useState('')
   const [openAxis, setOpenAxis] = useState<string | null>(null)
   const q = query.trim()
-  const hits = q ? searchHits(content, q) : []
+  const hits = q ? (simple ? zoneSearchHits(content, q) : searchHits(content, q)) : []
   const levels = levelsOf(content, sel)
   const current = models.entries.find(e => e.id === models.currentId)
   const groupHidden = (g: ModelGroup) => hidden.has(g.id)
@@ -450,7 +421,9 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
             </li>
           ))}
         </ul>
-      ) : models.open ? modelCards() : current ? (
+      ) : models.open ? modelCards() : current && simple && actions.shapeTree ? (
+        <ShapeTree content={content} sel={sel} selPoint={selPoint} hidden={hidden} entry={current} onOpenModels={() => models.onOpen(true)} modelCount={models.entries.length} actions={actions.shapeTree} />
+      ) : current ? (
         <>
           <Card
             kind="model" id={current.id} name={current.draft.name} open off={allHidden} shown={!allHidden}
