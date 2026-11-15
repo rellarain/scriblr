@@ -17,6 +17,7 @@ import { createMockMaps, seedMaps } from './mockMaps'
 import { createMockMapBiomes } from './mockMapBiomes'
 import { createMockChannels } from './mockChannels'
 import { createMockFeedback } from './mockFeedback'
+import { createMockSupport } from './mockSupport'
 import { createMockMapShapes } from './mockMapShapes'
 import { createMockTraining, emptyProgress } from './mockTraining'
 import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
@@ -210,6 +211,12 @@ export function createMockBackend() {
   const channels = createMockChannels()
   // The feedback pipeline (Help tiles, the Inbox, the Office's Voting and Channel Management, Assignment).
   const feedback = createMockFeedback({ planSeed: true })
+  const channelNode = (id: string) => (channels.channels().body as { nodes: Array<{ id: string; kind: string }> }).nodes.find(n => n.id === id)
+  // Support chats, with one waiting and one in progress for the cards.
+  const support = createMockSupport({
+    isNode: id => !!channelNode(id), isConsole: id => channelNode(id)?.kind === 'console',
+    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), send: (d, u, n, by) => feedback.sendChecked(d, u, n, by), seed: true,
+  })
   const libraryShapes = createMockMapShapes()
   // The Characters console's cast, which its edits change in memory only.
   const cast = createMockCharacters(seedCharacters())
@@ -254,6 +261,7 @@ export function createMockBackend() {
     if (parts[0] === 'user-settings') return json({ theme: previewTheme(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
     if (parts[0] === 'resources') { const answer = channels.resources(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'channels') { const answer = channels.channels(); return json(answer.body, answer.status) }
+    if (parts[0] === 'support') { const answer = support.route(method, parts.slice(1), body, new URLSearchParams(search), headers.get('X-Admin-Id') ?? ''); return json(answer.body, answer.status) }
     if (parts[0] === 'staff') { const answer = feedback.rosterRoute(method, parts.slice(1), body, headers.get('X-Admin-Id') ?? ''); return json(answer.body, answer.status) }
     if (parts[0] === 'project-plan') { const answer = feedback.planRoute(method, parts.slice(1), body, headers.get('X-Admin-Id') ?? ''); return json(answer.body, answer.status) }
     if (parts[0] === 'feedback') { const answer = feedback.route(method, parts.slice(1), body, new URLSearchParams(search), headers.get('X-Admin-Id') ?? ''); return json(answer.body, answer.status) }

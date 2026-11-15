@@ -2,11 +2,11 @@
 
 How a writer's feedback reaches the people who decide on it, in as few steps as possible. A writer writes it as a **statement** (a subject in the [channel list](../Channels/README.md) and a verb, such as *Fix Writer > Draft > Draft*) in the Help tile of the console they are in. A helper **checks** it in the Inbox. In the Office it is **voted on** (advice only) and **corrected** by Channel Management. The Project Plan's planner then accepts or vetoes it. Messages with the same subject and verb are **one statement**: they share its votes and are listed under it.
 
-Code: `feedback/` (the shared pieces: `StatementCard`, `MessageCard`, `VoteControl`, `ChannelPicker`, `ToneFaces`, `ActingAs`, `MyFeedback`, the stores `staffStore.ts` and `mineStore.ts`, `feedbackApi.ts`, `feedbackLogic.ts`, `feedback.scss`); the Help tile `components/help/HelpTile.tsx`; the Inbox `helper/inbox/` (`InboxSection`, `CheckView`, `ConfigurationView`); the Office pages `admin/office/StatementPages.tsx`; Assignment `admin/RoleAssignment.tsx`; the user's dashboard `user/UserNotifications.tsx`. Storage: `feedback.json` in the app's data folder (backend `storage/feedback.py`, API `api/feedback.py`).
+Code: `support/` (the chat stores and API: `supportStores.ts`, `supportApi.ts`, `supportTypes.ts`); `feedback/` (the shared pieces: `StatementCard`, `MessageCard`, `VoteControl`, `ChannelPicker`, `ToneFaces`, `ActingAs`, `MyFeedback`, the stores `staffStore.ts` and `mineStore.ts`, `feedbackApi.ts`, `feedbackLogic.ts`, `feedback.scss`); the Help tile `components/help/HelpTile.tsx`; the Inbox `helper/inbox/` (`InboxSection`, `CheckView`, `ConfigurationView`); the Office pages `admin/office/StatementPages.tsx`; Assignment `admin/RoleAssignment.tsx`; the user's dashboard `user/UserNotifications.tsx`. Storage: `feedback.json` and `support.json` in the app's data folder (backend `storage/feedback.py` and `storage/support.py`, API `api/feedback.py` and `api/support.py`).
 
 ## The Help tile (every console)
 
-Three icon tabs (`role="tablist"`), each with an `aria-label` and a title:
+Four icon tabs (`role="tablist"`), each with an `aria-label` and a title:
 
 - **Guides** (`BookOpenIcon`): the Resources articles written for this console's node and the nodes under it, or the console's short default text.
 - **Send feedback** (`EnvelopeIcon`), a form:
@@ -17,6 +17,12 @@ Three icon tabs (`role="tablist"`), each with an `aria-label` and a title:
   - **Send**: enabled once the subject, a verb and some text are there.
   
   Where the writer was is sent with the feedback.
+- **Chat** (`ChatBubblesIcon`), a chat with support for this console (`components/help/HelpChat.tsx`):
+  - **Before a chat**: the subject picker (it must be inside a console: the chat goes to that console's queue) and **Your question**; **Start the chat**.
+  - **During a chat**: the conversation (`role="log"`, labelled *Conversation*): the writer's messages on one side, staff's on the other, and short notes for what staff did (*Someone is here to help.*, put on hold, checked in, sent to another console, passed to a more experienced helper).
+  - A **guide** staff sent opens in place (a `<details>` with the Resources articles of that part of the app).
+  - **Feedback drafted for you** (a group): the statement and the words staff wrote with the writer, and **Send this feedback as mine**. Once sent it is the writer's own feedback, already checked by that staff member (so it goes straight into voting), and listed under My feedback.
+  - **Your message** with **Send the message**, and **Close the chat**. A closed chat lets the writer start a new one.
 - **My feedback** (`ListIcon`): everything the writer sent, newest first. Each card shows:
   - its statement;
   - the steps it has passed (Received, Checked, In voting, Planned, In progress, Done or Declined), with the current one marked and `aria-current="step"`;
@@ -55,6 +61,21 @@ Each **message card** under it carries the text (the words that could mean a ver
 - **Voting**: the square yes, no and pass buttons (`VoteControl`), each with an optional note. Votes are advice for the planner. A badge counts the statements still waiting for your vote.
 - **Channel Management**: under each message, its subject, verb and tone. A message moved to another subject or verb leaves its statement and joins (or starts) another.
 
+## The Helper's chats
+
+The Helper panel's **Conversation** tile (`helper/ChatsSection.tsx`, its state in `helper/useHelperChats.ts`) is the staff side of the Help tile's Chat. The sidebar's **New chat** takes the chat that has waited longest; the chat heads are the chats the staff member acting is in. A chat that is transferred, escalated or closed leaves the panel.
+
+- **Header**: back, the writer's name, the queue (a console) and the support tier, and the **Stage** select (Greeting, The issue, Acknowledgement, Solutions, Resolution, Closing).
+- **Focal feature**: what the chat is about, changed with the subject picker.
+- **The conversation**: the same events as the writer sees, from the other side.
+- **Composer**, three tabs:
+  - **Response**: **Your response** and **Send the response** (a helper message or an admin message, by who is acting).
+  - **Guide**: a part of the app and **Send the guide** (the writer sees its articles; the stage moves to Solutions).
+  - **Feedback**: a form, **Draft feedback**: subject, verb chips, **The feedback**, how the writer feels, and **Draft it for the writer to confirm**.
+- **Actions**: Check in, Put on hold, Escalate (the next tier, at most 3; back to waiting), **Transfer to** another console with **Transfer** (back to waiting in that queue), and Close the chat.
+
+Every change is saved at once (`support.json`) and both sides read again, so a message sent in a Help tile shows in the Helper panel straight away and the other way round. The Queue console (who supports which queue, levels, the switchboard) is the next step.
+
 ## Roles and Acting as
 
 Roles are held per console of the channel list (or per interface), and set in **Office > Assignment**:
@@ -89,3 +110,5 @@ User > Dashboard > Notifications lists the feedback with questions waiting first
 - Don't name a subject by its words: point at its channel id.
 - Don't show the writer's name to staff, or staff comments to the writer.
 - Don't treat a vote as the decision: the planner accepts or vetoes.
+- Don't send feedback for the writer from a chat: draft it, and the writer sends it as theirs.
+- Don't show a chat's messages anywhere but in that chat: elsewhere it is listed by its writer, queue, stage and actions only.

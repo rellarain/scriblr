@@ -1,6 +1,7 @@
 import { vi } from 'vitest'
 import { createMockChannels } from '../designSystem/mockChannels'
 import { createMockFeedback } from '../designSystem/mockFeedback'
+import { createMockSupport } from '../designSystem/mockSupport'
 
 // A stand-in for the feedback and Project Plan routes (`/api/feedback...`, `/api/project-plan...`) and the channel list (`/api/channels`, `/api/resources`) for tests: the
 // same pretend stores the design system uses (designSystem/mockFeedback.ts, mockChannels.ts), so a test drives a Help tile, the
@@ -9,6 +10,11 @@ import { createMockFeedback } from '../designSystem/mockFeedback'
 export function feedbackBackend() {
   const feedback = createMockFeedback()
   const channels = createMockChannels()
+  const node = (id: string) => (channels.channels().body as { nodes: Array<{ id: string; kind: string }> }).nodes.find(n => n.id === id)
+  const support = createMockSupport({
+    isNode: id => !!node(id), isConsole: id => node(id)?.kind === 'console',
+    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), send: (d, u, n, by) => feedback.sendChecked(d, u, n, by),
+  })
   const calls: string[] = []
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase()
@@ -22,6 +28,7 @@ export function feedbackBackend() {
       ? feedback.route(method, parts.slice(1), body, new URLSearchParams(search), headers.get('X-Admin-Id') ?? '')
       : parts[0] === 'project-plan' ? feedback.planRoute(method, parts.slice(1), body, headers.get('X-Admin-Id') ?? '')
       : parts[0] === 'staff' ? feedback.rosterRoute(method, parts.slice(1), body, headers.get('X-Admin-Id') ?? '')
+      : parts[0] === 'support' ? support.route(method, parts.slice(1), body, new URLSearchParams(search), headers.get('X-Admin-Id') ?? '')
       : parts[0] === 'channels' ? channels.channels()
       : parts[0] === 'resources' ? channels.resources(method, parts.slice(1), body)
       : { status: 404, body: { detail: `unexpected ${method} ${path}` } }

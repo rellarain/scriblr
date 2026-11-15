@@ -452,6 +452,22 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
   }
 
   return {
+    // For the pretend support chats: what kind of staff member someone is, and feedback a chat drafted, sent as the writer's
+    // and already checked by the staff member.
+    // Who an X-Admin-Id header acts as: the admin named, else the first admin (as the backend's current_admin).
+    actingAs(id: string): string { return admins.find(x => x.id === id)?.id ?? (id || admins[0]?.id || '') },
+    staffKind(id: string): 'helper' | 'admin' | null {
+      const pp = people.find(x => x.id === id)
+      return pp ? pp.kind : admins.some(a => a.id === id) ? 'admin' : null
+    },
+    sendChecked(draft: { channelId: string; verbId: string; text: string; tone: string | null }, authorId: string, author: string, checkedBy: string): string {
+      const m = message(`fb-${next++}`, draft.text, authorId, now(), 'neutral', draft.channelId, draft.verbId, (draft.tone as Tone | null) ?? undefined, checkedBy)
+      m.senderTone = null
+      if (!draft.tone) { m.checkedBy = ''; m.checkedAt = null }
+      void author
+      messages.push(m)
+      return m.id
+    },
     // /staff... (adminId from the X-Admin-Id header)
     rosterRoute(method: string, parts: string[], body: unknown, adminId: string): { status: number; body: unknown } {
       try {

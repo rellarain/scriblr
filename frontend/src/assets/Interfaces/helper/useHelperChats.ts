@@ -1,73 +1,36 @@
-import { useMemo, useState } from 'react'
-import type { FormFieldDef, HelperMessage } from './helperTypes'
-import { SEED_CONVERSATIONS, SEED_MESSAGES, SEED_PROFILES } from './helperSeed'
+import { useCallback, useMemo, useState } from 'react'
+import type { HelperConversation, HelperUserProfile } from './helperTypes'
+import { getStaffChats, takeChat, useStaffChats } from '../../../support/supportStores'
 
-function newId(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
-}
+// The Helper panel's chats, from the support store (support/supportStores.ts) as the staff member acting sees them: the chat heads
+// are the chats they are in; "New chat" takes the next one waiting (the oldest); the profiles feed the sidebar's queue counts (the
+// chats they are in, as active, and the ones waiting).
 
 export function useHelperChats() {
-  const [conversations, setConversations] = useState(SEED_CONVERSATIONS)
-  const [profiles, setProfiles] = useState(SEED_PROFILES)
-  const [messages, setMessages] = useState(SEED_MESSAGES)
+  const { view } = useStaffChats()
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
 
-  function selectChat(chatId: string | null) {
-    setSelectedChatId(chatId)
+  const conversations: HelperConversation[] = useMemo(() => view.mine.map(c => ({ id: c.id, label: c.userName || 'A writer' })), [view.mine])
+  const profiles: HelperUserProfile[] = useMemo(() => [
+    ...view.mine.map(c => ({ chatId: c.id, name: c.userName || 'A writer', status: 'Active now', userType: 'standard' as const, currentProjectTitle: '', activity: { wordCountTotal: 0, chapterCount: 0, sceneCount: 0, lastActiveAt: c.createdAt } })),
+    ...view.waiting.map(c => ({ chatId: c.id, name: c.userName || 'A writer', status: 'Waiting', userType: 'standard' as const, currentProjectTitle: '', activity: { wordCountTotal: 0, chapterCount: 0, sceneCount: 0, lastActiveAt: c.waitingSince } })),
+  ], [view.mine, view.waiting])
+
+  // A chat that is no longer theirs (transferred, escalated, closed) is let go.
+  const selected = selectedChatId && view.mine.some(c => c.id === selectedChatId) ? selectedChatId : null
+
+  const selectChat = useCallback((chatId: string | null) => { setSelectedChatId(chatId) }, [])
+
+  // Takes the next chat waiting (the oldest) and opens it; returns its id, or null when nothing is waiting.
+  function createConversation(): string | null {
+    const next = getStaffChats().view.waiting[0]
+    if (!next) return null
+    setSelectedChatId(next.id)
+    void takeChat(next.id)
+    return next.id
   }
 
-  // Creates a minimal placeholder conversation + profile (there's no real
-  // "start a chat" flow yet) and selects it, returning its id.
-  function createConversation(): string {
-    const id = newId('chat')
-    const label = `New chat ${conversations.length + 1}`
-    setConversations(prev => [...prev, { id, label }])
-    setProfiles(prev => [...prev, {
-      chatId: id, name: label, status: 'Active now', userType: 'standard',
-      currentProjectTitle: 'Untitled project',
-      activity: { wordCountTotal: 0, chapterCount: 0, sceneCount: 0, lastActiveAt: new Date().toISOString() },
-    }])
-    setSelectedChatId(id)
-    return id
-  }
-
-  function sendTextMessage(chatId: string, text: string) {
-    if (!text.trim()) return
-    setMessages(prev => [...prev, {
-      id: newId('msg'), chatId, sender: 'admin', sentAt: new Date().toISOString(),
-      kind: 'text', text: text.trim(),
-    }])
-  }
-
-  function sendForm(chatId: string, title: string, fields: FormFieldDef[]) {
-    if (!title.trim() || fields.length === 0) return
-    setMessages(prev => [...prev, {
-      id: newId('msg'), chatId, sender: 'admin', sentAt: new Date().toISOString(),
-      kind: 'form', form: { title: title.trim(), fields, sent: true },
-    }])
-  }
-
-  function sendPageLink(chatId: string, channelId: string, label?: string) {
-    setMessages(prev => [...prev, {
-      id: newId('msg'), chatId, sender: 'admin', sentAt: new Date().toISOString(),
-      kind: 'pageLink', pageLink: { channelId, label },
-    }])
-  }
-
-  const messagesByChat = useMemo(() => {
-    const map = new Map<string, HelperMessage[]>()
-    for (const m of messages) {
-      const bucket = map.get(m.chatId)
-      if (bucket) bucket.push(m)
-      else map.set(m.chatId, [m])
-    }
-    return map
-  }, [messages])
-
-  return {
-    conversations, profiles, messages, selectedChatId, messagesByChat,
-    selectChat, createConversation, sendTextMessage, sendForm, sendPageLink,
-  }
+  return { conversations, profiles, selectedChatId: selected, selectChat, createConversation }
 }
 
 export type HelperChats = ReturnType<typeof useHelperChats>

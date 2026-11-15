@@ -54,7 +54,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'feedback', dir: 'Feedback', title: 'Feedback: from the Help tile to voting', group: 'Feedback', height: 720,
-    summary: "The feedback pipeline up to the Project Plan: a console's Help tile (guides, Send feedback as a statement, My feedback with where each stands and the questions asked of you), the Helper's Inbox (check each message's subject, verb and tone), the Office's Voting and Channel Management (the statements, lumped by subject and verb, with votes and corrections) and the user's Notifications.",
+    summary: "The feedback pipeline up to the Project Plan: a console's Help tile (guides, Send feedback as a statement, a chat with the people who support the console, My feedback with where each stands and the questions asked of you), the Helper's side of a chat, the Helper's Inbox (check each message's subject, verb and tone), the Office's Voting and Channel Management (the statements, lumped by subject and verb, with votes and corrections) and the user's Notifications.",
   },
   {
     id: 'project-plan', dir: 'ProjectPlan', title: 'Project Plan: plans per part of the app', group: 'Feedback', height: 720,

@@ -24,6 +24,8 @@ import MapsConfigConsole from '../assets/Interfaces/admin/maps/MapsConfigConsole
 import ChannelsConsole from '../assets/Interfaces/admin/channels/ChannelsConsole'
 import { ChannelManagementPage, VotingPage } from '../assets/Interfaces/admin/office/StatementPages'
 import InboxSection from '../assets/Interfaces/helper/inbox/InboxSection'
+import ChatsSection from '../assets/Interfaces/helper/ChatsSection'
+import { useHelperChats } from '../assets/Interfaces/helper/useHelperChats'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from '../assets/Interfaces/admin/plan/PlanPages'
 import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage } from '../assets/Interfaces/admin/office/StaffPages'
 import UserNotifications from '../assets/Interfaces/user/UserNotifications'
@@ -297,7 +299,15 @@ function ChannelsCard() {
 
 // The feedback pipeline, one screen per view, all on the same pretend store (mockFeedback.ts): what is sent in the Help tile shows
 // up in the Inbox, a checked message in Voting, a question asked in the Inbox under the writer's Notifications.
-const FEEDBACK_VIEWS = [{ id: 'help', label: 'Help tile' }, { id: 'inbox', label: 'Inbox' }, { id: 'voting', label: 'Voting' }, { id: 'channels', label: 'Channel Management' }, { id: 'notifications', label: 'Notifications' }]
+const FEEDBACK_VIEWS = [{ id: 'help', label: 'Help tile' }, { id: 'conversation', label: 'Helper chat' }, { id: 'inbox', label: 'Inbox' }, { id: 'voting', label: 'Voting' }, { id: 'channels', label: 'Channel Management' }, { id: 'notifications', label: 'Notifications' }]
+// The Helper panel's Conversation on the chat already in progress in the pretend store (chat-2, Dana's).
+function HelperChatCard() {
+  const helper = useHelperChats()
+  const { selectChat } = helper
+  useEffect(() => { selectChat('chat-2') }, [selectChat])
+  return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex', padding: 12 }}>{helper.selectedChatId ? <ChatsSection helper={helper} /> : null}</div></div>
+}
+
 function FeedbackCard({ view }: { view: string }) {
   const pane = (cls: string, width: string, child: ReactNode) => (
     <div className={cls} style={{ position: 'relative', width, height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
@@ -305,6 +315,7 @@ function FeedbackCard({ view }: { view: string }) {
     </div>
   )
   if (view === 'help') return pane('aUI', 'min(380px, 100%)', <HelpTile target={HELP_TARGETS.writerDraft} fallback="Resources and assistance using the Draft console here." />)
+  if (view === 'conversation') return <HelperChatCard />
   if (view === 'inbox') return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex' }}><InboxSection /></div></div>
   if (view === 'voting') return pane('aUI', '100%', <VotingPage />)
   if (view === 'channels') return pane('aUI', '100%', <ChannelManagementPage />)

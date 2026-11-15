@@ -1,5 +1,5 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
-import { BookOpenIcon, EnvelopeIcon, ListIcon, type IconProps } from '../../assets/icons'
+import { BookOpenIcon, ChatBubblesIcon, EnvelopeIcon, ListIcon, type IconProps } from '../../assets/icons'
 import HelpArticles from '../../assets/Interfaces/writer/levels/HelpArticles'
 import { useChannels } from '../../channels/channelStore'
 import { nearest } from '../../channels/channelTree'
@@ -10,16 +10,18 @@ import { FeelingPicker } from '../../feedback/ToneFaces'
 import type { Tone } from '../../feedback/feedbackTypes'
 import { sendFeedback, useMine } from '../../feedback/mineStore'
 import '../../feedback/feedback.scss'
+import HelpChat from './HelpChat'
 import './help.scss'
 
 // The Help tile of a console (every interface has one): its guides (Resources, by its channel id), a form to send feedback
 // as a statement (what it is about, a verb, the words, and a smile, a frown, both or neither), and the feedback you sent with where each stands
-// and the questions asked of you. Where you were is sent with the feedback.
+// and the questions asked of you, and a chat with the people who support the console. Where you were is sent with the feedback.
 
-type Section = 'guides' | 'send' | 'mine'
+type Section = 'guides' | 'send' | 'chat' | 'mine'
 const SECTIONS: Array<{ key: Section; label: string; Icon: ComponentType<IconProps> }> = [
   { key: 'guides', label: 'Guides', Icon: BookOpenIcon },
   { key: 'send', label: 'Send feedback', Icon: EnvelopeIcon },
+  { key: 'chat', label: 'Chat', Icon: ChatBubblesIcon },
   { key: 'mine', label: 'My feedback', Icon: ListIcon },
 ]
 
@@ -92,6 +94,7 @@ export default function HelpTile({ target, fallback }: { target: HelpTarget; fal
       <div className="helpBody" role="tabpanel" id={`help-panel-${section}`} aria-labelledby={`help-tab-${section}`}>
         {section === 'guides' && <HelpArticles target={target} fallback={fallback} />}
         {section === 'send' && <SendFeedback target={target} onSent={() => undefined} />}
+        {section === 'chat' && <HelpChat target={target} />}
         {section === 'mine' && <MyFeedbackList messages={view.messages} empty="Nothing sent yet." />}
       </div>
     </div>

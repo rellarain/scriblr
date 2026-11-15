@@ -16,6 +16,7 @@ import { __resetStaffForTests } from '../feedback/staffStore'
 import { __resetMineForTests } from '../feedback/mineStore'
 import { __resetPlanForTests } from '../plan/projectPlanStore'
 import { __resetRosterForTests } from '../staff/rosterStore'
+import { __resetSupportForTests } from '../support/supportStores'
 
 // What one test leaves behind must not reach the next: stubbed globals (fetch, ResizeObserver, ...), the browser storage the stores read,
 // and the settings store itself. (React Testing Library unmounts what a test rendered on its own.)
@@ -39,4 +40,5 @@ afterEach(() => {
   __resetMineForTests()
   __resetPlanForTests()
   __resetRosterForTests()
+  __resetSupportForTests()
 })

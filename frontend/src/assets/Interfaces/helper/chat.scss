@@ -1,0 +1,14 @@
+// The Helper panel's Conversation tile (ChatsSection.tsx). Theme tokens only; fields and buttons from feedback.scss.
+
+.scConversation { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.scTop { flex-wrap: wrap; }
+.scFocal { font-size: 12.5px; summary { cursor: pointer; color: var(--ink-muted); } }
+.scLog { display: flex; flex-direction: column; gap: 6px; min-height: 80px; max-height: 420px; overflow-y: auto; padding: 4px; background: var(--ov-sink-1); }
+.scMsg { margin: 0; max-width: 85%; padding: 6px 8px; font-size: 12.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere;
+  &--user { align-self: flex-start; background: var(--ov-sink-2); color: var(--ink); }
+  &--staff { align-self: flex-end; background: var(--accent); color: var(--on-accent); }
+}
+.scNote { margin: 0; align-self: center; font-size: 11.5px; color: var(--ink-muted); }
+.scComposer { display: flex; flex-direction: column; gap: 6px; }
+.scForm { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; > .fbPicker, > textarea { align-self: stretch; } }
+.scActions { flex-wrap: wrap; }
