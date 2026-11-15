@@ -1,7 +1,7 @@
 import RoleAssignment from './admin/RoleAssignment'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
-  BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
+  BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon,
   EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon,
   type IconProps,
 } from '../icons'
@@ -21,8 +21,8 @@ const DesignerConsole = lazy(() => import('./admin/characters/DesignerConsole'))
 const WriterLimitsConsole = lazy(() => import('./admin/characters/WriterLimitsConsole'))
 import { DESIGNER_TOOLS, WRITER_DESIGNER } from './admin/characters/designerFeatures'
 
-// Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section (this array
-// covers 7 of them; Resources -- not in that doc -- is built separately
+// The consoles of scrilbrPlan.md's "Admin Page (AUI)" section, as the user has since reshaped them (2026-11-15: the Manager and Director consoles merged
+// into Office, and a Project Plan console in place of the Processor, whose Voting page went to the Organizer). Resources -- not in that doc -- is built separately
 // below, since it isn't this shape: one console, no per-page children, just
 // the article/quiz builder). This is a full structural skeleton -- every
 // named component present and selectable, placeholder body text
@@ -30,14 +30,14 @@ import { DESIGNER_TOOLS, WRITER_DESIGNER } from './admin/characters/designerFeat
 // sections (which didn't match the doc; the parts of that pipeline the
 // doc actually keeps, Tone/Sorting/Explicate, moved to HUI's Inbox
 // Console instead, since the doc assigns them there).
-type AuiSectionKey = 'dashboard' | 'processor' | 'organizer' | 'manager' | 'director' | 'office' | 'configuration' | 'designer' | 'resources'
+type AuiSectionKey = 'dashboard' | 'projectPlan' | 'organizer' | 'office' | 'configuration' | 'designer' | 'resources'
 
 type AuiSubSectionKey =
   | 'notifications' | 'dashboardSchedule' | 'dashboardHelp'
-  | 'voting' | 'processorHelp'
-  | 'channelManagement' | 'bookclubManagement' | 'organizerHelp'
-  | 'allotment' | 'assignment' | 'teamSchedule' | 'managerHelp'
-  | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department' | 'directorHelp'
+  | 'projectTimeline' | 'projectPlanHelp'
+  | 'voting' | 'channelManagement' | 'bookclubManagement' | 'organizerHelp'
+  | 'allotment' | 'assignment' | 'teamSchedule'
+  | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
   | 'configOverview' | 'configPlot' | 'configMaps' | 'configWriterDesigner' | 'configHelp'
   | 'designerWork' | 'designerHelp'
@@ -79,7 +79,7 @@ const DESIGNER_HELP = [
 
 const SECTIONS: AuiSectionDef[] = [
   {
-    key: 'dashboard', label: 'Dashboard', Icon: BarChartIcon,
+    key: 'dashboard', label: 'Dashboard', Icon: HomeIcon,
     subSections: [
       { key: 'notifications', label: 'Notifications', Icon: EnvelopeIcon,
         body: 'View admin notifications here.' },
@@ -90,17 +90,20 @@ const SECTIONS: AuiSectionDef[] = [
     ],
   },
   {
-    key: 'processor', label: 'Processor', Icon: VotingIcon,
+    key: 'projectPlan', label: 'Project Plan', Icon: GanttIcon,
     subSections: [
-      { key: 'voting', label: 'Voting', Icon: VotingIcon,
-        body: 'Approve and/or deny explicated, toned, and sorted feedback, and set the admin-defined processing order for tones and feature sorting, here.' },
-      { key: 'processorHelp', label: 'Help', Icon: HelpIcon,
-        body: 'Resources and assistance using the Processor console here.' },
+      { key: 'projectTimeline', label: 'Timeline', Icon: GanttIcon,
+        body: 'Plan the project here: its phases, milestones and tasks on a timeline.' },
+      { key: 'projectPlanHelp', label: 'Help', Icon: HelpIcon,
+        body: 'Resources and assistance using the Project Plan console here.' },
     ],
   },
   {
     key: 'organizer', label: 'Organizer', Icon: LibraryIcon,
     subSections: [
+      // the first processing pass (it was the Processor console's page)
+      { key: 'voting', label: 'Voting', Icon: VotingIcon,
+        body: 'Approve and/or deny explicated, toned, and sorted feedback, and set the admin-defined processing order for tones and feature sorting, here.' },
       { key: 'channelManagement', label: 'Channel Management', Icon: SortingIcon,
         body: 'Review processed feedback here, as a second processing pass after Voting.' },
       { key: 'bookclubManagement', label: 'Bookclub Management', Icon: LibraryIcon,
@@ -110,7 +113,8 @@ const SECTIONS: AuiSectionDef[] = [
     ],
   },
   {
-    key: 'manager', label: 'Manager', Icon: PeopleIcon,
+    key: 'office', label: 'Office', Icon: BriefcaseIcon,
+    // The Manager's pages, then the Director's, then the Office's own (the doc gives these as bullets instead of named components).
     subSections: [
       { key: 'allotment', label: 'Allotment', Icon: PeopleIcon,
         body: 'Manage team and user allotments here.' },
@@ -118,13 +122,6 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Manage team and user assignments here.' },
       { key: 'teamSchedule', label: 'Team Schedule', Icon: CalendarIcon,
         body: 'View and manage team schedules here.' },
-      { key: 'managerHelp', label: 'Help', Icon: HelpIcon,
-        body: 'Resources and assistance using the Manager console here.' },
-    ],
-  },
-  {
-    key: 'director', label: 'Director', Icon: BuildingIcon,
-    subSections: [
       { key: 'departmentDetails', label: 'Department Details', Icon: BuildingIcon,
         body: 'View department details here.' },
       { key: 'departmentRoster', label: 'Department Roster', Icon: PeopleIcon,
@@ -133,14 +130,6 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'View department analytics here.' },
       { key: 'department', label: 'Department', Icon: BuildingIcon,
         body: 'Manage the department here.' },
-      { key: 'directorHelp', label: 'Help', Icon: HelpIcon,
-        body: 'Resources and assistance using the Director console here.' },
-    ],
-  },
-  {
-    key: 'office', label: 'Office', Icon: BriefcaseIcon,
-    // The doc gives this console bullets instead of named components.
-    subSections: [
       { key: 'monitorTraining', label: 'Monitor Training', Icon: BriefcaseIcon,
         body: 'Monitor admin training progress here.' },
       { key: 'departmentSchedules', label: 'Department Schedules', Icon: CalendarIcon,

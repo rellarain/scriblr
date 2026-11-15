@@ -1024,7 +1024,7 @@ mounted it; it remains in git history.
   feedback statements; by stage or by case) and processes the statement cases they
   form (yes / no / pass votes with notes, solutions, closing). There is no quorum;
   tone is a six-category score over the validators; access is three roles per
-  console (Processor, Configurer, Planner) assigned in Admin > Manager > Assignment;
+  console (Processor, Configurer, Planner) assigned in Admin > Office > Assignment;
   the Inbox names nobody. See `backend/app/storage/feedback.py` for the rules and
   `helper/inbox/` for the interface.
 - **`RUI.tsx`** / **`UUI.tsx`** — Reader and Home/Dashboard-shaped views

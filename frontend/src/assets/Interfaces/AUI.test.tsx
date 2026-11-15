@@ -24,21 +24,38 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals() })
 
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
-const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'designer', 'resources', 'instructor']
+const SECTIONS = ['dashboard', 'projectPlan', 'organizer', 'office', 'configuration', 'designer', 'resources', 'instructor']
 
 describe('AUI (the Admin panel as tiles)', () => {
-  it('shows the ten sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
+  it('shows the eight sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
-    expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
+    expect(within(tile('office')).getByText('Assignment')).toBeTruthy()
     // Help is a console of its own, not a tile of a section.
-    expect(within(tile('manager')).queryByText(/using the Manager console/)).toBeNull()
-    expect(within(tile('help')).getByText(/using the Manager console/)).toBeTruthy()
+    expect(within(tile('office')).queryByText(/using the Office console/)).toBeNull()
+    expect(within(tile('help')).getByText(/using the Office console/)).toBeTruthy()
+    expect(within(tile('help')).getByText(/using the Project Plan console/)).toBeTruthy()
   })
 
-  it('shows the role assignment editor in the Manager tile', () => {
+  it('has the Manager and Director pages in the Office, a Project Plan in place of the Processor (its Voting in the Organizer) and a house for the Dashboard', () => {
     render(<AUI />)
-    expect(within(tile('manager')).getByText('role assignment')).toBeTruthy()
+    for (const gone of ['processor', 'manager', 'director']) expect(tile(gone)).toBeNull()
+    const office = within(within(tile('office').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Office tiles tabs' }))
+    expect(office.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual([
+      'Allotment', 'Assignment', 'Team Schedule', 'Department Details', 'Department Roster', 'Department Analytics', 'Department', 'Monitor Training', 'Department Schedules', 'Hire/Term Admin',
+    ])
+    expect(within(tile('projectPlan')).getByRole('heading', { name: /Project Plan/ })).toBeTruthy()
+    expect(within(tile('projectPlan')).getByText(/its phases, milestones and tasks on a timeline/)).toBeTruthy()
+    expect(within(tile('organizer')).getByText(/Approve and\/or deny explicated/)).toBeTruthy()
+    const bar = screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' })
+    // the Dashboard is a house (the Reader's home icon) and the Project Plan bars on a graph
+    expect(within(bar).getByRole('button', { name: 'Dashboard' }).querySelector('path')?.getAttribute('d')).toBe('M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6')
+    expect(within(bar).getByRole('button', { name: 'Project Plan' }).querySelectorAll('rect')).toHaveLength(3)
+  })
+
+  it('shows the role assignment editor in the Office tile', () => {
+    render(<AUI />)
+    expect(within(tile('office')).getByText('role assignment')).toBeTruthy()
   })
 
   it('shows Configuration > Plot as the plot presets page, without a second heading above it', async () => {
@@ -81,8 +98,7 @@ describe('AUI (the Admin panel as tiles)', () => {
     const bar = screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' })
     expect(within(bar).getAllByRole('button')).toHaveLength(SECTIONS.length + 1)
     expect(within(bar).getAllByRole('button').at(-1)?.getAttribute('aria-label')).toBe('Help')
-    const pages = within(tile('manager').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Manager tiles tabs' })
-    expect(within(pages).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Allotment', 'Assignment', 'Team Schedule'])
+    const pages = within(tile('office').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Office tiles tabs' })
     await user.click(within(pages).getByRole('button', { name: 'Assignment' }))
     expect(tile('assignment')).toBeNull()
     await user.click(within(bar).getByRole('button', { name: 'Office' }))

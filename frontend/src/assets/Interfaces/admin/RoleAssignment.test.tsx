@@ -9,7 +9,7 @@ const reply = (body: unknown, status = 200) => ({ ok: status < 400, status, stat
 beforeEach(() => { resetFeedbackStore('adm-dana') })
 afterEach(() => { vi.unstubAllGlobals() })
 
-describe('Admin > Manager > Assignment', () => {
+describe('Admin > Office > Assignment', () => {
   it('lists the admins with a checkbox per role for the chosen console', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => reply(bundle())))
     await loadFeedback()

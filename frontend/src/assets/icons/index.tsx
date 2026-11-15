@@ -119,6 +119,16 @@ export function BarChartIcon(props: IconProps) {
   </IconBase>
 }
 
+// A project plan: horizontal bars on a graph, each starting where the one above it is under way (a Gantt chart).
+export function GanttIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 3v17h17" />
+    <rect x="7" y="5.5" width="6" height="2.5" />
+    <rect x="10" y="10" width="7" height="2.5" />
+    <rect x="13" y="14.5" width="6" height="2.5" />
+  </IconBase>
+}
+
 export function InboxIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M4 4h16l2 8v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7L4 4Z" />
@@ -566,19 +576,19 @@ export function SunIcon(props: IconProps) {
   </IconBase>
 }
 
+// The sun half risen on the horizon with five rays fanning out from its middle (dawn).
 export function SunriseIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M3 19h18M7 19a5 5 0 0 1 10 0" />
-    <path d="M12 4v5M9.5 6.5L12 4l2.5 2.5" />
-    <path d="M4.5 12.5l1.4 1.4M19.5 12.5l-1.4 1.4" />
+    <path d="M12 12V9M15.5 12.94l1.5-2.6M8.5 12.94L7 10.34M18.06 15.5l2.6-1.5M5.94 15.5l-2.6-1.5" />
   </IconBase>
 }
 
+// The sun half set on the horizon under horizontal streaks of cloud across the sky (dusk).
 export function SunsetIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M3 19h18M7 19a5 5 0 0 1 10 0" />
-    <path d="M12 4v5M9.5 6.5L12 9l2.5-2.5" />
-    <path d="M4.5 12.5l1.4 1.4M19.5 12.5l-1.4 1.4" />
+    <path d="M4 11.5h9M16 11.5h4M9 7.5h11M4 3.5h7" />
   </IconBase>
 }
 

@@ -3,7 +3,7 @@ import { feedbackApi } from '../helper/inbox/feedbackApi'
 import { changeFeedback, clearFeedbackError, useFeedback } from '../helper/inbox/feedbackStore'
 import type { Role } from '../helper/inbox/feedbackTypes'
 
-// Admin > Manager > Assignment: which roles each admin holds on each console. Processor validates feedback and
+// Admin > Office > Assignment: which roles each admin holds on each console. Processor validates feedback and
 // votes, Configurer proposes solutions, reopens cases and manages verb categories, Planner closes cases. The
 // changes are made as the admin signed in to the Inbox (there is no login yet) and are kept in a role history;
 // nobody can remove their own Configurer role on Helper > Inbox.
