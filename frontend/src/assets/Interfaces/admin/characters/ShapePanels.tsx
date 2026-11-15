@@ -101,6 +101,8 @@ export interface ArrangeActions {
   onKeep: (on: boolean) => void
   centre: [number, number]
   onStep: (shapeId: string, dir: -1 | 1) => void
+  // Align a shape that is connected to others: they all move so the box around them is centred (engine/align.ts); false when it is alone (it aligns by itself)
+  onAlign?: (axis: 'x' | 'y') => boolean
   canForward: boolean
   canBack: boolean
 }
@@ -124,10 +126,23 @@ export function ArrangeSection({ shape, actions, onEditShape }: { shape: ModelSh
         <button type="button" className={`cmIconBtn${actions.keep ? ' cmIconBtn--on' : ''}`} aria-pressed={actions.keep} aria-label="Keep proportions" title="Keep proportions" onClick={() => actions.onKeep(!actions.keep)}><LinkIcon size={14} /></button>
         <button type="button" className="cmIconBtn" aria-label="Flip across" title="Flip across" onClick={() => edit(flipShape(shape, 'across'))}><FlipAcrossIcon size={14} /></button>
         <button type="button" className="cmIconBtn" aria-label="Flip down" title="Flip down" onClick={() => edit(flipShape(shape, 'down'))}><FlipDownIcon size={14} /></button>
-        <button type="button" className="cmIconBtn" aria-label="Align across to the middle of the model" title="Align across to the middle of the model" onClick={() => edit(alignShape(shape, 'x', actions.centre))}><AlignAcrossIcon size={14} /></button>
-        <button type="button" className="cmIconBtn" aria-label="Align down to the middle of the model" title="Align down to the middle of the model" onClick={() => edit(alignShape(shape, 'y', actions.centre))}><AlignDownIcon size={14} /></button>
+        <button type="button" className="cmIconBtn" aria-label="Align across to the middle of the model" title="Align across to the middle of the model" onClick={() => { if (!actions.onAlign?.('x')) edit(alignShape(shape, 'x', actions.centre)) }}><AlignAcrossIcon size={14} /></button>
+        <button type="button" className="cmIconBtn" aria-label="Align down to the middle of the model" title="Align down to the middle of the model" onClick={() => { if (!actions.onAlign?.('y')) edit(alignShape(shape, 'y', actions.centre)) }}><AlignDownIcon size={14} /></button>
         <button type="button" className="cmIconBtn" aria-label="Forward" title="Forward" disabled={!actions.canForward} onClick={() => actions.onStep(shape.id, 1)}><ForwardIcon size={14} /></button>
         <button type="button" className="cmIconBtn" aria-label="Back" title="Back" disabled={!actions.canBack} onClick={() => actions.onStep(shape.id, -1)}><BackwardIcon size={14} /></button>
+      </div>
+    </div>
+  )
+}
+
+// An object's or a group's Align buttons: its shapes and every shape connected to them are centred together on the middle of the model.
+export function AlignSection({ kind, onAlign }: { kind: 'object' | 'group'; onAlign: (axis: 'x' | 'y') => void }) {
+  return (
+    <div className="cmArrange" role="group" aria-label={`Align the ${kind}`}>
+      <h3 className="cmInsSub">Align</h3>
+      <div className="cmInline cmArrangeTools">
+        <button type="button" className="cmIconBtn" aria-label="Align across to the middle of the model" title="Align across to the middle of the model" onClick={() => onAlign('x')}><AlignAcrossIcon size={14} /></button>
+        <button type="button" className="cmIconBtn" aria-label="Align down to the middle of the model" title="Align down to the middle of the model" onClick={() => onAlign('y')}><AlignDownIcon size={14} /></button>
       </div>
     </div>
   )

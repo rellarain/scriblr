@@ -87,3 +87,34 @@ describe('links', () => {
     expect(within(canvas()).queryAllByRole('button', { name: /linked/ })).toHaveLength(2)
   })
 })
+
+describe('Align', () => {
+  const ysOf = (id: string) => numbers(id).filter((_, i) => i % 2 === 1)
+  it('centres a shape with every shape connected to it, as one undo step', async () => {
+    const user = await open(model())
+    click(pathOf('a'), [100, 80])
+    // A and B make 60..180 across (middle 120): both move 20 to the left; C, on its own, stays
+    await user.click(within(screen.getByRole('group', { name: 'Arrange the shape' })).getByRole('button', { name: 'Align across to the middle of the model' }))
+    expect(Math.min(...xsOf('a'))).toBeCloseTo(40, 0)
+    expect(Math.max(...xsOf('b'))).toBeCloseTo(160, 0)
+    expect(Math.min(...xsOf('c'))).toBeCloseTo(0, 1)
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(Math.min(...xsOf('a'))).toBeCloseTo(60, 0)
+    expect(Math.max(...xsOf('b'))).toBeCloseTo(180, 0)
+  })
+
+  it("aligns an object's shapes, and a group's, with what is connected to them", async () => {
+    const user = await open(model())
+    await user.click(screen.getByRole('button', { name: 'Expand Body' }))
+    await user.click(screen.getByRole('button', { name: 'Part' }))
+    // A, B and C make 0..180 across (middle 90): all move 10 to the right
+    await user.click(within(screen.getByRole('group', { name: 'Align the object' })).getByRole('button', { name: 'Align across to the middle of the model' }))
+    expect(Math.min(...xsOf('a'))).toBeCloseTo(70, 0)
+    expect(Math.min(...xsOf('c'))).toBeCloseTo(10, 0)
+    await user.click(screen.getByRole('button', { name: 'Body' }))
+    // 40..240 down (middle 140): all move 60 down
+    await user.click(within(screen.getByRole('group', { name: 'Align the group' })).getByRole('button', { name: 'Align down to the middle of the model' }))
+    expect(Math.min(...ysOf('a'))).toBeCloseTo(100, 0)
+    expect(Math.max(...ysOf('c'))).toBeCloseTo(300, 0)
+  })
+})

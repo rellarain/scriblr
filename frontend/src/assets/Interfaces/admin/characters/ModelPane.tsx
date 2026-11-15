@@ -98,6 +98,7 @@ import * as clipboard from './shapeClipboard'
 import { FIRST_CHOICE, ShapeForm, templateOfChoice, type FormKind, type ShapeChoice } from './ShapeForm'
 import { CAST_OPACITY, KIND_NAMES } from './engine/kinds'
 import { castOverlaps, hasBothCasts } from './engine/castOverlap'
+import { alignConnected, alignSet } from './engine/align'
 import { addPointShared, connect, connectedSet, copyShareAt, disconnect, linkShown, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
@@ -1719,10 +1720,26 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const arrangeObject = shapesOnly && selShape ? objectOfShape(content, selShape.id) : undefined
   const arrangeAt = selShape ? solved.shapes[selShape.id] : undefined
   const arrangeIndex = selShape && arrangeObject ? arrangeObject.shapes.indexOf(selShape.id) : -1
+  // Align with everything connected (engine/align.ts): the box around the shapes and every shape connected to them is centred on the model's middle, as one undo step.
+  function alignAll(seeds: string[], axis: 'x' | 'y') {
+    const r = alignConnected(content, canvasSolved, seeds, axis, axis === 'x' ? content.axis : MODEL_MIDDLE_Y)
+    if (!r.ok) { setNote(r.reason); return }
+    if (r.content !== content) commit(r.content, true)
+  }
+  const onAlignPart = shapesOnly && !recording ? (kind: 'object' | 'group', id: string, axis: 'x' | 'y') => {
+    const objects = kind === 'object' ? [id] : groupById(content, id)?.objects ?? []
+    alignAll(objects.flatMap(oid => objectById(content, oid)?.shapes ?? []), axis)
+  } : undefined
   const arrange: ArrangeActions | undefined = shapesOnly && selShape ? {
     keep: keepRatio, onKeep: setKeepRatio,
     centre: arrangeAt ? apply(inverse(arrangeAt.matrix), content.axis, MODEL_MIDDLE_Y) : [content.axis, MODEL_MIDDLE_Y],
     onStep: (id, dir) => { commit(stepShape(content, id, dir), true) },
+    // a shape connected to others aligns with them; a lone one aligns by itself (the panel does it)
+    onAlign: axis => {
+      if (recording || selShape.mirrorOf || selShape.cloneOf || alignSet(content, [selShape.id]).length < 2) return false
+      alignAll([selShape.id], axis)
+      return true
+    },
     canForward: !!arrangeObject && arrangeIndex >= 0 && arrangeIndex < arrangeObject.shapes.length - 1,
     canBack: arrangeIndex > 0,
   } : undefined
@@ -2140,7 +2157,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} symmetry={symmetry} joint={jointActions} mirrors={mirrorActions} clones={cloneActions}
+              arrange={arrange} connections={connections} symmetry={symmetry} joint={jointActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

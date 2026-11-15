@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { ArrangeSection, CloneSection, ConnectionsSection, LookSection, MarksSection, MirrorSection, JointSection, SymmetrySection, TypeSection, type CloneActions, type MirrorActions, type JointActions, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
+import { AlignSection, ArrangeSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CloneActions, type ConnectionActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -90,6 +90,8 @@ export interface InspectorProps {
   // the shape editor's mirrors (Z3) and clones (Z4)
   mirrors?: MirrorActions
   clones?: CloneActions
+  // the shape editor's Align for an object or a group (with everything connected to its shapes)
+  onAlign?: (kind: 'object' | 'group', id: string, axis: 'x' | 'y') => void
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -189,6 +191,8 @@ function ShapeTab(p: InspectorProps) {
 
       {sel.kind === 'object' && object && simple && object.cloneOf && p.clones && <CloneSection content={content} kind="object" thing={object} actions={p.clones} />}
       {sel.kind === 'object' && object && simple && !object.cloneOf && p.mirrors && <MirrorSection content={content} kind="object" thing={object} actions={p.mirrors} clones={object.mirrorOf ? undefined : p.clones} />}
+      {sel.kind === 'object' && object && simple && !object.cloneOf && !object.mirrorOf && p.onAlign && <AlignSection kind="object" onAlign={axis => p.onAlign?.('object', object.id, axis)} />}
+      {sel.kind === 'group' && group && simple && p.onAlign && <AlignSection kind="group" onAlign={axis => p.onAlign?.('group', group.id, axis)} />}
       {sel.kind === 'object' && object && !simple && (
         <>
           <label className="cmField">
