@@ -4,10 +4,10 @@ import { NO_COLOURING, type Colouring } from './engine/colour'
 import { crossingNear, crossingsOf, type Crossing, type LockStage } from './engine/crossings'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
 import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/frames'
-import { apply, boxOf, build, flatten, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
+import { apply, boxOf, build, flatten, inPolygon, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
-import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget } from './engine/connect'
+import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget } from './engine/connect'
 import { rayAngles, wedgeAt } from './engine/symmetry'
 import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, rotOf, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
@@ -224,12 +224,14 @@ export interface CanvasProps {
   poseMarks?: Array<{ id: string; shapeId: string; markId: string; x: number; y: number; name: string }>
   sliders?: SliderMark[]
   onStop?: (shapeId: string, i: number, which: 'lo' | 'hi', world: [number, number]) => void
+  // the shape editor (Z1): a box dragged out on the empty grid makes a rectangle there (Shift: a square)
+  onDrawBox?: (box: Box) => void
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
 
 type Drag =
-  | { kind: 'point'; shapeId: string; index: number; x0: number; y0: number; moved: boolean; via?: { shapeId: string; i: number } }
+  | { kind: 'point'; shapeId: string; index: number; x0: number; y0: number; moved: boolean; via?: { shapeId: string; i: number }; count?: number }
   // a point locked onto a segment of another shape, slid along it (shape editor S5)
   | { kind: 'slide'; shapeId: string; index: number; x0: number; y0: number; moved: boolean }
   | { kind: 'handle'; shapeId: string; index: number; which: 'hi' | 'ho' }
@@ -237,6 +239,11 @@ type Drag =
   | { kind: 'pivot' }
   | { kind: 'pose' }
   | { kind: 'posePress'; shapeId: string; x0: number; y0: number; world: [number, number] }
+  // the shape editor (Z1): a press on a segment (a click selects it; a drag adds a point there, or moves a shared segment), a shared segment moving (the points it runs
+  // between, from where they were, along `dir` when a symmetric shape holds it), and a box drawn on the empty grid
+  | { kind: 'segPress'; shapeId: string; e: number; x0: number; y0: number; at: [number, number]; other: boolean }
+  | { kind: 'segMove'; roots: Array<{ shapeId: string; i: number; x: number; y: number }>; start: [number, number]; dir: [number, number] | null }
+  | { kind: 'box'; start: [number, number]; x0: number; y0: number; moved: boolean; box: Box | null }
   | { kind: 'stop'; shapeId: string; i: number; which: 'lo' | 'hi'; x0: number; y0: number; moved: boolean }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
   // the box of the selected shape (shape editor S4): a resize from one of its handles, or a turn by its round handle, worked out from the shape as it was when it began
@@ -291,6 +298,9 @@ export function DesignerCanvas(p: CanvasProps) {
   }
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<Hover | null>(null)
+  // while a point is dragged (Z1): the shape under it, whose outline and points are shown; and the box being drawn on the grid
+  const [dragOver, setDragOver] = useState<string | null>(null)
+  const [drawBox, setDrawBox] = useState<Box | null>(null)
   const [guides, setGuides] = useState<{ x: number | null; y: number | null } | null>(null)
   // where the Skin tool's brush is (the pointer, in canvas space), while the tool is on
   const [brush, setBrush] = useState<[number, number] | null>(null)
@@ -578,6 +588,14 @@ export function DesignerCanvas(p: CanvasProps) {
     const h = hitTest(e)
     if (!h) return false
     if (h.kind === 'cross') { p.lock?.onAdvance(h.crossing); return true }
+    // the shape editor (Z1): a press on a segment waits: a click selects it, a drag adds a point there (or moves a shared segment)
+    if (h.kind === 'edge' && p.connect && !p.weights && !p.skin) {
+      const other = !shape || h.shapeId !== shape.id
+      if (other && onBody) return false
+      dragRef.current = { kind: 'segPress', shapeId: h.shapeId, e: h.e, x0: e.clientX, y0: e.clientY, at: [h.x, h.y], other }
+      capture(e)
+      return true
+    }
     // another shape's point or segment: that shape is selected with it (the next press drags it)
     if (!shape || h.shapeId !== shape.id) {
       if (onBody && h.kind === 'edge') return false
@@ -617,8 +635,11 @@ export function DesignerCanvas(p: CanvasProps) {
     if (ctrlRemove(e)) return
     if (p.taper) { addTaper(e); return }
     if (hoverDown(e)) return
+    const busy = !!p.pick || legacyPose || !!p.frames || !!p.weights || !!p.skin || !!through
+    // the shape editor (Z1): a drag on the empty grid draws a rectangle; a click there still unselects (when the press ends)
+    if (!busy && p.onDrawBox) { dragRef.current = { kind: 'box', start: toWorld(e), x0: e.clientX, y0: e.clientY, moved: false, box: null }; capture(e); return }
     // a click on the empty grid unselects everything (not while a tool is waiting for a click of its own)
-    if (!p.pick && !legacyPose && !p.frames && !p.weights && !p.skin && !through && sel.kind !== 'none') p.onSelect(NONE)
+    if (!busy && sel.kind !== 'none') p.onSelect(NONE)
   }
   function onShapeDown(e: ReactPointerEvent, id: string) {
     e.stopPropagation()
@@ -819,6 +840,21 @@ export function DesignerCanvas(p: CanvasProps) {
       p.onStop?.(d.shapeId, d.i, d.which, toWorld(e))
       return
     }
+    if (d.kind === 'segPress') {
+      if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+      beginSegmentDrag(d, e)
+      return
+    }
+    if (d.kind === 'segMove') { moveSegment(d, e); return }
+    if (d.kind === 'box') {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+        d.moved = true
+      }
+      d.box = boxFrom(d.start, toWorld(e), e.shiftKey === true)
+      setDrawBox(d.box)
+      return
+    }
     if (d.kind === 'posePress') {
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
       if (p.pose?.onDown({ kind: 'part', shapeId: d.shapeId }, d.world, false)) { dragRef.current = { kind: 'pose' }; p.pose.onMove(toWorld(e)) } else dragRef.current = null
@@ -890,13 +926,22 @@ export function DesignerCanvas(p: CanvasProps) {
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
       d.moved = true
       p.onGesture()
+      // the hover of the point that was pressed is let go: the dragged point shows where it would connect instead (Z1)
+      if (d.kind === 'point') setHover(null)
     }
     const s = shapesById.get(d.shapeId)
-    if (!s) return
+    // (a point just added from a segment is there once the page has drawn the shape with it: until then the old shape would have another point at that place)
+    if (!s || (d.kind === 'point' && (!s.pts[d.index] || (d.count !== undefined && s.pts.length !== d.count)))) return
     let [wx, wy] = toWorld(e)
     // the shape editor (S5): a dragged point over a point or a segment of another shape is ready to connect there (and is not snapped meanwhile)
     const ready = d.kind === 'point' && p.connect ? dropTargetAt(content, solved, d.shapeId, wx, wy, CONNECT_REACH * u, weldTree(content, d.shapeId, d.index)) : null
     if (d.kind === 'point') showDrop(ready)
+    if (d.kind === 'point' && p.connect) {
+      // the shape under the dragged point shows its outline and points (Z1), and a point it comes close to takes the dragged point onto it
+      const over = ready?.shapeId ?? shapeUnder(wx, wy, d.shapeId)
+      setDragOver(o => (o === over ? o : over))
+      if (ready?.kind === 'point') { wx = ready.x; wy = ready.y }
+    }
     if ((d.kind === 'point' && !ready) || d.kind === 'handle') [wx, wy] = snapPoint(s, d.kind === 'point' ? d.index : -1, wx, wy)
     else if (d.kind === 'move' && !onGrid && d.box0) {
       const b = d.box0, [sx, sy] = d.world0
@@ -926,6 +971,17 @@ export function DesignerCanvas(p: CanvasProps) {
     setGuides(null)
     if (d && d.kind === 'pose') p.pose?.onUp()
     if (d && d.kind === 'posePress') p.onSelect({ kind: 'shape', id: d.shapeId })
+    setDragOver(null)
+    if (d && d.kind === 'segPress') {
+      // a click on a segment selects it (with its shape, when that was another)
+      if (d.other) p.onSelect({ kind: 'shape', id: d.shapeId })
+      p.onSelectSegment(d.e)
+    }
+    if (d && d.kind === 'box') {
+      setDrawBox(null)
+      if (d.moved && d.box && d.box.w >= 2 && d.box.h >= 2) p.onDrawBox?.(d.box)
+      else if (!d.moved && sel.kind !== 'none') p.onSelect(NONE)
+    }
     if (d && d.kind === 'point' && d.moved && dropRef.current && p.connect) p.connect.onConnect(d.shapeId, d.index, dropRef.current)
     showDrop(null)
     if (d && d.kind === 'pan' && !d.moved) {
@@ -934,7 +990,78 @@ export function DesignerCanvas(p: CanvasProps) {
     }
     if (d && d.kind === 'paint' && !d.moved && d.point >= 0) p.skin?.onStep(d.point, d.down ? -1 : 1)
   }
-  // A double-click on a segment adds a point there (on the segment of the shape the pointer is over, which the first click selected).
+  // The top shape under a place that a dragged point could connect to (not the dragged shape, a twin, a helper or a shape not drawn).
+  function shapeUnder(x: number, y: number, dragged: string): string | null {
+    for (let i = solved.order.length - 1; i >= 0; i--) {
+      const id = solved.order[i], r = solved.shapes[id], s = shapesById.get(id)
+      if (!r || !s || id === dragged || !r.visible || r.off || s.mirrorOf || s.helper || r.poly.length < 3) continue
+      if (x < r.box.x || x > r.box.x + r.box.w || y < r.box.y || y > r.box.y + r.box.h) continue
+      if (inPolygon(r.poly, x, y)) return id
+    }
+    return null
+  }
+  // The box drawn on the grid from where the drag began to the pointer (Shift: a square; on the grid's lines with Snap to grid).
+  function boxFrom(a: [number, number], b: [number, number], square: boolean): Box {
+    let [x0, y0] = a, [x1, y1] = b
+    if (onGrid) { x0 = snapTo(x0, unit); y0 = snapTo(y0, unit); x1 = snapTo(x1, unit); y1 = snapTo(y1, unit) }
+    if (square) {
+      const side = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))
+      x1 = x0 + Math.sign(x1 - x0 || 1) * side; y1 = y0 + Math.sign(y1 - y0 || 1) * side
+    }
+    return { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }
+  }
+  // A segment press that moved (Z1): a shared segment moves (its two points, and so both shapes); any other segment gets a new point where it was pressed, which the drag
+  // then moves (one undo step for both).
+  function beginSegmentDrag(d: Extract<Drag, { kind: 'segPress' }>, e: { clientX: number; clientY: number }) {
+    const s = shapesById.get(d.shapeId), r = solved.shapes[d.shapeId]
+    dragRef.current = null
+    if (!s || !r || s.mirrorOf || s.kind === 'pivot') return
+    if (d.other) p.onSelect({ kind: 'shape', id: s.id })
+    if (sharedSegment(content, s.id, d.e) || sharersOf(content, s.id, d.e).length > 0) {
+      const home = segmentHome(content, s.id, d.e), hs = shapesById.get(home.shapeId)
+      if (!hs || hs.pts.length < 2) return
+      const roots = [home.e, (home.e + 1) % hs.pts.length].flatMap(i => {
+        const rt = rootOf(content, home.shapeId, i), q = shapesById.get(rt.shapeId)?.pts[rt.i]
+        return q ? [{ shapeId: rt.shapeId, i: rt.i, x: q.x, y: q.y }] : []
+      })
+      // on a symmetric shape the segment moves along its line of symmetry (its first axis, as it is drawn now)
+      const holder = hs.sym ? hs : s.sym ? s : null, hm = holder ? solved.shapes[holder.id]?.matrix : undefined
+      let dir: [number, number] | null = null
+      if (holder?.sym && hm) {
+        const a = ((rotOf(holder) + holder.sym.a) * Math.PI) / 180, vx = hm[0] * Math.cos(a) + hm[2] * Math.sin(a), vy = hm[1] * Math.cos(a) + hm[3] * Math.sin(a), l = Math.hypot(vx, vy)
+        if (l > 1e-9) dir = [vx / l, vy / l]
+      }
+      p.onGesture()
+      const move: Extract<Drag, { kind: 'segMove' }> = { kind: 'segMove', roots, start: d.at, dir }
+      dragRef.current = move
+      moveSegment(move, e)
+      return
+    }
+    if (!d.other && !editable) return
+    const [lx, ly] = apply(inverse(r.matrix), d.at[0], d.at[1])
+    const added = addPoint(s, d.e, { mirror, axis })
+    if (added.index < 0) { p.onNote?.('A shape may have at most 60 points.'); return }
+    p.onEditShape(s.id, mirror ? added.shape : movePoint(added.shape, added.index, lx, ly), added.index)
+    dragRef.current = { kind: 'point', shapeId: s.id, index: added.index, x0: d.x0, y0: d.y0, moved: true, count: added.shape.pts.length }
+    setHover(null)
+    beginGuides([s.id])
+  }
+  function moveSegment(d: Extract<Drag, { kind: 'segMove' }>, e: { clientX: number; clientY: number }) {
+    const [wx, wy] = toWorld(e)
+    let dx = wx - d.start[0], dy = wy - d.start[1]
+    if (d.dir) { const k = dx * d.dir[0] + dy * d.dir[1]; dx = k * d.dir[0]; dy = k * d.dir[1] }
+    const next = new Map<string, ModelShape>()
+    for (const rt of d.roots) {
+      const s0 = next.get(rt.shapeId) ?? shapesById.get(rt.shapeId), m = solved.shapes[rt.shapeId]?.matrix
+      if (!s0) continue
+      // the move in that shape's own space
+      const inv = m ? inverse(m) : null, lx = inv ? inv[0] * dx + inv[2] * dy : dx, ly = inv ? inv[1] * dx + inv[3] * dy : dy
+      next.set(rt.shapeId, movePoint(s0, rt.i, rt.x + lx, rt.y + ly, { ...options, mirror: false }))
+    }
+    for (const [id, sh] of next) p.onShape(id, sh)
+  }
+  // A double-click on a segment adds a point there (on the segment of the shape the pointer is over, which the first click selected). In the shape editor it is only for a shared
+  // segment (a point shared by every shape on it); elsewhere a drag from the segment adds one.
   function onDouble(e: ReactMouseEvent) {
     e.stopPropagation()
     if (p.taper) { e.preventDefault(); p.taper.onFinish(); return }
@@ -945,6 +1072,7 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!s || !r || s.mirrorOf || (shape?.id === s.id && !editable)) return
     // a shared segment gets its point on the segment that is drawn and on every segment that shares it (shape editor S5)
     if (p.connect && (sharedSegment(content, s.id, h.e) || sharersOf(content, s.id, h.e).length)) { p.connect.onAddShared(s.id, h.e, h.x, h.y); return }
+    if (p.connect) return
     const [x, y] = apply(inverse(r.matrix), h.x, h.y)
     const added = addPoint(s, h.e, { mirror, axis })
     if (added.index < 0) { p.onNote?.('A shape may have at most 60 points.'); return }
@@ -1018,7 +1146,7 @@ export function DesignerCanvas(p: CanvasProps) {
   // the point the selected segment ends at (none past the last point of an open shape)
   const segEnd = part === 'segment' && shape && (shape.closed || selPoint < built.length - 1) ? built[(selPoint + 1) % built.length] : undefined
   const nudgeHint = p.taper ? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : part === 'shape' ? 'Arrow keys move the shape' : part === 'segment' ? 'Arrow keys move the segment' : 'Arrow keys move the point; Delete removes it'
-  const hoverShapeId = hover ? (hover.kind === 'edge' ? hover.shapeId : shape?.id ?? null) : null
+  const hoverShapeId = dragOver ?? (hover ? (hover.kind === 'edge' || hover.kind === 'point' ? hover.shapeId : shape?.id ?? null) : null)
   const hoveredPoint = hover?.kind === 'point' && hover.shapeId === shape?.id ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
   const selectedPointsDrawn = shown.has('points') && overlay && !p.rigid
@@ -1264,21 +1392,23 @@ export function DesignerCanvas(p: CanvasProps) {
   // What shows only while the pointer is over an outline, a point or a crossing: the outline widens, its points appear small, the point under the pointer is larger, a large
   // handle sits on the outline where a click would add a point, and a crossing shows the stage of its lock. It is drawn over every layer and takes no clicks of its own.
   function hoverLayer(): ReactNode {
-    if (!hover || !hoverShapeId) return null
+    if (!hoverShapeId || (!hover && !dragOver)) return null
     const hs = solved.shapes[hoverShapeId], hShape = shapesById.get(hoverShapeId)
     if (!hs || !hShape) return null
     const own = !!shape && hoverShapeId === shape.id
-    const pts = own ? built : build(hs.local, hShape.closed, hs.matrix)
+    const pts = own && !dragOver ? built : build(hs.local, hShape.closed, hs.matrix)
+    // the point a dragged point would land on, else the point hovered
+    const lit = (i: number) => (dragOver ? drop?.kind === 'point' && drop.shapeId === hoverShapeId && drop.i === i : hover?.kind === 'point' && hover.i === i)
     return (
       <g className="cmHover" aria-hidden="true">
         <path d={hs.d} className="cmHoverOutline" data-hover={hoverShapeId} />
-        {!(own && selectedPointsDrawn) && pts.map((b, i) => <circle key={i} cx={b.x} cy={b.y} r={(hover.kind === 'point' && hover.i === i ? 5.5 : 3) * u} className={`cmHoverPoint${hover.kind === 'point' && hover.i === i ? ' cmHoverPoint--on' : ''}`} />)}
-        {hover.kind === 'edge' && (() => {
+        {(dragOver || !(own && selectedPointsDrawn)) && pts.map((b, i) => <circle key={i} cx={b.x} cy={b.y} r={(lit(i) ? 5.5 : 3) * u} className={`cmHoverPoint${lit(i) ? ' cmHoverPoint--on' : ''}`} data-hover-point={dragOver ? i : undefined} />)}
+        {!hover || dragOver ? null : hover.kind === 'edge' && (() => {
           const a = pts[hover.e], b = pts[(hover.e + 1) % pts.length]
           return a && b ? <path d={segmentPath(a, b)} className="cmSeg cmSeg--hover" data-hover-segment={hover.e} /> : null
         })()}
-        {hover.kind === 'edge' && <circle cx={hover.x} cy={hover.y} r={(own ? 6 : 4.5) * u} className={`cmEdgeHandle${own ? '' : ' cmEdgeHandle--soft'}`} data-edge-handle={hoverShapeId} />}
-        {hover.kind === 'cross' && (() => {
+        {!dragOver && hover?.kind === 'edge' && <circle cx={hover.x} cy={hover.y} r={(own ? 6 : 4.5) * u} className={`cmEdgeHandle${own ? '' : ' cmEdgeHandle--soft'}`} data-edge-handle={hoverShapeId} />}
+        {!dragOver && hover?.kind === 'cross' && (() => {
           const stage = p.lock?.stageOf(hover.crossing) ?? 0
           return (
             <g className={`cmCross cmCross--${stage}`} data-cross={stage}>
@@ -1307,6 +1437,7 @@ export function DesignerCanvas(p: CanvasProps) {
           <circle cx={g.x} cy={g.y} r={4.5 * u} className="cmPickGroupDot" />
         </g>
       ))}
+      {drawBox && <rect x={drawBox.x} y={drawBox.y} width={drawBox.w} height={drawBox.h} className="cmDrawBox" data-draw-box="" aria-hidden="true" />}
       {(p.poseMarks ?? []).map(m => (p.pose?.light ? (
         <circle key={m.id} cx={m.x} cy={m.y} r={5 * u} className="cmPoseMark cmPoseMark--live" data-pose-mark={m.id} role="button" tabIndex={-1} aria-label={`Pose with ${m.name || 'the posable point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'mark', shapeId: m.shapeId, markId: m.markId })} />
       ) : p.layers.includes('pivots') ? (

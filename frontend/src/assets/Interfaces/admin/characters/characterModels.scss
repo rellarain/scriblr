@@ -499,6 +499,10 @@
 .cmHoverPoint { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; &--on { fill: var(--accent); } }
 .cmEdgeHandle { fill: var(--accent); stroke: var(--surface-raised); stroke-width: 2; vector-effect: non-scaling-stroke; &--soft { fill: var(--surface-raised); stroke: var(--accent); } }
 .cmPoint--hover { fill: var(--accent); }
+// a dragged point over a point or segment it would connect to is the alert colour, whatever else it is (hovered, selected, linked), inside the ink ring (Z1)
+.cmPoint.cmPoint--connect { fill: var(--alert); stroke: var(--ink); stroke-width: 2; }
+// the box a drag on the empty grid draws (Z1): a dashed outline in the ink over a faint wash of the accent
+.cmDrawBox { fill: var(--accent); fill-opacity: 0.12; stroke: var(--ink); stroke-width: 1.25; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCrossRing { fill: color-mix(in srgb, var(--surface-raised) 70%, transparent); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .cmCrossDot { fill: var(--accent); }
 .cmCross--1 .cmCrossRing { stroke-width: 3; }

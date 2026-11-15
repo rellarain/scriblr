@@ -1224,12 +1224,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const id = freshId(base, 'o', makeId)
     return { content: addObject(base, groupId, { id, name: `Object ${base.objects.length + 1}`, layer, shapes: [] }), objectId: id }
   }
-  function addShapeTo(objectId: string, templateId: string, c: ModelContent, from?: { kind: FormKind; at: [number, number] }) {
+  function addShapeTo(objectId: string, templateId: string, c: ModelContent, from?: { kind: FormKind; at: [number, number]; box?: Box }) {
     const obj = objectById(c, objectId)
     if (obj && obj.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
     const id = freshId(c, 's', makeId)
     const at = from?.at ?? [100, 100], kind = from?.kind ?? 'base'
-    const made = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, templateBox(templateId, at[0], at[1]))
+    const made = newShape(id, templateById(templateId)?.name ?? 'Shape', templateId, from?.box ?? templateBox(templateId, at[0], at[1]))
     // the shape editor's shapes start with a thin outline (S3); a shadow or a light has none, and starts see-through (T1)
     const shape = !shapesOnly ? made : kind === 'shadow' || kind === 'light' ? { ...made, name: KIND_NAMES[kind], kind, op: CAST_OPACITY[kind], outline: null } : { ...made, kind, outline: LIMITS.outlineNew }
     if (commit(addShape(c, objectId, shape), true)) choose({ kind: 'shape', id })
@@ -1369,6 +1369,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (into) { addShapeTo(into, t, content, from); return }
     const r = addObjectOn('body')
     addShapeTo(r.objectId, t, r.content, from)
+  }
+  // A box dragged out on the empty grid (Z1): a rectangle there (a square when Shift kept it square), into the selected object, else into a new object.
+  function drawRectangle(box: Box) {
+    const into = contextObject(content, sel), from = { kind: 'base' as FormKind, at: [box.x + box.w / 2, box.y + box.h / 2] as [number, number], box }
+    const template = Math.abs(box.w - box.h) < 1e-6 ? 'square' : 'rectangle'
+    if (into) { addShapeTo(into, template, content, from); return }
+    const r = addObjectOn('body')
+    addShapeTo(r.objectId, template, r.content, from)
   }
   // The canvas's "new shape" button: into the selected object, else into a new object (and group) on the Body layer.
   function newShapeFromCanvas(templateId: string) {
@@ -1752,6 +1760,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
             onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
             rigid={!!selPivot} pivotPoints={pivotPoints} anchorMarks={anchorMarks} poseMarks={poseMarks} sliders={sliderMarks} onStop={shapesOnly ? moveStop : undefined}
+            onDrawBox={shapesOnly && !recording ? drawRectangle : undefined}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
