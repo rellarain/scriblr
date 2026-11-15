@@ -12,6 +12,7 @@ import { chapterDatesOf, type ChapterMeta } from '../chapterDates'
 import EdgeTabs from '../EdgeTabs'
 import HueSlider from '../HueSlider'
 import HelpArticles from '../levels/HelpArticles'
+import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { PublishControl } from '../PublishControl'
 import { Placeholder } from '../shared'
 import SplitArea from '../SplitArea'
@@ -56,7 +57,6 @@ const DRAFT_LAYOUT: SplitNode = {
   b: { dir: 'col', ratio: 0.18, a: { id: 'points' }, b: { dir: 'row', ratio: 0.62, a: { id: 'draft' }, b: { dir: 'col', ratio: 0.5, a: { id: 'settings' }, b: { id: 'help' } } } },
 }
 
-const DRAFT_HELP_NAMES = ['draft', 'chapter']
 const DRAFT_HELP_FALLBACK = 'The Draft level is the open chapter as an open book: write each moment in its card, and switch to Preview to read the chapter as it will be published.'
 
 // Settings and Help, the last two console tabs of the Draft level: icons in the chapter tile's tools that turn the Settings tile and the Help tile
@@ -170,7 +170,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                   id: 'help', title: 'Help', Icon: HelpIcon, railless: true, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
                   children: (
                     <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Draft help">
-                      <HelpArticles names={DRAFT_HELP_NAMES} fallback={DRAFT_HELP_FALLBACK} />
+                      <HelpArticles target={HELP_TARGETS.writerDraft} fallback={DRAFT_HELP_FALLBACK} />
                     </div>
                   ),
                 },

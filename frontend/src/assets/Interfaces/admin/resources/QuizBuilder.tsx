@@ -53,9 +53,6 @@ function QuizBuilder({ resources, selectedId, onSelectNode }: {
     <div className="resSplit">
       <ResourceTree
         childrenOf={resources.childrenOf} selectedId={selectedId} onSelect={onSelectNode}
-        onAddChild={(parentId, kind) => { void resources.addNode(parentId, kind).then(id => { if (id) onSelectNode(id) }) }}
-        onRename={(id, name) => { void resources.renameNode(id, name) }}
-        onDelete={id => { void resources.deleteNode(id) }}
       />
       <div className="resPane">
         {!node ? (

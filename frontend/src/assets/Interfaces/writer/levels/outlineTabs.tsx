@@ -8,9 +8,9 @@ import { nodeLabel } from '../plotTree'
 import { Placeholder } from '../shared'
 import { useWordCounts } from '../useWordCounts'
 import HelpArticles from './HelpArticles'
+import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
-export const OUTLINE_HELP_NAMES = ['outline', 'book']
 export const OUTLINE_HELP_FALLBACK = 'The Outline level is the open book: its arcs and chapters to move around in, the open chapter’s acts, scenes and moments as cards, the book’s draft stats and its own settings. Plotpoints still to place are in the Project’s Plot tab, in its Plotpoints tile: drag one onto a card.'
 
 const kv = (k: string, v: React.ReactNode) => (
@@ -83,7 +83,7 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'details', label: 'Book details', Icon: InfoIcon, render: () => <BookDetails w={w} /> },
     { id: 'publish', label: 'Publish', Icon: ExportIcon, render: () => <BookPublish w={w} /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, render: () => <SettingsPane w={w} /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.writerBook} fallback={OUTLINE_HELP_FALLBACK} /> },
   ]
 }
 

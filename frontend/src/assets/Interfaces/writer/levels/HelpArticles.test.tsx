@@ -17,18 +17,25 @@ const FILE = file(
   },
 )
 
+const t = (id: string, aliases: string[] = []) => ({ id, aliases })
+
 describe('articlesFor', () => {
-  it("takes the nodes with the level's name and everything under them, skipping empty ones", () => {
-    expect(articlesFor(FILE, ['dashboard']).map(a => a.node.id)).toEqual(['d', 's'])
-    expect(articlesFor(FILE, ['DASH', ' Project ']).map(a => a.node.id)).toEqual(['p'])
-    expect(articlesFor(FILE, ['nothing'])).toEqual([])
+  it("takes the Help tile's own node and everything under it, skipping empty ones", () => {
+    expect(articlesFor(FILE, t('d')).map(a => a.node.id)).toEqual(['d', 's'])
+    expect(articlesFor(FILE, t('w')).map(a => a.node.id)).toEqual(['d', 's', 'p'])
+    expect(articlesFor(FILE, t('nothing'))).toEqual([])
+  })
+
+  it('also takes the nodes named by its older aliases, once each', () => {
+    expect(articlesFor(FILE, t('gone', ['DASH', ' Project '])).map(a => a.node.id)).toEqual(['p'])
+    expect(articlesFor(FILE, t('d', ['dashboard', 'project'])).map(a => a.node.id)).toEqual(['d', 's', 'p'])
   })
 })
 
 describe('HelpArticles', () => {
   it('shows the written articles', async () => {
     vi.spyOn(resourcesApi, 'getResources').mockResolvedValue(FILE)
-    render(<HelpArticles names={['dashboard']} fallback="Default help." />)
+    render(<HelpArticles target={t('d')} fallback="Default help." />)
     expect(await screen.findByText('The dashboard guide.')).toBeTruthy()
     expect(screen.getByText('Where do notes go?')).toBeTruthy()
     expect(screen.queryByText('Default help.')).toBeNull()
@@ -36,11 +43,11 @@ describe('HelpArticles', () => {
 
   it('falls back to the default text when nothing is written, or the articles cannot load', async () => {
     vi.spyOn(resourcesApi, 'getResources').mockResolvedValue(file([], {}))
-    const first = render(<HelpArticles names={['dashboard']} fallback="Default help." />)
+    const first = render(<HelpArticles target={t('d')} fallback="Default help." />)
     expect(await screen.findByText('Default help.')).toBeTruthy()
     first.unmount()
     vi.spyOn(resourcesApi, 'getResources').mockRejectedValue(new Error('offline'))
-    render(<HelpArticles names={['dashboard']} fallback="Default help." />)
+    render(<HelpArticles target={t('d')} fallback="Default help." />)
     expect(await screen.findByText('Default help.')).toBeTruthy()
   })
 })

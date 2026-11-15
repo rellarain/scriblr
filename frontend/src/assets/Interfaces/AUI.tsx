@@ -2,7 +2,7 @@ import RoleAssignment from './admin/RoleAssignment'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -15,6 +15,8 @@ const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsol
 // The plot presets page, loaded when Configuration > Plot is opened.
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
 const MapsConfigConsole = lazy(() => import('./admin/maps/MapsConfigConsole'))
+// The channel list's editor, loaded when Configuration > Channels is opened.
+const ChannelsConsole = lazy(() => import('./admin/channels/ChannelsConsole'))
 // The Designer (the character models and the canvas they are drawn on), loaded when its console is opened.
 const DesignerConsole = lazy(() => import('./admin/characters/DesignerConsole'))
 // The limits for the models writers design for themselves, loaded when Configuration > Writers' designer is opened.
@@ -40,7 +42,7 @@ type AuiSubSectionKey =
   | 'allotment' | 'assignment' | 'teamSchedule'
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
-  | 'configOverview' | 'configPlot' | 'configMaps' | 'configWriterDesigner' | 'configHelp'
+  | 'configOverview' | 'configPlot' | 'configMaps' | 'configChannels' | 'configWriterDesigner' | 'configHelp'
   | 'designerWork' | 'designerHelp'
 
 interface AuiSubSection {
@@ -151,6 +153,8 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Set up the plot presets the Writer offers: ready-made categories with their description, keywords, fields, subcategories and clusters.' },
       { key: 'configMaps', label: 'Maps', Icon: MapIcon,
         body: 'Set the biomes every project draws its maps with: their colours, names, groups and the map levels they are offered on.' },
+      { key: 'configChannels', label: 'Channels', Icon: TreeIcon,
+        body: 'The interfaces, consoles, components and features that feedback, plans, chats and guides point at.' },
       // the writers' own designer is off the screen for now (designerFeatures.ts)
       ...(WRITER_DESIGNER ? [{ key: 'configWriterDesigner' as const, label: "Writers' designer", Icon: MannequinIcon,
         body: "Set how big the models a writer designs for themselves may be: points in a shape, shapes in an object, objects in a group, the totals in a model, the size of a character's copy and the models in a writer's library." }] : []),
@@ -199,6 +203,7 @@ function AUI() {
       children: page.key === 'assignment' ? <RoleAssignment />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
         : page.key === 'configMaps' ? <Suspense fallback={null}><MapsConfigConsole /></Suspense>
+        : page.key === 'configChannels' ? <Suspense fallback={null}><ChannelsConsole /></Suspense>
         : page.key === 'configWriterDesigner' ? <Suspense fallback={null}><WriterLimitsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),

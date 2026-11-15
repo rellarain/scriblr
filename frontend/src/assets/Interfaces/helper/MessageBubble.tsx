@@ -1,5 +1,6 @@
 import type { HelperMessage } from './helperTypes'
-import { channelTagLabel } from './inbox/inboxHelpers'
+import { useChannels } from '../../../channels/channelStore'
+import { labelOf } from '../../../channels/channelTree'
 
 interface MessageBubbleProps {
   message: HelperMessage
@@ -12,6 +13,7 @@ function formatTimestamp(iso: string): string {
 }
 
 function MessageBubble({ message, senderName }: MessageBubbleProps) {
+  const { index } = useChannels()
   const bubbleClass = message.sender === 'admin'
     ? 'helperMessageBubble helperMessageBubble--admin'
     : 'helperMessageBubble helperMessageBubble--user'
@@ -45,7 +47,7 @@ function MessageBubble({ message, senderName }: MessageBubbleProps) {
         <>
           {message.text && <p className="feedbackCardText">{message.text}</p>}
           <span className="helperMessagePageLink channelPill">
-            {message.pageLink.label ?? channelTagLabel(message.pageLink.target)} →
+            {message.pageLink.label ?? labelOf(index, message.pageLink.channelId)} →
           </span>
         </>
       )}

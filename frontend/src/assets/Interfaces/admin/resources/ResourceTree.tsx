@@ -7,18 +7,19 @@ const KIND_LABEL: Record<ResourceNodeKind, string> = {
   interface: 'Interface', console: 'Console', component: 'Component', feature: 'Feature',
 }
 
-// The Interface > Console > Component > Feature structural nav, shared by
+// The Interface > Console > Component > Feature structural nav (the channel list), shared by
 // the Article Builder and the Quiz/Test/Exam Builder (they read the same
 // tree, just show different content for whichever node is selected). A
 // node's own expand/collapse caret sits at the row's right edge, after its
-// label -- not before it.
+// label -- not before it. The list is edited in Configuration > Channels;
+// without the edit handlers the tree only selects.
 function ResourceTree({ childrenOf, selectedId, onSelect, onAddChild, onRename, onDelete }: {
   childrenOf: (parentId: string | null) => ResourceNode[]
   selectedId: string | null
   onSelect: (id: string) => void
-  onAddChild: (parentId: string | null, kind: ResourceNodeKind) => void
-  onRename: (id: string, name: string) => void
-  onDelete: (id: string) => void
+  onAddChild?: (parentId: string | null, kind: ResourceNodeKind) => void
+  onRename?: (id: string, name: string) => void
+  onDelete?: (id: string) => void
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
@@ -45,12 +46,18 @@ function ResourceTree({ childrenOf, selectedId, onSelect, onAddChild, onRename, 
           style={{ paddingLeft: 8 + depth * 16 }}
           onClick={() => onSelect(node.id)}
         >
-          <input
-            type="text" className="resTreeLabel" value={node.name} placeholder={`Untitled ${KIND_LABEL[node.kind].toLowerCase()}`}
-            onClick={e => e.stopPropagation()}
-            onChange={e => onRename(node.id, e.target.value)}
-          />
-          {confirmingDeleteId === node.id ? (
+          {onRename ? (
+            <input
+              type="text" className="resTreeLabel" value={node.name} placeholder={`Untitled ${KIND_LABEL[node.kind].toLowerCase()}`}
+              onClick={e => e.stopPropagation()}
+              onChange={e => onRename(node.id, e.target.value)}
+            />
+          ) : (
+            <button type="button" className="resTreeLabel resTreeLabel--select" aria-pressed={selected}>
+              {node.name || `Untitled ${KIND_LABEL[node.kind].toLowerCase()}`}
+            </button>
+          )}
+          {!onDelete ? null : confirmingDeleteId === node.id ? (
             <span className="resTreeConfirm" onClick={e => e.stopPropagation()}>
               <button type="button" className="toneBtn" onClick={() => { onDelete(node.id); setConfirmingDeleteId(null) }}>Confirm</button>
               <button type="button" className="toneBtn" onClick={() => setConfirmingDeleteId(null)}>Cancel</button>
@@ -63,7 +70,7 @@ function ResourceTree({ childrenOf, selectedId, onSelect, onAddChild, onRename, 
               <TrashIcon size={13} />
             </button>
           )}
-          {childKind && (
+          {childKind && onAddChild && (
             <button
               type="button" className="resTreeIconBtn" aria-label={`Add ${KIND_LABEL[childKind]} under ${node.name || KIND_LABEL[node.kind]}`}
               onClick={e => { e.stopPropagation(); if (collapsed.has(node.id)) toggle(node.id); onAddChild(node.id, childKind) }}
@@ -88,9 +95,11 @@ function ResourceTree({ childrenOf, selectedId, onSelect, onAddChild, onRename, 
     <div className="resTree" role="tree" aria-label="Interface, Console, Component, Feature">
       <div className="resTreeHeading">Interface &gt; Console &gt; Component &gt; Feature</div>
       {childrenOf(null).map(node => renderNode(node, 0))}
-      <button type="button" className="resTreeAddRoot" onClick={() => onAddChild(null, 'interface')}>
-        <PlusIcon size={13} /> Add interface
-      </button>
+      {onAddChild && (
+        <button type="button" className="resTreeAddRoot" onClick={() => onAddChild(null, 'interface')}>
+          <PlusIcon size={13} /> Add interface
+        </button>
+      )}
     </div>
   )
 }

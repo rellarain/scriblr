@@ -32,7 +32,7 @@ export const SEED_MESSAGES: HelperMessage[] = [
     text: 'Sorry about that — can you tell me roughly how large a paste triggers it?' },
   { id: 'msg-3', chatId: 'chat-1', sender: 'admin', sentAt: '2026-08-19T14:12:00', kind: 'pageLink',
     text: 'In case it helps, here is where autosave settings live:',
-    pageLink: { target: { page: 'Writer', component: 'Editor', feature: 'Autosave' } } },
+    pageLink: { channelId: 'writer/draft/draft' } },
   { id: 'msg-4', chatId: 'chat-1', sender: 'admin', sentAt: '2026-08-19T14:15:00', kind: 'form',
     text: 'Could you fill this out so we can reproduce it on our end?',
     form: { title: 'Editor freeze report', sent: true, fields: [
@@ -45,7 +45,7 @@ export const SEED_MESSAGES: HelperMessage[] = [
     text: "I can't find where to change my shelf order." },
   { id: 'msg-6', chatId: 'chat-2', sender: 'admin', sentAt: '2026-08-18T09:05:00', kind: 'pageLink',
     text: 'Shelf ordering lives here:',
-    pageLink: { target: { page: 'Writer', component: 'Sidebar', feature: 'Shelves' } } },
+    pageLink: { channelId: 'writer/dashboard' } },
   { id: 'msg-7', chatId: 'chat-2', sender: 'user', sentAt: '2026-08-18T09:07:00', kind: 'text',
     text: 'Found it, thank you!' },
   // chat-3
@@ -60,5 +60,5 @@ export const SEED_MESSAGES: HelperMessage[] = [
     ] } },
   { id: 'msg-10', chatId: 'chat-3', sender: 'admin', sentAt: '2026-08-20T08:42:00', kind: 'pageLink',
     text: 'Also flagging this for your reference:',
-    pageLink: { target: { page: 'Reader', component: 'Library', feature: 'Search' }, label: 'Library search' } },
+    pageLink: { channelId: 'reader/library/catalog', label: 'Library search' } },
 ]

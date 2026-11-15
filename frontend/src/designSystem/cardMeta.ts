@@ -49,6 +49,10 @@ export const CARD_META: CardMeta[] = [
     summary: 'Admin > Configuration > Maps, in two tabs: the biomes every project draws its maps with (colour, name, group and levels) and the default shapes its Shapes panel offers (added from My shapes; name, kind, levels and order), each saved as a draft and published as a whole.',
   },
   {
+    id: 'channels', dir: 'Channels', title: 'Channels: the channel list', group: 'Feedback', height: 640,
+    summary: "Admin > Configuration > Channels: the app's one interface > console > component > feature list that feedback, plans, chats, queues and the Help guides point at; rename, add, drag into order and delete, a node in use refused with the reason.",
+  },
+  {
     id: 'character-models', dir: 'CharacterModels', title: 'Character models: the designer', group: 'Outline', height: 900,
     summary: 'The Designer console, where the shapes characters are drawn from are designed: the list of models, a tree of groups, objects and shapes, a canvas with draggable points and curve handles, an inspector, previews at random sizes and the checks, with draft and publish like the Plot presets; and the Configuration page that sets the limits for the models writers design for themselves.',
   },

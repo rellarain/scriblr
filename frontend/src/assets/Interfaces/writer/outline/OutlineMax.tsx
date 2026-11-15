@@ -4,7 +4,8 @@ import { Placeholder } from '../shared'
 import { useWordCounts } from '../useWordCounts'
 import EdgeTabs from '../EdgeTabs'
 import HelpArticles from '../levels/HelpArticles'
-import { OUTLINE_HELP_FALLBACK, OUTLINE_HELP_NAMES, useOutlineTabs } from '../levels/outlineTabs'
+import { HELP_TARGETS } from '../../../../channels/helpTargets'
+import { OUTLINE_HELP_FALLBACK, useOutlineTabs } from '../levels/outlineTabs'
 import BookEditor from './BookEditor'
 import BookPublish from './BookPublish'
 import BookSettings from './BookSettings'
@@ -71,7 +72,7 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
           <div className="wrCoverColumn">
             {tabs.isOpen('settings') && <BookSettings w={w} book={book} bookWords={counts.books[book.id] ?? 0} compact />}
             {tabs.isOpen('publish') && <BookPublish w={w} />}
-            {tabs.isOpen('help') && <div className="wrBookEdHelp"><HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} /></div>}
+            {tabs.isOpen('help') && <div className="wrBookEdHelp"><HelpArticles target={HELP_TARGETS.writerBook} fallback={OUTLINE_HELP_FALLBACK} /></div>}
             {tabs.isOpen('details') && <DraftStats book={book} chapters={chapters} nodeWords={counts.nodes} settings={w.activeProject?.settings} />}
             <OutlineNav
               w={w} book={book} counts={counts} focus={focus} plotDrag={plotDrag} onAdded={showWholeBook}

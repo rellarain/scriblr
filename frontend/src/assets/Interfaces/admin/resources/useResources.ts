@@ -40,8 +40,7 @@ function errMessage(err: unknown, fallback: string): string {
 // Exam/Test/Quiz.
 //
 // Content/assessment edits apply to local state immediately (optimistic),
-// then persist in the background -- mirroring useAuiConfig.ts's commit()
-// pattern. Waiting for the server's response before updating local state
+// then persist in the background. Waiting for the server's response before updating local state
 // (as every mutator originally did) loses data: two edits fired close
 // together -- typing a question's prompt, then one of its options, well
 // within a network round-trip -- would each compute their next value from

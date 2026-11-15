@@ -21,6 +21,7 @@ import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
 import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
 import MapsConfigConsole from '../assets/Interfaces/admin/maps/MapsConfigConsole'
+import ChannelsConsole from '../assets/Interfaces/admin/channels/ChannelsConsole'
 import DesignerConsole from '../assets/Interfaces/admin/characters/DesignerConsole'
 import WriterLimitsConsole from '../assets/Interfaces/admin/characters/WriterLimitsConsole'
 import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
@@ -276,6 +277,17 @@ function InstructorCard() {
 
 // The Maps console as it sits in the Project level's Maps tab (on the tab's surface), against the pretend Maps API.
 // Admin > Configuration > Maps as it sits in the admin panel (in the admin accent): the Biomes and Shapes tabs, against the pretend biomes and shapes APIs.
+// Admin > Configuration > Channels as it sits in the admin panel (in the admin accent), against the pretend channel list.
+function ChannelsCard() {
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'hidden', boxSizing: 'border-box', padding: 14 }}>
+        <ChannelsConsole />
+      </div>
+    </div>
+  )
+}
+
 function MapBiomesCard() {
   return (
     <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
@@ -427,6 +439,7 @@ export const CARDS: CardDef[] = [
   card('characters', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <CharactersCard /> }),
   card('items', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ItemsCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),
+  card('channels', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ChannelsCard /> }),
   card('map-biomes', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapBiomesCard /> }),
   card('shelf', { defaults: { zones: ['day', 'night'] }, render: () => <ShelfCard /> }),
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),

@@ -8,9 +8,9 @@ import ProjectConsole from '../plan/ProjectConsole'
 import ScheduleConsole from '../schedule/ScheduleConsole'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpArticles from './HelpArticles'
+import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
-export const DASH_HELP_NAMES = ['dashboard', 'dash', 'shelves']
 const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, the agenda, the backlog and analytics), the project (its phases, goals and work, and the template) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
 
 export function dashTabs(w: WriterWorkspace): LevelTab[] {
@@ -33,7 +33,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
       },
     },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={DASH_HELP_NAMES} fallback={DASH_HELP_FALLBACK} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.writerDashboard} fallback={DASH_HELP_FALLBACK} /> },
   ]
 }
 

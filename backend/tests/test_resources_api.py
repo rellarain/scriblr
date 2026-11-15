@@ -14,22 +14,91 @@ def _find(nodes: list[dict], kind: str, name: str) -> dict:
     raise AssertionError(f"no {kind} node named {name!r} among {[ (n['kind'], n['name']) for n in nodes ]}")
 
 
-def test_get_seeds_the_tree_from_the_feedback_taxonomy(client: TestClient) -> None:
+def _add(client: TestClient, parent_id: str | None, kind: str, name: str) -> dict:
+    resp = client.post("/api/resources/nodes", json={"parentId": parent_id, "kind": kind, "name": name})
+    assert resp.status_code == 200, resp.text
+    return _find(resp.json()["nodes"], kind, name)
+
+
+def _plotlines(client: TestClient) -> dict:
+    """A feature (admins add the features): Writer > Project > Plot > Plotlines."""
+    return _add(client, "writer/project/plot", "feature", "Plotlines")
+
+
+def test_get_seeds_the_tree_from_the_app_screens(client: TestClient) -> None:
     body = _tree(client)
     assert body["schemaVersion"] == 1
     assert body["content"] == {}
     assert body["assessments"] == {}
     kinds = {n["kind"] for n in body["nodes"]}
-    assert kinds == {"interface", "console", "component", "feature"}
-    # Writer > Shelf > Project Plot > Plotlines is real taxonomy from feedback.py.
-    writer = _find(body["nodes"], "interface", "Writer")
-    shelf = _find(body["nodes"], "console", "Shelf")
-    assert shelf["parentId"] == writer["id"]
-    plot = _find(body["nodes"], "component", "Project Plot")
-    assert plot["parentId"] == shelf["id"]
-    plotlines = _find(body["nodes"], "feature", "Plotlines")
-    assert plotlines["parentId"] == plot["id"]
+    assert kinds == {"interface", "console", "component"}  # features are the admins' own
+    by_id = {n["id"]: n for n in body["nodes"]}
+    assert by_id["writer"]["name"] == "Writer"
+    assert by_id["writer/draft"]["parentId"] == "writer"
+    assert by_id["writer/draft/draft"]["kind"] == "component"
+    assert by_id["admin/office/voting"]["name"] == "Voting"
+    assert by_id["admin/office/hire-term-admin"]["name"] == "Hire/Term Admin"
+    interfaces = sorted((n for n in body["nodes"] if n["parentId"] is None), key=lambda n: n["order"])
+    assert [n["name"] for n in interfaces] == ["Writer", "Reader", "Training", "User", "Helper", "Admin"]
     assert client.get("/api/resources").json() == body  # stable across reloads
+
+
+def test_the_channel_route_gives_the_tree_alone(client: TestClient) -> None:
+    body = client.get("/api/channels").json()
+    assert set(body) == {"nodes"}
+    assert {n["id"] for n in body["nodes"]} == {n["id"] for n in _tree(client)["nodes"]}
+
+
+def test_a_node_goes_only_under_the_kind_one_level_up(client: TestClient) -> None:
+    assert client.post("/api/resources/nodes", json={"parentId": None, "kind": "feature", "name": "X"}).status_code == 400
+    assert client.post("/api/resources/nodes", json={"parentId": "writer", "kind": "component", "name": "X"}).status_code == 400
+    assert client.post("/api/resources/nodes", json={"parentId": "writer/draft/draft", "kind": "console", "name": "X"}).status_code == 400
+    assert _add(client, "writer/draft/draft", "feature", "Autosave")["parentId"] == "writer/draft/draft"
+
+
+def test_screens_of_a_newer_version_are_merged_in_once(client: TestClient, app_data_root: Path) -> None:
+    """A tree written before the app's screens were merged keeps its own nodes and names, gains the missing
+    screens after its own siblings, and a screen branch whose parent an admin deleted is not brought back."""
+    import json
+
+    old = {
+        "schemaVersion": 1,
+        "nodes": [
+            {"id": "writer", "kind": "interface", "parentId": None, "order": 0, "name": "Writing"},
+            {"id": "writer/shelf", "kind": "console", "parentId": "writer", "order": 0, "name": "Shelf"},
+            {"id": "writer/shelf/plot", "kind": "component", "parentId": "writer/shelf", "order": 0, "name": "Plot"},
+        ],
+        "content": {"writer/shelf/plot": {"guide": "kept", "tutorials": [], "faq": []}},
+        "assessments": {},
+    }
+    (app_data_root / "resources.json").write_text(json.dumps(old), encoding="utf-8")
+    body = _tree(client)
+    by_id = {n["id"]: n for n in body["nodes"]}
+    assert by_id["writer"]["name"] == "Writing"  # an admin's rename survives
+    assert by_id["writer/shelf/plot"]["name"] == "Plot"
+    assert body["content"]["writer/shelf/plot"]["guide"] == "kept"
+    assert by_id["writer/dashboard"]["order"] > by_id["writer/shelf"]["order"]  # after the siblings already there
+    assert "admin/office/voting" in by_id
+    assert body["screensVersion"] >= 1
+    # Deleting a screen branch is not undone by the next load.
+    assert client.delete("/api/resources/nodes/admin/office").status_code == 200
+    assert not any(n["id"].startswith("admin/office") for n in _tree(client)["nodes"])
+
+
+def test_a_node_something_points_at_cannot_be_deleted(client: TestClient) -> None:
+    from app.storage import channels
+
+    def check(root: Path, ids: set[str]) -> list[str]:
+        return ["1 test item"] if "writer/draft/draft" in ids else []
+
+    channels.register_use_check(check)
+    try:
+        resp = client.delete("/api/resources/nodes/writer/draft")
+        assert resp.status_code == 409
+        assert "1 test item" in resp.json()["detail"]
+        assert client.delete("/api/resources/nodes/writer/dashboard").status_code == 200
+    finally:
+        channels._use_checks.remove(check)
 
 
 def test_add_rename_reorder_delete_node(client: TestClient) -> None:
@@ -58,9 +127,8 @@ def test_add_rename_reorder_delete_node(client: TestClient) -> None:
 
 
 def test_delete_cascades_to_descendants_and_their_content(client: TestClient) -> None:
-    tree = _tree(client)
-    plot = _find(tree["nodes"], "component", "Project Plot")
-    plotlines = _find(tree["nodes"], "feature", "Plotlines")
+    plotlines = _plotlines(client)
+    plot = {"id": "writer/project/plot"}
 
     client.put(f"/api/resources/nodes/{plotlines['id']}/guide", json={"guide": "# Plotlines"})
     assert _tree(client)["content"][plotlines["id"]]["guide"] == "# Plotlines"
@@ -74,7 +142,7 @@ def test_delete_cascades_to_descendants_and_their_content(client: TestClient) ->
 
 
 def test_guide_tutorials_and_faq_round_trip(client: TestClient) -> None:
-    node = _find(_tree(client)["nodes"], "feature", "Plotlines")
+    node = _plotlines(client)
 
     resp = client.put(f"/api/resources/nodes/{node['id']}/guide", json={"guide": "# Plotlines\n\nGroups plot points."})
     assert resp.status_code == 200
@@ -96,7 +164,7 @@ def test_assessment_only_allowed_on_console_component_or_feature(client: TestCli
     resp = client.put(f"/api/resources/nodes/{interface['id']}/assessment", json={"questions": []})
     assert resp.status_code == 400
 
-    feature = _find(_tree(client)["nodes"], "feature", "Plotlines")
+    feature = _plotlines(client)
     questions = [{"id": "q1", "prompt": "Pick one", "options": [
         {"id": "o1", "text": "Right", "isCorrect": True}, {"id": "o2", "text": "Wrong", "isCorrect": False},
     ]}]
@@ -120,7 +188,7 @@ def test_persists_across_app_instances(storage_root: Path, app_data_root: Path) 
         app.dependency_overrides[get_app_data_storage_root] = lambda: app_data_root
         return TestClient(app)
 
-    node = _find(_tree(make())["nodes"], "feature", "Plotlines")
+    node = _plotlines(make())
     make().put(f"/api/resources/nodes/{node['id']}/guide", json={"guide": "persisted"})
     assert _tree(make())["content"][node["id"]]["guide"] == "persisted"
 
@@ -135,7 +203,7 @@ def test_promotable_feedback_matches_by_channel_name(client: TestClient) -> None
     # Seeded Feedback messages (feedback.py's _build_seed) include one on
     # Writer > Shelf > Sidebar Shelf -- not under Project Plot -- so it
     # should surface for a Shelf-level node but not for an unrelated one.
-    shelf = _find(_tree(client)["nodes"], "console", "Shelf")
+    shelf = _find(_tree(client)["nodes"], "console", "Project")
     resp = client.get(f"/api/resources/nodes/{shelf['id']}/promotable-feedback")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)

@@ -685,6 +685,8 @@ the one project-independent router).
 | `my-models` | `/api/my-models` | the writer's own models (the Characters console's *My models* section): the same routes as `character-models` except `/basic`, on `my-models.json`; `PUT` refuses (422) an id that does not start with `my-`, and a library that would grow past the number of models the admin allows; a model is refused at Publish (422) when it is over a limit the admin set for writers; a published model of this library can be copied into a project by `POST /api/projects/{id}/figure-models` like one of the catalog's (the id says which library it is from) — global (`my-models.json`, project-independent) |
 | `my-models/limits` | `GET`/`PUT /api/my-models/limits` | the limits the admin sets for the writer's own models (points in a shape, shapes in an object, objects in a group, shapes, objects, groups and sliders in a model, the size of a character's copy in KB, models in the library): each held between a floor and the admin's own limit (its ceiling and its start); `PUT` answers what was kept — global (`my-models-limits.json`, project-independent; a file that cannot be read is put aside and the ceilings apply) |
 | `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole anonymous inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote` (yes, no, pass), `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close` (Planner), `POST /cases/{id}/reopen` (Configurer), `PUT /admins/{id}/roles`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
+| `resources` | `/api/resources` | The Help guides and quizzes on the channel list: `GET ""` the whole file (nodes, content, assessments) · `POST "/nodes"` `{parentId, kind, name}` (a node goes only under the kind one level up: an interface at the top, then console, component, feature; 400 otherwise) · `PUT "/nodes/{id}/name"` · `PUT "/nodes/reorder"` `{parentId, orderedIds}` · `DELETE "/nodes/{id}"` (with everything under it; 409 while feedback, a plan or a chat points at it) · `PUT "/nodes/{id}/guide"`, `"/tutorials"`, `"/faq"`, `"/assessment"` (an interface holds no assessment) · `GET "/nodes/{id}/promotable-feedback"` — global (`resources.json`, quarantined when it cannot be read) |
+| `channels` | `/api/channels` | `GET ""` the channel list alone (`{nodes}`): the app's one interface > console > component > feature tree with stable ids, kept as the node tree of `resources.json` and edited through the `resources` node routes (Admin > Configuration > Channels). The app's own screens (`storage/channels.py` `APP_SCREENS`) are merged in once per `SCREENS_VERSION`: missing nodes added, nothing renamed or removed |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
 
 Plus `GET /api/health` (inline in `main.py`, not part of a router).
@@ -714,7 +716,8 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
 - **State and data**: there is no global query cache. The Writer's workspace hook (`writer/useWriterWorkspace.ts`) loads and saves the project's outline,
   plot and settings through `api/` and keeps them in React state with its own autosave and undo history; other interfaces use small stores
   (`settings/settingsStore.ts`, `reader/readerStore.ts`, `helper/inbox/feedbackStore`). `api/client.ts` is a thin JSON `get/post/put/patch/delete`
-  wrapper (same-origin `/api`, throwing `ApiError`); `api/export.ts` is the one raw `fetch` + Blob download, since PDF isn't JSON.
+  wrapper (same-origin `/api`, throwing `ApiError`); `api/export.ts` is the one raw `fetch` + Blob download, since PDF isn't JSON
+  (the Helper Inbox's `helper/inbox/feedbackApi.ts` still sends its own `fetch` with the `X-Admin-Id` header).
 - **Styles** — the Writer's stylesheet, `writer/writer.scss`, is an index of one partial per area in `writer/styles/` (shared, shelves, levels,
   plot, draft level, preview, level tabs, ...), loaded in the order the rules were written in (a later rule overrides an earlier one at equal
   specificity); tests that scan the stylesheet read the partials too (`src/test/readStyles.ts`). The space, radius and type-size scale is a set of CSS custom
@@ -1012,12 +1015,11 @@ mounted it; it remains in git history.
   its Reaction / Flag / Export tools. A sentence's reaction bars show one heart per level, not a stack
   (`ReactionHeartIcon`): like is an outline, two concentric outlines, a filled heart; dislike is an outline with a
   line down its middle, two separate outlined halves, two separate filled halves. A chapter with no outline is one free draft.
-- **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
-  (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
-  duplicate of anything above — it has no committed counterpart, is
-  currently pure frontend mock state with no backend wiring, and reads
-  closer to the archived legacy reader-roles concept
-  (`docs/legacy-concept/`) than to anything currently backed by the API.
+- **`AUI.tsx`** (`admin/` subfolder) — the Admin panel: one console per section
+  (Dashboard, Project Plan, Organizer, Office, Configuration, Designer, Resources,
+  Instructor, Help), each holding its pages as tiles. Real pages: Office >
+  Assignment (roles), Configuration > Plot, Maps and **Channels** (the channel list,
+  `admin/channels/`), the Designer, Resources and Instructor; the rest is placeholder text.
 - **`HUI.tsx`** (`helper/` subfolder) — a helper side panel: chats (frontend-only
   mock state) and the **Inbox**, which is backed by the API. The Inbox validates
   feedback messages in two stages (tone, then the subjects and verbs that build the

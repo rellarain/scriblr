@@ -4,6 +4,7 @@ import {
 import type { TrainingCourse, TrainingLesson, TrainingModule } from '../../../api/types'
 import ThemeSettingsPanel from '../../../theme/ThemeSettingsPanel'
 import HelpArticles from '../writer/levels/HelpArticles'
+import { HELP_TARGETS } from '../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from '../writer/levels/LevelTabs'
 import { TrainingAssessments, TrainingEmpty, TrainingList, TrainingMarkdown, TrainingPage, type DoneAction, type TrainingRow } from './TrainingPage'
 import { courseProgress, looseCourses, progressText } from './trainingContent'
@@ -16,7 +17,6 @@ import type { TrainingState } from './useTrainingState'
 // that can be marked complete has a button for it.
 
 const DESK_HELP = 'The Training desk shows the courses you are enrolled in; the catalog lists every course, grouped in its curricula. Open a course to see its modules, exams and projects, then a module for its lessons and tests, and a lesson for its material, quizzes and exercises.'
-export const TRAINING_HELP_NAMES = ['training', 'desk']
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
 
@@ -81,7 +81,7 @@ export function deskTabs(t: TrainingState): LevelTab[] {
       ),
     },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={TRAINING_HELP_NAMES} fallback={DESK_HELP} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.training} fallback={DESK_HELP} /> },
   ]
 }
 

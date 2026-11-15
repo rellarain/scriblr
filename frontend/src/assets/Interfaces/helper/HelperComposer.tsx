@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import type { ChannelTag, FormFieldDef, FormFieldKind } from './helperTypes'
-import { CHANNEL_TAXONOMY, FORM_FIELD_KINDS } from './helperTypes'
+import type { FormFieldDef, FormFieldKind } from './helperTypes'
+import { FORM_FIELD_KINDS } from './helperTypes'
+import { useChannels } from '../../../channels/channelStore'
+import { KIND_LABEL, childrenOf } from '../../../channels/channelTree'
 
 interface HelperComposerProps {
   onSendText: (text: string) => void
   onSendForm: (title: string, fields: FormFieldDef[]) => void
-  onSendPageLink: (target: ChannelTag, label?: string) => void
+  onSendPageLink: (channelId: string, label?: string) => void
 }
 
 type ComposerMode = 'text' | 'form' | 'pageLink' | 'helpConfig'
@@ -113,46 +115,43 @@ function FormComposer({ onSend }: { onSend: (title: string, fields: FormFieldDef
   )
 }
 
-function LinkComposer({ onSend }: { onSend: (target: ChannelTag, label?: string) => void }) {
-  const [page, setPage] = useState('')
-  const [component, setComponent] = useState('')
-  const [feature, setFeature] = useState('')
+// A link to any place in the app: a node of the channel list, picked a level at a time.
+function LinkComposer({ onSend }: { onSend: (channelId: string, label?: string) => void }) {
+  const { index } = useChannels()
+  const [path, setPath] = useState<string[]>([])
   const [label, setLabel] = useState('')
+  const levels: { parentId: string | null; value: string }[] = [{ parentId: null, value: path[0] ?? '' }]
+  for (let i = 0; i < path.length; i++) {
+    if (childrenOf(index, path[i]).length > 0) levels.push({ parentId: path[i], value: path[i + 1] ?? '' })
+  }
+  const target = path[path.length - 1] ?? ''
 
-  const pageDef = CHANNEL_TAXONOMY.find(p => p.name === page)
-  const componentDef = pageDef?.components.find(c => c.name === component)
-
+  function choose(depth: number, id: string) {
+    setPath(prev => (id ? [...prev.slice(0, depth), id] : prev.slice(0, depth)))
+  }
   function handleSend() {
-    if (!page || !component || !feature) return
-    onSend({ page, component, feature }, label.trim() || undefined)
-    setPage(''); setComponent(''); setFeature(''); setLabel('')
+    if (!target) return
+    onSend(target, label.trim() || undefined)
+    setPath([]); setLabel('')
   }
 
   return (
     <div className="channelAddForm">
-      <select value={page} onChange={e => { setPage(e.target.value); setComponent(''); setFeature('') }}>
-        <option value="">Page…</option>
-        {CHANNEL_TAXONOMY.map(p => (
-          <option key={p.name} value={p.name}>{p.name}</option>
-        ))}
-      </select>
-      <select value={component} disabled={!pageDef} onChange={e => { setComponent(e.target.value); setFeature('') }}>
-        <option value="">Component…</option>
-        {pageDef?.components.map(c => (
-          <option key={c.name} value={c.name}>{c.name}</option>
-        ))}
-      </select>
-      <select value={feature} disabled={!componentDef} onChange={e => setFeature(e.target.value)}>
-        <option value="">Feature…</option>
-        {componentDef?.features.map(f => (
-          <option key={f} value={f}>{f}</option>
-        ))}
-      </select>
+      {levels.map((level, depth) => {
+        const options = childrenOf(index, level.parentId)
+        const kind = options[0]?.kind
+        return (
+          <select key={level.parentId ?? 'top'} value={level.value} aria-label={kind ? KIND_LABEL[kind] : 'Place'} onChange={e => choose(depth, e.target.value)}>
+            <option value="">{kind ? `${KIND_LABEL[kind]}…` : 'Place…'}</option>
+            {options.map(n => <option key={n.id} value={n.id}>{n.name || KIND_LABEL[n.kind]}</option>)}
+          </select>
+        )
+      })}
       <input
         className="statementField" value={label} placeholder="Custom link text (optional)…"
         onChange={e => setLabel(e.target.value)}
       />
-      <button type="button" className="toneBtn" disabled={!feature} onClick={handleSend}>Send link</button>
+      <button type="button" className="toneBtn" disabled={!target} onClick={handleSend}>Send link</button>
     </div>
   )
 }

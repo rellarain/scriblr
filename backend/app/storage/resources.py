@@ -5,16 +5,12 @@ Exam/Test/Quiz question bank. Lives at %APPDATA%\\Scriblr\\resources.json, a
 sibling of user-settings.json, and reuses project_store's atomic-write
 helpers (quarantine on corruption, like every other global store here).
 
-The tree is seeded once, on first load, from feedback.py's own
-Page/Console/Component/Feature TAXONOMY (renamed "page" -> "interface" here)
--- that constant's own comment says "a fixed list for now; editing it comes
-later," and this is that. Seeding seams from feedback.py: past that first
-load the two are independent copies (this one gets stable ids and becomes
-freely editable; feedback.py's stays name-keyed and untouched), so nothing
-here can corrupt Feedback's own data.
+The tree is the app's channel list (see channels.py): seeded from the app's
+own screens, with the screens a newer version adds merged in once, and edited
+by admins in Configuration > Channels. A node that feedback, a plan or a chat
+still points at cannot be deleted.
 """
 
-import re
 import threading
 import uuid
 from pathlib import Path
@@ -23,10 +19,10 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 from . import project_store
-from .feedback import TAXONOMY as FEEDBACK_TAXONOMY
+from . import channels
 
 SCHEMA_VERSION = 1
-NodeKind = Literal["interface", "console", "component", "feature"]
+NodeKind = channels.NodeKind
 
 _lock = threading.RLock()
 
@@ -37,6 +33,10 @@ class ResourcesError(Exception):
 
 class NotFound(ResourcesError):
     status = 404
+
+
+class InUse(ResourcesError):
+    status = 409
 
 
 # ---------------------------------------------------------------------------
@@ -93,39 +93,27 @@ class ResourcesFile(BaseModel):
     nodes: list[ResourceNode] = Field(default_factory=list)
     content: dict[str, ResourceContent] = Field(default_factory=dict)
     assessments: dict[str, Assessment] = Field(default_factory=dict)
+    # The channels.SCREENS_VERSION whose screens are merged into `nodes`.
+    screensVersion: int = 0
 
 
 # ---------------------------------------------------------------------------
-# Seeding, from feedback.py's TAXONOMY
+# Seeding, from the app's own screens (channels.APP_SCREENS)
 # ---------------------------------------------------------------------------
 
 
-def _slug(name: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    return s or "node"
+def _make_node(node_id: str, kind: str, parent_id: Optional[str], name: str, order: int) -> ResourceNode:
+    return ResourceNode(id=node_id, kind=kind, parentId=parent_id, order=order, name=name)
 
 
 def _seed_nodes() -> list[ResourceNode]:
     nodes: list[ResourceNode] = []
-
-    def add(name: str, kind: NodeKind, parent_id: Optional[str], order: int) -> str:
-        node_id = f"{parent_id}/{_slug(name)}" if parent_id else _slug(name)
-        nodes.append(ResourceNode(id=node_id, kind=kind, parentId=parent_id, order=order, name=name))
-        return node_id
-
-    for pi, page in enumerate(FEEDBACK_TAXONOMY):
-        page_id = add(page["name"], "interface", None, pi)
-        for ci, console in enumerate(page["consoles"]):
-            console_id = add(console["name"], "console", page_id, ci)
-            for coi, component in enumerate(console["components"]):
-                component_id = add(component["name"], "component", console_id, coi)
-                for fi, feature in enumerate(component["features"]):
-                    add(feature, "feature", component_id, fi)
+    channels.merge_screens(nodes, _make_node)
     return nodes
 
 
 def _default_file() -> ResourcesFile:
-    return ResourcesFile(nodes=_seed_nodes())
+    return ResourcesFile(nodes=_seed_nodes(), screensVersion=channels.SCREENS_VERSION)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +131,12 @@ def _load(root: Path) -> ResourcesFile:
         file = _default_file()
         _save(root, file)
         return file
-    return project_store._read_shard(path, ResourcesFile)
+    file = project_store._read_shard(path, ResourcesFile)
+    if file.screensVersion < channels.SCREENS_VERSION:
+        channels.merge_screens(file.nodes, _make_node)
+        file.screensVersion = channels.SCREENS_VERSION
+        _save(root, file)
+    return file
 
 
 def _save(root: Path, file: ResourcesFile) -> None:
@@ -183,8 +176,10 @@ def _descendant_ids(file: ResourcesFile, node_id: str) -> list[str]:
 def add_node(root: Path, parent_id: Optional[str], kind: NodeKind, name: str = "") -> ResourcesFile:
     with _lock:
         file = _load(root)
-        if parent_id is not None:
-            _find(file, parent_id)  # raises NotFound if bogus
+        parent_kind = _find(file, parent_id).kind if parent_id is not None else None  # raises NotFound if bogus
+        if not channels.kind_fits(parent_kind, kind):
+            where = f"under a {parent_kind}" if parent_kind else "at the top"
+            raise ResourcesError(f"a {kind} cannot go {where}")
         siblings = [n for n in file.nodes if n.parentId == parent_id]
         order = max((n.order for n in siblings), default=-1) + 1
         node_id = f"{parent_id}/{uuid.uuid4().hex[:8]}" if parent_id else uuid.uuid4().hex[:8]
@@ -217,6 +212,9 @@ def delete_node(root: Path, node_id: str) -> ResourcesFile:
         file = _load(root)
         _find(file, node_id)
         doomed = set(_descendant_ids(file, node_id))
+        in_use = channels.uses(root, doomed)
+        if in_use:
+            raise InUse("still used by " + ", ".join(in_use))
         file.nodes = [n for n in file.nodes if n.id not in doomed]
         for doomed_id in doomed:
             file.content.pop(doomed_id, None)

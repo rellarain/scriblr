@@ -225,29 +225,10 @@ export interface CreateProjectRequest {
   title: string
 }
 
-export type AuiConfigNodeKind = 'console' | 'component' | 'feature'
-
-export interface AuiConfigNode {
-  id: string
-  tab: string
-  kind: AuiConfigNodeKind
-  parentId: string | null
-  order: number
-  name: string
-  idea: string
-}
-
-// A frozen copy of one Configuration tab, made by Publish.
-export interface PublishedTab {
-  version: number
-  publishedAt: string
-  nodes: AuiConfigNode[]
-}
-
-// The Resources article/quiz builder (AUI): a structural Interface > Console >
-// Component > Feature tree, seeded once from the Feedback taxonomy, plus
-// per-node Guide/Tutorials/FAQ content and (console/component/feature only)
-// an Exam/Test/Quiz question bank.
+// The Resources article/quiz builder (AUI): the channel list (the app's one
+// Interface > Console > Component > Feature tree, see channels/channelTree.ts),
+// plus per-node Guide/Tutorials/FAQ content and (console/component/feature
+// only) an Exam/Test/Quiz question bank.
 export type ResourceNodeKind = 'interface' | 'console' | 'component' | 'feature'
 
 export interface ResourceNode {
@@ -299,25 +280,13 @@ export interface ResourcesFile {
   nodes: ResourceNode[]
   content: Record<string, ResourceContent>
   assessments: Record<string, ResourceAssessment>
+  // The version of the app's screens merged into `nodes` (backend storage/channels.py).
+  screensVersion?: number
 }
 
 export interface PromotableFeedbackMessage {
   id: string
   text: string
-}
-
-export interface AuiConfig {
-  schemaVersion: number
-  // The working draft (every tab, flat).
-  nodes: AuiConfigNode[]
-  // Per-tab published snapshots, keyed by tab; a tab never published is absent.
-  published: Record<string, PublishedTab>
-}
-
-// What a save sends: only the draft. The server keeps the published copies.
-export interface AuiConfigDraft {
-  schemaVersion: number
-  nodes: AuiConfigNode[]
 }
 
 // Plot presets: global (not per project) ready-made plot categories, configured in Admin > Configuration > Plot and offered by the Plot

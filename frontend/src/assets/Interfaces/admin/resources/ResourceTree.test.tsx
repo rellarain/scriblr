@@ -82,4 +82,17 @@ describe('ResourceTree', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add interface/ }))
     expect(onAddChild).toHaveBeenCalledWith(null, 'interface')
   })
+
+  it('without edit handlers only selects: names are buttons, with no add or delete', () => {
+    const writer = node('writer', 'interface', null, 0, 'Writer')
+    const childrenOf = (parentId: string | null) => (parentId === null ? [writer] : [])
+    const onSelect = vi.fn()
+    render(<ResourceTree childrenOf={childrenOf} selectedId="writer" onSelect={onSelect} />)
+    const name = screen.getByRole('button', { name: 'Writer' })
+    expect(name.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(name)
+    expect(onSelect).toHaveBeenCalledWith('writer')
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Delete|Add/ })).toBeNull()
+  })
 })

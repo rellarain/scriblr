@@ -14,9 +14,9 @@ import MapsConsole from '../maps/MapsConsole'
 import ProjectConsole from '../plan/ProjectConsole'
 import ScheduleConsole from '../schedule/ScheduleConsole'
 import HelpArticles from './HelpArticles'
+import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
-export const PROJECT_HELP_NAMES = ['project', 'shelf', 'project console']
 const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series and books, schedule, its project plan (phases, goals, processes, exercises, routines and tasks), history and analytics, and its own settings.'
 
 const body = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.body
@@ -101,7 +101,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ProjectEditor w={w} /> },
-    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={PROJECT_HELP_NAMES} fallback={PROJECT_HELP_FALLBACK} /> },
+    { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles target={HELP_TARGETS.writerProject} fallback={PROJECT_HELP_FALLBACK} /> },
   ]
 }
 

@@ -15,6 +15,7 @@ import { copyOf, createMockFigureModels } from './mockFigureModels'
 import { createMockItems, seedItems } from './mockItems'
 import { createMockMaps, seedMaps } from './mockMaps'
 import { createMockMapBiomes } from './mockMapBiomes'
+import { createMockChannels } from './mockChannels'
 import { createMockMapShapes } from './mockMapShapes'
 import { createMockTraining, emptyProgress } from './mockTraining'
 import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
@@ -205,6 +206,7 @@ export function createMockBackend() {
   const maps = createMockMaps(seedMaps())
   // The admin's biome list (Configuration > Maps) and each project's own biomes.
   const biomes = createMockMapBiomes()
+  const channels = createMockChannels()
   const libraryShapes = createMockMapShapes()
   // The Characters console's cast, which its edits change in memory only.
   const cast = createMockCharacters(seedCharacters())
@@ -247,7 +249,8 @@ export function createMockBackend() {
     const [bare, search = ''] = path.split('?')
     const parts = bare.split('/').filter(Boolean).map(decodeURIComponent)
     if (parts[0] === 'user-settings') return json({ theme: previewTheme(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
-    if (parts[0] === 'resources') return json({ schemaVersion: 1, nodes: [], content: {} })
+    if (parts[0] === 'resources') { const answer = channels.resources(method, parts.slice(1), body); return json(answer.body, answer.status) }
+    if (parts[0] === 'channels') { const answer = channels.channels(); return json(answer.body, answer.status) }
     if (parts[0] === 'activity' && parts[1] === 'ribbon') return json(ribbonFixture(localDay()))
     if (parts[0] === 'training') { const answer = training.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }

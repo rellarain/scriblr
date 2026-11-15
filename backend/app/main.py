@@ -16,6 +16,7 @@ from .api import (
     facets,
     feedback,
     library,
+    channels,
     character_models,
     characters,
     figure_models,
@@ -178,6 +179,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(user_settings.router)
     app.include_router(feedback.router)
     app.include_router(resources.router)
+    app.include_router(channels.router)
     app.include_router(training.router)
     app.include_router(library.router)
     app.include_router(reader.router)

@@ -4,11 +4,10 @@ import QuizBuilder from './QuizBuilder'
 import { useResources } from './useResources'
 import './resources.scss'
 
-// AUI's redesigned Resources tile: an Interface > Console > Component >
-// Feature article/quiz builder, replacing the old Console/Component/Feature
-// planning-outline editor (admin/AuiConfigEditor.tsx) that used to live
-// here. Real backend persistence (backend/app/storage/resources.py), not
-// mock/local state -- see the plan for why.
+// AUI's Resources tile: the guides and quizzes for each node of the channel
+// list (Interface > Console > Component > Feature; the list itself is edited
+// in Configuration > Channels). Real backend persistence
+// (backend/app/storage/resources.py).
 function ResourcesConsole() {
   const resources = useResources()
   const [view, setView] = useState<'article' | 'quiz'>('article')

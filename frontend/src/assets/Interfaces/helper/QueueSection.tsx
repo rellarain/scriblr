@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { QUEUE_DEPARTMENTS } from './queueSeed'
+import { useChannels } from '../../../channels/channelStore'
+import { childrenOf } from '../../../channels/channelTree'
 
 // Queue Console per scrilbrPlan.md's Helper page section: "view of all
-// assigned/active console queues." Each console is one queue; checking its
-// box means this helper is currently accepting chats from it.
+// assigned/active console queues." Each console of the channel list is one
+// queue; checking its box means this helper is currently accepting chats
+// from it.
 //
-// Departments (Pages) are collapsible cards, collapsed by default -- expand
-// one to reveal its consoles nested inside as a flat checkbox list (no
-// per-console collapse, no component list -- just the queue name and
-// whether it's accepted).
+// Interfaces are collapsible cards, collapsed by default -- expand one to
+// reveal its consoles nested inside as a flat checkbox list.
 function QueueSection() {
+  const { index } = useChannels()
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set())
   const [acceptedQueues, setAcceptedQueues] = useState<Set<string>>(new Set())
 
@@ -39,15 +40,16 @@ function QueueSection() {
           <p>Check a queue below to accept chats from it.</p>
         </div>
 
-        {QUEUE_DEPARTMENTS.map(department => {
-          const isDeptExpanded = expandedDepartments.has(department.name)
+        {childrenOf(index, null).map(department => {
+          const isDeptExpanded = expandedDepartments.has(department.id)
+          const consoles = childrenOf(index, department.id)
           return (
-            <div key={department.name} className="queueDepartment">
+            <div key={department.id} className="queueDepartment">
               <button
                 type="button"
                 className="queueDepartmentToggle"
                 aria-expanded={isDeptExpanded}
-                onClick={() => toggleDepartment(department.name)}
+                onClick={() => toggleDepartment(department.id)}
               >
                 <span aria-hidden="true">{isDeptExpanded ? '▾' : '▸'}</span>
                 {department.name}
@@ -55,11 +57,11 @@ function QueueSection() {
 
               {isDeptExpanded && (
                 <div className="queueDepartmentBody">
-                  {department.consoles.length === 0 && (
+                  {consoles.length === 0 && (
                     <p className="queueEmptyNote">No consoles defined yet.</p>
                   )}
-                  {department.consoles.map(consoleEntry => {
-                    const consoleId = `${department.name}::${consoleEntry.name}`
+                  {consoles.map(consoleEntry => {
+                    const consoleId = consoleEntry.id
                     const isAccepted = acceptedQueues.has(consoleId)
                     return (
                       <label

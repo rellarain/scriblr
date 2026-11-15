@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { ChannelTag, FormFieldDef, HelperMessage } from './helperTypes'
+import type { FormFieldDef, HelperMessage } from './helperTypes'
 import { SEED_CONVERSATIONS, SEED_MESSAGES, SEED_PROFILES } from './helperSeed'
 
 function newId(prefix: string): string {
@@ -47,10 +47,10 @@ export function useHelperChats() {
     }])
   }
 
-  function sendPageLink(chatId: string, target: ChannelTag, label?: string) {
+  function sendPageLink(chatId: string, channelId: string, label?: string) {
     setMessages(prev => [...prev, {
       id: newId('msg'), chatId, sender: 'admin', sentAt: new Date().toISOString(),
-      kind: 'pageLink', pageLink: { target, label },
+      kind: 'pageLink', pageLink: { channelId, label },
     }])
   }
 

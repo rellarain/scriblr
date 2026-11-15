@@ -11,6 +11,7 @@ import { __resetBiomesForTests } from '../assets/Interfaces/writer/maps/mapBiome
 import { __resetShapeLibraryForTests } from '../assets/Interfaces/writer/maps/mapShapeStore'
 import { __resetWorldLinksForTests } from '../assets/Interfaces/writer/links/linkStore'
 import { __resetWorldNavForTests } from '../assets/Interfaces/writer/links/worldNav'
+import { __resetChannelsForTests } from '../channels/channelStore'
 
 // What one test leaves behind must not reach the next: stubbed globals (fetch, ResizeObserver, ...), the browser storage the stores read,
 // and the settings store itself. (React Testing Library unmounts what a test rendered on its own.)
@@ -29,4 +30,5 @@ afterEach(() => {
   __resetItemsForTests()
   __resetWorldLinksForTests()
   __resetWorldNavForTests()
+  __resetChannelsForTests()
 })

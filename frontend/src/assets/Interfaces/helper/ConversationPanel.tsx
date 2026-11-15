@@ -1,4 +1,4 @@
-import type { ChannelTag, FormFieldDef, HelperConversation, HelperMessage, HelperUserProfile } from './helperTypes'
+import type { FormFieldDef, HelperConversation, HelperMessage, HelperUserProfile } from './helperTypes'
 import ProfileHeader from './ProfileHeader'
 import MessageList from './MessageList'
 import HelperComposer from './HelperComposer'
@@ -10,7 +10,7 @@ interface ConversationPanelProps {
   onBack: () => void
   onSendText: (text: string) => void
   onSendForm: (title: string, fields: FormFieldDef[]) => void
-  onSendPageLink: (target: ChannelTag, label?: string) => void
+  onSendPageLink: (channelId: string, label?: string) => void
 }
 
 function ConversationPanel({

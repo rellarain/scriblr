@@ -36,7 +36,10 @@ describe('the pretend backend', () => {
     const again = await (await f(`/api/projects/${FIXTURE_PROJECT_ID}`)).json()
     expect(again.outline.nodes.find((n: { id: string }) => n.id === 'b1').title).toBe('Changed')
     expect((await f('/api/user-settings')).status).toBe(200)
-    expect((await (await f('/api/resources')).json()).nodes).toEqual([])
+    // the pretend channel list (designSystem/mockChannels.ts): the same nodes from both routes
+    const channels = (await (await f('/api/resources')).json()).nodes as { id: string }[]
+    expect(channels.some(n => n.id === 'admin/office/voting')).toBe(true)
+    expect((await (await f('/api/channels')).json()).nodes).toEqual(channels)
   })
 })
 

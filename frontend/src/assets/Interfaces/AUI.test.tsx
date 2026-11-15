@@ -15,6 +15,7 @@ vi.mock('./admin/instructor/InstructorConsole', () => ({ default: () => <div>ins
 vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
 vi.mock('./admin/characters/DesignerConsole', () => ({ default: (p: { tools?: string }) => <div>character models console ({p.tools ?? 'all'})</div> }))
 vi.mock('./admin/characters/WriterLimitsConsole', () => ({ default: () => <div>writer limits console</div> }))
+vi.mock('./admin/channels/ChannelsConsole', () => ({ default: () => <div>channels console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -88,6 +89,12 @@ describe('AUI (the Admin panel as tiles)', () => {
     const plot = within(tile('configuration')).getByRole('region', { name: 'Plot' })
     expect(await within(plot).findByText('plot presets console')).toBeTruthy()
     expect(plot.querySelector('h2')).toBeNull()
+  })
+
+  it('shows Configuration > Channels as the channel list editor', async () => {
+    render(<AUI />)
+    const channels = within(tile('configuration')).getByRole('region', { name: 'Channels' })
+    expect(await within(channels).findByText('channels console')).toBeTruthy()
   })
 
   it("leaves out Configuration > Writers' designer while the writers' own designer is off the screen", () => {
