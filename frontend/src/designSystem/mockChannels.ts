@@ -32,6 +32,12 @@ function sampleNodes(): ResourceNode[] {
   })
 }
 
+// The console queues of a channel list, in its order (interfaces, then each one's consoles).
+export function consoleIds(nodes: Array<{ id: string; kind: string; parentId: string | null; order: number }>): string[] {
+  const by = (a: { order: number }, b: { order: number }) => a.order - b.order
+  return nodes.filter(n => n.kind === 'interface').sort(by).flatMap(i => nodes.filter(n => n.kind === 'console' && n.parentId === i.id).sort(by).map(n => n.id))
+}
+
 export function createMockChannels() {
   let nodes = sampleNodes()
   let next = 1

@@ -1,17 +1,21 @@
 # Staff: roster, organisation and SLA
 
-The people who work on Scriblr's feedback, and how they are organised. Helpers and admins are listed in one roster and grouped into departments and teams. The Office gives helpers their hours, and each priority has an SLA: the time plan work has before it goes up to a manager or director. The pages are under Admin > Office (Department Roster, Department Details, Allotment, Hire/Term Admin, and the Supports column of Assignment) and Admin > Configuration > SLA.
+The people who work on Scriblr's feedback, and how they are organised. Helpers and admins are listed in one roster and grouped into departments and teams. The Office gives helpers their hours, and each priority has an SLA: the time plan work has before it goes up to a manager or director. The pages are under Admin > Office (Department Roster, Department Details, Allotment, Hire/Term Admin, Monitor Training, and the Supports column of Assignment) and Admin > Configuration > SLA.
 
-Code: `admin/office/StaffPages.tsx` (`RosterPage`, `DepartmentsPage`, `AllotmentPage`, `HirePage`, `SlaPage`) and `staff.scss`; the store `staff/rosterStore.ts`, the routes `staff/staffApi.ts`. Storage: `staff.json` in the app's data folder (backend `storage/staff.py`, API `api/staff.py`). On first use the staff are made from the feedback admins, placed in a sample organisation.
+Code: `admin/office/StaffPages.tsx` (`RosterPage`, `DepartmentsPage`, `AllotmentPage`, `HirePage`, `TrainingPage`, `SlaPage`) and `staff.scss`; the store `staff/rosterStore.ts`, the routes `staff/staffApi.ts`. Storage: `staff.json` in the app's data folder (backend `storage/staff.py`, API `api/staff.py`). On first use the staff are made from the feedback admins, placed in a sample organisation.
 
 ## The model
 
-- **People**: a name, helper or admin, active or left, a department and a team, helper hours, and the console queues they support. Hiring someone also adds them to the feedback pipeline, which keeps their roles. Terming someone marks them as left; they are never deleted, so their work keeps their name, and they stop leading any team or department.
+- **People**: a name, helper or admin, active or left, a department and a team, helper hours, the console queues they support (channel support), and the training they finished on interfaces and consoles, with promotions. Hiring someone also adds them to the feedback pipeline, which keeps their roles. Terming someone marks them as left; they are never deleted, so their work keeps their name, and they stop leading any team or department.
 - **Departments** have a director. **Teams** sit in a department and have a manager.
-- **Support tier**, worked out rather than set:
-  - a helper is tier 1;
-  - an admin who supports console queues (channel support) is tier 2;
-  - an admin with helper time is tier 3.
+- **Support tiers**, per console, worked out rather than set:
+  - **tier 1**: a helper promoted on that console;
+  - **tier 2**: a helper promoted on its interface;
+  - **tier 3**: the console's channel support (they manage its queue);
+  - **tier 4**: an admin with helper hours promoted on that console.
+
+  Someone with no tier on a console does not take its chats. The roster shows the highest tier a person has anywhere; someone who left has none.
+- **Promotion** follows training: a finished training on an interface or a console is recorded, then a director promotes the person on it (the director of their department, or any director when they have none). Until Training keeps records per staff member, finishing is recorded by hand on Monitor Training.
 - **Helper hours**: 5, 10, 20 or 30 a week, given by the Office.
 - **SLA**: hours per priority (urgent 4 h, high 1 day, normal 3 days, low 7 days to begin with).
 
@@ -25,7 +29,11 @@ Code: `admin/office/StaffPages.tsx` (`RosterPage`, `DepartmentsPage`, `Allotment
   - Delete one once it is empty; otherwise the server refuses it with the reason.
 - **Allotment**: every active person with the hour chips (None, 5 h, 10 h, 20 h, 30 h), `aria-pressed`.
 - **Hire/Term Admin**: a form (name, helper or admin, team) with a Hire button. Below it, everyone, with Term (`CloseIcon`) or Rehire (`RestoreIcon`).
-- **Assignment**: on a console, a **Supports** column puts a person on its support queue.
+- **Monitor Training**: a card per active person with their training: the part of the app, when it was finished, and who promoted them and when ("Not yet").
+  - **Promote** (`ChevronUpIcon`) and **Take back the promotion** (`ChevronDownIcon`), enabled only for their director.
+  - **Remove** (`TrashIcon`): not finished after all; it takes back the promotion too.
+  - **Training finished on…**: a select of the interfaces and consoles, with a plus to record it.
+- **Assignment**: on a console, a **Supports** column makes a person its channel support.
 - **Configuration > SLA**: a stepper per priority. It steps by an hour up to a day, then by days; Shift steps a day.
 
 ## What the SLA does
@@ -49,5 +57,6 @@ Work can be assigned to a person, a team or a department. Team members claim a t
 ## Don't
 
 - Don't delete someone who left: term them.
-- Don't set a tier by hand: it follows from what the person does.
+- Don't set a tier by hand: it follows from training, promotion, channel support and helper hours.
+- Don't promote without finished training: the server refuses it.
 - Don't time plan work with a timer: the plan works the SLA out when it is read.

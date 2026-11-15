@@ -127,7 +127,7 @@ function seedPlan(): Omit<PlanItem, 'can'>[] {
   ]
 }
 
-export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
+export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (nodeId: string) => boolean } = {}) {
   const admins = seedAdmins()
   let verbs = VERBS.map(v => ({ ...v, keywords: [...v.keywords] }))
   const messages = seedMessages()
@@ -188,19 +188,41 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
     { id: 'team-help', name: 'Help desk', departmentId: 'dep-support', managerId: 'adm-sam' },
   ]
   type Stored = Omit<Person, 'tier'>
+  const promotedBy = (nodeId: string, by: string | null = 'adm-sam') => ({ nodeId, finishedAt: '2026-11-02T10:00:00.000Z', promotedBy: by, promotedAt: by ? '2026-11-03T10:00:00.000Z' : null })
   const people: Stored[] = [
-    { id: 'adm-dana', name: 'Dana Ruiz', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-writing', allotment: null, supports: [] },
-    { id: 'adm-lee', name: 'Lee Park', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-reading', allotment: null, supports: ['reader/library', 'reader/nook'] },
-    { id: 'adm-sam', name: 'Sam Ortiz', kind: 'admin', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [] },
-    { id: 'hlp-ari', name: 'Ari Chen', kind: 'helper', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 20, supports: [] },
-    { id: 'hlp-noor', name: 'Noor Haddad', kind: 'helper', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [] },
+    { id: 'adm-dana', name: 'Dana Ruiz', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-writing', allotment: null, supports: ['writer/draft'], training: [] },
+    { id: 'adm-lee', name: 'Lee Park', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-reading', allotment: 10, supports: ['reader/library', 'reader/nook'], training: [] },
+    { id: 'adm-sam', name: 'Sam Ortiz', kind: 'admin', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [], training: [promotedBy('writer/draft')] },
+    { id: 'hlp-ari', name: 'Ari Chen', kind: 'helper', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 20, supports: [], training: [promotedBy('writer/draft'), promotedBy('writer')] },
+    { id: 'hlp-noor', name: 'Noor Haddad', kind: 'helper', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [], training: [promotedBy('reader/library'), promotedBy('writer/draft'), promotedBy('reader', null)] },
   ]
   for (const pp of people) if (!admins.some(a => a.id === pp.id)) admins.push({ id: pp.id, name: pp.name, roles: { [INBOX]: ['checker'] } })
   let sla = { urgent: 4, high: 24, normal: 72, low: 168 }
-  const tierOf = (pp: Stored): Person['tier'] => (pp.kind === 'helper' ? 1 : pp.allotment ? 3 : pp.supports.length ? 2 : null)
+  // Support tiers per console (backend staff.tier_for): 4 an admin with helper hours promoted on it, 3 its channel support, 2 a
+  // helper promoted on its interface, 1 a helper promoted on it; none for someone who left.
+  const promoted = (pp: Stored, node: string) => pp.training.some(r => r.nodeId === node && !!r.promotedBy)
+  const tierFor = (pp: Stored, console: string): number | null => {
+    if (!pp.active) return null
+    if (pp.kind === 'admin' && pp.allotment && promoted(pp, console)) return 4
+    if (pp.supports.includes(console)) return 3
+    if (pp.kind === 'helper' && promoted(pp, console.split('/')[0])) return 2
+    if (pp.kind === 'helper' && promoted(pp, console)) return 1
+    return null
+  }
+  const tierOf = (pp: Stored): Person['tier'] => {
+    if (!pp.active) return null
+    const tiers = pp.supports.map(() => 3)
+    for (const r of pp.training) {
+      if (!r.promotedBy) continue
+      const console = r.nodeId.includes('/')
+      if (pp.kind === 'admin' && console && pp.allotment) tiers.push(4)
+      else if (pp.kind === 'helper') tiers.push(console ? 1 : 2)
+    }
+    return tiers.length ? (Math.max(...tiers) as Person['tier']) : null
+  }
   function staffView(): StaffView {
     const depAt = (id: string | null) => { const n = departments.findIndex(d => d.id === id); return n < 0 ? departments.length : n }
-    const list = people.map(pp => ({ ...pp, supports: [...pp.supports], tier: tierOf(pp) }))
+    const list = people.map(pp => ({ ...pp, supports: [...pp.supports], training: pp.training.map(r => ({ ...r })), tier: tierOf(pp) }))
       .sort((a, b) => depAt(a.departmentId) - depAt(b.departmentId) || (a.tier ?? 9) - (b.tier ?? 9) || Number(!a.active) - Number(!b.active) || a.name.localeCompare(b.name))
     return { people: list, departments: departments.map(d => ({ ...d })), teams: teams.map(t => ({ ...t })), sla: { ...sla }, allotments: [5, 10, 20, 30] }
   }
@@ -213,8 +235,25 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
       if (!name) throw new Refused(400, 'A staff member needs a name.')
       const teamId = (body.teamId as string | null) ?? null
       const pid = `${body.kind === 'helper' ? 'hlp' : 'adm'}-${next++}`
-      people.push({ id: pid, name, kind: body.kind === 'helper' ? 'helper' : 'admin', active: true, teamId, departmentId: teams.find(t => t.id === teamId)?.departmentId ?? null, allotment: null, supports: [] })
+      people.push({ id: pid, name, kind: body.kind === 'helper' ? 'helper' : 'admin', active: true, teamId, departmentId: teams.find(t => t.id === teamId)?.departmentId ?? null, allotment: null, supports: [], training: [] })
       admins.push({ id: pid, name, roles: {} })
+      return staffView()
+    }
+    if (what === 'people' && method === 'PUT' && (parts[2] === 'training' || parts[2] === 'promotion')) {
+      const pp = people.find(x => x.id === id)
+      if (!pp) throw new Refused(404, `No staff member ${id}`)
+      const nodeId = String(body.nodeId ?? '')
+      const has = pp.training.find(r => r.nodeId === nodeId)
+      if (parts[2] === 'training') {
+        if (!opts.isTrainable?.(nodeId)) throw new Refused(400, 'Training is on an interface or a console.')
+        if (body.finished !== false && !has) pp.training.push({ nodeId, finishedAt: new Date().toISOString(), promotedBy: null, promotedAt: null })
+        if (body.finished === false && has) pp.training.splice(pp.training.indexOf(has), 1)
+        return staffView()
+      }
+      const own = departments.find(d => d.id === pp.departmentId)?.directorId ?? null
+      if ((own && meId !== own) || (!own && !departments.some(d => d.directorId === meId))) throw new Refused(400, own ? 'Only a director promotes (the director of their department).' : 'Only a director promotes.')
+      if (!has) throw new Refused(400, 'Their training there is not finished yet.')
+      if (body.promoted === false) { has.promotedBy = null; has.promotedAt = null } else { has.promotedBy = meId; has.promotedAt = new Date().toISOString() }
       return staffView()
     }
     if (what === 'people' && method === 'PATCH') {
@@ -454,6 +493,9 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
   return {
     // For the pretend support chats: what kind of staff member someone is, and feedback a chat drafted, sent as the writer's
     // and already checked by the staff member.
+    // The staff, for the pretend queues: a copy of each person, and their tier on a console.
+    staffPeople(): Stored[] { return people.map(pp => ({ ...pp, supports: [...pp.supports], training: pp.training.map(r => ({ ...r })) })) },
+    tierFor(pid: string, console: string): number | null { const pp = people.find(x => x.id === pid); return pp ? tierFor(pp, console) : null },
     // Who an X-Admin-Id header acts as: the admin named, else the first admin (as the backend's current_admin).
     actingAs(id: string): string { return admins.find(x => x.id === id)?.id ?? (id || admins[0]?.id || '') },
     staffKind(id: string): 'helper' | 'admin' | null {

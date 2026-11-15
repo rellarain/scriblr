@@ -7,6 +7,7 @@ import Header from './Header'
 import Sidebar from './Sidebar'
 import type { MainInterface, HuiPanel } from './interfaceShellTypes'
 import { useHelperChats } from './assets/Interfaces/helper/useHelperChats'
+import { useQueueMeter } from './support/supportStores'
 import { useStoredState } from './assets/Interfaces/writer/storage'
 import { CURRENT_USER } from './userSeed'
 import { useSettings } from './settings/settingsStore'
@@ -102,14 +103,13 @@ function App() {
     setAuiWidth(Math.max(AUI_COLUMN_W, Math.round(width / AUI_COLUMN_W) * AUI_COLUMN_W))
   }
 
-  // Queue button breakdown: active (currently open, being helped) vs pending
-  // (waiting to be helped) -- a heuristic off each profile's free-text
-  // status -- crossed with the profile's admin/standard userType.
-  const isActiveProfile = (p: typeof helper.profiles[number]) => p.status.toLowerCase().startsWith('active')
-  const activeAdminCount = helper.profiles.filter(p => isActiveProfile(p) && p.userType === 'admin').length
-  const activeStandardCount = helper.profiles.filter(p => isActiveProfile(p) && p.userType === 'standard').length
-  const pendingAdminCount = helper.profiles.filter(p => !isActiveProfile(p) && p.userType === 'admin').length
-  const pendingStandardCount = helper.profiles.filter(p => !isActiveProfile(p) && p.userType === 'standard').length
+  // The queue button's meter, from the real queues (support/supportStores.ts useQueueMeter): the chats the staff member is in and
+  // the ones waiting in the queues that are on for them, each split into escalated and first-tier chats.
+  const meter = useQueueMeter()
+  const activeAdminCount = meter.activeEscalated
+  const activeStandardCount = meter.activeFirst
+  const pendingAdminCount = meter.waitingEscalated
+  const pendingStandardCount = meter.waitingFirst
 
   // Re-clicking the already-active page's header icon reveals VUI (the
   // Base layer, normally fully covered by Mainscreen's opaque background)

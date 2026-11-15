@@ -1,7 +1,7 @@
 import RoleAssignment from './admin/RoleAssignment'
 import { ChannelManagementPage, VotingPage } from './admin/office/StatementPages'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from './admin/plan/PlanPages'
-import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage } from './admin/office/StaffPages'
+import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage, TrainingPage } from './admin/office/StaffPages'
 import HelpTile from '../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../channels/helpTargets'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
@@ -141,7 +141,7 @@ const SECTIONS: AuiSectionDef[] = [
       { key: 'department', label: 'Department', Icon: BuildingIcon,
         body: 'Manage the department here.' },
       { key: 'monitorTraining', label: 'Monitor Training', Icon: BriefcaseIcon,
-        body: 'Monitor admin training progress here.' },
+        body: '' },
       { key: 'departmentSchedules', label: 'Department Schedules', Icon: CalendarIcon,
         body: 'View and manage department schedules here.' },
       { key: 'hireTermAdmin', label: 'Hire/Term Admin', Icon: PeopleIcon,
@@ -228,6 +228,7 @@ function AUI() {
         : page.key === 'departmentDetails' ? <DepartmentsPage />
         : page.key === 'allotment' ? <AllotmentPage />
         : page.key === 'hireTermAdmin' ? <HirePage />
+        : page.key === 'monitorTraining' ? <TrainingPage />
         : page.key === 'configWriterDesigner' ? <Suspense fallback={null}><WriterLimitsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),

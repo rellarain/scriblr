@@ -69,10 +69,11 @@ def test_transfer_and_escalate_send_it_back_to_waiting(client: TestClient) -> No
     assert act(client, chat["id"], action="transfer", toQueue="reader/library").status_code == 400  # the same queue
     v = act(client, chat["id"], action="escalation").json()
     assert v["waiting"][0]["tier"] == 2
+    for _ in range(2):
+        client.post(f"/api/support/chats/{chat['id']}/take", headers=DANA)
+        act(client, chat["id"], DANA, action="escalation")
     client.post(f"/api/support/chats/{chat['id']}/take", headers=DANA)
-    act(client, chat["id"], DANA, action="escalation")
-    client.post(f"/api/support/chats/{chat['id']}/take", headers=DANA)
-    assert act(client, chat["id"], DANA, action="escalation").status_code == 400  # tier 3 is the top
+    assert act(client, chat["id"], DANA, action="escalation").status_code == 400  # tier 4 is the top
 
 
 def test_feedback_drafted_in_a_chat_becomes_the_users_once_confirmed_already_checked(client: TestClient) -> None:

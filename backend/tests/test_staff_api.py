@@ -23,9 +23,9 @@ def person(view: dict, pid: str) -> dict:
 def test_the_sample_staff_come_from_the_feedback_admins_in_one_roster(client: TestClient) -> None:
     v = staff(client)
     assert [d["name"] for d in v["departments"]] == ["Product", "Support"]
-    # By department, then tier (none last), active above inactive, then by name.
+    # By department, then tier (the highest anywhere; none last), active above inactive, then by name.
     assert [(p["name"], p["tier"]) for p in v["people"]] == [
-        ("Lee Park", 2), ("Dana Ruiz", None), ("Ari Chen", 1), ("Noor Haddad", 1), ("Sam Ortiz", 3),
+        ("Dana Ruiz", 3), ("Lee Park", 3), ("Noor Haddad", 1), ("Ari Chen", 2), ("Sam Ortiz", 4),
     ]
     assert v["sla"] == {"urgent": 4, "high": 24, "normal": 72, "low": 168}
     # The helpers can act in the feedback screens too.
@@ -52,12 +52,38 @@ def test_helper_hours_and_console_support(client: TestClient) -> None:
     v = client.patch("/api/staff/people/hlp-noor", headers=SAM, json={"allotment": 30}).json()
     assert person(v, "hlp-noor")["allotment"] == 30
     assert client.patch("/api/staff/people/hlp-noor", headers=SAM, json={"allotment": 12}).status_code == 400
+    v = client.patch("/api/staff/people/adm-dana", headers=SAM, json={"supports": []}).json()
+    assert person(v, "adm-dana")["tier"] is None
     v = client.patch("/api/staff/people/adm-dana", headers=SAM, json={"supports": ["writer/draft"]}).json()
-    assert person(v, "adm-dana")["tier"] == 2
+    assert person(v, "adm-dana")["tier"] == 3
     assert client.patch("/api/staff/people/adm-dana", headers=SAM, json={"supports": ["writer/draft/draft"]}).status_code == 400
     # A console someone supports is not deleted from the channel list.
     resp = client.delete("/api/resources/nodes/writer/draft")
     assert resp.status_code == 409
+
+
+def test_training_then_a_director_promotes(client: TestClient) -> None:
+    # Noor finished training on the Reader interface but is not promoted on it yet: tier 1 (the console she is promoted on).
+    v = staff(client)
+    noor = person(v, "hlp-noor")
+    assert {r["nodeId"]: bool(r["promotedBy"]) for r in noor["training"]} == {"reader/library": True, "writer/draft": True, "reader": False}
+    assert noor["tier"] == 1
+    # Only the director of her department (Support: Sam) promotes her; Dana directs Product.
+    assert client.put("/api/staff/people/hlp-noor/promotion", headers=DANA, json={"nodeId": "reader", "promoted": True}).status_code == 400
+    v = client.put("/api/staff/people/hlp-noor/promotion", headers=SAM, json={"nodeId": "reader", "promoted": True}).json()
+    assert person(v, "hlp-noor")["tier"] == 2
+    # No promotion before the training is finished; training is on an interface or a console only.
+    assert client.put("/api/staff/people/hlp-noor/promotion", headers=SAM, json={"nodeId": "writer/book", "promoted": True}).status_code == 400
+    assert client.put("/api/staff/people/hlp-noor/training", headers=SAM, json={"nodeId": DRAFT}).status_code == 400
+    v = client.put("/api/staff/people/hlp-noor/training", headers=ARI, json={"nodeId": "writer/book"}).json()
+    rec = next(r for r in person(v, "hlp-noor")["training"] if r["nodeId"] == "writer/book")
+    assert rec["finishedAt"] and rec["promotedBy"] is None
+    # Taking back the training takes back the promotion.
+    v = client.put("/api/staff/people/hlp-noor/training", headers=SAM, json={"nodeId": "reader", "finished": False}).json()
+    assert person(v, "hlp-noor")["tier"] == 1
+    # An admin is tier 4 on a console only with helper hours and a promotion there.
+    v = client.patch("/api/staff/people/adm-sam", headers=SAM, json={"allotment": None}).json()
+    assert person(v, "adm-sam")["tier"] is None
 
 
 def test_departments_teams_and_the_sla(client: TestClient) -> None:

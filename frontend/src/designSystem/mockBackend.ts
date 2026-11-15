@@ -15,7 +15,7 @@ import { copyOf, createMockFigureModels } from './mockFigureModels'
 import { createMockItems, seedItems } from './mockItems'
 import { createMockMaps, seedMaps } from './mockMaps'
 import { createMockMapBiomes } from './mockMapBiomes'
-import { createMockChannels } from './mockChannels'
+import { consoleIds, createMockChannels } from './mockChannels'
 import { createMockFeedback } from './mockFeedback'
 import { createMockSupport } from './mockSupport'
 import { createMockMapShapes } from './mockMapShapes'
@@ -210,12 +210,12 @@ export function createMockBackend() {
   const biomes = createMockMapBiomes()
   const channels = createMockChannels()
   // The feedback pipeline (Help tiles, the Inbox, the Office's Voting and Channel Management, Assignment).
-  const feedback = createMockFeedback({ planSeed: true })
   const channelNode = (id: string) => (channels.channels().body as { nodes: Array<{ id: string; kind: string }> }).nodes.find(n => n.id === id)
+  const feedback = createMockFeedback({ planSeed: true, isTrainable: id => ['interface', 'console'].includes(channelNode(id)?.kind ?? '') })
   // Support chats, with one waiting and one in progress for the cards.
   const support = createMockSupport({
     isNode: id => !!channelNode(id), isConsole: id => channelNode(id)?.kind === 'console',
-    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), send: (d, u, n, by) => feedback.sendChecked(d, u, n, by), seed: true,
+    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), people: () => feedback.staffPeople(), tierFor: (pid, q) => feedback.tierFor(pid, q), consoles: () => consoleIds((channels.channels().body as { nodes: Parameters<typeof consoleIds>[0] }).nodes), send: (d, u, n, by) => feedback.sendChecked(d, u, n, by), seed: true,
   })
   const libraryShapes = createMockMapShapes()
   // The Characters console's cast, which its edits change in memory only.

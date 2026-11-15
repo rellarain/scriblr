@@ -3,8 +3,8 @@ import type { HelperConversation, HelperUserProfile } from './helperTypes'
 import { getStaffChats, takeChat, useStaffChats } from '../../../support/supportStores'
 
 // The Helper panel's chats, from the support store (support/supportStores.ts) as the staff member acting sees them: the chat heads
-// are the chats they are in; "New chat" takes the next one waiting (the oldest); the profiles feed the sidebar's queue counts (the
-// chats they are in, as active, and the ones waiting).
+// are the chats they are in; "New chat" takes the chat that is next for them by the queues (their switchboard, tier, the queues'
+// levels, then the oldest; backend storage/queues.py); the profiles list the chats they are in, as active, and the ones waiting.
 
 export function useHelperChats() {
   const { view } = useStaffChats()
@@ -21,13 +21,13 @@ export function useHelperChats() {
 
   const selectChat = useCallback((chatId: string | null) => { setSelectedChatId(chatId) }, [])
 
-  // Takes the next chat waiting (the oldest) and opens it; returns its id, or null when nothing is waiting.
+  // Takes the chat that is next for the staff member and opens it; returns its id, or null when nothing is for them now.
   function createConversation(): string | null {
-    const next = getStaffChats().view.waiting[0]
+    const next = getStaffChats().view.next
     if (!next) return null
-    setSelectedChatId(next.id)
-    void takeChat(next.id)
-    return next.id
+    setSelectedChatId(next)
+    void takeChat(next)
+    return next
   }
 
   return { conversations, profiles, selectedChatId: selected, selectChat, createConversation }

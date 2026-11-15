@@ -46,7 +46,8 @@ export interface Chat {
 // A chat in progress with someone else: no messages, the kinds of what staff did instead.
 export type ChatSummary = Omit<Chat, 'events'> & { actions: EventKind[] }
 
-export interface StaffChatView { me: string; waiting: Chat[]; mine: Chat[]; others: ChatSummary[]; closed: Chat[] }
+// `next`: the chat the staff member would take next from the queues that are on for them (queues.py), or null.
+export interface StaffChatView { me: string; waiting: Chat[]; mine: Chat[]; others: ChatSummary[]; closed: Chat[]; next: string | null }
 export interface UserChatView { chats: Chat[] }
 
 export interface ActionInput {
@@ -67,3 +68,50 @@ export const EVENT_LABEL: Record<EventKind, string> = {
   feedbackInitiated: 'Feedback drafted', feedbackConfirmed: 'Feedback sent', escalation: 'Escalated', transfer: 'Transferred',
   checkIn: 'Check-in', hold: 'On hold', stage: 'Stage', focal: 'Feature', taken: 'Taken', closed: 'Closed',
 }
+
+// --- the queues (backend storage/queues.py) ---------------------------------------------------------------------------------
+
+export type QueueLevel = 'low' | 'medium' | 'high' | 'urgent'
+export const LEVELS: QueueLevel[] = ['low', 'medium', 'high', 'urgent']
+export const LEVEL_LABEL: Record<QueueLevel, string> = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' }
+// required: the level asks for this tier; on / off: optional, as the person chose; unavailable: no helper time now.
+export type SwitchState = 'required' | 'on' | 'off' | 'unavailable'
+
+export interface ScheduleBlock { day: number; start: number; hours: number }
+// A week of helper time: `own` false when the week repeats the latest schedule before it.
+export interface ScheduleWeek { start: string; blocks: ScheduleBlock[]; hours: number; own: boolean }
+export interface LevelRanges { medium: number; high: number; urgent: number }
+
+export interface QueueStaff { id: string; name: string; tier: number; state: 'active' | 'idle' | 'inactive' }
+export interface QueueChat { id: string; staffId: string; staffName: string; userName: string; focal: string; stage: ChatStage; tier: number; createdAt: string; actions: EventKind[] }
+export interface QueueWaiting { id: string; userName: string; focal: string; tier: number; waitingSince: string }
+
+export interface QueueRow {
+  id: string
+  pending: number
+  level: QueueLevel
+  autoLevel: QueueLevel
+  override: { level: QueueLevel; until: string } | null
+  ranges: LevelRanges
+  ownRanges: boolean
+  // null: no tier on this console (not on the switchboard).
+  myTier: number | null
+  myState: SwitchState | null
+  // The person is this queue's channel support (sets its levels).
+  canManage: boolean
+  // Admins only (empty for helpers): who is on it, the chats in progress (never their messages), who is waiting.
+  staff: QueueStaff[]
+  chats: QueueChat[]
+  waiting: QueueWaiting[]
+}
+
+export interface QueueView {
+  me: { id: string; name: string; kind: 'helper' | 'admin'; allotment: number | null; onShift: boolean; thisWeek: ScheduleWeek; nextWeek: ScheduleWeek; managesAny: boolean }
+  // Today, Monday 0.
+  today: number
+  levels: LevelRanges
+  queues: QueueRow[]
+  next: string | null
+}
+
+export const DAY_LABEL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']

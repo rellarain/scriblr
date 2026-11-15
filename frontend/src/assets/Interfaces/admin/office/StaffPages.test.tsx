@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { __resetStaffForTests } from '../../../../feedback/staffStore'
 import { getRosterState } from '../../../../staff/rosterStore'
 import { feedbackBackend } from '../../../../test/feedbackBackend'
-import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage } from './StaffPages'
+import { setChannels } from '../../../../channels/channelStore'
+import { createMockChannels } from '../../../../designSystem/mockChannels'
+import type { ResourceNode } from '../../../../api/types'
+import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage, TrainingPage } from './StaffPages'
 
 let backend: ReturnType<typeof feedbackBackend>
 beforeEach(() => {
@@ -17,10 +20,10 @@ describe('Office staff pages', () => {
   it('lists one roster by department, then tier, active above inactive, then by name', async () => {
     render(<RosterPage />)
     const support = await screen.findByRole('region', { name: 'Support' })
-    expect(within(support).getAllByRole('rowheader').map(r => r.textContent)).toEqual(['Ari Chen', 'Noor Haddad', 'Sam Ortiz'])
-    expect(within(support).getAllByRole('row')[3]).toHaveTextContent('Tier 3')
+    expect(within(support).getAllByRole('rowheader').map(r => r.textContent)).toEqual(['Noor Haddad', 'Ari Chen', 'Sam Ortiz'])
+    expect(within(support).getAllByRole('row')[3]).toHaveTextContent('Tier 4')
     const product = screen.getByRole('region', { name: 'Product' })
-    expect(within(product).getAllByRole('rowheader').map(r => r.textContent)).toEqual(['Lee Park', 'Dana Ruiz'])
+    expect(within(product).getAllByRole('rowheader').map(r => r.textContent)).toEqual(['Dana Ruiz', 'Lee Park'])
   })
 
   it('hires a person into a team and terms them (kept, marked as left)', async () => {
@@ -67,5 +70,29 @@ describe('Office staff pages', () => {
     fireEvent.click(within(low).getByRole('button', { name: 'Shorten the Low SLA' }))
     await waitFor(() => expect(getRosterState().view?.sla.low).toBe(144))
     expect(backend.calls).toContain('PUT /staff/sla')
+  })
+
+  it('records finished training, and only their director promotes', async () => {
+    setChannels((createMockChannels().channels().body as { nodes: ResourceNode[] }).nodes)
+    render(<TrainingPage />)
+    // Dana directs Product; Noor is in Support, so Dana cannot promote her.
+    const noor = await screen.findByRole('region', { name: 'Training of Noor Haddad' })
+    expect(within(noor).getByRole('button', { name: 'Promote Noor Haddad on Reader' })).toBeDisabled()
+    // Anyone records a finished training.
+    fireEvent.change(within(noor).getByLabelText('Training Noor Haddad finished'), { target: { value: 'reader/nook' } })
+    fireEvent.click(within(noor).getByRole('button', { name: "Record Noor Haddad's finished training" }))
+    await waitFor(() => expect(person('hlp-noor')?.training.some(r => r.nodeId === 'reader/nook')).toBe(true))
+    expect(within(noor).getByRole('rowheader', { name: 'Reader > Nook' })).toBeInTheDocument()
+  })
+
+  it('a director promotes, which gives the tier', async () => {
+    __resetStaffForTests('adm-sam')
+    setChannels((createMockChannels().channels().body as { nodes: ResourceNode[] }).nodes)
+    render(<TrainingPage />)
+    const noor = await screen.findByRole('region', { name: 'Training of Noor Haddad' })
+    await waitFor(() => expect(within(noor).getByRole('button', { name: 'Promote Noor Haddad on Reader' })).toBeEnabled())
+    fireEvent.click(within(noor).getByRole('button', { name: 'Promote Noor Haddad on Reader' }))
+    await waitFor(() => expect(person('hlp-noor')?.tier).toBe(2))
+    expect(await within(noor).findByRole('button', { name: "Take back Noor Haddad's promotion on Reader" })).toBeInTheDocument()
   })
 })

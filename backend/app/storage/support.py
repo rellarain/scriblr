@@ -8,7 +8,9 @@ How the pieces fit:
     every step is an event: a message (the user's, a helper's or an admin's) or an action (a greeting, a guide sent, feedback
     drafted for the user to confirm, an escalation, a transfer, a check-in, a hold, a change of stage or focal feature).
   - Transferring sends the chat back to waiting in another console's queue; escalating sends it back to waiting at the next
-    tier (helpers are tier 1, channel support tier 2, admins with helper time tier 3; staff.py).
+    tier (1 to 4 on each console: helpers promoted on the console, helpers promoted on its interface, the console's channel
+    support, admins with helper hours promoted on it; staff.py).
+  - The queues' settings and helper time (schedules, levels, the switchboard) are kept here too (queues.py).
   - Feedback drafted in a chat becomes the user's feedback when they confirm it, already checked by that staff member.
   - The user sees their own chats; staff see what is waiting and the chats they are in.
 """
@@ -23,6 +25,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 from . import channels, feedback, project_store, staff
+from .queues import QueueSettings, seed_schedules
 from .schema import utcnow
 
 Stage = Literal["greeting", "issue", "acknowledgement", "solution", "resolution", "closing"]
@@ -34,6 +37,7 @@ EventKind = Literal[
 ChatStatus = Literal["pending", "active", "closed"]
 SCHEMA_VERSION = 1
 TEXT_MAX = 2000
+TIER_TOP = 4
 CHATS_MAX = 5000
 
 
@@ -80,7 +84,7 @@ class Chat(BaseModel):
     userName: str = ""
     queue: str
     focal: str
-    tier: int = Field(default=1, ge=1, le=3)
+    tier: int = Field(default=1, ge=1, le=TIER_TOP)
     staffId: str = ""
     status: ChatStatus = "pending"
     stage: Stage = "greeting"
@@ -93,6 +97,7 @@ class Chat(BaseModel):
 class SupportFile(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     chats: list[Chat] = Field(default_factory=list)
+    queues: QueueSettings = Field(default_factory=QueueSettings)
 
 
 # --------------------------------------------------------------------------
@@ -113,7 +118,10 @@ def _save(root: Path, file: SupportFile) -> None:
 def _load(root: Path) -> SupportFile:
     path = _path(root)
     if not path.exists():
-        return SupportFile()
+        # First use: the sample staff's hours this week.
+        file = SupportFile()
+        seed_schedules(file.queues, staff.load(root), datetime.now().astimezone())
+        return file
     try:
         return SupportFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
@@ -341,7 +349,7 @@ def act(
         _back_to_waiting(chat)
         chat.stage = "acknowledgement"
     elif action == "escalation":
-        if chat.tier >= 3:
+        if chat.tier >= TIER_TOP:
             raise SupportError("This chat is at the top tier already.")
         chat.tier += 1
         ev.toTier = chat.tier

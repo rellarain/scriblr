@@ -14,3 +14,5 @@
 .stInactive { color: var(--ink-muted); }
 .stStep { display: inline-flex; align-items: center; gap: 4px; }
 .stStepValue { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.stActions { white-space: nowrap; text-align: right; }
+.stHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

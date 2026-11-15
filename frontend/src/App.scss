@@ -1038,17 +1038,9 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   overflow-y: auto;
 }
 
-// Shared read-only placeholder body (heading + paragraph), used by the
-// Queue analytics collapsible and the composer's Help tool mode.
-.helperPlaceholderContent {
-  h2 { font-size: 15px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
-  p { font-size: 13px; opacity: 0.85; }
-}
-
-// --- Queue console: department (page) card > console card > component list ---
-// The Queue console gets its own full-size, scrollbar-less wrapper (rather
-// than reusing .helperChatsSection/.helperChatsScroll, which other panels
-// still rely on for a visible scrollbar) so it always fills .hUIMain.
+// --- Queue console and Helper > Settings (helper/queue.scss holds the rest) ---
+// The Queue console and Settings get their own full-size, scrollbar-less wrapper
+// (the Conversation keeps .helperChatsSection/.helperChatsScroll) so they always fill .hUIMain.
 .queueSection {
   width: 100%;
   height: 100%;
@@ -1068,60 +1060,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   scrollbar-width: none; // Firefox
   -ms-overflow-style: none; // old Edge/IE
   &::-webkit-scrollbar { display: none; } // Chrome/Safari
-
-  // Scoped override: .helperPlaceholderContent is shared with Settings/the
-  // composer's Help tool mode, so align just this one with the department
-  // cards' 10px side margin instead of changing the shared class.
-  > .helperPlaceholderContent { margin: 10px 0 0 10px; }
 }
 
-// Departments are collapsible cards, collapsed by default -- expand one to
-// reveal its consoles nested inside. Each console is a checkbox (checking
-// it means "accept chats from this queue"), styled as its own darkened
-// card; its component list nests one shade darker still. Checking a
-// console recolors it (and its components) into shades of the accent
-// color instead of the neutral darkened background.
-
-.queueDepartment {
-  margin: 8px 10px 0;
-  background: var(--ov-sink-2);
-  border-radius: 0;
-  padding: 10px 12px;
-  &:last-child { margin-bottom: 10px; }
-}
-.queueDepartmentToggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: var(--ink);
-  padding: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-.queueDepartmentBody { padding-top: 6px; }
-
-// A console is now just a checkbox row -- checking it means "accept chats
-// from this queue" -- styled as its own darkened card, recoloring into an
-// accent shade once checked.
-.queueConsole {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--ov-sink-1);
-  border-radius: 0;
-  padding: 6px 8px;
-  color: var(--ink);
-  font-size: 12px;
-  cursor: pointer;
-  &--selected { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
-
-  input[type='checkbox'] { accent-color: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
-}
-
-.queueEmptyNote { font-size: 12px; opacity: 0.6; font-style: italic; padding: 2px 0; }
 
 // --- Inbox: icon tabs, validation, processing, configuration ---
 //

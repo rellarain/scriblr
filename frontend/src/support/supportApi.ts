@@ -1,5 +1,5 @@
 import { api, type ApiHeaders } from '../api/client'
-import type { ActionInput, StaffChatView, UserChatView } from './supportTypes'
+import type { ActionInput, LevelRanges, QueueLevel, QueueView, ScheduleBlock, StaffChatView, UserChatView } from './supportTypes'
 
 // The support routes (backend/app/api/support.py). The user's side needs no admin; staff calls name the staff member acting.
 
@@ -20,4 +20,13 @@ export const staffSupportApi = {
   take: (a: string, chatId: string) => api.post<StaffChatView>(`/support/chats/${id(chatId)}/take`, undefined, as(a)),
   send: (a: string, chatId: string, text: string) => api.post<StaffChatView>(`/support/chats/${id(chatId)}/messages`, { text }, as(a)),
   act: (a: string, chatId: string, input: ActionInput) => api.post<StaffChatView>(`/support/chats/${id(chatId)}/actions`, input, as(a)),
+}
+
+// The Queue console (helper time, the switchboard, levels), each answered with the whole queue view.
+export const queueApi = {
+  load: (a: string) => api.get<QueueView>('/support/queues', as(a)),
+  schedule: (a: string, blocks: ScheduleBlock[]) => api.put<QueueView>('/support/schedule', { blocks }, as(a)),
+  setSwitch: (a: string, queue: string, on: boolean) => api.put<QueueView>('/support/switchboard', { queue, on }, as(a)),
+  setRanges: (a: string, queue: string | null, ranges: LevelRanges | null) => api.put<QueueView>('/support/levels', { queue, ranges }, as(a)),
+  setOverride: (a: string, queue: string, level: QueueLevel | null, hours: number) => api.put<QueueView>('/support/overrides', { queue, level, hours }, as(a)),
 }

@@ -17,4 +17,6 @@ export const staffApi = {
   editTeam: (a: string, tid: string, patch: GroupPatch) => api.patch<StaffView>(`/staff/teams/${id(tid)}`, patch, as(a)),
   removeTeam: (a: string, tid: string) => api.delete<StaffView>(`/staff/teams/${id(tid)}`, as(a)),
   setSla: (a: string, sla: Partial<Record<Priority, number>>) => api.put<StaffView>('/staff/sla', sla, as(a)),
+  setTraining: (a: string, pid: string, nodeId: string, finished: boolean) => api.put<StaffView>(`/staff/people/${id(pid)}/training`, { nodeId, finished }, as(a)),
+  promote: (a: string, pid: string, nodeId: string, promoted: boolean) => api.put<StaffView>(`/staff/people/${id(pid)}/promotion`, { nodeId, promoted }, as(a)),
 }

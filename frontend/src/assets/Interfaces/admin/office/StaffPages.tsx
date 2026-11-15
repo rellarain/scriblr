@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, RestoreIcon, TrashIcon, CloseIcon } from '../../../icons'
+import { ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, RestoreIcon, TrashIcon, CloseIcon } from '../../../icons'
+import { useChannels } from '../../../../channels/channelStore'
+import { childrenOf, labelOf } from '../../../../channels/channelTree'
+import { useStaff } from '../../../../feedback/staffStore'
 import ActingAs from '../../../../feedback/ActingAs'
 import '../../../../feedback/feedback.scss'
 import { staffApi } from '../../../../staff/staffApi'
@@ -7,11 +10,12 @@ import type { Person, PersonKind, Priority, StaffView } from '../../../../staff/
 import { changeRoster, clearRosterError, loadRoster, useRoster } from '../../../../staff/rosterStore'
 import './staff.scss'
 
-// Admin > Office's staff pages (Department Roster, Department Details, Allotment, Hire/Term Admin) and Configuration > SLA, over one
-// staff view (staff/rosterStore.ts). Support tiers are worked out: a helper is tier 1, an admin who supports console queues tier 2,
-// an admin with helper time tier 3. Changes act as the staff member in the Acting as chip.
+// Admin > Office's staff pages (Department Roster, Department Details, Allotment, Hire/Term Admin, Monitor Training) and
+// Configuration > SLA, over one staff view (staff/rosterStore.ts). Support tiers are worked out per console: 1 a helper promoted on
+// it, 2 a helper promoted on its interface, 3 its channel support, 4 an admin with helper hours promoted on it (the roster shows the
+// highest anywhere). Changes act as the staff member in the Acting as chip.
 
-const TIER_LABEL: Record<number, string> = { 1: 'Tier 1', 2: 'Tier 2', 3: 'Tier 3' }
+const TIER_LABEL: Record<number, string> = { 1: 'Tier 1', 2: 'Tier 2', 3: 'Tier 3', 4: 'Tier 4' }
 const KIND_LABEL: Record<PersonKind, string> = { helper: 'Helper', admin: 'Admin' }
 const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' }
 
@@ -255,6 +259,73 @@ export function SlaPage() {
           </tbody>
         </table>
       )}
+    </Frame>
+  )
+}
+
+// --- Monitor Training ------------------------------------------------------------------------------------------------------
+
+const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '')
+
+// Training finished on interfaces and consoles, recorded per person, and the director's promotion that gives the tier (until Training
+// keeps records per staff member, finishing is recorded here by hand).
+export function TrainingPage() {
+  const { index } = useChannels()
+  const { adminId } = useStaff()
+  const [picks, setPicks] = useState<Record<string, string>>({})
+  const places = childrenOf(index, null).flatMap(i => [i, ...childrenOf(index, i.id)])
+  return (
+    <Frame label="Monitor Training">
+      {view => {
+        const directors = new Set(view.departments.map(d => d.directorId).filter(Boolean))
+        const mayPromote = (p: Person) => {
+          const own = view.departments.find(d => d.id === p.departmentId)?.directorId ?? null
+          return own ? adminId === own : directors.has(adminId)
+        }
+        return (
+          <div className="fbList">
+            {view.people.filter(p => p.active).map(p => {
+              const may = mayPromote(p)
+              const pick = picks[p.id] ?? ''
+              return (
+                <section key={p.id} className="stGroup" aria-label={`Training of ${p.name}`}>
+                  <h3 className="fbLabel">{p.name} <span className="fbMuted">{p.tier ? TIER_LABEL[p.tier] : KIND_LABEL[p.kind]}</span></h3>
+                  {p.training.length > 0 && (
+                    <table className="stTable">
+                      <thead><tr><th scope="col">Part of the app</th><th scope="col">Finished</th><th scope="col">Promoted</th><th scope="col"><span className="stHidden">Changes</span></th></tr></thead>
+                      <tbody>
+                        {p.training.map(r => {
+                          const label = labelOf(index, r.nodeId)
+                          return (
+                            <tr key={r.nodeId}>
+                              <th scope="row">{label}</th>
+                              <td>{day(r.finishedAt)}</td>
+                              <td>{r.promotedBy ? `${nameOf(view, r.promotedBy)}, ${day(r.promotedAt)}` : <span className="fbMuted">Not yet</span>}</td>
+                              <td className="stActions">
+                                {r.promotedBy
+                                  ? <button type="button" className="fbIconBtn" disabled={!may} aria-label={`Take back ${p.name}'s promotion on ${label}`} title={may ? 'Take back the promotion' : 'Only their director promotes'} onClick={() => void changeRoster(a => staffApi.promote(a, p.id, r.nodeId, false))}><ChevronDownIcon size={12} /></button>
+                                  : <button type="button" className="fbIconBtn" disabled={!may} aria-label={`Promote ${p.name} on ${label}`} title={may ? 'Promote' : 'Only their director promotes'} onClick={() => void changeRoster(a => staffApi.promote(a, p.id, r.nodeId, true))}><ChevronUpIcon size={12} /></button>}
+                                <button type="button" className="fbIconBtn" aria-label={`Remove ${p.name}'s training on ${label}`} title="Not finished after all (takes back the promotion)" onClick={() => void changeRoster(a => staffApi.setTraining(a, p.id, r.nodeId, false))}><TrashIcon size={12} /></button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                  <div className="fbRow">
+                    <select className="fbSelect" value={pick} aria-label={`Training ${p.name} finished`} onChange={e => setPicks(prev => ({ ...prev, [p.id]: e.target.value }))}>
+                      <option value="">Training finished on…</option>
+                      {places.filter(n => !p.training.some(r => r.nodeId === n.id)).map(n => <option key={n.id} value={n.id}>{labelOf(index, n.id)}</option>)}
+                    </select>
+                    <button type="button" className="fbIconBtn" disabled={!pick} aria-label={`Record ${p.name}'s finished training`} title="Record the finished training" onClick={() => { void changeRoster(a => staffApi.setTraining(a, p.id, pick, true)); setPicks(prev => ({ ...prev, [p.id]: '' })) }}><PlusIcon size={12} /></button>
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+        )
+      }}
     </Frame>
   )
 }

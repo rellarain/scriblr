@@ -10,7 +10,7 @@ from ..storage import staff as store
 from . import feedback as feedback_api
 
 # The staff (Admin > Office): the roster, the departments and teams, helper hours, the console queues each person
-# supports, and the SLA per priority. Every call acts as the staff member in the X-Admin-Id header (no login yet; anyone
+# supports, training and promotions, and the SLA per priority. Every call acts as the staff member in the X-Admin-Id header (no login yet; anyone
 # may change it for now) and returns the whole staff view.
 router = APIRouter(prefix="/api/staff", tags=["staff"])
 
@@ -46,6 +46,16 @@ class PersonPatch(BaseModel):
     supports: Optional[list[str]] = None
 
 
+class TrainingBody(BaseModel):
+    nodeId: str
+    finished: bool = True
+
+
+class PromoteBody(BaseModel):
+    nodeId: str
+    promoted: bool = True
+
+
 class NameBody(BaseModel):
     name: str = Field(max_length=store.NAME_MAX)
     departmentId: Optional[str] = None
@@ -71,6 +81,16 @@ def post_person(body: HireBody, admin_id: str = Depends(feedback_api.current_adm
 @router.patch("/people/{person_id}")
 def patch_person(person_id: str, body: PersonPatch, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
     return _run(root, admin_id, lambda f: store.edit_person(f, root, person_id, body.model_dump(exclude_unset=True)))
+
+
+@router.put("/people/{person_id}/training")
+def put_training(person_id: str, body: TrainingBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _run(root, admin_id, lambda f: store.set_training(f, root, person_id, body.nodeId, body.finished))
+
+
+@router.put("/people/{person_id}/promotion")
+def put_promotion(person_id: str, body: PromoteBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _run(root, admin_id, lambda f: store.promote(f, admin_id, person_id, body.nodeId, body.promoted))
 
 
 @router.post("/departments")

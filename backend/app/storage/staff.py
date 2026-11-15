@@ -6,9 +6,13 @@ How the pieces fit:
   - The people are the staff the feedback pipeline acts as (its `admins`, which keep each person's roles per console).
     Hiring adds a person to both; a person who leaves is marked inactive, never deleted, so what they did keeps their name.
     On first use the staff are made from the feedback admins, placed in a small sample organisation.
-  - A person's support tier is worked out, not set: a helper is tier 1; an admin who supports console queues (channel
-    support) is tier 2; an admin with helper time is tier 3 (mainly serving tier 2).
-  - The roster is one list: by department, then tier, active above inactive, then by name.
+  - Support tiers are per console and worked out, not set: tier 1 is a helper promoted on that console, tier 2 a helper
+    promoted on its interface, tier 3 the console's channel support (the people who support its queue: they manage it),
+    tier 4 an admin with helper hours promoted on that console. Someone with no tier on a console does not take its chats.
+  - Promotion follows training: a person's finished training on an interface or a console is recorded (by hand until
+    Training keeps records per staff member), then a director promotes them on it.
+  - The roster is one list: by department, then tier (the highest a person has anywhere), active above inactive, then by
+    name.
   - Plan work is due within the SLA of its priority, counted from when it was assigned (project_plan.py works out the
     escalation when the plan is read).
 """
@@ -18,11 +22,13 @@ import re
 import threading
 import uuid
 from pathlib import Path
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from . import channels, feedback, project_store
+from .schema import utcnow
 
 PersonKind = Literal["helper", "admin"]
 ALLOTMENTS = (5, 10, 20, 30)
@@ -30,6 +36,8 @@ SCHEMA_VERSION = 1
 NAME_MAX = 80
 PRIORITIES = ("urgent", "high", "normal", "low")
 DEFAULT_SLA = {"urgent": 4, "high": 24, "normal": 72, "low": 168}
+TIER_MAX = 4
+TRAINING_MAX = 200
 
 
 class StaffError(Exception):
@@ -38,6 +46,15 @@ class StaffError(Exception):
 
 class NotFound(StaffError):
     status = 404
+
+
+class Training(BaseModel):
+    """Training a person finished on an interface or a console, and the director's promotion on it."""
+
+    nodeId: str
+    finishedAt: datetime = Field(default_factory=utcnow)
+    promotedBy: Optional[str] = None
+    promotedAt: Optional[datetime] = None
 
 
 class Person(BaseModel):
@@ -49,8 +66,10 @@ class Person(BaseModel):
     teamId: Optional[str] = None
     # Helper hours a week the Office allots (5, 10, 20 or 30), or none.
     allotment: Optional[int] = None
-    # The console queues (channel ids) this person supports.
+    # The console queues (channel ids) this person supports (channel support).
     supports: list[str] = Field(default_factory=list)
+    # Training finished on interfaces and consoles, and promotions.
+    training: list[Training] = Field(default_factory=list, max_length=TRAINING_MAX)
 
 
 class Department(BaseModel):
@@ -97,12 +116,21 @@ def _seed(root: Path) -> StaffFile:
     lee = next((p for p in file.people if p.id == "adm-lee"), None)
     if lee:
         lee.supports = ["reader/library", "reader/nook"]
+        lee.allotment = 10
+    dana = next((p for p in file.people if p.id == "adm-dana"), None)
+    if dana:
+        dana.supports = ["writer/draft"]
     sam = next((p for p in file.people if p.id == "adm-sam"), None)
     if sam:
         sam.allotment = 10
+        sam.training = [Training(nodeId="writer/draft", promotedBy="adm-sam", promotedAt=utcnow())]
     for pid, name in (("hlp-ari", "Ari Chen"), ("hlp-noor", "Noor Haddad")):
         file.people.append(Person(id=pid, name=name, kind="helper", departmentId="dep-support", teamId="team-help", allotment=20 if pid == "hlp-ari" else 10))
         feedback_admin(root, pid, name)
+    ari = next(p for p in file.people if p.id == "hlp-ari")
+    ari.training = [Training(nodeId="writer/draft", promotedBy="adm-sam", promotedAt=utcnow()), Training(nodeId="writer", promotedBy="adm-sam", promotedAt=utcnow())]
+    noor = next(p for p in file.people if p.id == "hlp-noor")
+    noor.training = [Training(nodeId="reader/library", promotedBy="adm-sam", promotedAt=utcnow()), Training(nodeId="writer/draft", promotedBy="adm-sam", promotedAt=utcnow()), Training(nodeId="reader")]
     return file
 
 
@@ -162,8 +190,11 @@ def mutate(root: Path, fn) -> StaffFile:
 
 
 def _uses(root: Path, ids: set[str]) -> list[str]:
-    n = sum(1 for p in load(root).people if any(s in ids for s in p.supports))
-    return [f"{n} staff member{'s' if n != 1 else ''} supporting its queue"] if n else []
+    people = load(root).people
+    n = sum(1 for p in people if any(s in ids for s in p.supports))
+    t = sum(1 for p in people if any(r.nodeId in ids for r in p.training))
+    out = [f"{n} staff member{'s' if n != 1 else ''} supporting its queue"] if n else []
+    return out + ([f"training of {t} staff member{'s' if t != 1 else ''}"] if t else [])
 
 
 channels.register_use_check(_uses)
@@ -174,14 +205,44 @@ channels.register_use_check(_uses)
 # --------------------------------------------------------------------------
 
 
-def tier_of(p: Person) -> Optional[int]:
-    if p.kind == "helper":
-        return 1
-    if p.allotment:
+def interface_of(console_id: str) -> str:
+    return console_id.split("/")[0]
+
+
+def promoted(p: Person, node_id: str) -> bool:
+    return any(r.nodeId == node_id and r.promotedBy for r in p.training)
+
+
+def tier_for(p: Person, console_id: str) -> Optional[int]:
+    """The person's support tier on a console (the highest that applies), or None: they do not take its chats. Someone
+    who left has none."""
+    if not p.active:
+        return None
+    if p.kind == "admin" and p.allotment and promoted(p, console_id):
+        return 4
+    if console_id in p.supports:
         return 3
-    if p.supports:
+    if p.kind == "helper" and promoted(p, interface_of(console_id)):
         return 2
+    if p.kind == "helper" and promoted(p, console_id):
+        return 1
     return None
+
+
+def tier_of(p: Person) -> Optional[int]:
+    """The highest tier a person has on any console (the roster's); none for someone who left."""
+    if not p.active:
+        return None
+    tiers = [3 for _ in p.supports]
+    for r in p.training:
+        if not r.promotedBy:
+            continue
+        console = "/" in r.nodeId
+        if p.kind == "admin" and console and p.allotment:
+            tiers.append(4)
+        elif p.kind == "helper":
+            tiers.append(1 if console else 2)
+    return max(tiers) if tiers else None
 
 
 def roster(file: StaffFile) -> list[Person]:
@@ -299,6 +360,37 @@ def edit_person(file: StaffFile, root: Path, pid: str, changes: dict) -> None:
         if bad:
             raise StaffError(f"No console {bad[0]}.")
         p.supports = list(dict.fromkeys(changes["supports"]))
+
+
+def set_training(file: StaffFile, root: Path, pid: str, node_id: str, finished: bool) -> None:
+    """Record (or take back) a person's finished training on an interface or a console. Taking it back takes back the
+    promotion too."""
+    from . import resources
+    p = person(file, pid)
+    kinds = {n.id: n.kind for n in resources.load_resources(root).nodes}
+    if kinds.get(node_id) not in ("interface", "console"):
+        raise StaffError("Training is on an interface or a console.")
+    has = next((r for r in p.training if r.nodeId == node_id), None)
+    if finished and has is None:
+        if len(p.training) >= TRAINING_MAX:
+            raise StaffError("Too many training records.")
+        p.training.append(Training(nodeId=node_id))
+    elif not finished and has is not None:
+        p.training.remove(has)
+
+
+def promote(file: StaffFile, me: str, pid: str, node_id: str, on: bool) -> None:
+    """A director promotes a person on an interface or a console they finished training on (or takes it back): the
+    director of the person's department, or any director when they have none."""
+    p = person(file, pid)
+    directors = {d.directorId for d in file.departments if d.directorId}
+    own = next((d.directorId for d in file.departments if d.id == p.departmentId), None) if p.departmentId else None
+    if (own and me != own) or (not own and me not in directors):
+        raise StaffError("Only a director promotes" + (" (the director of their department)." if own else "."))
+    r = next((x for x in p.training if x.nodeId == node_id), None)
+    if r is None:
+        raise StaffError("Their training there is not finished yet.")
+    r.promotedBy, r.promotedAt = (me, utcnow()) if on else (None, None)
 
 
 def add_department(file: StaffFile, name: str) -> Department:

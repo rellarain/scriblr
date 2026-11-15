@@ -14,6 +14,7 @@ interface SidebarDividerProps {
   onSelectPanel: (panel: HuiPanel) => void
   expanded: boolean
   onCollapse: () => void
+  // The meter (App.tsx, from the real queues): "admin" counts escalated chats (tier 2 and up), "standard" first-tier ones.
   activeAdminCount: number
   activeStandardCount: number
   pendingAdminCount: number
@@ -83,8 +84,8 @@ function SidebarDivider({
         className={isQueueActive ? 'queueButton queueButton--active' : 'queueButton'}
         aria-pressed={isQueueActive}
         aria-label={
-          `Queue console: ${activeAdminCount} admin and ${activeStandardCount} standard users being helped, ` +
-          `${pendingAdminCount} admin and ${pendingStandardCount} standard users waiting`
+          `Queue console: ${activeAdminCount + activeStandardCount} chats in progress (${activeAdminCount} escalated), ` +
+          `${pendingAdminCount + pendingStandardCount} waiting for you (${pendingAdminCount} escalated)`
         }
         title="Queue console"
         onClick={() => onSelectPanel('queue')}

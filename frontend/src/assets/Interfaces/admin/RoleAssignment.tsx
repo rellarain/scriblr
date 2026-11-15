@@ -11,8 +11,8 @@ import { changeRoster, useRoster } from '../../../staff/rosterStore'
 // statements about the interface itself). A Checker checks feedback in the Inbox (on Helper > Inbox), a Voter votes on the
 // console's statements, a Channel manager corrects them (and, on Helper > Inbox, keeps the verbs), a Planner accepts or vetoes
 // them. The changes are made as the staff member acting (there is no login yet) and kept in a role history; nobody can remove
-// their own Channel manager role on Helper > Inbox. On a console, Supports puts the person on its support queue (channel support: tier 2 for
-// an admin).
+// their own Channel manager role on Helper > Inbox. On a console, Supports makes the person its channel support (tier 3 there: they manage
+// its queue).
 
 const ROLES: Array<{ key: Role; label: string; hint: string }> = [
   { key: 'checker', label: 'Checker', hint: 'Checks feedback in the Inbox (on Helper > Inbox)' },

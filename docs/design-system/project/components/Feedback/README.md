@@ -63,7 +63,7 @@ Each **message card** under it carries the text (the words that could mean a ver
 
 ## The Helper's chats
 
-The Helper panel's **Conversation** tile (`helper/ChatsSection.tsx`, its state in `helper/useHelperChats.ts`) is the staff side of the Help tile's Chat. The sidebar's **New chat** takes the chat that has waited longest; the chat heads are the chats the staff member acting is in. A chat that is transferred, escalated or closed leaves the panel.
+The Helper panel's **Conversation** tile (`helper/ChatsSection.tsx`, its state in `helper/useHelperChats.ts`) is the staff side of the Help tile's Chat. The sidebar's **New chat** takes the chat that is next for the staff member by the queues (below); the chat heads are the chats the staff member acting is in. A chat that is transferred, escalated or closed leaves the panel.
 
 - **Header**: back, the writer's name, the queue (a console) and the support tier, and the **Stage** select (Greeting, The issue, Acknowledgement, Solutions, Resolution, Closing).
 - **Focal feature**: what the chat is about, changed with the subject picker.
@@ -74,7 +74,35 @@ The Helper panel's **Conversation** tile (`helper/ChatsSection.tsx`, its state i
   - **Feedback**: a form, **Draft feedback**: subject, verb chips, **The feedback**, how the writer feels, and **Draft it for the writer to confirm**.
 - **Actions**: Check in, Put on hold, Escalate (the next tier, at most 3; back to waiting), **Transfer to** another console with **Transfer** (back to waiting in that queue), and Close the chat.
 
-Every change is saved at once (`support.json`) and both sides read again, so a message sent in a Help tile shows in the Helper panel straight away and the other way round. The Queue console (who supports which queue, levels, the switchboard) is the next step.
+Every change is saved at once (`support.json`) and both sides read again, so a message sent in a Help tile shows in the Helper panel straight away and the other way round.
+
+## The Queue console (Helper)
+
+One console per console queue of the channel list (`helper/QueueSection.tsx`, `helper/queue.scss`; the store `useQueues` in `support/supportStores.ts`; backend `storage/queues.py`), for two audiences.
+
+- **Support tiers** are per console ([Staff](../Staff/README.md)): 1 a helper promoted on it, 2 a helper promoted on its interface, 3 its channel support, 4 an admin with helper hours promoted on it. A chat starts at tier 1; escalating moves it up, to 4 at most.
+- **Helper time**: being inside one of this week's scheduled blocks (Helper > Settings, below).
+- **Levels**: Low, Medium, High, Urgent, from how many users are waiting, by ranges the queue's channel support set (one default, and per queue). A temporary override raises a queue's level for 1 to 24 hours.
+- **For everyone, the switchboard**:
+  - the staff member, On shift or Off shift, and their hours this week;
+  - per interface, a row for each console where they have a tier: its name, their tier (T1 to T4), its level chip, how many are waiting, and a switch (`role="switch"`);
+  - a queue is **required** (on, locked) up to a tier set by its level: Low tier 1, Medium tiers 1-2, High tiers 1-3, Urgent every tier; above that it is optional and the switch is theirs;
+  - without helper time every switch is off and locked.
+- **The next chat** (New chat): from the queues that are on, a chat at their own tier first (an escalation from the tier below); a lower tier's chat only when its queue is High or Urgent, or nobody of the tiers between is covering it; then by level, then the oldest.
+- **For admins, the queues** (a `<details>` card each, with its level, waiting and in-progress counts):
+  - **People**: everyone with a tier there, Active (in a chat in it), Idle (helper time, the queue on, no chat) or Inactive;
+  - **In progress**: staff, writer, feature, stage and the last action with the count, never the messages;
+  - **Waiting**: writer, feature, tier and how long;
+  - for the queue's channel support, **Levels**: steppers for Medium from, High from and Urgent from (each kept between its neighbours), Use the default levels, and Raise the level (a select) for some hours.
+  - Channel support also set the **Default levels** at the top.
+
+The sidebar's queue meter counts the chats the staff member is in and those waiting for them, escalated and first-tier.
+
+## Helper > Settings: the schedule
+
+- **This week**: the blocks, fixed.
+- **Next week**: a row per day with a switch, the start (a stepper by the hour) and the hours (a stepper, 1 to 12, ending by midnight), the total against the allotment, and **Save next week** (`SaveIcon`). A week with no schedule of its own repeats the latest one.
+- Without helper hours it says so.
 
 ## Roles and Acting as
 
@@ -112,3 +140,4 @@ User > Dashboard > Notifications lists the feedback with questions waiting first
 - Don't treat a vote as the decision: the planner accepts or vetoes.
 - Don't send feedback for the writer from a chat: draft it, and the writer sends it as theirs.
 - Don't show a chat's messages anywhere but in that chat: elsewhere it is listed by its writer, queue, stage and actions only.
+- Don't change this week's schedule: coverage is fixed per week; only next week's is set.

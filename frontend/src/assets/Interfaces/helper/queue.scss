@@ -1,0 +1,65 @@
+// The Queue console and the Helper's schedule (QueueSection.tsx, SettingsSection.tsx). Theme tokens only; fields and buttons come
+// from feedback.scss. Level chips use pairs the contrast audit already checks: ink on a sunk ground (low), on-accent on the accent
+// (medium), on-alert on the alert (high, and urgent with an ink ring).
+
+.queueScroll { padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
+.qMe { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.qShift {
+  padding: 1px 8px; font-size: 11px; font-weight: 700; background: var(--ov-sink-2); color: var(--ink);
+  &--on { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
+}
+.qBoard, .qAdmin { display: flex; flex-direction: column; gap: 8px; }
+.qGroup { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--ov-sink-1); }
+.qRow { display: flex; align-items: center; gap: 8px; font-size: 12.5px; min-height: 28px; }
+.qName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qCount { min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.qLevel {
+  padding: 1px 7px; font-size: 11px; font-weight: 700; background: var(--ov-sink-2); color: var(--ink);
+  &--medium { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
+  &--high, &--urgent { background: var(--alert); color: var(--on-alert); }
+  &--urgent { box-shadow: inset 0 0 0 2px var(--ink); }
+}
+
+// A switch: a track with a knob, the knob at the end when on.
+.qSwitch {
+  flex: 0 0 auto; position: relative; width: 34px; height: 18px; padding: 0; border-radius: 9px;
+  background: var(--ov-sink-2); box-shadow: inset 0 0 0 1px var(--hairline);
+  .qKnob { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); transition: left 120ms; }
+  &[aria-checked='true'] {
+    background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+    .qKnob { left: 19px; background: var(--on-accent); }
+  }
+  &:disabled { cursor: default; opacity: 0.7; }
+  &:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .qKnob { transition: none; } }
+}
+
+.qCard {
+  padding: 8px 10px; background: var(--ov-sink-1);
+  > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; }
+  .fbLabel { margin: 8px 0 4px; }
+}
+.qPeople {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px;
+  li { display: flex; gap: 8px; align-items: center; > :first-child { flex: 1 1 auto; } }
+}
+.qState {
+  font-size: 11px; font-weight: 700; padding: 0 6px; background: var(--ov-sink-2); color: var(--ink);
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
+  &--inactive { color: var(--ink-muted); background: transparent; }
+}
+.qTable {
+  width: 100%; border-collapse: collapse; font-size: 11.5px;
+  th, td { padding: 3px 4px; text-align: left; vertical-align: top; }
+  thead th { font-size: 10.5px; color: var(--ink-muted); font-weight: 700; }
+  tbody tr { box-shadow: inset 0 -1px 0 var(--hairline); }
+}
+.qRanges { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.qStep { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.qStepLabel { color: var(--ink-muted); }
+.qStepValue { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+
+// The Helper's schedule (Settings).
+.qWeek { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--ov-sink-1); }
+.qDay { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; min-height: 28px; > .qDayName { width: 124px; } }

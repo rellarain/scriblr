@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from ..deps import get_app_data_storage_root
 from ..storage import feedback as fb_store
+from ..storage import queues
 from ..storage import resources
 from ..storage import staff as staff_store
 from ..storage import support as store
@@ -13,7 +15,8 @@ from . import feedback as feedback_api
 
 # Support chats. A user starts one from a Help tile and follows it in "mine"; staff take chats from the queues, talk, send
 # guides, draft feedback, transfer, escalate and close them. Staff calls act as the X-Admin-Id staff member and return the
-# staff view; the user's calls need no admin and return the user's chats.
+# staff view (with the chat that is next for them); the user's calls need no admin and return the user's chats. The queue
+# routes (helper time, the switchboard, levels) return the Queue console's view (queues.py).
 router = APIRouter(prefix="/api/support", tags=["support"])
 
 
@@ -28,10 +31,41 @@ def _known(root: Path) -> dict[str, str]:
     return {n.id: n.kind for n in resources.load_resources(root).nodes}
 
 
+def _now() -> datetime:
+    """Local time (helper schedules are in the user's own hours); tests replace it."""
+    return datetime.now().astimezone()
+
+
+def _consoles(root: Path) -> list[str]:
+    """The console queues, in the channel list's order."""
+    nodes = resources.load_resources(root).nodes
+    interfaces = sorted((n for n in nodes if n.kind == "interface"), key=lambda n: n.order)
+    out: list[str] = []
+    for i in interfaces:
+        out += [n.id for n in sorted((n for n in nodes if n.kind == "console" and n.parentId == i.id), key=lambda n: n.order)]
+    return out
+
+
+def _with_next(root: Path, file: store.SupportFile, admin_id: str) -> dict:
+    view = store.staff_view(file, admin_id)
+    view["next"] = queues.next_for(file, file.queues, staff_store.load(root), admin_id, _consoles(root), _now())
+    return view
+
+
 def _staff(root: Path, admin_id: str, fn: Callable[[store.SupportFile], None]) -> dict:
     def go() -> dict:
         fb_store.admin_by_id(fb_store.load(root), admin_id)
-        return store.staff_view(store.mutate(root, fn), admin_id)
+        return _with_next(root, store.mutate(root, fn), admin_id)
+    return _guard(go)
+
+
+def _queues(root: Path, admin_id: str, fn: Optional[Callable[[store.SupportFile, staff_store.StaffFile, list[str], datetime], None]] = None) -> dict:
+    def go() -> dict:
+        sf = staff_store.load(root)
+        consoles = _consoles(root)
+        now = _now()
+        file = store.mutate(root, lambda f: fn(f, sf, consoles, now)) if fn else store.load(root)
+        return queues.view(file, file.queues, sf, admin_id, consoles, now)
     return _guard(go)
 
 
@@ -111,7 +145,7 @@ def post_confirm(chat_id: str, event_id: str, body: ConfirmBody, root: Path = De
 
 @router.get("")
 def get_staff_view(admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
-    return _guard(lambda: store.staff_view(store.load(root), admin_id))
+    return _guard(lambda: _with_next(root, store.load(root), admin_id))
 
 
 @router.post("/chats/{chat_id}/take")
@@ -132,3 +166,64 @@ def post_action(chat_id: str, body: ActionBody, admin_id: str = Depends(feedback
     return _staff(root, admin_id, lambda f: store.act(
         f, fb, admin_id, chat_id, known, body.action, text=body.text, node_id=body.nodeId, stage=body.stage,
         to_queue=body.toQueue, draft=body.draft.model_dump() if body.draft else None))
+
+
+# --- the queues ---------------------------------------------------------------------
+
+
+class BlockBody(BaseModel):
+    day: int
+    start: int
+    hours: int
+
+
+class ScheduleBody(BaseModel):
+    blocks: list[BlockBody] = Field(default_factory=list, max_length=7)
+
+
+class SwitchBody(BaseModel):
+    queue: str
+    on: bool
+
+
+class RangesBody(BaseModel):
+    medium: int
+    high: int
+    urgent: int
+
+
+class LevelsBody(BaseModel):
+    queue: Optional[str] = None
+    ranges: Optional[RangesBody] = None
+
+
+class OverrideBody(BaseModel):
+    queue: str
+    level: Optional[queues.Level] = None
+    hours: int = 4
+
+
+@router.get("/queues")
+def get_queues(admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _queues(root, admin_id)
+
+
+@router.put("/schedule")
+def put_schedule(body: ScheduleBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _queues(root, admin_id, lambda f, sf, c, now: queues.set_schedule(f.queues, sf, admin_id, [b.model_dump() for b in body.blocks], now))
+
+
+@router.put("/switchboard")
+def put_switch(body: SwitchBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _queues(root, admin_id, lambda f, sf, c, now: queues.set_switch(f, f.queues, sf, admin_id, body.queue, body.on, c, now))
+
+
+@router.put("/levels")
+def put_levels(body: LevelsBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    ranges = body.ranges.model_dump() if body.ranges else None
+    return _queues(root, admin_id, lambda f, sf, c, now: queues.set_ranges(f.queues, sf, admin_id, body.queue, ranges, c))
+
+
+@router.put("/overrides")
+def put_override(body: OverrideBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _queues(root, admin_id, lambda f, sf, c, now: queues.set_override(f.queues, sf, admin_id, body.queue, body.level, body.hours, c, now))

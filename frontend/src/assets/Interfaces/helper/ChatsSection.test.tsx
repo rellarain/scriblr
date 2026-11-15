@@ -4,7 +4,7 @@ import { setChannels } from '../../../channels/channelStore'
 import { createMockChannels } from '../../../designSystem/mockChannels'
 import { __resetStaffForTests, loadStaff } from '../../../feedback/staffStore'
 import type { ResourceNode } from '../../../api/types'
-import { getStaffChats, startChat, useUserChats } from '../../../support/supportStores'
+import { getStaffChats, setQueueSwitch, startChat, useUserChats } from '../../../support/supportStores'
 import { feedbackBackend } from '../../../test/feedbackBackend'
 import ChatsSection from './ChatsSection'
 import { useHelperChats } from './useHelperChats'
@@ -13,7 +13,8 @@ beforeEach(async () => {
   feedbackBackend()
   __resetStaffForTests('hlp-ari')
   setChannels((createMockChannels().channels().body as { nodes: ResourceNode[] }).nodes)
-  await act(async () => { await loadStaff(); await startChat('writer/draft/draft', 'Pasting freezes the editor.') })
+  // Ari is tier 2 on Writer > Draft: a low queue is optional for her, so she turns it on.
+  await act(async () => { await loadStaff(); await setQueueSwitch('writer/draft', true); await startChat('writer/draft/draft', 'Pasting freezes the editor.') })
 })
 
 // The sidebar's New chat and chat heads, and the Conversation tile, as HUI and the sidebar put them together.

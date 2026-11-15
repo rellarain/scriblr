@@ -2,10 +2,11 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { getStaffState, refreshStaff, subscribeStaff } from '../feedback/staffStore'
 import { refreshMine } from '../feedback/mineStore'
 import { CURRENT_USER } from '../userSeed'
-import { staffSupportApi, userSupportApi } from './supportApi'
-import type { ActionInput, StaffChatView, UserChatView } from './supportTypes'
+import { queueApi, staffSupportApi, userSupportApi } from './supportApi'
+import type { ActionInput, QueueView, StaffChatView, UserChatView } from './supportTypes'
 
-// The two sides of support chat: the user's chats (every Help tile) and the staff view (the Helper panel, the Queue console).
+// The two sides of support chat: the user's chats (every Help tile) and the staff view (the Helper panel, the Queue console),
+// and the Queue console's own view (helper time, the switchboard, levels).
 // Both read the same backend; a change on one side tells the other to read again (SUPPORT_CHANGED), so a message sent in a
 // Help tile shows in the Helper panel at once and the other way round. The user is the one local account (userSeed.ts).
 
@@ -92,10 +93,10 @@ export function useUserChats() {
 
 // --- the staff side ----------------------------------------------------------------------------------------------------------
 
-const EMPTY_STAFF: StaffChatView = { me: '', waiting: [], mine: [], others: [], closed: [] }
+const EMPTY_STAFF: StaffChatView = { me: '', waiting: [], mine: [], others: [], closed: [], next: null }
 const staffStore = makeStore<StaffChatView>(EMPTY_STAFF)
 const staffView = (v: StaffChatView | undefined): StaffChatView => ({
-  me: v?.me ?? '', waiting: list(v?.waiting), mine: list(v?.mine), others: list(v?.others), closed: list(v?.closed),
+  me: v?.me ?? '', waiting: list(v?.waiting), mine: list(v?.mine), others: list(v?.others), closed: list(v?.closed), next: v?.next ?? null,
 })
 let actingFor = ''
 
@@ -142,8 +143,87 @@ export function useStaffChats() {
   return snapshot
 }
 
+// --- the queues --------------------------------------------------------------------------------------------------------------
+
+const queueStore = makeStore<QueueView | null>(null)
+let queueActingFor = ''
+// An answer without the staff member or the queue list is no view (null): the console shows that it is loading or failed.
+const queueViewOf = (v: QueueView | null | undefined): QueueView | null => {
+  if (!v || !v.me || !Array.isArray(v.queues)) return null
+  const week = (w: QueueView['me']['thisWeek'] | undefined) => ({ start: w?.start ?? '', blocks: list(w?.blocks), hours: w?.hours ?? 0, own: !!w?.own })
+  return {
+    ...v,
+    me: { ...v.me, thisWeek: week(v.me.thisWeek), nextWeek: week(v.me.nextWeek) },
+    levels: v.levels ?? { medium: 3, high: 6, urgent: 10 },
+    queues: v.queues.map(q => ({ ...q, staff: list(q.staff), chats: list(q.chats), waiting: list(q.waiting) })),
+    next: v.next ?? null,
+  }
+}
+
+export async function loadQueues(): Promise<void> {
+  const g = queueStore.gen()
+  queueActingFor = getStaffState().adminId
+  if (queueStore.get().status === 'idle') queueStore.set({ status: 'loading' })
+  try {
+    const view = queueViewOf(await queueApi.load(queueActingFor))
+    if (g === queueStore.gen()) queueStore.set({ view, status: 'ready', error: null })
+  } catch (err) {
+    if (g === queueStore.gen()) queueStore.set({ status: 'error', error: message(err, 'The queues could not be loaded.') })
+  }
+}
+
+function queueChange(run: (adminId: string) => Promise<QueueView>): Promise<boolean> {
+  return queueStore.serial(async () => {
+    try {
+      queueStore.set({ view: queueViewOf(await run(getStaffState().adminId)), status: 'ready', error: null })
+      // What is next for the staff member, and the sidebar's meter, follow.
+      changed()
+      return true
+    } catch (err) {
+      queueStore.set({ error: message(err, 'That could not be changed.') })
+      return false
+    }
+  })
+}
+
+export const saveSchedule = (blocks: Parameters<typeof queueApi.schedule>[1]) => queueChange(a => queueApi.schedule(a, blocks))
+export const setQueueSwitch = (queue: string, on: boolean) => queueChange(a => queueApi.setSwitch(a, queue, on))
+export const setQueueRanges = (queue: string | null, ranges: Parameters<typeof queueApi.setRanges>[2]) => queueChange(a => queueApi.setRanges(a, queue, ranges))
+export const setQueueOverride = (queue: string, level: Parameters<typeof queueApi.setOverride>[2], hours: number) => queueChange(a => queueApi.setOverride(a, queue, level, hours))
+export const clearQueueError = () => queueStore.set({ error: null })
+
+export function useQueues() {
+  const snapshot = useSyncExternalStore(queueStore.subscribe, queueStore.get, queueStore.get)
+  useEffect(() => {
+    if (queueStore.get().status === 'idle') void loadQueues()
+    const again = () => { if (queueStore.get().status !== 'idle') void loadQueues() }
+    window.addEventListener(SUPPORT_CHANGED, again)
+    const unsub = subscribeStaff(() => { if (getStaffState().adminId !== queueActingFor) again() })
+    return () => { window.removeEventListener(SUPPORT_CHANGED, again); unsub() }
+  }, [])
+  return snapshot
+}
+
+// The sidebar's queue meter: the chats this staff member is in, and the ones waiting in the queues that are on for them (all
+// waiting chats until the queues are loaded), each split into first-tier and escalated ones.
+export function useQueueMeter() {
+  const { view: chats } = useStaffChats()
+  const { view: queues } = useQueues()
+  const on = queues ? new Set(queues.queues.filter(q => q.myState === 'required' || q.myState === 'on').map(q => q.id)) : null
+  const tierOf = queues ? new Map(queues.queues.map(q => [q.id, q.myTier ?? 0])) : null
+  const waiting = chats.waiting.filter(c => !on || (on.has(c.queue) && c.tier <= (tierOf?.get(c.queue) ?? 0)))
+  return {
+    activeEscalated: chats.mine.filter(c => c.tier > 1).length,
+    activeFirst: chats.mine.filter(c => c.tier <= 1).length,
+    waitingEscalated: waiting.filter(c => c.tier > 1).length,
+    waitingFirst: waiting.filter(c => c.tier <= 1).length,
+  }
+}
+
 export function __resetSupportForTests() {
   userStore.reset()
   staffStore.reset()
+  queueStore.reset()
   actingFor = ''
+  queueActingFor = ''
 }
