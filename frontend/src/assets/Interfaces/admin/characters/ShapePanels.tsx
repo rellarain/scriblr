@@ -1,7 +1,7 @@
 import type { ModelCloneAt, ModelContent, ModelMirrorLine, ModelObject, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
 import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
-import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine/connect'
+import { NAME_LIMIT, isWeld, linkHolder, sharedSegment, sharersOf, weldedTo } from './engine/connect'
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { RADIUS, TURN_LIMIT } from './engine/pivots'
@@ -252,10 +252,11 @@ export function ConnectionsSection({ content, shape, selPoint, actions }: { cont
   const nameOf = (id: string): string => shapeById(content, id)?.name || 'a shape'
   const rows: ConnectionRow[] = []
   if (actions.part === 'point') {
-    const b = shape.pts[selPoint]?.bind
-    if (b) {
+    // on a symmetric shape the copies of a point share its link (joints J1): a copy shows the link of the copy that holds it
+    const holder = linkHolder(shape, selPoint), b = holder === null ? null : shape.pts[holder]?.bind
+    if (b && holder !== null) {
       const text = b.kind === 'edge' ? `On a segment of ${nameOf(b.s)}` : isWeld(b) ? `Welded to point ${b.i + 1} of ${nameOf(b.s)}` : `Follows point ${b.i + 1} of ${nameOf(b.s)}`
-      rows.push({ key: 'own', text, shapeId: shape.id, i: selPoint, field: 'name', value: b.name ?? '', label: 'Name of the connection' })
+      rows.push({ key: 'own', text: holder === selPoint ? text : `${text} (a copy of point ${holder + 1})`, shapeId: shape.id, i: holder, field: 'name', value: b.name ?? '', label: 'Name of the connection' })
     }
     for (const f of weldedTo(content, shape.id, selPoint)) {
       const fb = shapeById(content, f.shapeId)?.pts[f.i]?.bind

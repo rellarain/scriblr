@@ -208,6 +208,15 @@ export function bezierAt(a: BuiltPoint[], e: number, t: number): EdgePoint {
   const l = Math.hypot(dx, dy) || 1
   return { x, y, tx: dx / l, ty: dy / l }
 }
+// The slope of segment e at place t, as it is (not made a unit long): how far the curve goes per whole of t (joints J1: the handles of a part of the segment).
+export function bezierSlope(a: BuiltPoint[], e: number, t: number): [number, number] {
+  const n = a.length, p = a[e % n], q = a[(e + 1) % n], u = 1 - t
+  const c1: [number, number] = hasOut(p.m) ? [p.hox, p.hoy] : [p.x, p.y], c2: [number, number] = hasIn(q.m) ? [q.hix, q.hiy] : [q.x, q.y]
+  return [
+    3 * u * u * (c1[0] - p.x) + 6 * u * t * (c2[0] - c1[0]) + 3 * t * t * (q.x - c2[0]),
+    3 * u * u * (c1[1] - p.y) + 6 * u * t * (c2[1] - c1[1]) + 3 * t * t * (q.y - c2[1]),
+  ]
+}
 // Which way is outward: +1 when the outline runs clockwise on the screen.
 export function windSign(a: BuiltPoint[]): 1 | -1 {
   let s = 0

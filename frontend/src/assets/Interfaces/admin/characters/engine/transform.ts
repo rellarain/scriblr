@@ -91,6 +91,8 @@ export interface ResizeOptions {
   keep?: boolean
   // put the dragged sides on the grid lines this far apart (only for a frame that is not turned)
   grid?: number | null
+  // resize about the middle, both sides moving (Ctrl; joints J1)
+  fromMiddle?: boolean
 }
 
 // A resize from a handle, worked out from the shape `s0` and its frame `f0` as they were when the drag began: the opposite side or corner stays where it is and the dragged
@@ -98,12 +100,14 @@ export interface ResizeOptions {
 export function resizeFrom(s0: ModelShape, f0: Frame, h: BoxHandle, px: number, py: number, o: ResizeOptions = {}): ModelShape {
   const [u, v] = handleSide(h)
   const [lx, ly] = apply(unframeMat(f0), px, py)
-  const ax = -u * (f0.w / 2), ay = -v * (f0.h / 2)
-  let w = u ? Math.max(MIN_SIDE, (lx - ax) * u) : f0.w
-  let ht = v ? Math.max(MIN_SIDE, (ly - ay) * v) : f0.h
+  // from the opposite side, or (Ctrl, joints J1) from the middle, both sides moving
+  const mid = o.fromMiddle === true, k = mid ? 2 : 1
+  const ax = mid ? 0 : -u * (f0.w / 2), ay = mid ? 0 : -v * (f0.h / 2)
+  let w = u ? Math.max(MIN_SIDE, (lx - ax) * u * k) : f0.w
+  let ht = v ? Math.max(MIN_SIDE, (ly - ay) * v * k) : f0.h
   if (o.grid && normTurn(f0.rot) === 0) {
-    if (u) w = Math.max(MIN_SIDE, (snapTo(f0.cx + ax + u * w, o.grid) - (f0.cx + ax)) * u)
-    if (v) ht = Math.max(MIN_SIDE, (snapTo(f0.cy + ay + v * ht, o.grid) - (f0.cy + ay)) * v)
+    if (u) w = Math.max(MIN_SIDE, (snapTo(f0.cx + ax + (u * w) / k, o.grid) - (f0.cx + ax)) * u * k)
+    if (v) ht = Math.max(MIN_SIDE, (snapTo(f0.cy + ay + (v * ht) / k, o.grid) - (f0.cy + ay)) * v * k)
   }
   let sx = f0.w > 1e-6 ? w / f0.w : 1, sy = f0.h > 1e-6 ? ht / f0.h : 1
   if (o.keep || mustKeepRatio(s0)) {

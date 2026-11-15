@@ -281,7 +281,10 @@
 // classes: the pattern's and the members' panel in the Shape tab
 .cmClass { display: flex; flex-direction: column; gap: var(--space-2); }
 .cmMembers { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding-left: 0; list-style: none; small { color: var(--ink-muted); } }
-.cmPoint--linked { fill: var(--ink); stroke: var(--accent); stroke-width: 2.5; cursor: pointer; }
+// a linked point (joints J1): the alert colour in a ring of the ink, which keeps it readable on the canvas whatever the alert hue is
+.cmPoint--linked { fill: var(--alert); stroke: var(--ink); stroke-width: 2; cursor: pointer; }
+// a segment that runs along another shape's outline (joints J1): the alert colour over a wider ink line
+.cmSegShared { fill: none; pointer-events: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke: var(--alert); stroke-width: 2.5; &--under { stroke: var(--ink); stroke-width: 5; } }
 .cmTwin { display: inline-flex; align-items: center; flex: 0 0 auto; color: var(--ink-muted); }
 .cmLinks .cmPlain { padding-left: 0; list-style: none; gap: var(--space-3); }
 .cmLink-item { display: flex; flex-direction: column; gap: var(--space-1); padding-left: var(--space-3); box-shadow: inset 2px 0 0 var(--hairline); p { margin: 0; } }

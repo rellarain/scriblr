@@ -65,6 +65,9 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   // ---- the Designer's canvas (shape editor S5): a point being connected is filled with the alert colour inside a ring of the zone's ink, so it reads on the canvas ground
   // (surface-deep) whatever the alert hue is
   add('connect-ring/deep', 'Designer canvas', 'Ring round a point being connected, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
+  // linked points and shared segments (joints J1) are drawn the same way: the alert colour inside a ring (a wider line) of the ink
+  add('linked-ring/deep', 'Designer canvas', 'Ring round a linked point, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
+  add('shared-line/deep', 'Designer canvas', 'Ink line under a shared segment, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
 
   // ---- text on the accent, alert and admin-accent fills (and their hover / dim shades)
   const onAccent = fillInk(colors.accent, hues.theme)

@@ -150,6 +150,16 @@ export function slideOnEdge(c: ModelContent, solved: Solved, shapeId: string, i:
   return { ...s, pts: s.pts.map((p, k) => (k === i ? { ...p, x: lx, y: ly, bind: { ...b, t: r2(best) } } : p)) }
 }
 
+// Every shape connected to a shape, through any number of shapes, with links either way (joints J1: a drag in a shape's fill takes them all along). The shape is in it.
+export function connectedSet(c: ModelContent, shapeId: string): Set<string> {
+  const near = new Map<string, Set<string>>()
+  const join = (a: string, b: string) => { if (a === b) return; (near.get(a) ?? near.set(a, new Set()).get(a)!).add(b); (near.get(b) ?? near.set(b, new Set()).get(b)!).add(a) }
+  for (const s of c.shapes) for (const p of s.pts) if (p.bind?.s) join(s.id, p.bind.s)
+  const out = new Set([shapeId]), stack = [shapeId]
+  while (stack.length) for (const n of near.get(stack.pop()!) ?? []) if (!out.has(n)) { out.add(n); stack.push(n) }
+  return out
+}
+
 // Every point that moves with point i of a shape because it is welded to it, or to one of those (the points a drop must not land on).
 export function weldTree(c: ModelContent, shapeId: string, i: number): Set<string> {
   const out = new Set<string>(), stack = [{ shapeId, i }]
@@ -206,6 +216,54 @@ export function nameConnection(c: ModelContent, shapeId: string, i: number, fiel
   })
 }
 export const NAME_LIMIT = 40
+
+// The points of a shape drawn as linked (joints J1): those that follow a shape, those other shapes' points are joined to, and on a symmetric shape every copy of such a
+// point (the copies follow by symmetry, so they are linked too).
+export function linkShown(c: ModelContent, shapeId: string): number[] {
+  const s = shapeById(c, shapeId)
+  if (!s || !s.pts.length) return []
+  const on = new Set<number>()
+  s.pts.forEach((p, i) => { if (p.bind) on.add(i) })
+  for (const o of c.shapes) for (const p of o.pts) { const b = p.bind; if (b && b.kind === 'point' && b.s === shapeId && o.id !== shapeId) on.add(b.i % s.pts.length) }
+  if (s.sym) for (const i of [...on]) for (const j of orbitOf(s, i)) on.add(j)
+  return [...on].sort((a, b) => a - b)
+}
+
+// The copy of point i of a symmetric shape that holds the link the copies share (i itself when it is linked; null when no copy is).
+export function linkHolder(s: ModelShape, i: number): number | null {
+  if (s.pts[i]?.bind) return i
+  if (!s.sym) return null
+  return orbitOf(s, i).find(j => !!s.pts[j]?.bind) ?? null
+}
+
+// Where on another shape's outline a point lies when it is joined there with no offset: a weld at that shape's point i (the start of its segment i), or a lock on one of its
+// segments (not a bridge end). Null for anything else.
+export function curvePlace(b: ModelBind | null | undefined): { s: string; e: number; t: number } | null {
+  if (!b) return null
+  if (b.kind === 'point') return Math.abs(b.d[0]) < 1e-6 && Math.abs(b.d[1]) < 1e-6 ? { s: b.s, e: b.i, t: 0 } : null
+  return Math.abs(b.o) < 1e-6 && !b.tan ? { s: b.s, e: b.e, t: b.t } : null
+}
+// Two places on one outline of m points on the same segment, as that segment and the two places along it (a weld at the segment's far end is read as its end), or null.
+export function sameSegment(a: { e: number; t: number }, b: { e: number; t: number }, m: number, closed: boolean): { e: number; ta: number; tb: number } | null {
+  if (m < 2) return null
+  const ends = (p: { e: number; t: number }) => {
+    const e = ((p.e % m) + m) % m, out = [{ e, t: p.t }]
+    if (p.t <= 1e-9) { const prev = e - 1 >= 0 ? e - 1 : closed ? m - 1 : -1; if (prev >= 0) out.push({ e: prev, t: 1 }) }
+    return out.filter(q => closed || q.e < m - 1)
+  }
+  for (const x of ends(a)) for (const y of ends(b)) if (x.e === y.e && Math.abs(x.t - y.t) > 1e-6) return { e: x.e, ta: x.t, tb: y.t }
+  return null
+}
+// Whether segment e of a shape runs along another shape's outline (joints J1): both its ends joined, with no offset, on one segment of the same shape. It is drawn with that
+// segment's curve, and marked in the alert colour.
+export function sharesCurve(c: ModelContent, shapeId: string, e: number): boolean {
+  const s = shapeById(c, shapeId)
+  if (!s || s.pts.length < 2 || (!s.closed && e >= s.pts.length - 1)) return false
+  const a = curvePlace(s.pts[e]?.bind), b = curvePlace(s.pts[(e + 1) % s.pts.length]?.bind)
+  if (!a || !b || a.s !== b.s || a.s === shapeId) return false
+  const t = shapeById(c, a.s)
+  return !!t && sameSegment(a, b, t.pts.length, t.closed) !== null
+}
 
 // ---- shared segments ----
 

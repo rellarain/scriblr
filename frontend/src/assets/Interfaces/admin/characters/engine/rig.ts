@@ -1,5 +1,5 @@
 import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelFallSide, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
-import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, hasIn, hasOut, inverse, mul, pathText, reflectList, rotate, roundCorners, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
+import { IDENTITY, apply, bezierAt, bezierSlope, boxOf, build, clamp, edgeAt, flatten, hasIn, hasOut, inverse, mul, pathText, reflectList, rotate, roundCorners, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
 import { carriesOutline, classKey, classesOf, lookOf, membersOf, overrideEntry, overrideFor, type Choices } from './forms'
 import { applyDrape, applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
@@ -9,6 +9,7 @@ import { texturedPath } from './texture'
 import { followBound } from './symmetry'
 import { mirrorLineMat, mirrorPoints, usesMirrorLine } from './mirrorLine'
 import { carryPoints, cloneMat, middleOf, middleOfAll } from './cloneAt'
+import { curvePlace, sameSegment } from './connect'
 import { poseOf } from './pivots'
 import { slidPlace } from './sliders'
 import { isCast } from './kinds'
@@ -666,7 +667,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     let inv: Mat | null = null
     let carried: Map<number, PointSkin> | null = null
     const leaves = new Map<number, [number, number]>()   // the points that leave along their edge, with the direction of that edge in this shape's space
-    const welded = new Map<number, { s: string; i: number; a: BuiltPoint[] }>()   // the points welded (no offset) to a point of a shape that is not skinned
+    const onCurve = new Map<number, { s: string; e: number; t: number; a: BuiltPoint[]; closed: boolean }>()   // the points joined with no offset onto the outline of a shape that is not skinned
     for (let k = 0; k < list.length; k++) {
       const p = list[k], b = p.bind
       if (!b || b.s === sh.id) continue
@@ -699,34 +700,34 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const x = lx + (b.kind === 'point' ? b.d[0] * f : 0), y = ly + (b.kind === 'point' ? b.d[1] * f : 0)
       if (Number.isFinite(x) && Number.isFinite(y)) {
         p.x = x; p.y = y
-        if (b.kind === 'point' && Math.abs(b.d[0]) < 1e-6 && Math.abs(b.d[1]) < 1e-6) welded.set(k, { s: b.s, i: b.i, a })
+        const place = curvePlace(b)
+        if (place) { const [se, st] = b.kind === 'edge' ? slidPlace(b, n) : [place.e, place.t]; onCurve.set(k, { s: b.s, e: se, t: st, a, closed: shapeMap.get(b.s)?.closed ?? true }) }
         if (b.kind === 'edge' && b.tan) {
           const [se, st] = slidPlace(b, n), e = bezierAt(a, se, st), tx = inv[0] * e.tx + inv[2] * e.ty, ty = inv[1] * e.tx + inv[3] * e.ty, tl = Math.hypot(tx, ty)
           if (tl > 1e-9) leaves.set(k, [tx / tl, ty / tl])
         }
       }
     }
-    // A shared segment (shape editor S5): a side whose two ends are welded to neighbouring points of one other shape is drawn as that shape's side: its curve handles and
-    // whether its ends are curved are copied (read into this shape's space, the other way round when it runs the other way), so the two shapes meet along one curve.
-    if (welded.size >= 2) {
+    // A shared segment (shape editor S5; joints J1): a side whose two ends are joined with no offset onto one segment of another shape (welded to its neighbouring points,
+    // or locked onto it) is drawn as that segment, or the part of it between them: its curve is copied (read into this shape's space, the other way round when it runs the
+    // other way), so the two shapes meet along one curve.
+    if (onCurve.size >= 2) {
       const n = list.length
       for (let k = 0; k < (sh.closed ? n : n - 1); k++) {
-        const j = (k + 1) % n, wa = welded.get(k), wb = welded.get(j)
+        const j = (k + 1) % n, wa = onCurve.get(k), wb = onCurve.get(j)
         if (!wa || !wb || wa.s !== wb.s) continue
-        const a = wa.a, m = a.length, forward = (wa.i + 1) % m === wb.i % m
-        if (!forward && (wb.i + 1) % m !== wa.i % m) continue
+        const a = wa.a, m = a.length, seg = sameSegment(wa, wb, m, wa.closed)
+        if (!seg) continue
         inv = inv ?? inverse(Mg)
-        const im = inv
-        const vec = (q: BuiltPoint, out: boolean): [number, number] => {
-          const vx = (out ? q.hox : q.hix) - q.x, vy = (out ? q.hoy : q.hiy) - q.y
-          return [im[0] * vx + im[2] * vy, im[1] * vx + im[3] * vy]
-        }
-        const p = list[k], q = list[j], ta = a[wa.i % m], tb = a[wb.i % m]
-        const pOut = forward ? hasOut(ta.m) : hasIn(ta.m), qIn = forward ? hasIn(tb.m) : hasOut(tb.m)
-        p.m = pOut ? (hasIn(p.m) ? 'c' : 'sc') : (hasIn(p.m) ? 'cs' : 's')
-        q.m = qIn ? (hasOut(q.m) ? 'c' : 'cs') : (hasOut(q.m) ? 'sc' : 's')
-        p.ho = pOut ? vec(ta, forward) : null
-        q.hi = qIn ? vec(tb, !forward) : null
+        const im = inv, ts = seg.tb - seg.ta
+        const s0 = a[seg.e % m], s1 = a[(seg.e + 1) % m], straight = !hasOut(s0.m) && !hasIn(s1.m)
+        // the part of a cubic between two places: its handles are the curve's direction there, a third of the way between them long
+        const hand = (t: number, sign: number): [number, number] => { const [dx, dy] = bezierSlope(a, seg.e, t), vx = (dx * ts * sign) / 3, vy = (dy * ts * sign) / 3; return [im[0] * vx + im[2] * vy, im[1] * vx + im[3] * vy] }
+        const p = list[k], q = list[j]
+        p.m = !straight ? (hasIn(p.m) ? 'c' : 'sc') : (hasIn(p.m) ? 'cs' : 's')
+        q.m = !straight ? (hasOut(q.m) ? 'c' : 'cs') : (hasOut(q.m) ? 'sc' : 's')
+        p.ho = straight ? null : hand(seg.ta, 1)
+        q.hi = straight ? null : hand(seg.tb, -1)
       }
     }
     if (leaves.size < 2) return carried

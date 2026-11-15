@@ -43,7 +43,7 @@ import { toggleUnder } from './engine/wear'
 import { stepDrape } from './engine/drapeEdit'
 import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
-import { cycleMode, deletePoint, joinSegment, movePoint, newShape, setMode, toggleSegment } from './engine/edit'
+import { cycleMode, deletePoint, joinSegment, movePoint, moveShape, newShape, setMode, toggleSegment } from './engine/edit'
 import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine/bridgeEdit'
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
@@ -97,7 +97,7 @@ import * as clipboard from './shapeClipboard'
 import { FIRST_CHOICE, ShapeForm, templateOfChoice, type FormKind, type ShapeChoice } from './ShapeForm'
 import { CAST_OPACITY, KIND_NAMES } from './engine/kinds'
 import { castOverlaps, hasBothCasts } from './engine/castOverlap'
-import { addPointShared, connect, disconnect, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
+import { addPointShared, connect, connectedSet, disconnect, linkShown, loosen, nameConnection, rebindByPlace, segmentHome } from './engine/connect'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
 import type { DrapeActions, FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName, WearActions } from './rigActions'
@@ -522,6 +522,27 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const e = setOverride(c, t.object.id, t.axis.id, t.form.id, id, next.pts)
       return e.ok ? e.content : c
     }, false)
+  }
+  // A drag in a shape's fill (joints J1): the shape moves, and every shape connected to it (links either way) moves with it by as much on the canvas. Nothing moves when
+  // one of them is anchored.
+  function moveBody(id: string, next: ModelShape) {
+    const cur = shapeById(canvasContent, id), r = canvasSolved.shapes[id]
+    const others = shapesOnly && !recording && cur && !cur.mirrorOf && !cur.cloneOf ? [...connectedSet(content, id)].filter(sid => sid !== id) : []
+    if (!others.length || !cur || !r || !cur.pts.length || cur.pts.length !== next.pts.length) { live(id, next); return }
+    // an anchored shape refuses the move itself; one connected to it holds the rest
+    if (anchorsOf(cur).length) { live(id, next); return }
+    const pinned = others.map(sid => shapeById(content, sid)).find(s => !!s && anchorsOf(s).length > 0)
+    if (pinned) { setNote(`${pinned.name.trim() || 'A connected shape'} is anchored, and this shape is connected to it: it cannot be moved.`); return }
+    const m = r.matrix, lx = next.pts[0].x - cur.pts[0].x, ly = next.pts[0].y - cur.pts[0].y
+    const wx = m[0] * lx + m[2] * ly, wy = m[1] * lx + m[3] * ly
+    if (Math.abs(wx) < 1e-9 && Math.abs(wy) < 1e-9) return
+    live(id, next)
+    for (const sid of others) {
+      const s = shapeById(content, sid), rs = canvasSolved.shapes[sid]
+      if (!s || !rs || !s.pts.length) continue
+      const iv = inverse(rs.matrix)
+      live(sid, moveShape(s, iv[0] * wx + iv[2] * wy, iv[1] * wx + iv[3] * wy))
+    }
   }
   // `followed`: a symmetric shape's copies were already made to follow (a joined segment, T2)
   function editShape(id: string, next: ModelShape, point?: number, followed = false) {
@@ -1929,10 +1950,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={shapesOnly ? shapePose : poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
-            linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
+            linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} linkShown={shapesOnly && selShape ? linkShown(content, selShape.id) : undefined} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
             onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
-            onShape={live} onEditShape={editShape}
+            onShape={live} onMoveBody={shapesOnly ? moveBody : undefined} onEditShape={editShape}
             onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
             onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
             rigid={!!selPivot} pivotPoints={pivotPoints} anchorMarks={anchorMarks} poseMarks={poseMarks} sliders={sliderMarks} onStop={shapesOnly ? moveStop : undefined}

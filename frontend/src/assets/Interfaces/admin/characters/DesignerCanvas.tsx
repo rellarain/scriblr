@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement, type ReactNode } from 'react'
-import type { ModelContent, ModelShape } from '../../../../api/types'
+import type { ModelContent, ModelPoint, ModelShape } from '../../../../api/types'
 import { NO_COLOURING, type Colouring } from './engine/colour'
 import { crossingNear, crossingsOf, type Crossing, type LockStage } from './engine/crossings'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
@@ -7,7 +7,7 @@ import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/
 import { apply, boxOf, build, flatten, inPolygon, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
-import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget } from './engine/connect'
+import { dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, weldTree, type DropTarget, sharesCurve } from './engine/connect'
 import { rayAngles, wedgeAt } from './engine/symmetry'
 import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, rotOf, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
@@ -38,6 +38,8 @@ const EDGE_HOLD = 280
 const EDGE_SPEED = 420
 // How near, in pixels, the pointer has to be to an outline, a point or a crossing to reveal it; how far a press may move and still be a click; how near a dragged thing has to be to a line to show it.
 const REACH_EDGE = 6
+// how close to an outline, inside the fill, a press grabs the outline rather than moving the shape (joints J1)
+const REACH_EDGE_INSIDE = 2
 const REACH_POINT = 7
 const REACH_CROSS = 9
 const CLICK_SLOP = 3
@@ -206,6 +208,10 @@ export interface CanvasProps {
   onGesture: () => void
   // The shape's new form while it is dragged (no undo entry of its own).
   onShape: (id: string, next: ModelShape) => void
+  // ... when it is dragged by its fill (joints J1: the page moves the shapes connected to it too); onShape when not given
+  // the points of the selected shape drawn as linked (joints J1); `linked` when not given
+  linkShown?: number[]
+  onMoveBody?: (id: string, next: ModelShape) => void
   // Discrete edits: they remember the content themselves.
   onEditShape: (id: string, next: ModelShape, selectPoint?: number) => void
   // Something the canvas could not do, in words (a shape at its most points).
@@ -368,6 +374,8 @@ export function DesignerCanvas(p: CanvasProps) {
   const shapesById = new Map(content.shapes.map(s => [s.id, s]))
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
+  // the points drawn as linked (joints J1): also those other shapes are joined to, and the copies of a symmetric shape's linked point
+  const shownLinked = new Set(p.linkShown ?? p.linked ?? [])
   const lockOn = !!p.lock?.enabled && overlay && !p.weights && !p.skin
   const hoverOk = !legacyPose && !p.pick && !through && !p.frames && !p.taper
 
@@ -531,6 +539,13 @@ export function DesignerCanvas(p: CanvasProps) {
     return list
   }
   // The nearest of: a crossing of the selected shape's outline with another, a point of it, its outline, the outline of another drawn shape.
+  // Whether a press this far (in model units) from an outline grabs it: on the line, or just outside it; inside the fill only right on the line, so a drag in the fill
+  // moves the shape (joints J1). An open outline has no fill.
+  function grabsEdge(dist: number, px: number, pts: ModelPoint[], closed: boolean, lx: number, ly: number): boolean {
+    if (dist > REACH_EDGE * px) return false
+    if (dist <= REACH_EDGE_INSIDE * px || !closed || pts.length < 3) return true
+    return !inPolygon(flatten(build(pts, closed), closed), lx, ly)
+  }
   function hitTest(e: { clientX: number; clientY: number }): Hover | null {
     if (!hoverOk) return null
     const px = pixel(), [wx, wy] = toWorld(e)
@@ -547,7 +562,7 @@ export function DesignerCanvas(p: CanvasProps) {
     if (overlay && shape && matrix && !p.skin && !p.rigid) {
       const [lx, ly] = apply(inverse(matrix), wx, wy)
       const hit = nearestEdge(shape.pts, lx, ly)
-      if (hit && hit.dist * Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2])) <= REACH_EDGE * px) {
+      if (hit && grabsEdge(hit.dist * Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2])), px, shape.pts, shape.closed, lx, ly)) {
         const [cx, cy] = apply(matrix, hit.x, hit.y)
         return { kind: 'edge', shapeId: shape.id, e: hit.e, x: cx, y: cy }
       }
@@ -564,7 +579,7 @@ export function DesignerCanvas(p: CanvasProps) {
       if (best >= 0) return { kind: 'point', shapeId: id, i: best }
       const [lx, ly] = apply(inverse(r.matrix), wx, wy)
       const hit = nearestEdge(r.local, lx, ly)
-      if (hit && hit.dist * Math.sqrt(Math.abs(r.matrix[0] * r.matrix[3] - r.matrix[1] * r.matrix[2])) <= REACH_EDGE * px) {
+      if (hit && grabsEdge(hit.dist * Math.sqrt(Math.abs(r.matrix[0] * r.matrix[3] - r.matrix[1] * r.matrix[2])), px, r.local, s.closed, lx, ly)) {
         const [cx, cy] = apply(r.matrix, hit.x, hit.y)
         return { kind: 'edge', shapeId: id, e: hit.e, x: cx, y: cy }
       }
@@ -820,7 +835,7 @@ export function DesignerCanvas(p: CanvasProps) {
 
   // ---- moving ----
 
-  function onMove(e: { clientX: number; clientY: number; shiftKey?: boolean }) {
+  function onMove(e: { clientX: number; clientY: number; shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }) {
     if (p.pointerRef) p.pointerRef.current = toWorld(e)
     const d = dragRef.current
     if (p.skin) { const at = toWorld(e); setBrush(b => (b && Math.abs(b[0] - at[0]) < 1e-6 && Math.abs(b[1] - at[1]) < 1e-6 ? b : at)) }
@@ -892,7 +907,7 @@ export function DesignerCanvas(p: CanvasProps) {
       const at = solved.shapes[d.shapeId], [wx, wy] = toWorld(e)
       const [x, y] = at ? apply(inverse(at.matrix), wx, wy) : [wx, wy]
       p.onShape(d.shapeId, d.kind === 'resize'
-        ? resizeFrom(d.from, d.frame, d.handle, x, y, { keep: e.shiftKey === true || p.keepRatio === true, grid: onGrid ? unit : null })
+        ? resizeFrom(d.from, d.frame, d.handle, x, y, { keep: e.shiftKey === true || p.keepRatio === true, grid: onGrid ? unit : null, fromMiddle: e.ctrlKey === true || e.metaKey === true })
         : turnFrom(d.from, d.frame, d.start, x, y, e.shiftKey === true))
       return
     }
@@ -963,9 +978,9 @@ export function DesignerCanvas(p: CanvasProps) {
     else if (onGrid && d.box) {
       // the shape's top left corner lands on a line, whatever the pointer has done on the way
       const dx = snapTo(d.box.x + (x - d.start[0]), unit) - d.box.x, dy = snapTo(d.box.y + (y - d.start[1]), unit) - d.box.y
-      p.onShape(s.id, moveShape(d.from, dx, dy))
+      ;(p.onMoveBody ?? p.onShape)(s.id, moveShape(d.from, dx, dy))
     } else {
-      p.onShape(s.id, moveShape(s, x - d.last[0], y - d.last[1]))
+      ;(p.onMoveBody ?? p.onShape)(s.id, moveShape(s, x - d.last[0], y - d.last[1]))
       d.last = [x, y]
     }
   }
@@ -1166,6 +1181,23 @@ export function DesignerCanvas(p: CanvasProps) {
   // of the selected shape as titles on a band along each (shape editor S5)
   const dragging = dragRef.current?.kind === 'point' ? dragRef.current : null
   const connectAt = drop && dragging ? dragging.via ?? { shapeId: dragging.shapeId, i: dragging.index } : null
+  // Every segment that runs along another shape's outline (joints J1), in the alert colour over an ink line, so shared segments show without selecting anything.
+  const sharedMarkup = p.connect ? (() => {
+    const out: JSX.Element[] = []
+    for (const s of content.shapes) {
+      const r = solved.shapes[s.id]
+      if (!r || !r.visible || r.off || r.local.length !== s.pts.length || !s.pts.some(pt => pt.bind)) continue
+      let b: BuiltPoint[] | null = null
+      const n = s.pts.length
+      for (let k = 0; k < (s.closed ? n : n - 1); k++) {
+        if (!sharesCurve(content, s.id, k)) continue
+        b = b ?? build(r.local, s.closed, r.matrix)
+        const d = segmentPath(b[k], b[(k + 1) % n])
+        out.push(<path key={`u${s.id}:${k}`} d={d} className="cmSegShared cmSegShared--under" aria-hidden="true" />, <path key={`o${s.id}:${k}`} d={d} className="cmSegShared" data-shared={`${s.id}:${k}`} aria-hidden="true" />)
+      }
+    }
+    return out.length ? <g aria-hidden="true">{out}</g> : null
+  })() : null
   const sharedNames = p.connect && selectedPointsDrawn && shape ? shape.pts.map((pt, k) => {
     const name = pt.bind?.segName, next = built[(k + 1) % built.length]
     if (!name || !next || (!shape.closed && k >= built.length - 1) || !sharedSegment(content, shape.id, k)) return null
@@ -1321,10 +1353,11 @@ export function DesignerCanvas(p: CanvasProps) {
         {guides.y !== null && <line x1={vb.x} y1={guides.y} x2={vb.x + vb.w} y2={guides.y} className="cmGuide" data-guide="y" />}
       </g>
     ) : null,
-    outlines: sel.kind === 'shape' && shapesById.has(sel.id) && solved.shapes[sel.id]?.d ? (
+    outlines: sharedMarkup || (sel.kind === 'shape' && shapesById.has(sel.id) && solved.shapes[sel.id]?.d) ? (
       <>
-        <path d={solved.shapes[sel.id].d} className="cmRing cmRing--under" aria-hidden="true" />
-        <path d={solved.shapes[sel.id].d} className="cmRing cmRing--over" data-ring={sel.id} aria-hidden="true" />
+        {sharedMarkup}
+        {sel.kind === 'shape' && solved.shapes[sel.id]?.d && <path d={solved.shapes[sel.id].d} className="cmRing cmRing--under" aria-hidden="true" />}
+        {sel.kind === 'shape' && solved.shapes[sel.id]?.d && <path d={solved.shapes[sel.id].d} className="cmRing cmRing--over" data-ring={sel.id} aria-hidden="true" />}
         {segEnd && part === 'segment' && cur && <path d={segmentPath(cur, segEnd)} className="cmSeg cmSeg--sel" data-segment={selPoint} aria-hidden="true" />}
       </>
     ) : null,
@@ -1343,8 +1376,8 @@ export function DesignerCanvas(p: CanvasProps) {
           return (
             <circle
               key={i} cx={b.x} cy={b.y} r={(ptOn(i) || i === hoveredPoint ? 5.5 : edgeOnSelected ? 3 : 4) * u} role="button" tabIndex={-1} aria-pressed={ptOn(i)}
-              aria-label={`Point ${i + 1}${linkedSet.has(i) ? ', linked' : ''}${p.skin ? `, skin weight ${Math.round((p.skin.weights[i] ?? 0) * 100)}%` : w > 0 ? `, weight ${Math.round(w * 100)}%` : p.weights ? ', no weight' : ''}`}
-              className={`cmPoint${ptOn(i) ? ' cmPoint--sel' : ''}${i === hoveredPoint ? ' cmPoint--hover' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}${w > 0 && !p.skin ? ' cmPoint--weighted' : ''}${p.weights || p.skin ? ' cmPoint--weigh' : ''}${connectAt && connectAt.shapeId === shape!.id && connectAt.i === i ? ' cmPoint--connect' : ''}`}
+              aria-label={`Point ${i + 1}${shownLinked.has(i) ? ', linked' : ''}${p.skin ? `, skin weight ${Math.round((p.skin.weights[i] ?? 0) * 100)}%` : w > 0 ? `, weight ${Math.round(w * 100)}%` : p.weights ? ', no weight' : ''}`}
+              className={`cmPoint${ptOn(i) ? ' cmPoint--sel' : ''}${i === hoveredPoint ? ' cmPoint--hover' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${shownLinked.has(i) ? ' cmPoint--linked' : ''}${w > 0 && !p.skin ? ' cmPoint--weighted' : ''}${p.weights || p.skin ? ' cmPoint--weigh' : ''}${connectAt && connectAt.shapeId === shape!.id && connectAt.i === i ? ' cmPoint--connect' : ''}`}
               onPointerDown={e => onPointDown(e, i)}
             >
               {shape!.pts[i].bind?.name ? <title>{shape!.pts[i].bind!.name}</title> : null}
