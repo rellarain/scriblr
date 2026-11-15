@@ -1656,9 +1656,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (next && commit(next, true)) choose({ kind: 'shape', id })
     },
   } : undefined
-  // Pose mode in the shape editor (shape types T4): on while the model (nothing below it) or a group is selected. A press that moves on a shape of a figure with a pivot
-  // poses it (with a group selected, only that group's shapes); one that stays put selects as usual, which leaves Pose mode. Each drag is one undo step.
-  const posingOn = shapesOnly && !recording && !through && (sel.kind === 'none' || sel.kind === 'group')
+  // Pose mode in the shape editor (shape types T4): on only while a group is selected (the user, 2026-11-15: not the model). A press that moves on a shape of that group's
+  // figure poses it; one that stays put selects as usual, which leaves Pose mode. Each drag is one undo step.
+  const posingOn = shapesOnly && !recording && !through && sel.kind === 'group'
   function shapePoseBegin(grab: PoseGrab, world: [number, number]): boolean {
     const at = toModel(solved, world[0], world[1])
     const target = grab.kind === 'slider' ? shapeById(content, grab.shapeId)?.pts[grab.i]?.bind?.s : undefined
@@ -1689,7 +1689,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const poseHandles = content.shapes.some(s => marksOf(s).some(m => m.kind === 'pose') || s.pts.some(isSlider))
   const shapePose: PoseCanvas | null = posingOn && (poseOf(content).posable.size > 0 || poseHandles) ? {
     joints: [], scales: [], slides: [], light: true,
-    canPose: id => poseOf(content).posable.has(id) && (sel.kind !== 'group' || groupOfShape(content, id) === sel.id),
+    canPose: id => poseOf(content).posable.has(id) && groupOfShape(content, id) === sel.id,
+    canGrab: id => groupOfShape(content, id) === sel.id,
     onDown: shapePoseBegin, onMove: shapePoseMove, onUp: () => { shapePoseRef.current = null }, onCancel: shapePoseCancel,
   } : null
   // the posable points and the sliders where they are drawn now (T5); a slider's stops are shown while its shape is edited

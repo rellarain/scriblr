@@ -98,6 +98,9 @@ describe('a slider', () => {
 
   it('slides in Pose mode, and Reset pose puts it back', async () => {
     const user = await open(rail(true))
+    // Pose mode is on while a group is selected
+    expect(canvas().querySelector('[data-slider]')).toBeNull()
+    await user.click(within(screen.getByRole('navigation', { name: 'Model tree' })).getByRole('button', { name: 'Group' }))
     const handle = canvas().querySelector('[data-slider]')!
     dragOn(handle, [90, 60], [130, 62])
     expect(beadCorner()[0]).toBeCloseTo(130, 0)
@@ -113,8 +116,10 @@ describe('a posable point', () => {
     rightClick(dotAt(86, 160), [86, 160])
     await user.click(within(screen.getByRole('dialog', { name: 'Point type' })).getByRole('button', { name: 'Posable' }))
     expect(within(screen.getByRole('group', { name: 'Posable points' })).getByRole('textbox', { name: 'Name of posable point 1' })).toBeInTheDocument()
-    // back to the model: the posable point is grabbed and reaches to the left
+    // the group selected: the posable point is grabbed and reaches to the left
     click(canvas(), [200, 300])
+    expect(screen.queryByRole('button', { name: 'Pose with the posable point' })).toBeNull()
+    await user.click(within(screen.getByRole('navigation', { name: 'Model tree' })).getByRole('button', { name: 'Group' }))
     const mark = screen.getByRole('button', { name: 'Pose with the posable point' })
     dragOn(mark, [86, 160], [20, 106])
     const moved = screen.getByRole('button', { name: 'Pose with the posable point' })

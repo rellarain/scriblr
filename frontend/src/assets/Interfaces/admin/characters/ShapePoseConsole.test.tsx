@@ -8,8 +8,8 @@ import { addPivot } from './engine/pivots'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 // Anchors and Pose mode in the shape editor (shape types T4): the point form pins a point (or a spot inside a shape) with an anchor; an anchored point and an anchored shape
-// cannot be moved; with the model selected a drag on a figure poses it (a swing at the pivot, or with no anchor the figure hanging from what is held) and a click selects;
-// Reset pose puts it back.
+// cannot be moved; with a group selected (and only then) a drag on its figure poses it (a swing at the pivot, or with no anchor the figure hanging from what is held) and a
+// click selects; Reset pose puts it back.
 vi.setConfig({ testTimeout: 30000 })
 
 const box = (id: string, x: number, y: number, w: number, h: number): ModelShape => ({
@@ -62,6 +62,8 @@ const rightClick = (el: Element, at: [number, number]) => { pointer(el, 'pointer
 const dots = () => Array.from(canvas().querySelectorAll('.cmPoint'))
 const dotAt = (x: number, y: number) => dots().find(d => Number(d.getAttribute('cx')) === x && Number(d.getAttribute('cy')) === y)!
 const anchors = () => canvas().querySelectorAll('[data-anchor]')
+// Pose mode is on while a group is selected: its card in the tree
+const poseGroup = (user: ReturnType<typeof userEvent.setup>) => user.click(within(screen.getByRole('navigation', { name: 'Model tree' })).getByRole('button', { name: 'Group' }))
 
 describe('anchors', () => {
   it('pin a point from the point form, are listed with a name, and come off again', async () => {
@@ -107,8 +109,9 @@ describe('anchors', () => {
 })
 
 describe('Pose mode', () => {
-  it('swings a shape at its pivot when the model is selected, and Reset pose puts it back', async () => {
+  it('swings a shape at its pivot when its group is selected, and Reset pose puts it back', async () => {
     const user = await open(model(true))
+    await poseGroup(user)
     expect(screen.queryByRole('button', { name: 'Reset pose' })).toBeNull()
     // the arm hangs below the pivot: dragged a quarter round, it lies to the left
     dragOn(pathOf('arm'), [80, 150], [30, 100])
@@ -119,14 +122,23 @@ describe('Pose mode', () => {
     expect(screen.queryByRole('button', { name: 'Reset pose' })).toBeNull()
   })
 
-  it('selects a shape that is clicked without moving', async () => {
+  it('is off with the model selected: a drag on a figure does not pose it', async () => {
     await open(model(true))
+    dragOn(pathOf('arm'), [80, 150], [30, 100])
+    // (the drag edits instead: nothing is posed)
+    expect(screen.queryByRole('button', { name: 'Reset pose' })).toBeNull()
+  })
+
+  it('selects a shape that is clicked without moving', async () => {
+    const user = await open(model(true))
+    await poseGroup(user)
     click(pathOf('arm'), [80, 150])
     expect(screen.getByRole('textbox', { name: 'Shape name' })).toHaveValue('arm shape')
   })
 
   it('with no anchor lets the figure hang from what is held', async () => {
-    await open(model())
+    const user = await open(model())
+    await poseGroup(user)
     const arm = boxOf('arm')
     dragOn(pathOf('arm'), [80, 150], [90, 150])
     // the arm followed the pointer; the body swung down below the pivot
@@ -136,7 +148,8 @@ describe('Pose mode', () => {
   })
 
   it('turns the figure about the anchor of its anchored shape', async () => {
-    await open(model(true))
+    const user = await open(model(true))
+    await poseGroup(user)
     // the anchored body is the figure's root: with its one anchor (its top left corner) it turns about it
     dragOn(pathOf('body'), [95, 50], [95, 90])
     expect(boxOf('body').x0).not.toBeCloseTo(60, 0)

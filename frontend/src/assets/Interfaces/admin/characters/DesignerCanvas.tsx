@@ -81,6 +81,8 @@ export interface PoseCanvas {
   // stays put selects as usual); there are no markers of its own and the view stays where it is
   light?: boolean
   canPose?: (shapeId: string) => boolean
+  // which shapes' posable points and sliders can be grabbed (those of the selected group): the others are drawn as when editing
+  canGrab?: (shapeId: string) => boolean
 }
 
 // Frames (phase 5a): every frame of the model as a rectangle in the view (the one being edited has handles, and is moved and resized by dragging; the arrow keys
@@ -1438,14 +1440,14 @@ export function DesignerCanvas(p: CanvasProps) {
         </g>
       ))}
       {drawBox && <rect x={drawBox.x} y={drawBox.y} width={drawBox.w} height={drawBox.h} className="cmDrawBox" data-draw-box="" aria-hidden="true" />}
-      {(p.poseMarks ?? []).map(m => (p.pose?.light ? (
+      {(p.poseMarks ?? []).map(m => (p.pose?.light && (p.pose.canGrab?.(m.shapeId) ?? true) ? (
         <circle key={m.id} cx={m.x} cy={m.y} r={5 * u} className="cmPoseMark cmPoseMark--live" data-pose-mark={m.id} role="button" tabIndex={-1} aria-label={`Pose with ${m.name || 'the posable point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'mark', shapeId: m.shapeId, markId: m.markId })} />
       ) : p.layers.includes('pivots') ? (
         <circle key={m.id} cx={m.x} cy={m.y} r={4 * u} className="cmPoseMark" data-pose-mark={m.id} aria-hidden="true"><title>{m.name || 'Posable point'}</title></circle>
       ) : null))}
       {(p.sliders ?? []).map(m => (
         <Fragment key={m.id}>
-          {p.pose?.light && <circle cx={m.x} cy={m.y} r={5 * u} className="cmSlideHandle cmSlider" data-slider={m.id} role="button" tabIndex={-1} aria-label={`Slide ${m.name || 'the point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'slider', shapeId: m.shapeId, i: m.i })} />}
+          {p.pose?.light && (p.pose.canGrab?.(m.shapeId) ?? true) && <circle cx={m.x} cy={m.y} r={5 * u} className="cmSlideHandle cmSlider" data-slider={m.id} role="button" tabIndex={-1} aria-label={`Slide ${m.name || 'the point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'slider', shapeId: m.shapeId, i: m.i })} />}
           {m.stops && !p.pose && ([['lo', m.lo, 'First stop'], ['hi', m.hi, 'Second stop']] as const).map(([which, at, word]) => (
             <rect
               key={which} x={at[0] - 2.5 * u} y={at[1] - 2.5 * u} width={5 * u} height={5 * u} className="cmSlideStop" data-stop={`${m.id}:${which}`} role="button" tabIndex={-1}
