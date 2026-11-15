@@ -1,9 +1,9 @@
-import type { ModelContent, ModelMirrorLine, ModelObject, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
+import type { ModelCloneAt, ModelContent, ModelMirrorLine, ModelObject, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
 import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine/connect'
 import { shapeById } from './modelContent'
-import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
+import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { RADIUS, TURN_LIMIT } from './engine/pivots'
 import { removeMark, renameMark } from './engine/anchors'
 import { LIMITS } from './engine/limits'
@@ -29,7 +29,7 @@ export interface MirrorActions {
 }
 
 // A shape's or an object's mirror: the Mirror button on an original (one mirror each); on a mirror, what it mirrors, its line, and Detach.
-export function MirrorSection({ content, kind, thing, actions }: { content: ModelContent; kind: 'shape' | 'object'; thing: ModelShape | ModelObject; actions: MirrorActions }) {
+export function MirrorSection({ content, kind, thing, actions, clones }: { content: ModelContent; kind: 'shape' | 'object'; thing: ModelShape | ModelObject; actions: MirrorActions; clones?: CloneActions }) {
   const name = thing.name.trim() || `the ${kind}`
   if (thing.mirrorOf) {
     const list = kind === 'shape' ? content.shapes : content.objects
@@ -56,6 +56,42 @@ export function MirrorSection({ content, kind, thing, actions }: { content: Mode
         type="button" className="cmIconBtn" aria-label={`Mirror ${name}`} disabled={has}
         title={has ? `${name} has a mirror already` : `Mirror ${name}: a copy across a line of symmetry that follows every edit`} onClick={() => actions.onMirror(kind, thing.id)}
       ><SwapIcon size={14} /></button>
+      {clones && (
+        <button type="button" className="cmIconBtn" aria-label={`Clone ${name}`} title={`Clone ${name}: a copy with a place of its own that changes with every edit of the outline`} onClick={() => clones.onClone(kind, thing.id)}><CopyIcon size={14} /></button>
+      )}
+    </div>
+  )
+}
+
+// ---- clones (Z4) ----
+
+export interface CloneActions {
+  onClone: (kind: 'shape' | 'object', id: string) => void
+  onDetach: (kind: 'shape' | 'object', id: string) => void
+  // where a clone object stands (a clone shape is placed by moving, turning and flipping it)
+  onPlace: (objectId: string, at: ModelCloneAt) => void
+}
+
+// A clone's section: what it is a clone of and Detach; a clone object's place too (Across, Down, Turn, Flip).
+export function CloneSection({ content, kind, thing, actions }: { content: ModelContent; kind: 'shape' | 'object'; thing: ModelShape | ModelObject; actions: CloneActions }) {
+  const name = thing.name.trim() || `the ${kind}`
+  const list = (kind === 'shape' ? content.shapes : content.objects) as Array<ModelShape | ModelObject>
+  const original = list.find(x => x.id === thing.cloneOf)
+  const at = kind === 'object' ? thing.cloneAt ?? null : null
+  const place = (next: Partial<ModelCloneAt>) => { if (at) actions.onPlace(thing.id, { ...at, ...next }) }
+  const by = (big: boolean, small: number, large: number) => (big ? large : small)
+  return (
+    <div className="cmMirror" role="group" aria-label="Clone">
+      <h3 className="cmInsSub">Clone of {original?.name.trim() || `an untitled ${kind}`}</h3>
+      {at && (
+        <>
+          <Stepper label="Across" value={fmt(at.x)} bigBy={10} onStep={(dir, big) => place({ x: at.x + dir * by(big, 1, 10) })} />
+          <Stepper label="Down" value={fmt(at.y)} bigBy={10} onStep={(dir, big) => place({ y: at.y + dir * by(big, 1, 10) })} />
+          <Stepper label="Turn" value={`${fmt(at.turn)}°`} bigBy={15} onStep={(dir, big) => place({ turn: big ? (Math.round(at.turn / 15) + dir) * 15 : at.turn + dir })} />
+          <button type="button" className={`cmIconBtn${at.flip ? ' cmIconBtn--on' : ''}`} aria-pressed={at.flip} aria-label="Flip across" title="Flip across" onClick={() => place({ flip: !at.flip })}><FlipAcrossIcon size={14} /></button>
+        </>
+      )}
+      <button type="button" className="cmIconBtn" aria-label={`Detach ${name}`} title={`Detach ${name}: it keeps its outline and stops following its original`} onClick={() => actions.onDetach(kind, thing.id)}><UnlockIcon size={14} /></button>
     </div>
   )
 }

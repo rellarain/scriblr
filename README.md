@@ -481,6 +481,11 @@ described, now stale, in `docs/data-model.md`).
   Mirrors (Z3) add, with a default: on a twin shape and a twin object `mirrorLine` (`ModelMirrorLine`: `shape` a symmetric shape's id, `k`
   its axis 0..5; null: the model's centre line). A twin of a model with zones, or with a line, is its original as drawn reflected
   across the line in the model's space; a line across a shape that does not exist or is not symmetric stops a publish.
+  Clones (Z4) add, with defaults: on a shape and an object `cloneOf` (the original's id) and `cloneAt` (`ModelCloneAt`: `x`, `y`
+  where the original's middle goes, `turn` -180..180, `flip`); a clone has no points of its own (it is its original's outline
+  carried by its place) and a shape of a clone object has no place of its own (it goes with its object's). A clone of something
+  missing, of a clone, a mirror or a pivot circle, or a shape of a clone object that is not a clone of its original's shapes
+  stops a publish.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

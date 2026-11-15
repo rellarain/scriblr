@@ -161,12 +161,14 @@ export function pathTo(c: ModelContent, sel: Selection, point = false): string[]
   const object = (o: ModelObject) => {
     const g = groupOfObject(c, o.id)
     group(g?.id)
-    if (o.mirrorOf && g?.objects.includes(o.mirrorOf)) out.push(o.mirrorOf)
+    const of = o.mirrorOf ?? o.cloneOf
+    if (of && g?.objects.includes(of)) out.push(of)
   }
   if (sel.kind === 'shape') {
     const o = objectOfShape(c, sel.id), s = shapeById(c, sel.id)
     if (o) { object(o); out.push(o.id) }
-    if (o && s?.mirrorOf && o.shapes.includes(s.mirrorOf)) out.push(s.mirrorOf)
+    const of = s?.mirrorOf ?? s?.cloneOf
+    if (o && of && o.shapes.includes(of)) out.push(of)
     if (point) out.push(sel.id)
   } else if (sel.kind === 'object') { const o = objectById(c, sel.id); if (o) object(o) }
   else if (sel.kind === 'group') { const z = zoneOf(sel.id); if (z) out.push(z) }

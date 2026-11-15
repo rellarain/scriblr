@@ -96,7 +96,7 @@ export const renameMark = (s: ModelShape, id: string, name: string): ModelShape 
 
 // The matrix that takes one outline to the other when the whole shape was moved, turned, flipped or resized (null when its points were changed one by one). A three-point
 // shape counts only when all three moved, so a drag of one corner is not taken for a change of the whole.
-function affineOf(a: ModelPoint[], b: ModelPoint[]): Mat | null {
+export function affineOf(a: ModelPoint[], b: ModelPoint[]): Mat | null {
   if (a.length !== b.length || a.length < 3) return null
   if (a.length === 3 && a.some((p, i) => near(p, b[i].x, b[i].y))) return null
   const p0 = a[0]

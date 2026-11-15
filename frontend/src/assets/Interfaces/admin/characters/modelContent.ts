@@ -3,7 +3,7 @@ import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
 import { repairMarks, repairPlace } from './engine/anchors'
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine, ModelCloneAt } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { DEPTH_MAX, chainOf } from './engine/rig'
@@ -50,8 +50,8 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, mirrorLine: repairMirrorLine(o.mirrorLine), classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, mirrorLine: repairMirrorLine(o.mirrorLine), cloneOf: o.cloneOf ?? null, cloneAt: repairCloneAt(o.cloneAt), classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states), depth: repairDepth(g.depth) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
@@ -79,6 +79,16 @@ export function repairMirrorLine(v: unknown): ModelMirrorLine | null {
   if (typeof shape !== 'string' || !/^[A-Za-z0-9_.-]{1,80}$/.test(shape)) return null
   const axis = typeof k === 'number' && Number.isInteger(k) ? k : 0
   return axis >= 0 && axis < 6 ? { shape, k: axis } : null
+}
+
+// Where a clone stands, as the server keeps it (Z4): a place in hundredths, a turn in -180..180, a flip that is true or not; none when the place is not numbers.
+export function repairCloneAt(v: unknown): ModelCloneAt | null {
+  if (!v || typeof v !== 'object') return null
+  const { x, y, turn, flip } = v as { x?: unknown; y?: unknown; turn?: unknown; flip?: unknown }
+  if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null
+  const place = (n: number) => Math.round(Math.min(1e5, Math.max(-1e5, n)) * 100) / 100
+  const t = typeof turn === 'number' && Number.isFinite(turn) ? ((turn % 360) + 360) % 360 : 0
+  return { x: place(x), y: place(y), turn: Math.round((t > 180 ? t - 360 : t) * 100) / 100, flip: flip === true }
 }
 
 // The zones as the server keeps them (Z2): a zone that repeats an id goes, a name is trimmed and cut to length, and a zone keeps only groups that exist and are in no zone before it.
@@ -357,6 +367,8 @@ export function goneWith(c: ModelContent, seed: { shapes?: string[]; objects?: s
     for (const o of c.objects) if (o.mirrorOf && objects.has(o.mirrorOf)) objects.add(o.id)
     for (const s of c.shapes) if (s.mirrorOf && shapes.has(s.mirrorOf)) shapes.add(s.id)
     for (const s of c.shapes) if (s.copyOf && shapes.has(s.copyOf)) shapes.add(s.id)
+    for (const s of c.shapes) if (s.cloneOf && shapes.has(s.cloneOf)) shapes.add(s.id)
+    for (const o of c.objects) if (o.cloneOf && objects.has(o.cloneOf)) objects.add(o.id)
     for (const g of c.groups) if (groups.has(g.id)) for (const oid of g.objects) objects.add(oid)
     for (const o of c.objects) if (objects.has(o.id)) for (const sid of o.shapes) shapes.add(sid)
     grew = shapes.size + objects.size + groups.size > before
@@ -530,7 +542,10 @@ export function outlineSize(c: ModelContent, s: ModelShape): number {
   if (src && !src.mirrorOf) return src.pts.length
   // a shape of a class member with no points of its own follows the template's shape
   const tpl = s.copyOf && s.pts.length === 0 ? shapeById(c, s.copyOf) : undefined
-  return tpl && !tpl.copyOf ? tpl.pts.length : s.pts.length
+  if (tpl && !tpl.copyOf) return tpl.pts.length
+  // a clone (Z4) has its original's outline
+  const original = s.cloneOf && s.pts.length === 0 ? shapeById(c, s.cloneOf) : undefined
+  return original && !original.cloneOf && !original.mirrorOf ? original.pts.length : s.pts.length
 }
 
 export const renameShape = (c: ModelContent, id: string, name: string): ModelContent => updateShape(c, id, s => ({ ...s, name }))
@@ -988,11 +1003,37 @@ export function mirrorFaults(c: ModelContent): string[] {
   return faults
 }
 
+// Clones (Z4; the server's _clone_faults says the same words).
+export function cloneFaults(c: ModelContent): string[] {
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), objects = new Map(c.objects.map(o => [o.id, o]))
+  const owner = new Map(c.objects.flatMap(o => o.shapes.map(sid => [sid, o] as const)))
+  const faults: string[] = []
+  for (const o of c.objects) {
+    if (!o.cloneOf) continue
+    const name = label(o.name, o.id), original = objects.get(o.cloneOf)
+    if (!original) { faults.push(`Object ${name} is a clone of an object that does not exist.`); continue }
+    if (original.cloneOf || original.mirrorOf) faults.push(`Object ${name} is a clone of a clone or a mirror.`)
+    for (const sid of o.shapes) {
+      const s = shapes.get(sid)
+      if (s && (!s.cloneOf || !original.shapes.includes(s.cloneOf))) faults.push(`Shape ${label(s.name, s.id)} is in the clone ${name} but is not a clone of one of its original's shapes.`)
+    }
+  }
+  for (const s of c.shapes) {
+    if (!s.cloneOf) continue
+    const name = label(s.name, s.id), original = shapes.get(s.cloneOf)
+    if (!original) faults.push(`Shape ${name} is a clone of a shape that does not exist.`)
+    else if (original.cloneOf || original.mirrorOf || original.kind === 'pivot') faults.push(`Shape ${name} is a clone of a clone, a mirror or a pivot circle.`)
+    const home = owner.get(s.id)
+    if (!s.cloneAt && !home?.cloneOf) faults.push(`Shape ${name} is a clone with no place of its own outside a clone object.`)
+  }
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
   const shapeIds = new Set(c.shapes.map(s => s.id)), objectIds = new Set(c.objects.map(o => o.id)), groupIds = new Set(c.groups.map(g => g.id))
-  for (const s of c.shapes) if (s.pts.length < 3 && !s.mirrorOf && !(s.copyOf && s.pts.length === 0)) faults.push(`Shape ${label(s.name, s.id)} needs at least 3 points.`)
+  for (const s of c.shapes) if (s.pts.length < 3 && !s.mirrorOf && !(s.copyOf && s.pts.length === 0) && !(s.cloneOf && s.pts.length === 0)) faults.push(`Shape ${label(s.name, s.id)} needs at least 3 points.`)
   const owner = new Map<string, string>()
   for (const o of c.objects) {
     for (const sid of o.shapes) {
@@ -1030,6 +1071,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...handFaults(c))
   faults.push(...pivotFaults(c))
   faults.push(...mirrorFaults(c))
+  faults.push(...cloneFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

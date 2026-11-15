@@ -8,6 +8,7 @@ import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, ty
 import { texturedPath } from './texture'
 import { followBound } from './symmetry'
 import { mirrorLineMat, mirrorPoints, usesMirrorLine } from './mirrorLine'
+import { carryPoints, cloneMat, middleOf, middleOfAll } from './cloneAt'
 import { poseOf } from './pivots'
 import { slidPlace } from './sliders'
 import { isCast } from './kinds'
@@ -1101,7 +1102,10 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = '', skin: SolvedSkin | undefined, states: Moved[] = [], acrossLine = false
     // a shape of a class member follows a shape of the template; with no points of its own it is drawn as the template's shape is, in the member's own group,
     // under the member's own choice of form
-    const followed = !twin && sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
+    // a clone (Z4) has the outline of a shape that is neither a clone nor a mirror
+    const cloned = !twin && sh.cloneOf ? shapeMap.get(sh.cloneOf) : undefined
+    const source = cloned && !cloned.cloneOf && !cloned.mirrorOf && cloned.id !== sh.id ? cloned : undefined
+    const followed = !twin && !source && sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
     const tpl = followed && !followed.mirrorOf && !followed.copyOf ? followed : undefined
     const memberObject = tpl ? objectMap.get(objectOfShape.get(sh.id) ?? '') : undefined
     const memberId = memberObject?.classOf ? memberObject.id : undefined
@@ -1141,6 +1145,19 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         drawn = o ? reflectList(o.local, axis) : []
       }
       closed = twin.closed
+    } else if (source && sh.pts.length < 3) {
+      // a clone (Z4): the original's outline as resolved in its own space (links and drives, not its pose), carried by the clone's place: its own, or in a clone object the
+      // object's, about the middle of the original shape (or of the original object)
+      const o = shapeOut(source.id)
+      const home = objectMap.get(objectOfShape.get(sh.id) ?? '')
+      const homeOriginal = !sh.cloneAt && home?.cloneOf ? objectMap.get(home.cloneOf) : undefined
+      const at = sh.cloneAt ?? home?.cloneAt ?? null
+      let mid: [number, number] = o ? middleOf(o.local, source.closed) : [0, 0]
+      if (!sh.cloneAt && homeOriginal) mid = middleOfAll(homeOriginal.shapes.flatMap(id => { const x = shapeOut(id), s = shapeMap.get(id); return x && s ? [{ pts: x.local, closed: s.closed }] : [] }))
+      const M = at ? cloneMat(at, mid[0], mid[1]) : IDENTITY
+      rig = o ? carryPoints(o.rig, M) : []
+      drawn = o ? carryPoints(o.local, M) : []
+      closed = source.closed
     } else if (tpl && sh.pts.length < 3) {
       const o = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId), formCarries(tpl.id, memberId))
       rig = o.rig; drawn = o.drawn; closed = tpl.closed; skin = o.skin; states = o.states

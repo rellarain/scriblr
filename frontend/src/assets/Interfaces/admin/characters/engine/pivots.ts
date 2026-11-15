@@ -91,7 +91,7 @@ function work(c: ModelContent): Pose {
     parentOf: new Map(), nearOf: new Map(), hangs: new Map(), onCircle: new Map(), anchors: new Map(), figureAnchors: new Map(), posable: new Set(),
   }
   const byId = new Map(c.shapes.map(s => [s.id, s]))
-  const isBody = (s: ModelShape | undefined): boolean => !!s && !s.mirrorOf && actsAs(s) === 'base'
+  const isBody = (s: ModelShape | undefined): boolean => !!s && !s.mirrorOf && !s.cloneOf && actsAs(s) === 'base'
   // bodies: base shapes joined by their links to each other
   const parent = new Map<string, string>()
   const find = (id: string): string => { let r = id; while (parent.get(r) !== r) r = parent.get(r)!; return r }

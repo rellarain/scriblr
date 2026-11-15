@@ -148,7 +148,8 @@ export function paintOrigin(c: ModelContent, shape: ModelShape): PaintOrigin {
   const ix = paintIndex(c), hops: Hop[] = []
   let cur = shape
   while (hops.length < 4 && !cur.slot && (cur.gray === null || cur.gray === undefined)) {
-    const from = cur.mirrorOf ?? cur.copyOf, next = from ? ix.shapes.get(from) : undefined
+    // a clone (Z4) is painted as its original
+    const from = cur.mirrorOf ?? cur.copyOf ?? cur.cloneOf, next = from ? ix.shapes.get(from) : undefined
     if (!next) break
     const home = ix.owner.get(cur.id)
     hops.push(cur.mirrorOf ? { kind: 'twin' } : { kind: 'copy', member: home?.classOf ? home.id : undefined })

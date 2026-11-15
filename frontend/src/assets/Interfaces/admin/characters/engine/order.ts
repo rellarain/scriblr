@@ -30,10 +30,10 @@ export function treeRank(c: ModelContent): Map<string, number> {
 function zoneRank(c: ModelContent): Map<string, number> {
   const rank = new Map<string, number>()
   const objects = new Map(c.objects.map(o => [o.id, o])), groups = new Map(c.groups.map(g => [g.id, g]))
-  // a shape's mirrors in its object are drawn just behind it (Z3)
+  // a shape's mirrors and clones in its object are drawn just behind it (Z3, Z4)
   const twinsIn = new Map<string, string[]>()
-  for (const s of c.shapes) if (s.mirrorOf) twinsIn.set(s.mirrorOf, [...(twinsIn.get(s.mirrorOf) ?? []), s.id])
-  const mirrorOf = new Map(c.shapes.map(s => [s.id, s.mirrorOf ?? null]))
+  for (const s of c.shapes) { const of = s.mirrorOf ?? s.cloneOf; if (of) twinsIn.set(of, [...(twinsIn.get(of) ?? []), s.id]) }
+  const mirrorOf = new Map(c.shapes.map(s => [s.id, s.mirrorOf ?? s.cloneOf ?? null]))
   const take = (shapeIds: string[]) => {
     const mine = new Set(shapeIds)
     for (const id of shapeIds) {

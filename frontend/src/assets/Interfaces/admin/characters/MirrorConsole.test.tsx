@@ -62,7 +62,7 @@ describe('a mirror of a shape', () => {
     expect(Math.min(...xsOf(id))).toBeCloseTo(120, 1)
     expect(Math.max(...xsOf(id))).toBeCloseTo(140, 1)
     const tree = within(screen.getByRole('navigation', { name: 'Model tree' }))
-    expect(within(tree.getByRole('list', { name: 'Mirrors of hand shape' })).getByRole('group', { name: 'Shape hand shape (twin)' })).toBeInTheDocument()
+    expect(within(tree.getByRole('list', { name: 'Copies of hand shape' })).getByRole('group', { name: 'Shape hand shape (twin)' })).toBeInTheDocument()
     expect(canvas().querySelector('[data-mirror-axis]')).not.toBeNull()
     // its outer corner dragged out: the hand's outer corner goes the other way
     const corner = dotAt(140, 40)!

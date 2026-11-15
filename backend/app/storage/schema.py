@@ -1808,6 +1808,34 @@ class ModelMirrorLine(BaseModel):
     k: int = Field(default=0, ge=0, le=MODEL_SYM_AXES_MAX - 1)
 
 
+class ModelCloneAt(BaseModel):
+    """Clones (Z4): where a clone stands: the middle of its original's outline taken to (`x`, `y`) in its own space, turned by `turn` degrees about it and
+    flipped across first when `flip`."""
+
+    x: float = 100.0
+    y: float = 200.0
+    turn: float = 0.0
+    flip: bool = False
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _place(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("a place")
+        return round(_finite(value, 0.0, -1e5, 1e5), 2)
+
+    @field_validator("turn", mode="before")
+    @classmethod
+    def _turn(cls, value: Any) -> float:
+        a = _finite(value, 0.0, -1e6, 1e6) % 360.0
+        return round(a - 360.0 if a > 180.0 else a, 2)
+
+    @field_validator("flip", mode="before")
+    @classmethod
+    def _flip(cls, value: Any) -> bool:
+        return value is True
+
+
 class ModelZone(BaseModel):
     """A zone (Z2): a block of the tree between the model and its groups (Head, Hair, Torso...). Its groups are listed back to front, as the model's are; a model
     with zones is drawn in the order of its tree (zone, group, object, shape), not by z and layer."""
@@ -1900,6 +1928,9 @@ class ModelShape(BaseModel):
     place: Optional[ModelPlace] = None
     # Mirrors (Z3): on a twin, the line it is reflected across (None: the model's centre line).
     mirrorLine: Optional[ModelMirrorLine] = None
+    # Clones (Z4): the shape this one is a clone of (it has its outline, but no points of its own), and where it stands (None in a clone object: the object's place).
+    cloneOf: Optional[str] = None
+    cloneAt: Optional[ModelCloneAt] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1974,6 +2005,16 @@ class ModelShape(BaseModel):
     @classmethod
     def _mirror_line(cls, value: Any) -> Any:
         return _optional_model(ModelMirrorLine, value)
+
+    @field_validator("cloneOf", mode="before")
+    @classmethod
+    def _clone_of(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("cloneAt", mode="before")
+    @classmethod
+    def _clone_at(cls, value: Any) -> Any:
+        return _optional_model(ModelCloneAt, value)
 
     @field_validator("opBy", mode="before")
     @classmethod
@@ -2655,6 +2696,9 @@ class ModelObject(BaseModel):
     wrap: Optional[str] = None
     # Mirrors (Z3): on a twin object, the line it is reflected across (None: the model's centre line); its shapes carry the same line.
     mirrorLine: Optional[ModelMirrorLine] = None
+    # Clones (Z4): the object this one is a clone of (its shapes are clones of the original's shapes) and where it stands.
+    cloneOf: Optional[str] = None
+    cloneAt: Optional[ModelCloneAt] = None
 
     @field_validator("wrap", mode="before")
     @classmethod
@@ -2665,6 +2709,16 @@ class ModelObject(BaseModel):
     @classmethod
     def _mirror_line(cls, value: Any) -> Any:
         return _optional_model(ModelMirrorLine, value)
+
+    @field_validator("cloneOf", mode="before")
+    @classmethod
+    def _clone_of(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("cloneAt", mode="before")
+    @classmethod
+    def _clone_at(cls, value: Any) -> Any:
+        return _optional_model(ModelCloneAt, value)
 
     @field_validator("drape", mode="before")
     @classmethod

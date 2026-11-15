@@ -180,7 +180,7 @@ export function ShapeTree({ content, sel, selPoint, hidden, entry, onOpenModels,
       add: { label: `New object in ${name}`, title: `New object in ${name}`, off: g.objects.length >= max.objectsPerGroup, onClick: () => actions.onAddObject(g.id) },
       onEye: () => actions.onToggleHidden(g.id),
       // a mirror beside its original is listed inside the original's card (Z3)
-      kids: () => <ul className="dzCardList dzTreeList">{displayed(objects.filter(o => !(o.mirrorOf && g.objects.includes(o.mirrorOf)))).map(o => objectCard(o, g, off))}</ul>,
+      kids: () => <ul className="dzCardList dzTreeList">{displayed(objects.filter(o => !copyIn(o, g.objects))).map(o => objectCard(o, g, off))}</ul>,
     })
   }
   function objectCard(o: ModelObject, g: ModelGroup, groupOff: boolean): ReactNode {
@@ -194,18 +194,19 @@ export function ShapeTree({ content, sel, selPoint, hidden, entry, onOpenModels,
       onEye: () => actions.onToggleHidden(o.id),
       kids: () => (
         <>
-          {mirrorsOf(o).length > 0 && <ul className="dzCardList dzTreeList" aria-label={`Mirrors of ${name}`}>{mirrorsOf(o).map(m => objectCard(m, g, groupOff))}</ul>}
-          <ul className="dzCardList dzTreeList">{displayed(shapes.filter(s => !(s.mirrorOf && o.shapes.includes(s.mirrorOf)))).map(s => shapeCard(s, o, off))}</ul>
+          {mirrorsOf(o).length > 0 && <ul className="dzCardList dzTreeList" aria-label={`Copies of ${name}`}>{mirrorsOf(o).map(m => objectCard(m, g, groupOff))}</ul>}
+          <ul className="dzCardList dzTreeList">{displayed(shapes.filter(s => !copyIn(s, o.shapes))).map(s => shapeCard(s, o, off))}</ul>
         </>
       ),
     })
   }
-  // the mirrors of an object that are in its group, and of a shape that are in its object
+  // the copies (mirrors and clones, Z3 and Z4) of an object that are in its group, and of a shape that are in its object: listed inside the original's card
+  const copyIn = (x: { mirrorOf?: string | null; cloneOf?: string | null }, siblings: readonly string[]) => { const of = x.mirrorOf ?? x.cloneOf; return !!of && siblings.includes(of) }
   const mirrorsOf = (o: ModelObject): ModelObject[] => {
     const g = content.groups.find(x => x.objects.includes(o.id))
-    return g ? g.objects.map(id => objectById(content, id)).filter((x): x is ModelObject => !!x && x.mirrorOf === o.id) : []
+    return g ? g.objects.map(id => objectById(content, id)).filter((x): x is ModelObject => !!x && (x.mirrorOf === o.id || x.cloneOf === o.id)) : []
   }
-  const shapeMirrors = (s: ModelShape, o: ModelObject): ModelShape[] => o.shapes.map(id => shapeById(content, id)).filter((x): x is ModelShape => !!x && x.mirrorOf === s.id)
+  const shapeMirrors = (s: ModelShape, o: ModelObject): ModelShape[] => o.shapes.map(id => shapeById(content, id)).filter((x): x is ModelShape => !!x && (x.mirrorOf === s.id || x.cloneOf === s.id))
   function shapeCard(s: ModelShape, o: ModelObject, objectOff: boolean): ReactNode {
     const name = label(s.name, 'Untitled shape')
     return card({
@@ -215,7 +216,7 @@ export function ShapeTree({ content, sel, selPoint, hidden, entry, onOpenModels,
       onEye: () => actions.onToggleHidden(s.id),
       kids: () => (
         <>
-          {shapeMirrors(s, o).length > 0 && <ul className="dzCardList dzTreeList" aria-label={`Mirrors of ${name}`}>{shapeMirrors(s, o).map(m => shapeCard(m, o, objectOff))}</ul>}
+          {shapeMirrors(s, o).length > 0 && <ul className="dzCardList dzTreeList" aria-label={`Copies of ${name}`}>{shapeMirrors(s, o).map(m => shapeCard(m, o, objectOff))}</ul>}
           <PointRows shape={s} name={name} selected={sel.kind === 'shape' && sel.id === s.id ? selPoint : null} onSelect={i => actions.onSelectPoint(s.id, i)} />
         </>
       ),

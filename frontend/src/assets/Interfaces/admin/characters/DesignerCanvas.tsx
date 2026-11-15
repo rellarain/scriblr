@@ -554,7 +554,7 @@ export function DesignerCanvas(p: CanvasProps) {
     }
     for (let i = solved.order.length - 1; i >= 0; i--) {
       const id = solved.order[i], r = solved.shapes[id], s = shapesById.get(id)
-      if (!r || !s || !r.visible || r.off || id === shape?.id || r.poly.length < 2 || s.mirrorOf) continue
+      if (!r || !s || !r.visible || r.off || id === shape?.id || r.poly.length < 2 || s.mirrorOf || s.cloneOf) continue
       const reach = REACH_POINT * px
       if (wx < r.box.x - reach || wx > r.box.x + r.box.w + reach || wy < r.box.y - reach || wy > r.box.y + r.box.h + reach) continue
       // another shape's points come before its outline, so a click on one selects that shape and that point at once
@@ -1000,7 +1000,7 @@ export function DesignerCanvas(p: CanvasProps) {
   function shapeUnder(x: number, y: number, dragged: string): string | null {
     for (let i = solved.order.length - 1; i >= 0; i--) {
       const id = solved.order[i], r = solved.shapes[id], s = shapesById.get(id)
-      if (!r || !s || id === dragged || !r.visible || r.off || s.mirrorOf || s.helper || r.poly.length < 3) continue
+      if (!r || !s || id === dragged || !r.visible || r.off || s.mirrorOf || s.cloneOf || s.helper || r.poly.length < 3) continue
       if (x < r.box.x || x > r.box.x + r.box.w || y < r.box.y || y > r.box.y + r.box.h) continue
       if (inPolygon(r.poly, x, y)) return id
     }
@@ -1021,7 +1021,7 @@ export function DesignerCanvas(p: CanvasProps) {
   function beginSegmentDrag(d: Extract<Drag, { kind: 'segPress' }>, e: { clientX: number; clientY: number }) {
     const s = shapesById.get(d.shapeId), r = solved.shapes[d.shapeId]
     dragRef.current = null
-    if (!s || !r || s.mirrorOf || s.kind === 'pivot') return
+    if (!s || !r || s.mirrorOf || s.cloneOf || s.kind === 'pivot') return
     if (d.other) p.onSelect({ kind: 'shape', id: s.id })
     if (sharedSegment(content, s.id, d.e) || sharersOf(content, s.id, d.e).length > 0) {
       const home = segmentHome(content, s.id, d.e), hs = shapesById.get(home.shapeId)
@@ -1075,7 +1075,7 @@ export function DesignerCanvas(p: CanvasProps) {
     const h = hitTest(e)
     if (!h || h.kind !== 'edge') return
     const s = shapesById.get(h.shapeId), r = solved.shapes[h.shapeId]
-    if (!s || !r || s.mirrorOf || (shape?.id === s.id && !editable)) return
+    if (!s || !r || s.mirrorOf || s.cloneOf || (shape?.id === s.id && !editable)) return
     // a shared segment gets its point on the segment that is drawn and on every segment that shares it (shape editor S5)
     if (p.connect && (sharedSegment(content, s.id, h.e) || sharersOf(content, s.id, h.e).length)) { p.connect.onAddShared(s.id, h.e, h.x, h.y); return }
     if (p.connect) return

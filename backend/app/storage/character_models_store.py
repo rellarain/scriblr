@@ -212,6 +212,11 @@ def _outline_size(shapes: dict[str, ModelShape], shape: ModelShape) -> int:
         tpl = shapes.get(shape.copyOf)
         if tpl is not None and tpl.copyOf is None:
             return len(tpl.pts)
+    # a clone (Z4) has its original's outline
+    if shape.cloneOf and not shape.pts:
+        original = shapes.get(shape.cloneOf)
+        if original is not None and original.cloneOf is None and original.mirrorOf is None:
+            return len(original.pts)
     return len(shape.pts)
 
 
@@ -719,6 +724,42 @@ def _mirror_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _clone_faults(content: ModelContent) -> list[str]:
+    """Clones (Z4; the frontend's cloneFaults says the same words): a clone of something that is not there, or of a clone, a mirror or a pivot circle; a shape in a clone
+    object that is not a clone of one of its original's shapes; a clone shape with no place of its own outside a clone object."""
+    shapes = {s.id: s for s in content.shapes}
+    objects = {o.id: o for o in content.objects}
+    owner = {sid: o for o in content.objects for sid in o.shapes}
+    faults: list[str] = []
+    for o in content.objects:
+        if o.cloneOf is None:
+            continue
+        name = _label(o.name, o.id)
+        original = objects.get(o.cloneOf)
+        if original is None:
+            faults.append(f"Object {name} is a clone of an object that does not exist.")
+            continue
+        if original.cloneOf is not None or original.mirrorOf is not None:
+            faults.append(f"Object {name} is a clone of a clone or a mirror.")
+        for sid in o.shapes:
+            s = shapes.get(sid)
+            if s is not None and (s.cloneOf is None or s.cloneOf not in original.shapes):
+                faults.append(f"Shape {_label(s.name, s.id)} is in the clone {name} but is not a clone of one of its original's shapes.")
+    for s in content.shapes:
+        if s.cloneOf is None:
+            continue
+        name = _label(s.name, s.id)
+        original = shapes.get(s.cloneOf)
+        if original is None:
+            faults.append(f"Shape {name} is a clone of a shape that does not exist.")
+        elif original.cloneOf is not None or original.mirrorOf is not None or original.kind == "pivot":
+            faults.append(f"Shape {name} is a clone of a clone, a mirror or a pivot circle.")
+        home = owner.get(s.id)
+        if s.cloneAt is None and (home is None or home.cloneOf is None):
+            faults.append(f"Shape {name} is a clone with no place of its own outside a clone object.")
+    return faults
+
+
 def _proportion_faults(content: ModelContent) -> list[str]:
     """What is wrong with the skeleton, the fit of objects and the frames (phase 5a; the frontend's proportionFaults says the same words)."""
     faults: list[str] = []
@@ -777,7 +818,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     object_ids = {o.id for o in content.objects}
     group_ids = {g.id for g in content.groups}
     for s in content.shapes:
-        if len(s.pts) < 3 and not s.mirrorOf and not (s.copyOf and not s.pts):
+        if len(s.pts) < 3 and not s.mirrorOf and not (s.copyOf and not s.pts) and not (s.cloneOf and not s.pts):
             faults.append(f"Shape {_label(s.name, s.id)} needs at least 3 points.")
     owner: dict[str, str] = {}
     for o in content.objects:
@@ -821,6 +862,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_hand_faults(content))
     faults.extend(_pivot_faults(content))
     faults.extend(_mirror_faults(content))
+    faults.extend(_clone_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

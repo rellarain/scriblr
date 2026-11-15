@@ -36,7 +36,7 @@ export function dropTargetAt(c: ModelContent, solved: Solved, dragged: string, x
   let edge: DropTarget | null = null, ed = reach
   for (const s of c.shapes) {
     const r = solved.shapes[s.id]
-    if (s.id === dragged || s.mirrorOf || s.helper || !r?.visible || r.off || r.local.length < 3) continue
+    if (s.id === dragged || s.mirrorOf || s.cloneOf || s.helper || !r?.visible || r.off || r.local.length < 3) continue
     const a = build(r.local, s.closed, r.matrix)
     let moving = false
     a.forEach((p, i) => {
@@ -67,6 +67,7 @@ export function followRefusal(c: ModelContent, shapeId: string, i: number, targe
   const s = shapeById(c, shapeId)
   if (!s) return 'There is no such shape.'
   if (s.mirrorOf) return 'A twin has no points of its own.'
+  if (s.cloneOf) return 'A clone has no points of its own.'
   if (s.kind === 'pivot') return 'A pivot circle follows nothing: hang shapes on it instead.'
   // a symmetric shape's point may follow (shape types T1), but only one copy of each point: the copies follow it
   if (s.sym && orbitOf(s, i).some(j => j !== i && !!s.pts[j]?.bind)) return 'Another copy of this point already follows a shape: the copies of a symmetric shape\'s point follow one shape together.'

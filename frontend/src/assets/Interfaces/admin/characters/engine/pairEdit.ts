@@ -32,6 +32,7 @@ function untwinnable(c: ModelContent, kind: PairKind, id: string): string | null
     const s = shapeById(c, id)
     if (!s) return 'There is no such shape.'
     if (s.mirrorOf) return `${label(s.name, s.id)} is a twin already.`
+    if (s.cloneOf) return `${label(s.name, s.id)} is a clone: mirror its original.`
     if (twinsOf(c, 'shape', id).length) return `${label(s.name, s.id)} already has a twin.`
     if (outlineSize(c, s) < 3) return `${label(s.name, s.id)} has no outline yet: draw it first.`
     return null
@@ -40,6 +41,7 @@ function untwinnable(c: ModelContent, kind: PairKind, id: string): string | null
     const o = objectById(c, id)
     if (!o) return 'There is no such object.'
     if (o.mirrorOf) return `${label(o.name, o.id)} is a twin already.`
+    if (o.cloneOf) return `${label(o.name, o.id)} is a clone: mirror its original.`
     if (twinsOf(c, 'object', id).length) return `${label(o.name, o.id)} already has a twin.`
     for (const sid of o.shapes) {
       const s = shapeById(c, sid)

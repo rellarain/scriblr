@@ -80,7 +80,9 @@ import { LIMITS } from './engine/limits'
 import { axisOf, mirrorLineMat, mirrorPoints, mirroredTurn, usesMirrorLine } from './engine/mirrorLine'
 import { keepCarried, makeMirror, mirrorLineOptions, originalPoint, originalSegment, reconcileMirrors, setMirrorLine } from './engine/mirrors'
 import { normTurn, rotOf } from './engine/transform'
-import type { MirrorActions } from './ShapePanels'
+import { cloneEdit, clonePlace, detachClone, makeClone, reconcileClones, setCloneAt } from './engine/clones'
+import { cloneTurn } from './engine/cloneAt'
+import type { CloneActions, MirrorActions } from './ShapePanels'
 import { addZone, ensureZones, moveGroupTo, moveObjectTo, moveShapeTo, moveZone, needsZones, newGroupIn, removeZone, renameZone, topZone, zoneById, zonesOf } from './engine/zones'
 import type { ArrangeActions, ConnectionActions, PivotActions, SymmetryActions } from './ShapePanels'
 import { addCircle, addPivot, isPivotCircle, movePivotBy, pivotById, poseOf, radiusOf, renamePivot, setPivotSetting, setRadius } from './engine/pivots'
@@ -363,7 +365,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // a mirror drawn across a line (Z3) is edited as it is drawn: what is done to it is done to its original, across the line
   const mirrorOriginal = selShape?.mirrorOf ? shapeById(content, selShape.mirrorOf) : undefined
   const editableMirror = shapesOnly && !!selShape && !!mirrorOriginal && !mirrorOriginal.mirrorOf && usesMirrorLine(content, selShape)
-  const editable = !!selShape && !pointDriven && (!selShape.mirrorOf || editableMirror) && !hiddenByForm && !switchedOff && !selShape.hide && selWhere !== 'between'
+  // a clone (Z4) is edited as it is drawn too: a move, turn or flip places it, any other change goes to its original (so every clone changes)
+  const cloneOriginal = selShape?.cloneOf ? shapeById(content, selShape.cloneOf) : undefined
+  const editableClone = shapesOnly && !!selShape && !!cloneOriginal && !cloneOriginal.cloneOf && !cloneOriginal.mirrorOf && !selShape.mirrorOf
+  const editable = !!selShape && !pointDriven && (!selShape.mirrorOf || editableMirror) && (!selShape.cloneOf || editableClone) && !hiddenByForm && !switchedOff && !selShape.hide && selWhere !== 'between'
   // What the canvas draws and edits for the selected shape: the points as the rig puts them (links resolved), in the view being edited. A twin is shown the same
   // way, but not edited.
   // (the panel's copy: an editable mirror is shown with its outline as drawn and its frame turned across the line, still a mirror)
@@ -374,11 +379,19 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const R = mirrorLineMat(content, selShape.mirrorLine, sid => canvasSolved.shapes[sid]?.frame, [mirrorOriginal.id, selShape.id])
       return updateShape(shown, selShape.id, sh => ({ ...sh, pts: r.local, rot: mirroredTurn(R, rotOf(mirrorOriginal)) }))
     }
+    if (editableClone && cloneOriginal) {
+      // a clone's frame is its original's turned by the clone's place
+      const place = clonePlace(content, selShape, sid => canvasSolved.shapes[sid]?.local)
+      return updateShape(shown, selShape.id, sh => ({ ...sh, pts: r.local, rot: place ? cloneTurn(place.at, rotOf(cloneOriginal)) : rotOf(sh) }))
+    }
     return updateShape(shown, selShape.id, sh => ({ ...sh, pts: r.local }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown, canvasSolved, selShape, editableMirror, mirrorOriginal])
-  // an editable mirror is handed to the canvas as a shape of its own; its edits come back to toOriginal
-  const canvasContent = useMemo(() => (editableMirror && selShape ? updateShape(panelContent, selShape.id, sh => ({ ...sh, mirrorOf: null })) : panelContent), [panelContent, editableMirror, selShape])
+  }, [shown, canvasSolved, selShape, editableMirror, mirrorOriginal, editableClone, cloneOriginal])
+  // an editable mirror or clone is handed to the canvas as a shape of its own; its edits come back to toOriginal or toClone
+  const canvasContent = useMemo(
+    () => ((editableMirror || editableClone) && selShape ? updateShape(panelContent, selShape.id, sh => ({ ...sh, mirrorOf: null, cloneOf: null })) : panelContent),
+    [panelContent, editableMirror, editableClone, selShape],
+  )
 
   // An edit made on a mirror (Z3), given to its original: the outline carried back across the line (the mirror's turn the other way round). Null when the shape is not an
   // editable mirror; 'same' when the canvas handed back the mirror unchanged.
@@ -395,6 +408,22 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const T = mul(inverse(ro.frame), mul(R, rt.frame))
     const turned = rotOf(next) - mirroredTurn(R, rotOf(orig))
     return { id: orig.id, next: { ...orig, pts: keepCarried(orig.pts, mirrorPoints(next.pts, T)), rot: normTurn(rotOf(orig) - turned) } }
+  }
+
+  // An edit made on a clone (Z4): a move, turn or flip places the clone (or its clone object); any other change of its outline goes to its original, kept where it is, so
+  // every clone changes. 'own' is a change of the clone's own settings (from its panel); 'same' the canvas's copy handed back unchanged; null not an editable clone.
+  type CloneRoute = { kind: 'place'; edit: (c: ModelContent) => ModelContent } | { kind: 'outline'; id: string; next: ModelShape } | { kind: 'own'; next: ModelShape }
+  function toClone(id: string, next: ModelShape): CloneRoute | 'same' | null {
+    if (!shapesOnly) return null
+    const cl = shapeById(content, id), orig = cl?.cloneOf ? shapeById(content, cl.cloneOf) : undefined
+    if (!cl || !orig || orig.cloneOf || orig.mirrorOf || cl.mirrorOf) return null
+    const r = canvasSolved.shapes[id]
+    if (!r) return null
+    if (JSON.stringify(next.pts) === JSON.stringify(r.local)) return next.cloneOf ? { kind: 'own', next: { ...next, pts: cl.pts, rot: cl.rot, cloneAt: cl.cloneAt } } : 'same'
+    const e = cloneEdit(content, cl, r.local, next.pts, sid => canvasSolved.shapes[sid]?.local)
+    if (!e) return null
+    if (e.kind === 'place') return { kind: 'place', edit: c => setCloneAt(c, e.owner, e.id, e.at) }
+    return { kind: 'outline', id: e.id, next: { ...orig, pts: e.pts } }
   }
 
   // The form an edit of this shape's points goes to, if a chosen form gives the shape its outline (see forms.targetForShape).
@@ -428,7 +457,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     // skin weights stay with their points when points are added or taken away (phase O1)
     // depths and outlines at key angles stay with their points too (phase A3)
     // a mirrored object has a mirror of each shape of its original (Z3)
-    const synced = reconcileMirrors(reconcileClasses(alignTurns(content, alignSkins(content, next)), makeId), makeId)
+    // a clone object has a clone of each shape of its original (Z4)
+    const synced = reconcileClones(reconcileMirrors(reconcileClasses(alignTurns(content, alignSkins(content, next)), makeId), makeId), makeId)
     const refused = policy.writer ? growthRefusal(content, synced, policy.writer) : null
     if (refused) { setNote(refused); return false }
     const cast = castRefusal(content, synced)
@@ -452,6 +482,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const across = toOriginal(id, next)
     if (across === 'same') return
     if (across) { live(across.id, across.next); return }
+    const cloned = toClone(id, next)
+    if (cloned === 'same') return
+    if (cloned?.kind === 'place') { const place = cloned.edit; models.edit(entry.id, c => place(c), false); return }
+    if (cloned?.kind === 'outline') { live(cloned.id, cloned.next); return }
+    if (cloned?.kind === 'own') { const own = cloned.next; models.edit(entry.id, c => updateShape(c, id, () => own), false); return }
     // a pivot circle keeps its shape (T3): a drag of it moves its pivot, and its other circles with it
     const circle = shapesOnly ? shapeById(content, id) : undefined
     if (circle && isPivotCircle(circle)) {
@@ -499,6 +534,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const across = toOriginal(id, next)
     if (across === 'same') return
     if (across) { editShape(across.id, across.next, undefined, followed); if (point !== undefined) selectPoint(point); return }
+    const cloned = toClone(id, next)
+    if (cloned === 'same') return
+    if (cloned) {
+      if (cloned.kind === 'place') commit(cloned.edit(content), true)
+      else if (cloned.kind === 'own') commit(updateShape(content, id, () => cloned.next))
+      else editShape(cloned.id, cloned.next, undefined, followed)
+      if (point !== undefined) selectPoint(point)
+      return
+    }
     const old = shapeById(content, id)
     if (!old) return
     if (shapesOnly && isPivotCircle(old) && JSON.stringify(old.pts) !== JSON.stringify(next.pts)) {
@@ -627,7 +671,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const k = e.key.toLowerCase(), held = sel.kind === 'shape' ? shapeById(content, sel.id) : undefined
       if ((k === 'c' || k === 'x') && held && !held.mirrorOf) {
         e.preventDefault()
-        clipboard.copyShape(held)
+        // a clone (Z4) is copied as it is drawn, a shape of its own
+        clipboard.copyShape(held.cloneOf ? { ...held, pts: (canvasSolved.shapes[held.id]?.rig ?? []).map(p => ({ ...p, bind: null })), cloneOf: null, cloneAt: null } : held)
         if (k === 'x') deleteSelection({ kind: 'shape', id: held.id })
         return
       }
@@ -1287,12 +1332,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function deleteSelection(s: Selection) {
     if (s.kind === 'zone') { commit(removeZone(content, s.id), true); setSel(NONE); return }
     if (s.kind === 'shape' && shapeById(content, s.id)?.copyOf) { setNote('A shape that follows the pattern cannot be deleted: hide it in this member instead (the Shape tab).'); return }
+    if (s.kind === 'shape' && shapeById(content, s.id)?.cloneOf && objectOfShape(content, s.id)?.cloneOf) { setNote('A shape of a clone object follows its original: delete the shape in the original, or detach the clone.'); return }
     const twins = twinsOf(content, s.kind === 'none' ? 'shape' : s.kind, s.kind === 'none' ? '' : s.id).length
+    const clones = s.kind === 'shape' ? content.shapes.filter(x => x.cloneOf === s.id).length : s.kind === 'object' ? content.objects.filter(x => x.cloneOf === s.id).length : 0
     // the members of a class whose pattern goes keep their look: they are detached first
     const base = s.kind === 'none' ? content : detachBeforeRemoval(content, s.kind === 'shape' ? { shapes: [s.id] } : s.kind === 'object' ? { objects: [s.id] } : { groups: [s.id] })
     commit(s.kind === 'shape' ? removeShape(base, s.id) : s.kind === 'object' ? removeObject(base, s.id) : removeGroup(base, s.id), true)
     setSel(NONE)
     if (base !== content) setNote('The members of its class were detached first: they keep their look.')
+    else if (clones) setNote(clones === 1 && !twins ? 'Its clone went with it.' : 'Its copies went with it.')
     else if (twins) setNote('Its twin went with it.')
   }
   function copyShape(id: string) {
@@ -1408,6 +1456,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (!(sel.kind === 'shape' && sel.id === s.id)) choose({ kind: 'shape', id: s.id })
       const n = o.pts.length
       removeAt(t.kind === 'point' ? { kind: 'point', id: o.id, i: originalPoint(n, t.i) } : { kind: 'segment', id: o.id, e: originalSegment(n, t.e) }, true)
+      return
+    }
+    if (s.cloneOf) {
+      // on a clone (Z4): the point or segment of its original that it shows (a flipped clone runs the other way round)
+      const o = shapeById(content, s.cloneOf)
+      if (!shapesOnly || !o || o.cloneOf || o.mirrorOf) return
+      if (!(sel.kind === 'shape' && sel.id === s.id)) choose({ kind: 'shape', id: s.id })
+      const flipped = !!(s.cloneAt ?? objectOfShape(content, s.id)?.cloneAt)?.flip, n = o.pts.length
+      const i = t.kind === 'point' ? (flipped ? originalPoint(n, t.i) : t.i) : (flipped ? originalSegment(n, t.e) : t.e)
+      removeAt(t.kind === 'point' ? { kind: 'point', id: o.id, i } : { kind: 'segment', id: o.id, e: i }, true)
       return
     }
     if (!keepSelection && !(sel.kind === 'shape' && sel.id === s.id)) choose({ kind: 'shape', id: s.id })
@@ -1750,6 +1808,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onLine: (kind, twinId, line) => { commit(setMirrorLine(content, kind, twinId, line), true) },
     onDetach: (kind, twinId) => { applyEdit(breakPair(content, kind, twinId)) },
   } : undefined
+  // the shape editor's clones (Z4): make one, place a clone object, detach one
+  const cloneActions: CloneActions | undefined = shapesOnly ? {
+    onClone: (kind, id) => {
+      const r = makeClone(content, kind, id, makeId, { shapes: policy.max.shapesPerObject, objects: policy.max.objectsPerGroup })
+      if (applyEdit(r.edit) && r.cloneId) choose({ kind, id: r.cloneId })
+    },
+    onDetach: (kind, id) => { applyEdit(detachClone(content, kind, id, canvasSolved)) },
+    onPlace: (objectId, at) => { commit(setCloneAt(content, 'object', objectId, at), true) },
+  } : undefined
   const pivotActions: PivotActions | undefined = selShape && selPivot ? {
     pivot: selPivot, radius: Math.round(radiusOf(content, selShape) * 100) / 100,
     onName: name => models.edit(entry.id, c => renamePivot(c, selPivot.id, name), false),
@@ -2053,7 +2120,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} symmetry={symmetry} pivot={pivotActions} mirrors={mirrorActions}
+              arrange={arrange} connections={connections} symmetry={symmetry} pivot={pivotActions} mirrors={mirrorActions} clones={cloneActions}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}
