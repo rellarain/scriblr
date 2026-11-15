@@ -77,7 +77,8 @@ import {
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepGroupDepth, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { LIMITS } from './engine/limits'
-import type { ArrangeActions, ConnectionActions, SymmetryActions } from './ShapePanels'
+import type { ArrangeActions, ConnectionActions, PivotActions, SymmetryActions } from './ShapePanels'
+import { addCircle, addPivot, isPivotCircle, movePivotBy, pivotById, poseOf, radiusOf, renamePivot, setPivotSetting, setRadius } from './engine/pivots'
 import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
 import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
 import { PointForm } from './PointForm'
@@ -360,6 +361,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // ---- applying changes ----
 
+  // How far a pivot circle was moved as a whole (T3), or null when its points were not all moved by the same amount.
+  function pivotShift(old: ModelShape, next: ModelShape): [number, number] | null {
+    if (old.pts.length === 0 || old.pts.length !== next.pts.length) return null
+    const dx = next.pts[0].x - old.pts[0].x, dy = next.pts[0].y - old.pts[0].y
+    return next.pts.every((p, i) => Math.abs(p.x - old.pts[i].x - dx) < 1e-6 && Math.abs(p.y - old.pts[i].y - dy) < 1e-6) ? [dx, dy] : null
+  }
   // Lights and shadows may not overlap (shape types T1): a change that makes a light and a shadow overlap that did not overlap before is refused, and the note says which.
   function castRefusal(before: ModelContent, after: ModelContent): string | null {
     if (!shapesOnly || !hasBothCasts(after)) return null
@@ -395,6 +402,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // points go back into `pts`, in the back view into the outline of its own for the back.
   function live(id: string, next: ModelShape) {
     if (recording) { setRecording(r => (r ? { ...r, draft: next } : r)); return }
+    // a pivot circle keeps its shape (T3): a drag of it moves its pivot, and its other circles with it
+    const circle = shapesOnly ? shapeById(content, id) : undefined
+    if (circle && isPivotCircle(circle)) {
+      models.edit(entry.id, c => { const o = shapeById(c, id); const d = o && pivotShift(o, next); return d ? movePivotBy(c, o!.pivot!.at, d[0], d[1]) : c }, false)
+      return
+    }
     // a drag that would push a light into a shadow stops where it was (shape types T1)
     if (shapesOnly && hasBothCasts(content)) {
       const before = shapeById(content, id), followed = before?.sym && next.sym ? followSymmetry(before, next).shape : next
@@ -426,6 +439,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     }
     const old = shapeById(content, id)
     if (!old) return
+    if (shapesOnly && isPivotCircle(old) && JSON.stringify(old.pts) !== JSON.stringify(next.pts)) {
+      const d = pivotShift(old, next)
+      if (!d) { setNote('A pivot circle keeps its shape: change its size in the panel.'); return }
+      commit(movePivotBy(content, old.pivot!.at, d[0], d[1]), true)
+      return
+    }
     // an edit of a symmetric shape's points goes to its source, and the copies follow (shape editor S6)
     if (old.sym && next.sym && !followed) {
       const f = followSymmetry(old, next)
@@ -1251,6 +1270,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
   }
 
+  // A new pivot (T3): its point at (x, y) and its circles, into an object (else a new one); the first circle is selected.
+  function makePivot(into: string | null, x: number, y: number, count: number) {
+    const base = into && objectById(content, into) ? { content, objectId: into } : addObjectOn('body')
+    const obj = objectById(base.content, base.objectId)
+    if (obj && obj.shapes.length + count > policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
+    if ((base.content.pivots ?? []).length >= LIMITS.pivotsMax) { setNote(`A model may have at most ${LIMITS.pivotsMax} pivots.`); return }
+    const circles = Array.from({ length: count }, () => freshId(base.content, 's', makeId))
+    const next = addPivot(base.content, base.objectId, x, y, { pivot: freshId(base.content, 'p', makeId), circles })
+    if (commit(next, true)) choose({ kind: 'shape', id: circles[0] })
+  }
   // Paste (T2): the copied shape into the selection's object (else a new one), under the pointer when it is over the canvas, else a little right of and below where it was.
   function pasteHere() {
     const into = contextObject(content, sel)
@@ -1300,9 +1329,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // Create: the chosen shape where the form was opened, into the object it was opened for, else the selection's, else a new object on the Body layer.
   function createFromForm() {
     if (!shapeForm) return
-    const from = { kind: formChoice.kind, at: [shapeForm.x, shapeForm.y] as [number, number] }, t = templateOfChoice(formChoice)
     const into = shapeForm.objectId && objectById(content, shapeForm.objectId) ? shapeForm.objectId : contextObject(content, sel)
     setShapeForm(null)
+    if (formChoice.kind === 'pivot') { makePivot(into ?? null, shapeForm.x, shapeForm.y, formChoice.circles); return }
+    const from = { kind: formChoice.kind, at: [shapeForm.x, shapeForm.y] as [number, number] }, t = templateOfChoice(formChoice)
     if (into) { addShapeTo(into, t, content, from); return }
     const r = addObjectOn('body')
     addShapeTo(r.objectId, t, r.content, from)
@@ -1569,6 +1599,25 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
   } : undefined
 
+  // A pivot circle's section (T3): the pivot's name and place, the circle's size, turn and limits, one more circle.
+  const selPivot = shapesOnly && selShape && isPivotCircle(selShape) ? pivotById(content, selShape.pivot!.at) : undefined
+  const pivotActions: PivotActions | undefined = selShape && selPivot ? {
+    pivot: selPivot, radius: Math.round(radiusOf(content, selShape) * 100) / 100,
+    onName: name => models.edit(entry.id, c => renamePivot(c, selPivot.id, name), false),
+    onMove: (dx, dy) => { commit(movePivotBy(content, selPivot.id, dx, dy), true) },
+    onRadius: r => { commit(setRadius(content, selShape.id, r), true) },
+    onSetting: (key, v) => { commit(setPivotSetting(content, selShape.id, key, v), true) },
+    onAddCircle: () => {
+      const into = objectOfShape(content, selShape.id)
+      if (!into) return
+      if (into.shapes.length >= policy.max.shapesPerObject) { setNote(`An object may have at most ${policy.max.shapesPerObject} shapes.`); return }
+      const id = freshId(content, 's', makeId), next = addCircle(content, selPivot.id, into.id, id)
+      if (next && commit(next, true)) choose({ kind: 'shape', id })
+    },
+  } : undefined
+  // where the pivot points are now (they move with the side that holds them)
+  const pivotPoints = shapesOnly ? (content.pivots ?? []).map(p => { const at = poseOf(content).points.get(p.id) ?? [p.x, p.y]; return { id: p.id, x: at[0], y: at[1], name: p.name } }) : undefined
+
   // ---- the toolbars ----
 
   const consoleBar = (
@@ -1608,6 +1657,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onShape={live} onEditShape={editShape}
             onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
             onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
+            rigid={!!selPivot} pivotPoints={pivotPoints}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
@@ -1622,6 +1672,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             <PointForm
               at={{ left: pointForm.left, top: pointForm.top }} mode={shapeById(content, pointForm.id)!.pts[pointForm.i].m}
               onMode={m => { const s = shapeById(content, pointForm.id); if (s) editShape(s.id, setMode(s, pointForm.i, m, { axis: content.axis }), pointForm.i); setPointForm(null) }}
+              onPivotHere={() => { const s = shapeById(content, pointForm.id), pt = s?.pts[pointForm.i]; setPointForm(null); if (s && pt) makePivot(objectOfShape(content, s.id)?.id ?? null, pt.x, pt.y, 2) }}
               onClose={closePointForm}
             />
           )}
@@ -1744,7 +1795,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={canvasContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} symmetry={symmetry}
+              arrange={arrange} connections={connections} symmetry={symmetry} pivot={pivotActions}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}

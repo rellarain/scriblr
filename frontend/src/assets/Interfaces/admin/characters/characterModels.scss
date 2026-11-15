@@ -82,6 +82,7 @@
 .cmShapeForm { width: 268px; }
 .cmPointForm { width: 232px; }
 .cmPointFormRow { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.cmShapeFormPivot { display: flex; flex-direction: column; gap: var(--space-1); }
 .cmShapeFormKinds { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .cmShapeFormPresets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-1); .cmTplThumb { width: 34px; height: 34px; } }
 .cmShapeFormFoot { display: flex; justify-content: flex-end; }
@@ -262,6 +263,8 @@
 .cmPivotRing { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .cmPivotCross { stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .cmPivot--off .cmPivotRing { stroke: var(--ink-muted); }
+// the pivot points of the shape editor (shape types T3): where a pivot's circles turn; they are not grabbed (a circle is)
+.cmPivotPt { pointer-events: none; .cmPivotRing { stroke: var(--ink); } }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }
 // a helper shape is never drawn in the previews: on the canvas it is an outline, so it can still be picked and edited

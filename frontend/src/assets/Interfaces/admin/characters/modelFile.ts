@@ -5,6 +5,7 @@ import type {
 import { NAME_LIMIT } from './engine/connect'
 import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
+import { repairPivot, repairShapePivot } from './engine/pivots'
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
 import { roundWeight } from './engine/skin'
@@ -103,7 +104,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     loose: idOrNull(v.loose), copyOf: idOrNull(v.copyOf), hide: v.hide === true, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null,
     tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : 0, derive: tint(v.derive), shade: tint(v.shade), grad: gradient(v.grad),
     blend: (['multiply', 'screen', 'overlay'].includes(v.blend as string) ? v.blend : null) as ModelBlend | null, clip: idOrNull(v.clip),
-    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy), round: roundOf(typeof v.round === 'number' ? v.round : 0), outline: outlineOf(v.outline), rot: rotValue(v.rot), sym: symmetryOf(v.sym, list(v.pts).length), kind: kindOf(v.kind),
+    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy), round: roundOf(typeof v.round === 'number' ? v.round : 0), outline: outlineOf(v.outline), rot: rotValue(v.rot), sym: symmetryOf(v.sym, list(v.pts).length), kind: kindOf(v.kind), pivot: kindOf(v.kind) === 'pivot' ? repairShapePivot(v.pivot) : null,
     skin: skins(v.skin, list(v.pts).length),
     over: [...new Set(list(v.over).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.overMax),
     turn: repairTurn(v.turn, list(v.pts).length, p => point(p as never)),
@@ -395,6 +396,7 @@ export function parseModelFile(source: string): ModelImport {
       grips: withIds(list(m.grips), grip),
       fieldsets: withIds(list(m.fieldsets), fieldset),
       patterns: withIds(list(m.patterns), pattern),
+      pivots: withIds(list(m.pivots), (v, id) => repairPivot({ id, name: typeof v.name === 'string' ? v.name : '', x: Number(v.x), y: Number(v.y) })),
       tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
     }))
   })

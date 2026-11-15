@@ -42,7 +42,7 @@ describe('New shape in the shape editor', () => {
   it('opens the new-shape form: the types, the basics as pictures, and a polygon whose count the stepper changes', async () => {
     const user = await open()
     await user.click(tools().getByRole('button', { name: 'New shape' }))
-    expect(within(form().getByRole('group', { name: 'Type of the shape' })).getAllByRole('button').map(b => b.textContent)).toEqual(['Base', 'Stretch', 'Shadow', 'Light'])
+    expect(within(form().getByRole('group', { name: 'Type of the shape' })).getAllByRole('button').map(b => b.textContent)).toEqual(['Base', 'Stretch', 'Pivot', 'Shadow', 'Light'])
     expect(form().getByRole('button', { name: 'Base' })).toHaveAttribute('aria-pressed', 'true')
     const shapes = within(form().getByRole('group', { name: 'Shape' }))
     expect(shapes.getAllByRole('button').filter(b => b.classList.contains('cmTpl')).map(b => b.getAttribute('aria-label'))).toEqual([

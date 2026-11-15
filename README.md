@@ -463,6 +463,10 @@ described, now stale, in `docs/data-model.md`).
   `base`). A shape acts as a stretch shape when every point is linked; a shadow and a light are drawn black and white at the
   shape's opacity, above every other shape and kept inside them. A symmetric shape's points may now be linked: the solver moves
   the copies with a linked point.
+  Shape types T3 adds, with a default: on the model `pivots` (`ModelPivot`: `id`, `name` at most 40 characters, `x`, `y`; at most
+  32) and on a shape `pivot` (`ModelShapePivot`: `at` a pivot id, `turn`, `lo`, `hi` in degrees, -180..180, with lo <= 0 <= hi
+  and the turn held between them; null: not a pivot circle). A shape linked to a circle's outline turns with it about the pivot
+  point; the side of the figure's first shape holds still. A circle about a pivot that does not exist stops a publish.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

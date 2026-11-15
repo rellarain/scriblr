@@ -747,11 +747,14 @@ export type ModelBlend = 'multiply' | 'screen' | 'overlay'
 // Shape types T1: what a shape is (a stretch shape acts as one once every point follows another shape; a pivot circle turns the shapes hung on it; a shadow and a light are black and
 // white, see-through, drawn above the rest and kept inside it)
 export type ModelShapeKind = 'base' | 'stretch' | 'pivot' | 'shadow' | 'light'
+// Shape types T3: what makes a shape a pivot circle (the pivot point it turns about, its turn and the admin's limits, lo <= 0 <= hi), and a pivot point
+export interface ModelShapePivot { at: string; turn: number; lo: number; hi: number }
+export interface ModelPivot { id: string; name: string; x: number; y: number }
 // A shape that shows with a slider (phase 5b; a crease): fully hidden when the slider is at `hidden`, fully drawn at `shown`, in proportion between.
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }
@@ -856,7 +859,7 @@ export type ModelBoneEndKind = 'group' | 'point'
 export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
 export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
 export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

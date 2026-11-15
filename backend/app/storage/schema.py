@@ -1237,6 +1237,8 @@ MODEL_OUTLINE_MAX = 20
 MODEL_OUTLINE_NEW = 0.75
 MODEL_BIND_NAME_MAX = 40   # shape editor S5: the name of a connection, and of a shared segment
 MODEL_SYM_AXES_MAX = 6     # shape editor S6: the most axes a symmetric shape has
+MODEL_PIVOTS_MAX = 32      # shape types T3: the most pivot points a model has
+MODEL_TURN_LIMIT = 180.0   # shape types T3: a pivot circle turns at most this far each way
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
@@ -1644,6 +1646,51 @@ class ModelSymmetry(BaseModel):
         return round(_finite(value, 0.0, -1e5, 1e5), 2)
 
 
+class ModelShapePivot(BaseModel):
+    """What makes a shape a pivot circle (shape types T3): the pivot point it turns about (`at`), its turn in degrees, and the smallest and largest turn the admin allows
+    (lo <= 0 <= hi, the turn held between them)."""
+
+    at: str = Field(pattern=_MODEL_ID)
+    turn: float = 0.0
+    lo: float = -MODEL_TURN_LIMIT
+    hi: float = MODEL_TURN_LIMIT
+
+    @field_validator("turn", "lo", "hi", mode="before")
+    @classmethod
+    def _angle(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("an angle")
+        return round(_finite(value, 0.0, -MODEL_TURN_LIMIT, MODEL_TURN_LIMIT), 2)
+
+    @model_validator(mode="after")
+    def _held(self) -> "ModelShapePivot":
+        self.lo = min(0.0, self.lo)
+        self.hi = max(0.0, self.hi)
+        self.turn = min(self.hi, max(self.lo, self.turn))
+        return self
+
+
+class ModelPivot(BaseModel):
+    """A pivot point (shape types T3): the shared middle of a pivot's circles, in the model's space as drawn."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_BIND_NAME_MAX)
+    x: float = 100.0
+    y: float = 200.0
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_BIND_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _place(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("a place")
+        return round(_finite(value, 0.0, -1e5, 1e5), 2)
+
+
 class ModelShape(BaseModel):
     """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
 
@@ -1704,6 +1751,8 @@ class ModelShape(BaseModel):
     turn: Optional[ModelTurn] = None
     # Shape types T1: what the shape is (see ModelShapeKind); anything else is read as a base shape.
     kind: ModelShapeKind = "base"
+    # Shape types T3: on a pivot circle, the pivot point it turns about, its turn and the admin's limits (see ModelShapePivot); None on any other shape.
+    pivot: Optional[ModelShapePivot] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1714,6 +1763,11 @@ class ModelShape(BaseModel):
     @classmethod
     def _kind(cls, value: Any) -> str:
         return value if value in ("base", "stretch", "pivot", "shadow", "light") else "base"
+
+    @field_validator("pivot", mode="before")
+    @classmethod
+    def _pivot(cls, value: Any) -> Any:
+        return _optional_model(ModelShapePivot, value)
 
     @field_validator("turn", mode="before")
     @classmethod
@@ -3027,6 +3081,13 @@ class ModelContent(BaseModel):
     fieldsets: list[ModelFieldset] = Field(default_factory=list, max_length=MODEL_FIELDSETS_MAX)
     # Patterns (phase D4): marks kept inside a base shape.
     patterns: list[ModelPattern] = Field(default_factory=list, max_length=MODEL_PATTERNS_MAX)
+    # Shape types T3: the pivot points, each the middle its circles share.
+    pivots: list[ModelPivot] = Field(default_factory=list, max_length=MODEL_PIVOTS_MAX)
+
+    @field_validator("pivots", mode="before")
+    @classmethod
+    def _pivots(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelPivot, value)
 
     @field_validator("patterns", mode="before")
     @classmethod

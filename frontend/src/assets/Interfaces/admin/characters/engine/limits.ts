@@ -82,6 +82,9 @@ export const LIMITS = {
   // hands: grip points per model (the stops are the server's max_lengths)
   gripsWarn: 8,
   gripsMax: 16,
+  // shape types T3: pivot points
+  pivotsWarn: 16,
+  pivotsMax: 32,
   // how many of each a model may hold (the server's caps)
   shapesMax: 800,
   objectsMax: 200,

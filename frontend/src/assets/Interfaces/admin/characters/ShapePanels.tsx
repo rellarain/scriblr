@@ -1,8 +1,9 @@
-import type { ModelContent, ModelShape, ModelShapeKind } from '../../../../api/types'
+import type { ModelContent, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine/connect'
 import { shapeById } from './modelContent'
-import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PolygonIcon } from '../../../icons'
+import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon } from '../../../icons'
+import { RADIUS, TURN_LIMIT } from './engine/pivots'
 import { LIMITS } from './engine/limits'
 import { CAST_OPACITY, KIND_NAMES, actsAs, isCast, kindOf, unlinkedCount } from './engine/kinds'
 import { SYM_AXES_MAX } from './engine/symmetry'
@@ -57,20 +58,53 @@ export function ArrangeSection({ shape, actions, onEditShape }: { shape: ModelSh
 const TYPE_CHIPS: ModelShapeKind[] = ['base', 'shadow', 'light']
 export function TypeSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: EditShape }) {
   const kind = kindOf(shape.kind), chip = kind === 'stretch' ? 'base' : kind, acts = actsAs(shape)
+  // a pivot circle (T3) shows its own chip; the others turn it into a shape of that kind (it stops turning about its pivot)
+  const chips: ModelShapeKind[] = kind === 'pivot' ? ['pivot', ...TYPE_CHIPS] : TYPE_CHIPS
   const missing = kind === 'stretch' && acts !== 'stretch' ? unlinkedCount(shape) : 0
   const set = (k: ModelShapeKind) => {
     if (k === chip) return
     const cast = k === 'shadow' || k === 'light', was = isCast(shape)
-    onEditShape(shape.id, { ...shape, kind: k, ...(cast ? { outline: null, op: was ? shape.op : CAST_OPACITY[k] } : was ? { op: 1, outline: LIMITS.outlineNew } : {}) })
+    onEditShape(shape.id, { ...shape, kind: k, pivot: null, ...(cast ? { outline: null, op: was ? shape.op : CAST_OPACITY[k] } : was ? { op: 1, outline: LIMITS.outlineNew } : {}) })
   }
   return (
     <div className="cmShapeType" role="group" aria-label="Type of the shape">
       <h3 className="cmInsSub">Type</h3>
       <div className="cmInline">
-        {TYPE_CHIPS.map(k => <button key={k} type="button" className={`cmChip${chip === k ? ' cmChip--on' : ''}`} aria-pressed={chip === k} onClick={() => set(k)}>{KIND_NAMES[k]}</button>)}
+        {chips.map(k => <button key={k} type="button" className={`cmChip${chip === k ? ' cmChip--on' : ''}`} aria-pressed={chip === k} onClick={() => set(k)}>{KIND_NAMES[k]}</button>)}
       </div>
       {acts === 'stretch' && <p className="cmInsText" role="status">Stretch: every point follows a shape</p>}
       {missing > 0 && <p className="cmInsText" role="status">Stretch: {missing} {missing === 1 ? 'point follows' : 'points follow'} nothing yet</p>}
+    </div>
+  )
+}
+
+// A pivot circle (shape types T3): its pivot's name and place, the circle's size, its turn and the smallest and largest turn allowed, and one more circle on the pivot.
+export interface PivotActions {
+  pivot: ModelPivot
+  radius: number
+  onName: (name: string) => void
+  onMove: (dx: number, dy: number) => void
+  onRadius: (r: number) => void
+  onSetting: (key: 'turn' | 'lo' | 'hi', value: number) => void
+  onAddCircle: () => void
+}
+export function PivotSection({ shape, actions }: { shape: ModelShape; actions: PivotActions }) {
+  const p = shape.pivot
+  if (!p) return null
+  const deg = (v: number) => `${fmt(v)}°`, step = (big: boolean) => (big ? 15 : 5)
+  return (
+    <div className="cmPivotPanel" role="group" aria-label="Pivot">
+      <h3 className="cmInsSub">Pivot</h3>
+      <label className="cmField"><span>Pivot name</span><input value={actions.pivot.name} maxLength={NAME_LIMIT} placeholder="Pivot" onChange={e => actions.onName(e.target.value)} /></label>
+      <Stepper label="Across" value={fmt(actions.pivot.x)} bigBy={10} onStep={(dir, big) => actions.onMove(dir * (big ? 10 : 1), 0)} />
+      <Stepper label="Down" value={fmt(actions.pivot.y)} bigBy={10} onStep={(dir, big) => actions.onMove(0, dir * (big ? 10 : 1))} />
+      <Stepper label="Size" value={fmt(actions.radius)} bigBy={5} lowerOff={actions.radius <= RADIUS.min} raiseOff={actions.radius >= RADIUS.max} onStep={(dir, big) => actions.onRadius(actions.radius + dir * (big ? 5 : 1))} />
+      <Stepper label="Turn" value={deg(p.turn)} bigBy={15} lowerOff={p.turn <= p.lo} raiseOff={p.turn >= p.hi} onStep={(dir, big) => actions.onSetting('turn', p.turn + dir * step(big))} />
+      <Stepper label="Turns at least" value={deg(p.lo)} bigBy={15} lowerOff={p.lo <= -TURN_LIMIT} raiseOff={p.lo >= 0} onStep={(dir, big) => actions.onSetting('lo', p.lo + dir * step(big))} />
+      <Stepper label="Turns at most" value={deg(p.hi)} bigBy={15} lowerOff={p.hi <= 0} raiseOff={p.hi >= TURN_LIMIT} onStep={(dir, big) => actions.onSetting('hi', p.hi + dir * step(big))} />
+      <div className="cmInline">
+        <button type="button" className="cmIconBtn" aria-label="Add a circle" title="Add a circle to the pivot" onClick={actions.onAddCircle}><PlusIcon size={14} /></button>
+      </div>
     </div>
   )
 }

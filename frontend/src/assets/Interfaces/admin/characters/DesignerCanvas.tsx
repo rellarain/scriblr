@@ -207,6 +207,9 @@ export interface CanvasProps {
   // the shape editor (T2): Delete on a selected shape removes it; Ctrl + click on a point removes it, and on a segment joins its two points
   onDeleteShape?: (id: string) => void
   onRemove?: (target: RemoveTarget) => void
+  // the shape editor (T3): the selected shape moves only as a whole (a pivot circle keeps its shape: no points or box handles), and the pivot points, where they are now
+  rigid?: boolean
+  pivotPoints?: Array<{ id: string; x: number; y: number; name: string }>
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -502,12 +505,12 @@ export function DesignerCanvas(p: CanvasProps) {
       const cr = crossingNear(crossingsFor(shape.id), wx, wy, REACH_CROSS * px)
       if (cr) return { kind: 'cross', crossing: cr }
     }
-    if (overlay && shape && (editable || !!p.skin)) {
+    if (overlay && shape && (editable || !!p.skin) && !p.rigid) {
       let best = -1, bd = REACH_POINT * px
       built.forEach((b, i) => { const d = Math.hypot(b.x - wx, b.y - wy); if (d <= bd) { bd = d; best = i } })
       if (best >= 0) return { kind: 'point', shapeId: shape.id, i: best }
     }
-    if (overlay && shape && matrix && !p.skin) {
+    if (overlay && shape && matrix && !p.skin && !p.rigid) {
       const [lx, ly] = apply(inverse(matrix), wx, wy)
       const hit = nearestEdge(shape.pts, lx, ly)
       if (hit && hit.dist * Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2])) <= REACH_EDGE * px) {
@@ -976,7 +979,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const hoverShapeId = hover ? (hover.kind === 'edge' ? hover.shapeId : shape?.id ?? null) : null
   const hoveredPoint = hover?.kind === 'point' && hover.shapeId === shape?.id ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
-  const selectedPointsDrawn = shown.has('points') && overlay
+  const selectedPointsDrawn = shown.has('points') && overlay && !p.rigid
   // The box of the selected shape (shape editor S4), while the shape itself is what is selected: its frame a few pixels out, eight handles that resize it and a round one above
   // it that turns it.
   // the point being dragged that is ready to connect (the selected shape's point, also when the drag moves the point it is welded to), and the names of the shared segments
@@ -1164,6 +1167,14 @@ export function DesignerCanvas(p: CanvasProps) {
     ) : null,
     pivots: (
       <>
+        {(p.pivotPoints ?? []).map(pt => (
+          <g key={pt.id} className="cmPivot cmPivot--off cmPivotPt" data-pivot-point={pt.id} aria-hidden="true">
+            <title>{pt.name || 'Pivot'}</title>
+            <circle cx={pt.x} cy={pt.y} r={4 * u} className="cmPivotRing" />
+            <line x1={pt.x - 7 * u} y1={pt.y} x2={pt.x + 7 * u} y2={pt.y} className="cmPivotCross" />
+            <line x1={pt.x} y1={pt.y - 7 * u} x2={pt.x} y2={pt.y + 7 * u} className="cmPivotCross" />
+          </g>
+        ))}
         {anchor && !p.pose && !through && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
         {pivot && !p.pose && !through && (
           <g

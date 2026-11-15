@@ -7,6 +7,8 @@ import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './pr
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 import { texturedPath } from './texture'
 import { followBound } from './symmetry'
+import { poseOf } from './pivots'
+import { isCast } from './kinds'
 import { angleOf, fromBehind, wrapAngle, type View } from './angles'
 import { LAYER_THICK, carryKey, facing, facingFade, handleDepths, inSeen, isKeySpot, keyAt, mixBuilt, pickKeys, shiftOf, shifted, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turnedX, turningOf, twinKeys, unbuild, usesKeys, viewZ, type Key, type KeyPick, type Moved, type Spin, type Surface } from './turn'
 
@@ -158,6 +160,8 @@ export interface SolvedShape {
   rig: ModelPoint[]
   // The curve points of the rig outline with the group's matrix only (an anchor or a link reads these).
   pre: BuiltPoint[]
+  // a pivot circle (shape types T3): its outline on the side it is held on, without its own turn (a shadow or a light linked to it is placed on this)
+  held?: BuiltPoint[]
   // Local space to canvas space.
   matrix: Mat
   // The group's matrix alone: local space to the model's space, before the whole-model transform.
@@ -443,6 +447,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   const bares: Record<string, Mat> = {}
   // Groups and shapes are solved when something asks for them (an anchor asks for a shape, a shape for its group, a link for another shape); a thing that
   // is being solved is not asked for again, so a circle of anchors or links cannot loop: it is cut where it closes.
+  // the turns the pivots give the shapes that hang on them (shape types T3)
+  const pose = poseOf(c)
   const busyGroups = new Set<string>(), busyShapes = new Set<string>()
 
   // Skin weights (phase O1). A model with none pays nothing: no outline is skinned and every link takes the path it always took.
@@ -662,7 +668,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const p = list[k], b = p.bind
       if (!b || b.s === sh.id) continue
       const target = shapeOut(b.s)
-      const a = target?.pre
+      // a shadow or a light linked to a pivot circle stays where the circle is held: it does not swing with it (T3)
+      const a = isCast(sh) && target?.held ? target.held : target?.pre
       if (!target || !a || a.length < 1) continue
       if (target.skin) {
         const rest = restBuilt(b.s, target.skin), m = rest.length
@@ -1216,8 +1223,12 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const sh = shapeMap.get(id)
     if (!sh || busyShapes.has(id)) return undefined
     busyShapes.add(id)
-    const gid = groupOfShape.get(id) ?? null
-    place(sh, gid, gid ? groupMat(gid) : IDENTITY)
+    const gid = groupOfShape.get(id) ?? null, gm = gid ? groupMat(gid) : IDENTITY
+    // a shape that hangs on a pivot (shape types T3) is drawn through the turn the pivots give it
+    const posed = pose.mats.get(id)
+    place(sh, gid, posed ? mul(posed, gm) : gm)
+    const heldM = pose.held.get(id), done2 = out.shapes[id]
+    if (heldM && done2) done2.held = build(done2.rig, sh.closed, mul(heldM, gm))
     busyShapes.delete(id)
     return out.shapes[id]
   }

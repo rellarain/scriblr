@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE, FIGURE_MAX_ON } from '../../../../api/types'
 import { NAME_LIMIT } from './engine/connect'
 import { SYM_AXES_MAX } from './engine/symmetry'
+import { TURN_LIMIT } from './engine/pivots'
 import { LIMITS } from './engine/limits'
 import { PROPS, PROP_KEYS } from './engine/props'
 import { DEPTH_MAX } from './engine/rig'
@@ -51,6 +52,8 @@ describe('the model types match the backend schema', () => {
     ['WriterModelLimits', 'WriterModelLimits'],
     // a symmetric shape (shape editor S6)
     ['ModelSymmetry', 'ModelSymmetry'],
+    // pivots (shape types T3)
+    ['ModelPivot', 'ModelPivot'], ['ModelShapePivot', 'ModelShapePivot'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -100,6 +103,8 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.chainWarn).toBe(number('MODEL_CHAIN_WARN'))
     expect(LIMITS.gripsWarn).toBe(number('MODEL_GRIPS_WARN'))
     expect(LIMITS.gripsMax).toBe(number('MODEL_GRIPS_MAX'))
+    expect(LIMITS.pivotsMax).toBe(number('MODEL_PIVOTS_MAX'))
+    expect(TURN_LIMIT).toBe(number('MODEL_TURN_LIMIT'))
     expect(ROLE_MAX).toBe(number('MODEL_ROLE_MAX'))
     expect(LIMITS.rangesWarn).toBe(number('MODEL_RANGES_WARN'))
     expect(LIMITS.rangesMax).toBe(number('MODEL_RANGES_MAX'))

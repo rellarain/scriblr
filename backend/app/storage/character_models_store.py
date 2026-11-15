@@ -700,6 +700,12 @@ def _hand_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _pivot_faults(content: ModelContent) -> list[str]:
+    """Pivot circles (shape types T3; the frontend's pivotFaults says the same words): a circle that turns about a pivot point that is not there."""
+    pivot_ids = {p.id for p in content.pivots}
+    return [f"Pivot circle {_label(s.name, s.id)} turns about a pivot point that does not exist." for s in content.shapes if s.pivot is not None and s.pivot.at not in pivot_ids]
+
+
 def _proportion_faults(content: ModelContent) -> list[str]:
     """What is wrong with the skeleton, the fit of objects and the frames (phase 5a; the frontend's proportionFaults says the same words)."""
     faults: list[str] = []
@@ -800,6 +806,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_paint_faults(content))
     faults.extend(_proportion_faults(content))
     faults.extend(_hand_faults(content))
+    faults.extend(_pivot_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

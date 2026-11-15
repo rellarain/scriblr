@@ -65,6 +65,7 @@ export function followRefusal(c: ModelContent, shapeId: string, i: number, targe
   const s = shapeById(c, shapeId)
   if (!s) return 'There is no such shape.'
   if (s.mirrorOf) return 'A twin has no points of its own.'
+  if (s.kind === 'pivot') return 'A pivot circle follows nothing: hang shapes on it instead.'
   // a symmetric shape's point may follow (shape types T1), but only one copy of each point: the copies follow it
   if (s.sym && orbitOf(s, i).some(j => j !== i && !!s.pts[j]?.bind)) return 'Another copy of this point already follows a shape: the copies of a symmetric shape\'s point follow one shape together.'
   if (!s.pts[i]) return 'There is no such point.'

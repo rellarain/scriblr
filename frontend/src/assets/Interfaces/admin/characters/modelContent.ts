@@ -1,6 +1,7 @@
 import { normTurn } from './engine/transform'
 import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
+import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
 import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
@@ -65,6 +66,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     grips: (c.grips ?? []).map(repairGrip),
     fieldsets: repairFieldsets(c.fieldsets),
     patterns: repairPatterns(c.patterns),
+    pivots: (c.pivots ?? []).map(repairPivot),
   }
 }
 
@@ -81,7 +83,7 @@ function paintFields(s: ModelShape) {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
     cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), rot: rotValue(s.rot), sym: symmetryOf(s.sym, s.pts.length), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
-    turn: repairTurn(s.turn, s.pts.length, p => p as ModelShape['pts'][number]), kind: kindOf(s.kind),
+    turn: repairTurn(s.turn, s.pts.length, p => p as ModelShape['pts'][number]), kind: kindOf(s.kind), pivot: kindOf(s.kind) === 'pivot' ? repairShapePivot(s.pivot) : null,
   }
 }
 // Skin weights as the server keeps them (phase O1): one entry per group, at most LIMITS.skinMax, each with one weight per point (0..1 in hundredths; a short list is filled with 0,
@@ -471,18 +473,18 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
 
 // A shape goes with its twin.
 export function removeShape(c: ModelContent, id: string): ModelContent {
-  return removeAll(c, goneWith(c, { shapes: [id] }))
+  return prunePivots(removeAll(c, goneWith(c, { shapes: [id] })))
 }
 
 // An object goes with its shapes, and with its twin.
 export function removeObject(c: ModelContent, id: string): ModelContent {
-  return removeAll(c, goneWith(c, { objects: [id] }))
+  return prunePivots(removeAll(c, goneWith(c, { objects: [id] })))
 }
 
 // A group goes with its objects and their shapes, and with its twin; a group under it moves up to its parent.
 export function removeGroup(c: ModelContent, id: string): ModelContent {
   if (!groupById(c, id)) return c
-  return removeAll(c, goneWith(c, { groups: [id] }))
+  return prunePivots(removeAll(c, goneWith(c, { groups: [id] })))
 }
 
 // The twins of a shape, object or group (those that mirror it).
@@ -533,8 +535,8 @@ export function moveObjectWithin(c: ModelContent, groupId: string, objectId: str
 }
 
 // The next free id of a kind ('s', 'o', 'g', 'r', 'b' for a bone, 'f' for a frame) in the content.
-export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f' | 'k', make: MakeId = randomId): string {
-  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id), ...(c.grips ?? []).map(k => k.id)])
+export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f' | 'k' | 'p', make: MakeId = randomId): string {
+  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id), ...(c.grips ?? []).map(k => k.id), ...(c.pivots ?? []).map(k => k.id)])
   for (let i = 0; i < 20; i++) { const id = make(prefix); if (!taken.has(id)) return id }
   return `${prefix}_${taken.size}_${Date.now().toString(36)}`
 }
@@ -874,6 +876,12 @@ function handFaults(c: ModelContent): string[] {
   return faults
 }
 
+// What is wrong with the pivots (shape types T3; the server's _pivot_faults says the same words).
+function pivotFaults(c: ModelContent): string[] {
+  const ids = new Set((c.pivots ?? []).map(p => p.id))
+  return c.shapes.filter(s => s.pivot && !ids.has(s.pivot.at)).map(s => `Pivot circle ${label(s.name, s.id)} turns about a pivot point that does not exist.`)
+}
+
 function proportionFaults(c: ModelContent): string[] {
   const faults: string[] = []
   const groupIds = new Set(c.groups.map(g => g.id)), twinGroups = new Set(c.groups.filter(g => g.mirrorOf).map(g => g.id))
@@ -979,6 +987,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...paintFaults(c))
   faults.push(...proportionFaults(c))
   faults.push(...handFaults(c))
+  faults.push(...pivotFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

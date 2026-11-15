@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { ArrangeSection, ConnectionsSection, LookSection, SymmetrySection, TypeSection, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
+import { ArrangeSection, ConnectionsSection, LookSection, PivotSection, SymmetrySection, TypeSection, type PivotActions, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -84,6 +84,8 @@ export interface InspectorProps {
   connections?: ConnectionActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
+  // a pivot circle's own section (shape types T3)
+  pivot?: PivotActions
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -181,7 +183,8 @@ function ShapeTab(p: InspectorProps) {
       {shape && simple && (
         <>
           {!shape.mirrorOf && <TypeSection shape={shape} onEditShape={p.onEditShape} />}
-          {p.arrange && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
+          {p.pivot && shape.pivot && <PivotSection shape={shape} actions={p.pivot} />}
+          {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} />
           {p.symmetry && <SymmetrySection shape={shape} actions={p.symmetry} />}
           {p.connections && <ConnectionsSection content={content} shape={shape} selPoint={selPoint} actions={p.connections} />}

@@ -1,6 +1,6 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { ModelContent, ModelEntry, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../../../api/types'
-import { BridgeIcon, CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, MannequinIcon, MoonIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SunIcon, SwapIcon, TrashIcon } from '../../../icons'
+import { BridgeIcon, OrbitIcon, CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, MannequinIcon, MoonIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SunIcon, SwapIcon, TrashIcon } from '../../../icons'
 import { actsAs } from './engine/kinds'
 import { ReorderList } from './ReorderList'
 import { StatusBadge, modelLabel } from './StatusBadge'
@@ -89,6 +89,7 @@ function ShapeMarks({ content, shape, name }: { content: ModelContent; shape: Mo
     <>
       {kind === 'stretch' && <Mark label={`${name} is a stretch shape`} title={`${name} is a stretch shape: every point follows another shape`}><BridgeIcon size={11} /></Mark>}
       {kind === 'shadow' && <Mark label={`${name} is a shadow`}><MoonIcon size={11} /></Mark>}
+      {kind === 'pivot' && <Mark label={`${name} is a pivot circle`}><OrbitIcon size={11} /></Mark>}
       {kind === 'light' && <Mark label={`${name} is a light`}><SunIcon size={11} /></Mark>}
       {shape.mirrorOf && <Mark {...TWIN(name)}><SwapIcon size={11} /></Mark>}
       {shape.shade && <Mark label={`${name} is a shading shape`} title={`${name} is a shading shape: a ${shape.shade.kind === 'mid' ? 'mid tone' : shape.shade.kind} kept inside the other shapes of its object`}><LayersIcon size={11} /></Mark>}
