@@ -88,6 +88,10 @@ export interface PoseCanvas {
 }
 // The line a selected mirror (or the original of one) is reflected across (Z3), in canvas space: a point of it and its way.
 export interface MirrorAxis { x: number; y: number; dx: number; dy: number }
+// A line of symmetry as handles (Z5), in canvas space: its two ends (`shared`: carried on through other shapes on the same line, then drawn as a span) and the width
+// handle on the outline (null: none).
+export interface LineHandles { a: [number, number]; b: [number, number]; side: [number, number] | null; shared: boolean }
+export type LineGrab = 'a' | 'b' | 'side'
 
 // Frames (phase 5a): every frame of the model as a rectangle in the view (the one being edited has handles, and is moved and resized by dragging; the arrow keys
 // nudge it, Shift with them resizes it, Alt makes the step five). The boxes are in canvas space, as seen from the view being edited.
@@ -238,6 +242,10 @@ export interface CanvasProps {
   onDrawBox?: (box: Box) => void
   // the line a selected mirror is reflected across (Z3), drawn on the Symmetry axes layer
   mirrorAxis?: MirrorAxis | null
+  // the shape editor (Z5): the ends of the selected symmetric shape's line of symmetry (carried on through the shapes on the same line) and its width handle; dragging an
+  // end lengthens or shortens along the line, the width handle widens or narrows across it (`first` on the first move of a drag)
+  lines?: LineHandles | null
+  onLine?: (handle: LineGrab, world: [number, number], first: boolean) => void
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -257,6 +265,7 @@ type Drag =
   | { kind: 'segMove'; roots: Array<{ shapeId: string; i: number; x: number; y: number }>; start: [number, number]; dir: [number, number] | null }
   | { kind: 'box'; start: [number, number]; x0: number; y0: number; moved: boolean; box: Box | null }
   | { kind: 'stop'; shapeId: string; i: number; which: 'lo' | 'hi'; x0: number; y0: number; moved: boolean }
+  | { kind: 'line'; handle: LineGrab; x0: number; y0: number; moved: boolean }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
   // the box of the selected shape (shape editor S4): a resize from one of its handles, or a turn by its round handle, worked out from the shape as it was when it began
   | { kind: 'resize'; shapeId: string; handle: BoxHandle; from: ModelShape; frame: Frame; x0: number; y0: number; moved: boolean }
@@ -811,6 +820,13 @@ export function DesignerCanvas(p: CanvasProps) {
     dragRef.current = { kind: 'stop', shapeId: m.shapeId, i: m.i, which, x0: e.clientX, y0: e.clientY, moved: false }
     capture(e)
   }
+  // An end or the width handle of a line of symmetry (Z5).
+  function onLineDown(e: ReactPointerEvent, handle: LineGrab) {
+    e.stopPropagation()
+    if (e.button !== 0) return
+    dragRef.current = { kind: 'line', handle, x0: e.clientX, y0: e.clientY, moved: false }
+    capture(e)
+  }
   function onGripDown(e: ReactPointerEvent, grab: PoseGrab) {
     if (!p.pose) return
     onPoseHandleDown(e, grab)
@@ -859,6 +875,17 @@ export function DesignerCanvas(p: CanvasProps) {
         p.onGesture()
       }
       p.onStop?.(d.shapeId, d.i, d.which, toWorld(e))
+      return
+    }
+    if (d.kind === 'line') {
+      let first = false
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+        d.moved = first = true
+        p.onGesture()
+      }
+      const [wx, wy] = toWorld(e)
+      p.onLine?.(d.handle, onGrid ? [snapTo(wx, unit), snapTo(wy, unit)] : [wx, wy], first)
       return
     }
     if (d.kind === 'segPress') {
@@ -1494,6 +1521,23 @@ export function DesignerCanvas(p: CanvasProps) {
       ) : p.layers.includes('pivots') ? (
         <circle key={m.id} cx={m.x} cy={m.y} r={4 * u} className="cmPoseMark" data-pose-mark={m.id} aria-hidden="true"><title>{m.name || 'Posable point'}</title></circle>
       ) : null))}
+      {p.lines && !p.pose && p.layers.includes('mirror') && (
+        <g className="cmLines" data-lines="">
+          {p.lines.shared && <line x1={p.lines.a[0]} y1={p.lines.a[1]} x2={p.lines.b[0]} y2={p.lines.b[1]} className="cmLineSpan" data-line-span="" aria-hidden="true" />}
+          {([['a', p.lines.a, 'first'], ['b', p.lines.b, 'second']] as const).map(([which, at, word]) => (
+            <circle
+              key={which} cx={at[0]} cy={at[1]} r={4 * u} className="cmLineEnd" data-line-end={which} role="button" tabIndex={-1}
+              aria-label={`Lengthen along the line from its ${word} end`} onPointerDown={e => onLineDown(e, which)}
+            />
+          ))}
+          {p.lines.side && (
+            <rect
+              x={p.lines.side[0] - 3.5 * u} y={p.lines.side[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${p.lines.side[0]} ${p.lines.side[1]})`}
+              className="cmLineSide" data-line-side="" role="button" tabIndex={-1} aria-label="Widen across the line" onPointerDown={e => onLineDown(e, 'side')}
+            />
+          )}
+        </g>
+      )}
       {(p.sliders ?? []).map(m => (
         <Fragment key={m.id}>
           {p.pose?.light && (p.pose.canGrab?.(m.shapeId) ?? true) && <circle cx={m.x} cy={m.y} r={5 * u} className="cmSlideHandle cmSlider" data-slider={m.id} role="button" tabIndex={-1} aria-label={`Slide ${m.name || 'the point'}`} onPointerDown={e => onPoseHandleDown(e, { kind: 'slider', shapeId: m.shapeId, i: m.i })} />}

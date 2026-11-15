@@ -150,6 +150,15 @@
 .cmSymWedge { fill: var(--accent); fill-opacity: 0.2; stroke: none; pointer-events: none; }
 .cmSymPick { fill: transparent; cursor: pointer; }
 .cmSymAxis { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+// a line of symmetry as handles (Z5): its ends lengthen along it, the diamond on the outline widens across it; a line carried on through other shapes is drawn whole
+.cmLineSpan { stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; opacity: 0.6; }
+// solid, unlike the hollow box handles beside them: the accent with an edge of its own ink (the selection ring's pair)
+.cmLineEnd, .cmLineSide {
+  fill: var(--accent); stroke: var(--on-accent); stroke-width: 1.5; vector-effect: non-scaling-stroke;
+  &:hover { fill: var(--on-accent); stroke: var(--accent); }
+}
+.cmLineEnd { cursor: move; }
+.cmLineSide { cursor: col-resize; }
 .cmConnRow { display: flex; align-items: flex-end; gap: var(--space-2); .cmField { flex: 1 1 auto; min-width: 0; } }
 
 // ---- the inspector ----

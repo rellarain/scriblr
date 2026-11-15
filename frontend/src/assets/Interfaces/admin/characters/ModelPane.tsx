@@ -13,7 +13,7 @@ import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
 import { useDesignerPolicy } from './designerPolicy'
-import { DesignerCanvas, type FrameCanvas, type GripMark, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
+import { DesignerCanvas, type FrameCanvas, type GripMark, type LineGrab, type LineHandles, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
 import { ConsoleBar, PANEL_REST, ToolbarPanel, ViewBar, type PanelState } from './DesignerShell'
 import { DEFAULT_LAYERS, SHAPE_LAYERS, drawOrder, normalizeLayers, type LayerState } from './layerStack'
 import { advanceLock, lockStage } from './engine/crossings'
@@ -80,6 +80,7 @@ import { LIMITS } from './engine/limits'
 import { axisOf, mirrorLineMat, mirrorPoints, mirroredTurn, usesMirrorLine } from './engine/mirrorLine'
 import { keepCarried, makeMirror, mirrorLineOptions, originalPoint, originalSegment, reconcileMirrors, setMirrorLine } from './engine/mirrors'
 import { normTurn, rotOf } from './engine/transform'
+import { applyOnCanvas, lineOf, sharedLine, stretchMat, widenMat, widthHandle } from './engine/lines'
 import { cloneEdit, clonePlace, detachClone, makeClone, reconcileClones, setCloneAt } from './engine/clones'
 import { cloneTurn } from './engine/cloneAt'
 import type { CloneActions, MirrorActions } from './ShapePanels'
@@ -1788,6 +1789,27 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const [x, y] = apply(g, ax ? ax.x : content.axis ?? 100, ax ? ax.y : 200)
     return { x, y, dx: g[0] * Math.cos(a) + g[2] * Math.sin(a), dy: g[1] * Math.cos(a) + g[3] * Math.sin(a) }
   })()
+  // the selected symmetric shape's line of symmetry as handles (Z5): its ends (carried on through the shapes connected to it on the same line) and its width handle
+  const lineShape = shapesOnly && selShape && part === 'shape' && editable && !recording ? shapeById(canvasContent, selShape.id) : undefined
+  const shared = lineShape ? sharedLine(canvasContent, canvasSolved, lineShape.id) : null
+  const lineHandles: LineHandles | null = shared ? { a: shared.a, b: shared.b, side: widthHandle(lineShape, canvasSolved), shared: shared.ids.length > 1 } : null
+  // A drag of one of them works from the content as it was when it began, so the shapes keep their shares however far it goes.
+  const lineStart = useRef<{ c: ModelContent; solved: Solved; id: string; ids: string[]; a: [number, number]; b: [number, number]; side: [number, number] | null } | null>(null)
+  function moveLine(handle: LineGrab, world: [number, number], first: boolean) {
+    if (first || !lineStart.current) {
+      const line = selShape ? sharedLine(canvasContent, canvasSolved, selShape.id) : null
+      if (!selShape || !line) { lineStart.current = null; return }
+      lineStart.current = { c: content, solved: canvasSolved, id: selShape.id, ids: line.ids, a: line.a, b: line.b, side: widthHandle(shapeById(canvasContent, selShape.id), canvasSolved) }
+    }
+    const st = lineStart.current
+    const own = handle === 'side' ? lineOf(shapeById(st.c, st.id), st.solved) : null
+    const m = handle === 'side' ? (own && st.side ? widenMat(own, st.side, world) : null) : handle === 'a' ? stretchMat(st.b, st.a, world) : stretchMat(st.a, st.b, world)
+    if (!m) return
+    const done = applyOnCanvas(st.c, st.solved, handle === 'side' ? [st.id] : st.ids, m)
+    if (!done.ok) { setNote(done.reason); return }
+    const next = done.content
+    models.edit(entry.id, () => next, false)
+  }
   // the shape editor's mirrors (Z3): make one, change its line, detach it
   const mirrorActions: MirrorActions | undefined = shapesOnly ? {
     options: (kind, twinId) => {
@@ -1927,7 +1949,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
             pivotPoints={pivotPoints} anchorMarks={anchorMarks} poseMarks={poseMarks} sliders={sliderMarks} onStop={shapesOnly ? moveStop : undefined}
             onDrawBox={shapesOnly && !recording ? drawRectangle : undefined}
-            mirrorAxis={mirrorAxis}
+            mirrorAxis={mirrorAxis} lines={lineHandles} onLine={shapesOnly ? moveLine : undefined}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
