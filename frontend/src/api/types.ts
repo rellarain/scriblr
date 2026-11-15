@@ -736,7 +736,9 @@ export type ModelBindKind = 'point' | 'edge'
 // tan (phase 5b): an edge link may also leave along the direction of its edge; between two such points locked to different shapes the outline runs on smoothly from one edge to the other (a bridge).
 // Shape types T5: a slider, an edge link that moves along the other shape's outline between two stops (places e + t along it); `at` where it has been posed (null: as drawn)
 export interface ModelSlide { lo: number; hi: number; at: number | null }
-export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number; tan?: boolean; name?: string; segName?: string; slide?: ModelSlide | null }
+// Joints J2: a link made a pivot point: how far the side that follows is turned from the side it follows, and the smallest and largest turn allowed (lo <= 0 <= hi).
+export interface ModelJoint { turn: number; lo: number; hi: number }
+export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number; tan?: boolean; name?: string; segName?: string; slide?: ModelSlide | null; pivot?: ModelJoint | null }
 // A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic). bind links it to another shape.
 export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null; bind?: ModelBind | null }
 // Paint effects. A tone of a colour: a shadow (darker, a little warmer and fuller), a mid tone (half a shadow) or a highlight (toward white), by an amount t (0.02..0.8).
@@ -801,7 +803,7 @@ export type ModelFit = 'scale' | 'keep' | 'stretch'
 // Which parts of a colour an object (or a style) holds at one value (phase D3a): hue 0..359, saturation and lightness 0..100. A part that is null is free: it comes from the colour chosen for the slot.
 export interface ModelHsl { h: number | null; s: number | null; l: number | null }
 // drape (phase O6): how far, in percent, the object's weighted points hang back toward the way they were drawn when the body moves (a hem keeps hanging when the hips tilt); 0 leaves them where the body takes them.
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number; wrap?: string | null; mirrorLine?: ModelMirrorLine | null; cloneOf?: string | null; cloneAt?: ModelCloneAt | null }
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number; wrap?: string | null; mirrorLine?: ModelMirrorLine | null; cloneOf?: string | null; cloneAt?: ModelCloneAt | null; place?: ModelPlace | null }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }

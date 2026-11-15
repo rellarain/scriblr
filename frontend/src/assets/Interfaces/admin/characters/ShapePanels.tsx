@@ -1,10 +1,10 @@
-import type { ModelCloneAt, ModelContent, ModelMirrorLine, ModelObject, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
+import type { ModelCloneAt, ModelContent, ModelJoint, ModelMirrorLine, ModelObject, ModelShape, ModelShapeKind } from '../../../../api/types'
 import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, linkHolder, sharedSegment, sharersOf, weldedTo } from './engine/connect'
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
-import { RADIUS, TURN_LIMIT } from './engine/pivots'
+import { TURN_LIMIT } from './engine/pivots'
 import { removeMark, renameMark } from './engine/anchors'
 import { LIMITS } from './engine/limits'
 import { CAST_OPACITY, KIND_NAMES, actsAs, isCast, kindOf, unlinkedCount } from './engine/kinds'
@@ -184,32 +184,20 @@ function MarkList({ shape, kind, group, one, onEditShape }: { shape: ModelShape;
 }
 
 // A pivot circle (shape types T3): its pivot's name and place, the circle's size, its turn and the smallest and largest turn allowed, and one more circle on the pivot.
-export interface PivotActions {
-  pivot: ModelPivot
-  radius: number
-  onName: (name: string) => void
-  onMove: (dx: number, dy: number) => void
-  onRadius: (r: number) => void
+// A pivot point's section (joints J2): the turn of the linked point it is made from, and the smallest and largest turn allowed (5 degrees a step; Shift 15).
+export interface JointActions {
+  joint: ModelJoint
   onSetting: (key: 'turn' | 'lo' | 'hi', value: number) => void
-  onAddCircle: () => void
 }
-export function PivotSection({ shape, actions }: { shape: ModelShape; actions: PivotActions }) {
-  const p = shape.pivot
-  if (!p) return null
+export function JointSection({ actions }: { actions: JointActions }) {
+  const p = actions.joint
   const deg = (v: number) => `${fmt(v)}°`, step = (big: boolean) => (big ? 15 : 5)
   return (
-    <div className="cmPivotPanel" role="group" aria-label="Pivot">
-      <h3 className="cmInsSub">Pivot</h3>
-      <label className="cmField"><span>Pivot name</span><input value={actions.pivot.name} maxLength={NAME_LIMIT} placeholder="Pivot" onChange={e => actions.onName(e.target.value)} /></label>
-      <Stepper label="Across" value={fmt(actions.pivot.x)} bigBy={10} onStep={(dir, big) => actions.onMove(dir * (big ? 10 : 1), 0)} />
-      <Stepper label="Down" value={fmt(actions.pivot.y)} bigBy={10} onStep={(dir, big) => actions.onMove(0, dir * (big ? 10 : 1))} />
-      <Stepper label="Size" value={fmt(actions.radius)} bigBy={5} lowerOff={actions.radius <= RADIUS.min} raiseOff={actions.radius >= RADIUS.max} onStep={(dir, big) => actions.onRadius(actions.radius + dir * (big ? 5 : 1))} />
+    <div className="cmPivotPanel" role="group" aria-label="Pivot point">
+      <h3 className="cmInsSub">Pivot point</h3>
       <Stepper label="Turn" value={deg(p.turn)} bigBy={15} lowerOff={p.turn <= p.lo} raiseOff={p.turn >= p.hi} onStep={(dir, big) => actions.onSetting('turn', p.turn + dir * step(big))} />
       <Stepper label="Turns at least" value={deg(p.lo)} bigBy={15} lowerOff={p.lo <= -TURN_LIMIT} raiseOff={p.lo >= 0} onStep={(dir, big) => actions.onSetting('lo', p.lo + dir * step(big))} />
       <Stepper label="Turns at most" value={deg(p.hi)} bigBy={15} lowerOff={p.hi <= 0} raiseOff={p.hi >= TURN_LIMIT} onStep={(dir, big) => actions.onSetting('hi', p.hi + dir * step(big))} />
-      <div className="cmInline">
-        <button type="button" className="cmIconBtn" aria-label="Add a circle" title="Add a circle to the pivot" onClick={actions.onAddCircle}><PlusIcon size={14} /></button>
-      </div>
     </div>
   )
 }

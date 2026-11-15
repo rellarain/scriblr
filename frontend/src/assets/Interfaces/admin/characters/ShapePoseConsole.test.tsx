@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ModelBind, ModelContent, ModelShape } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import DesignerConsole from './DesignerConsole'
-import { addPivot } from './engine/pivots'
+import { NEW_JOINT } from './engine/pivots'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
-// Anchors and Pose mode in the shape editor (shape types T4): the point form pins a point (or a spot inside a shape) with an anchor; an anchored point and an anchored shape
-// cannot be moved; with a group selected (and only then) a drag on its figure poses it (a swing at the pivot, or with no anchor the figure hanging from what is held) and a
-// click selects; Reset pose puts it back.
+// Anchors and Pose mode in the shape editor (shape types T4; joints J3): the point form pins a point (or a spot inside a shape) with an anchor; an anchored point and an anchored
+// shape cannot be moved; with a group or an object selected a drag on an object poses it (reaching at the pivot point between it and the anchor, or with no anchor the figure
+// hanging from what is held) and a click selects; Reset pose puts it back.
 vi.setConfig({ testTimeout: 30000 })
 
 const box = (id: string, x: number, y: number, w: number, h: number): ModelShape => ({
@@ -18,19 +18,16 @@ const box = (id: string, x: number, y: number, w: number, h: number): ModelShape
 })
 const lock = (s: string, e: number, t: number): ModelBind => ({ kind: 'edge', s, i: 0, d: [0, 0], e, t, o: 0 })
 
-// a body with a pivot at (80, 100) under it; the arm hangs below on the pivot's outer circle; the body may carry an anchor on its top left corner
+// a body (object Body) and an arm (object Arm) hung below it: the arm's top middle (80, 100) is locked onto the body's bottom and made a pivot point; the body may carry an
+// anchor on its top left corner
 function model(anchored = false): ModelContent {
   let c = addGroup(blank('Posing'), newGroup('g', 'Group'))
-  c = addObject(c, 'g', { id: 'o', name: 'Part', layer: 'body', shapes: [] })
-  c = addShape(c, 'o', box('body', 60, 40, 40, 60))
-  c = addPivot(c, 'o', 80, 100, { pivot: 'p1', circles: ['c1', 'c2'] })
-  c = addShape(c, 'o', box('arm', 74, 100, 12, 60))
-  return {
-    ...c,
-    shapes: c.shapes.map(s => (s.id === 'body'
-      ? { ...s, pts: s.pts.map((p, i) => (i === 3 ? { ...p, bind: lock('c1', 0, 0.5) } : p)), marks: anchored ? [{ id: 'k1', kind: 'anchor' as const, x: 60, y: 40, i: 0, name: '' }] : [] }
-      : s.id === 'arm' ? { ...s, pts: s.pts.map((p, i) => (i === 0 ? { ...p, bind: lock('c2', 1, 0.5) } : p)) } : s)),
-  }
+  c = addObject(c, 'g', { id: 'ob', name: 'Body', layer: 'body', shapes: [] })
+  c = addObject(c, 'g', { id: 'oa', name: 'Arm', layer: 'body', shapes: [] })
+  const body = box('body', 60, 40, 40, 60)
+  c = addShape(c, 'ob', { ...body, marks: anchored ? [{ id: 'k1', kind: 'anchor' as const, x: 60, y: 40, i: 0, name: '' }] : [] })
+  const arm: ModelShape = { ...box('arm', 0, 0, 0, 0), pts: [[74, 100], [80, 100], [86, 100], [86, 160], [80, 160], [74, 160]].map(([x, y]) => ({ x, y, m: 's' as const })) }
+  return addShape(c, 'oa', { ...arm, pts: arm.pts.map((p, i) => (i === 1 ? { ...p, bind: { ...lock('body', 2, 0.5), pivot: { ...NEW_JOINT } } } : p)) })
 }
 async function open(c: ModelContent) {
   modelsBackend([draftEntry('m', c)])
@@ -62,7 +59,7 @@ const rightClick = (el: Element, at: [number, number]) => { pointer(el, 'pointer
 const dots = () => Array.from(canvas().querySelectorAll('.cmPoint'))
 const dotAt = (x: number, y: number) => dots().find(d => Number(d.getAttribute('cx')) === x && Number(d.getAttribute('cy')) === y)!
 const anchors = () => canvas().querySelectorAll('[data-anchor]')
-// Pose mode is on while a group is selected: its card in the tree
+// Pose mode is on while a group (or an object) is selected: its card in the tree
 const poseGroup = (user: ReturnType<typeof userEvent.setup>) => user.click(within(screen.getByRole('navigation', { name: 'Model tree' })).getByRole('button', { name: 'Group' }))
 
 describe('anchors', () => {
@@ -109,7 +106,7 @@ describe('anchors', () => {
 })
 
 describe('Pose mode', () => {
-  it('swings a shape at its pivot when its group is selected, and Reset pose puts it back', async () => {
+  it('turns an object at its pivot point when its group is selected, and Reset pose puts it back', async () => {
     const user = await open(model(true))
     await poseGroup(user)
     expect(screen.queryByRole('button', { name: 'Reset pose' })).toBeNull()
@@ -120,6 +117,16 @@ describe('Pose mode', () => {
     await user.click(screen.getByRole('button', { name: 'Reset pose' }))
     expect(boxOf('arm').y1).toBeGreaterThan(150)
     expect(screen.queryByRole('button', { name: 'Reset pose' })).toBeNull()
+  })
+
+  it('poses an object when it is selected', async () => {
+    const user = await open(model(true))
+    const tree = within(screen.getByRole('navigation', { name: 'Model tree' }))
+    await user.click(tree.getByRole('button', { name: 'Expand Group' }))
+    await user.click(tree.getByRole('button', { name: 'Arm' }))
+    dragOn(pathOf('arm'), [80, 150], [30, 100])
+    expect(boxOf('arm').x0).toBeLessThan(40)
+    expect(screen.getByRole('button', { name: 'Reset pose' })).toBeInTheDocument()
   })
 
   it('is off with the model selected: a drag on a figure does not pose it', async () => {

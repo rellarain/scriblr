@@ -65,6 +65,8 @@ describe('the model types match the backend schema', () => {
     ['ModelMirrorLine', 'ModelMirrorLine'],
     // clones (Z4)
     ['ModelCloneAt', 'ModelCloneAt'],
+    // joints (J2)
+    ['ModelJoint', 'ModelJoint'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {

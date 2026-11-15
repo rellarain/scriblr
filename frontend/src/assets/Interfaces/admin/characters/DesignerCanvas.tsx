@@ -1389,11 +1389,11 @@ export function DesignerCanvas(p: CanvasProps) {
     pivots: (
       <>
         {(p.pivotPoints ?? []).map(pt => (
-          <g key={pt.id} className="cmPivot cmPivot--off cmPivotPt" data-pivot-point={pt.id} aria-hidden="true">
-            <title>{pt.name || 'Pivot'}</title>
-            <circle cx={pt.x} cy={pt.y} r={4 * u} className="cmPivotRing" />
-            <line x1={pt.x - 7 * u} y1={pt.y} x2={pt.x + 7 * u} y2={pt.y} className="cmPivotCross" />
-            <line x1={pt.x} y1={pt.y - 7 * u} x2={pt.x} y2={pt.y + 7 * u} className="cmPivotCross" />
+          // a pivot point (joints J2): the accent inside a ring of the alert colour, over a wider ink ring so it reads on the canvas for every hue
+          <g key={pt.id} className="cmJoint" data-pivot-point={pt.id} aria-hidden="true">
+            <title>{pt.name || 'Pivot point'}</title>
+            <circle cx={pt.x} cy={pt.y} r={5 * u} className="cmJoint-under" />
+            <circle cx={pt.x} cy={pt.y} r={5 * u} className="cmJoint-dot" />
           </g>
         ))}
         {(p.anchorMarks ?? []).map(m => (

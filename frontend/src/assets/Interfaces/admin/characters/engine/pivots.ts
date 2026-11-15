@@ -1,77 +1,140 @@
-import type { ModelContent, ModelPivot, ModelShape, ModelShapePivot } from '../../../../../api/types'
-import { newShape } from './edit'
-import { IDENTITY, apply, mul, rotate, type Mat } from './geometry'
-import { actsAs } from './kinds'
+import type { ModelBind, ModelContent, ModelJoint, ModelPivot, ModelShape, ModelShapePivot } from '../../../../../api/types'
+import { IDENTITY, apply, bezierAt, build, inverse, mul, nearestEdge, rotate, type Mat } from './geometry'
 import { anchorsOf, placeMat } from './anchors'
 import { treeRank } from './order'
+import { orbitOf } from './symmetry'
+import type { Solved } from './rig'
 
-// Pivots (shape types T3). A pivot point is the middle that two or more pivot circles (of different sizes) share. A base shape hangs on a circle when one of its points follows that
-// circle (a weld on one of its points or a lock on one of its segments); base shapes connected to each other move as one body. Turning a circle swings everything that hangs on it,
-// and whatever hangs on that further out, round the pivot point. What is saved is the drawing plus an angle per circle, so a turn can be put back.
+// Pivot points (joints J2). Any link between shapes of two different objects can be made a pivot point: the shapes on its two sides turn about the linked point. Objects are
+// the bodies (all of an object's shapes move together); pivot links are the joints between them. What is saved is the drawing plus a turn per pivot (and where the first object
+// of a figure has been posed), so a pose can be put back.
 //
-// How it is worked out (`poseOf`): the bodies and pivots that hang together are a figure. Each figure is walked out from its root (its first anchored body, else its first body
-// in the tree; T4), placed where it has been posed (`place`):
-// at each pivot, the circle on the root's side is held (the pivot point moves with that side) and every other circle swings by its turn less the held circle's, carrying the
-// bodies on it. A body met again from another side closes a loop: the pivots round it do not swing, and neither do those between the root and another anchored body.
-// Shadows, lights and stretch shapes do not swing; they follow their links.
+// How it is worked out (`poseOf`): the objects joined through pivots are a figure. Each figure is walked out from its root (its first anchored object, else its first object in
+// the tree), placed where it has been posed (`ModelObject.place`): at each pivot the object further out turns about the pivot point by the pivot's turn, carrying what lies
+// beyond it. An object met again from another side closes a loop: the pivots round it do not turn, and neither do those between the root and another anchored object. Links
+// that are not pivots join nothing: a point linked across objects follows the shape it is linked to.
+//
+// Pivot circles (shape types T3: a point with circles round it that shapes hung on) were replaced by pivot points; `migrateJoints` turns an old model's circles into pivot links.
 
 export const TURN_LIMIT = 180
 const r2 = (v: number): number => Math.round(v * 100) / 100
 const angle = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? r2(Math.min(TURN_LIMIT, Math.max(-TURN_LIMIT, v))) : fallback)
+const wrap = (a: number): number => { const t = ((a % 360) + 360) % 360; return t > 180 ? t - 360 : t }
 
-// A pivot circle's settings as the server keeps them: lo <= 0 <= hi, the turn held between them; null without a pivot point.
+// A pivot's settings as the server keeps them: lo <= 0 <= hi, the turn held between them.
+export function repairJoint(v: unknown): ModelJoint | null {
+  if (!v || typeof v !== 'object') return null
+  const p = v as Record<string, unknown>
+  const lo = Math.min(0, angle(p.lo, -TURN_LIMIT)), hi = Math.max(0, angle(p.hi, TURN_LIMIT))
+  return { turn: Math.min(hi, Math.max(lo, angle(p.turn, 0))), lo, hi }
+}
+export const NEW_JOINT: ModelJoint = { turn: 0, lo: -TURN_LIMIT, hi: TURN_LIMIT }
+
+// ---- the old pivot circles (kept so an old model can be read and converted) ----
+
 export function repairShapePivot(v: unknown): ModelShapePivot | null {
   if (!v || typeof v !== 'object') return null
   const p = v as Record<string, unknown>
   if (typeof p.at !== 'string' || !p.at) return null
-  const lo = Math.min(0, angle(p.lo, -TURN_LIMIT)), hi = Math.max(0, angle(p.hi, TURN_LIMIT))
-  return { at: p.at, turn: Math.min(hi, Math.max(lo, angle(p.turn, 0))), lo, hi }
+  const j = repairJoint(p)!
+  return { at: p.at, ...j }
 }
 export function repairPivot(p: ModelPivot): ModelPivot {
   const place = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? r2(Math.min(1e5, Math.max(-1e5, v))) : fallback)
   return { id: p.id, name: typeof p.name === 'string' ? p.name.trim().slice(0, 40) : '', x: place(p.x, 100), y: place(p.y, 200) }
 }
-
 export const isPivotCircle = (s: Pick<ModelShape, 'kind' | 'pivot'> | undefined | null): boolean => !!s && s.kind === 'pivot' && !!s.pivot
 export const pivotsOf = (c: ModelContent): ModelPivot[] => c.pivots ?? []
-export const pivotById = (c: ModelContent, id: string | null | undefined): ModelPivot | undefined => (id ? pivotsOf(c).find(p => p.id === id) : undefined)
 export const circlesOf = (c: ModelContent, pivotId: string): ModelShape[] => c.shapes.filter(s => isPivotCircle(s) && s.pivot!.at === pivotId)
-// The radius of a circle as drawn: the mean distance of its points from its pivot point.
-export function radiusOf(c: ModelContent, s: ModelShape): number {
-  const p = pivotById(c, s.pivot?.at)
-  if (!p || s.pts.length === 0) return 0
-  return s.pts.reduce((sum, q) => sum + Math.hypot(q.x - p.x, q.y - p.y), 0) / s.pts.length
+// Pivot points no circle turns about any more go (after a circle, an object or a group was deleted).
+export function prunePivots(c: ModelContent): ModelContent {
+  if (!(c.pivots ?? []).length) return c
+  const used = new Set(c.shapes.flatMap(s => (isPivotCircle(s) ? [s.pivot!.at] : [])))
+  const kept = pivotsOf(c).filter(p => used.has(p.id))
+  return kept.length === pivotsOf(c).length ? c : { ...c, pivots: kept }
+}
+
+// ---- pivot links ----
+
+// The link a pivot toggle on point i of a shape works on: the point's own link; on a symmetric shape, the link of the copy that holds it; else the first point of another
+// shape welded to it. Null when the point is not linked.
+export function jointHolder(c: ModelContent, shapeId: string, i: number): { shapeId: string; i: number } | null {
+  const s = c.shapes.find(x => x.id === shapeId)
+  if (!s || !s.pts[i]) return null
+  if (s.pts[i].bind) return { shapeId, i }
+  if (s.sym) { const j = orbitOf(s, i).find(k => !!s.pts[k]?.bind); if (j !== undefined) return { shapeId, i: j } }
+  for (const o of c.shapes) {
+    if (o.id === shapeId) continue
+    const k = o.pts.findIndex(p => p.bind?.kind === 'point' && p.bind.s === shapeId && p.bind.i === i)
+    if (k >= 0) return { shapeId: o.id, i: k }
+  }
+  return null
+}
+export const jointAt = (c: ModelContent, shapeId: string, i: number): ModelJoint | null => {
+  const h = jointHolder(c, shapeId, i)
+  return h ? c.shapes.find(x => x.id === h.shapeId)?.pts[h.i]?.bind?.pivot ?? null : null
+}
+
+const objectOfShapeIn = (c: ModelContent, shapeId: string): string | null => c.objects.find(o => o.shapes.includes(shapeId))?.id ?? null
+const withBind = (c: ModelContent, shapeId: string, i: number, f: (b: ModelBind) => ModelBind): ModelContent => ({
+  ...c, shapes: c.shapes.map(s => (s.id === shapeId ? { ...s, pts: s.pts.map((p, k) => (k === i && p.bind ? { ...p, bind: f(p.bind) } : p)) } : s)),
+})
+
+// A linked point made a pivot point, or a plain link again. A pivot joins two objects, so a link between shapes of one object cannot be one.
+export function toggleJoint(c: ModelContent, shapeId: string, i: number): { ok: true; content: ModelContent; on: boolean } | { ok: false; reason: string } {
+  const h = jointHolder(c, shapeId, i)
+  if (!h) return { ok: false, reason: 'Only a linked point can be a pivot point: connect it to another shape first.' }
+  const b = c.shapes.find(x => x.id === h.shapeId)!.pts[h.i].bind!
+  if (b.pivot) return { ok: true, content: withBind(c, h.shapeId, h.i, x => ({ ...x, pivot: null })), on: false }
+  const a = objectOfShapeIn(c, h.shapeId), t = objectOfShapeIn(c, b.s)
+  if (!a || !t || a === t) return { ok: false, reason: 'A pivot point joins two objects: these shapes are in one object. Put them in different objects to bend them there.' }
+  return { ok: true, content: withBind(c, h.shapeId, h.i, x => ({ ...x, pivot: { ...NEW_JOINT } })), on: true }
+}
+
+// A pivot's turn or its limits changed: the turn stays inside the limits, and the limits keep the rest (0) inside them.
+export function setJointSetting(c: ModelContent, shapeId: string, i: number, key: 'turn' | 'lo' | 'hi', value: number): ModelContent {
+  const h = jointHolder(c, shapeId, i)
+  if (!h) return c
+  return withBind(c, h.shapeId, h.i, b => {
+    if (!b.pivot) return b
+    const v = r2(Math.min(TURN_LIMIT, Math.max(-TURN_LIMIT, value)))
+    const lo = key === 'lo' ? Math.min(0, v) : b.pivot.lo, hi = key === 'hi' ? Math.max(0, v) : b.pivot.hi
+    return { ...b, pivot: { lo, hi, turn: Math.min(hi, Math.max(lo, key === 'turn' ? v : b.pivot.turn)) } }
+  })
+}
+// A pivot turned by some degrees more, held to its limits (posing).
+export function addJointTurn(c: ModelContent, jointId: string, by: number): ModelContent {
+  const [shapeId, k] = jointId.split(':'), i = Number(k)
+  const b = c.shapes.find(s => s.id === shapeId)?.pts[i]?.bind
+  if (!b?.pivot) return c
+  return withBind(c, shapeId, i, x => ({ ...x, pivot: { ...x.pivot!, turn: r2(Math.min(x.pivot!.hi, Math.max(x.pivot!.lo, x.pivot!.turn + by))) } }))
 }
 
 // ---- the pose ----
 
+// A pivot link: the point that holds it (`shape`, `i`; its id is "shape:i"), the object of that point (`from`) and of the shape it is linked to (`to`), the pivot point where it is
+// drawn at rest, and the pivot's turn (how far `from` is turned from `to`).
+export interface Joint { id: string; shape: string; i: number; from: string; to: string; at: [number, number]; turn: number; lo: number; hi: number }
+
 export interface Pose {
-  // each shape that moves: the matrix it is drawn through (in the model's space)
+  // each shape that moves: the matrix it is drawn through (in the model's space); each object that moves
   mats: Map<string, Mat>
-  // each pivot circle: the matrix of the side it is held on (where a shadow or a light linked to it is placed: it does not swing)
-  held: Map<string, Mat>
-  // each pivot point where it is now
+  objectMats: Map<string, Mat>
+  // every pivot link, and where its pivot point is now
+  joints: Map<string, Joint>
   points: Map<string, [number, number]>
-  // pivots that do not swing (their two sides meet again, or an anchor holds the side beyond them)
+  // pivots that do not turn (their two sides meet again, or an anchor holds the side beyond them)
   blocked: Set<string>
-  // each body's shapes, by the body's first shape (what swings together)
-  bodies: Map<string, string[]>
-  // the body each base shape is in
+  // each shape's object, and each object's shapes
   bodyOf: Map<string, string>
-  // each figure's root body, and the pivot circle each body hangs from on the way to the root (its own side's circle)
+  bodies: Map<string, string[]>
+  // each object's figure (by its root object), and the way from each object back toward the root: the pivot, the object it hangs from, and which way the pivot's turn turns it
   rootOf: Map<string, string>
-  hangsFrom: Map<string, string>
-  // the way from each body (other than a root) back toward its root: the pivot, the circle the body is on, the circle held on the root's side, the body it hangs from
-  parentOf: Map<string, { pivot: string; circle: string; held: string; parent: string }>
-  // each pivot's circle on the root's side (it holds still while the others swing)
-  nearOf: Map<string, string>
-  // the circles each body hangs on, and the bodies on each circle
-  hangs: Map<string, string[]>
-  onCircle: Map<string, string[]>
-  // how many anchors each body has, and each figure (by its root)
+  parentOf: Map<string, { joint: string; parent: string; sign: 1 | -1 }>
+  // how many anchors each object has, and each figure (by its root)
   anchors: Map<string, number>
   figureAnchors: Map<string, number>
-  // the shapes a drag in Pose mode can pose: the bodies of a figure with a pivot, and the circles of its pivots
+  // the shapes a drag in Pose mode can pose (every shape of an object)
   posable: Set<string>
 }
 
@@ -85,204 +148,166 @@ export function poseOf(c: ModelContent): Pose {
   return made
 }
 
+// Where a link's point lies at rest, read from the drawing: a weld on the point it is welded to (followed to the point at the end of its welds), a lock at its place on the
+// segment.
+function restPlace(byId: Map<string, ModelShape>, b: ModelBind): [number, number] | null {
+  let t = byId.get(b.s), bind: ModelBind = b
+  for (let k = 0; k < 8 && t && bind.kind === 'point'; k++) {
+    const q = t.pts[bind.i % Math.max(1, t.pts.length)]
+    if (!q) return null
+    if (!q.bind || q.bind.kind !== 'point' || Math.abs(q.bind.d[0]) > 1e-6 || Math.abs(q.bind.d[1]) > 1e-6) return [q.x + bind.d[0], q.y + bind.d[1]]
+    bind = q.bind
+    t = byId.get(bind.s)
+  }
+  if (!t || t.pts.length < 2) return null
+  if (bind.kind === 'point') { const q = t.pts[bind.i % t.pts.length]; return q ? [q.x, q.y] : null }
+  const a = build(t.pts, t.closed), e = bezierAt(a, bind.e % a.length, bind.t)
+  return [e.x, e.y]
+}
+
 function work(c: ModelContent): Pose {
   const pose: Pose = {
-    mats: new Map(), held: new Map(), points: new Map(), blocked: new Set(), bodies: new Map(), bodyOf: new Map(), rootOf: new Map(), hangsFrom: new Map(),
-    parentOf: new Map(), nearOf: new Map(), hangs: new Map(), onCircle: new Map(), anchors: new Map(), figureAnchors: new Map(), posable: new Set(),
+    mats: new Map(), objectMats: new Map(), joints: new Map(), points: new Map(), blocked: new Set(), bodyOf: new Map(), bodies: new Map(), rootOf: new Map(),
+    parentOf: new Map(), anchors: new Map(), figureAnchors: new Map(), posable: new Set(),
   }
   const byId = new Map(c.shapes.map(s => [s.id, s]))
-  const isBody = (s: ModelShape | undefined): boolean => !!s && !s.mirrorOf && !s.cloneOf && actsAs(s) === 'base'
-  // bodies: base shapes joined by their links to each other
-  const parent = new Map<string, string>()
-  const find = (id: string): string => { let r = id; while (parent.get(r) !== r) r = parent.get(r)!; return r }
-  const rank = treeRank(c), rankOf = (id: string) => rank.get(id) ?? 0
-  const bodyShapes = c.shapes.filter(isBody).sort((a, b) => rankOf(a.id) - rankOf(b.id))
-  for (const s of bodyShapes) parent.set(s.id, s.id)
-  for (const s of bodyShapes) {
-    for (const p of s.pts) {
-      const t = p.bind ? byId.get(p.bind.s) : undefined
-      if (t && parent.has(t.id)) {
-        const a = find(s.id), b = find(t.id)
-        // the body is named by its first shape in the tree
-        if (a !== b) { if (rankOf(a) <= rankOf(b)) parent.set(b, a); else parent.set(a, b) }
-      }
-    }
-  }
-  for (const s of bodyShapes) {
-    const b = find(s.id)
-    pose.bodyOf.set(s.id, b)
-    pose.bodies.set(b, [...(pose.bodies.get(b) ?? []), s.id])
-  }
-  for (const [b, ids] of pose.bodies) {
+  const rank = treeRank(c), objectRank = new Map<string, number>()
+  for (const o of c.objects) {
+    const ids = o.shapes.filter(id => byId.has(id))
+    pose.bodies.set(o.id, ids)
+    for (const id of ids) { pose.bodyOf.set(id, o.id); pose.posable.add(id) }
+    objectRank.set(o.id, Math.min(Infinity, ...ids.map(id => rank.get(id) ?? Infinity)))
     const n = ids.reduce((k, id) => k + anchorsOf(byId.get(id)).length, 0)
-    if (n) pose.anchors.set(b, n)
+    if (n) pose.anchors.set(o.id, n)
   }
-  // what hangs on what: a body on each circle one of its points follows
-  const pivots = new Map(pivotsOf(c).map(p => [p.id, p]))
-  for (const s of bodyShapes) {
-    for (const p of s.pts) {
-      const t = p.bind ? byId.get(p.bind.s) : undefined
-      if (!t || !isPivotCircle(t) || !pivots.has(t.pivot!.at)) continue
-      const b = pose.bodyOf.get(s.id)!
-      if (!(pose.hangs.get(b) ?? []).includes(t.id)) pose.hangs.set(b, [...(pose.hangs.get(b) ?? []), t.id])
-      if (!(pose.onCircle.get(t.id) ?? []).includes(b)) pose.onCircle.set(t.id, [...(pose.onCircle.get(t.id) ?? []), b])
-    }
+  const rankOf = (o: string) => objectRank.get(o) ?? Infinity
+  // the joints: pivot links between shapes of two objects
+  const near = new Map<string, string[]>()
+  for (const s of c.shapes) {
+    s.pts.forEach((p, i) => {
+      const b = p.bind
+      if (!b?.pivot) return
+      const from = pose.bodyOf.get(s.id), to = pose.bodyOf.get(b.s), at = restPlace(byId, b)
+      if (!from || !to || from === to || !at) return
+      const id = `${s.id}:${i}`
+      pose.joints.set(id, { id, shape: s.id, i, from, to, at, turn: b.pivot.turn, lo: b.pivot.lo, hi: b.pivot.hi })
+      near.set(from, [...(near.get(from) ?? []), id])
+      near.set(to, [...(near.get(to) ?? []), id])
+    })
   }
-  const circles = new Map<string, ModelShape[]>()
-  for (const s of c.shapes) if (isPivotCircle(s) && pivots.has(s.pivot!.at)) circles.set(s.pivot!.at, [...(circles.get(s.pivot!.at) ?? []), s])
-  const pivotOf = (cid: string) => byId.get(cid)!.pivot!.at
-  const turnOf = (cid: string) => byId.get(cid)!.pivot!.turn ?? 0
-  const bodyMat = new Map<string, Mat>()
+  const placeOfObject = (o: string) => placeMat(c.objects.find(x => x.id === o)?.place)
   const seen = new Set<string>()
-  // each figure (the bodies joined through pivots), walked out from its root: its first anchored body, else its first body in the tree
-  for (const first of pose.bodies.keys()) {
+  const objects = [...pose.bodies.keys()].sort((a, b) => rankOf(a) - rankOf(b))
+  for (const first of objects) {
     if (seen.has(first)) continue
+    // the figure: the objects joined through pivots
     const members = [first]
     seen.add(first)
     for (let k = 0; k < members.length; k++) {
-      for (const cid of pose.hangs.get(members[k]) ?? []) {
-        for (const o of circles.get(pivotOf(cid)) ?? []) for (const b2 of pose.onCircle.get(o.id) ?? []) if (!seen.has(b2)) { seen.add(b2); members.push(b2) }
+      for (const jid of near.get(members[k]) ?? []) {
+        const j = pose.joints.get(jid)!, other = j.from === members[k] ? j.to : j.from
+        if (!seen.has(other)) { seen.add(other); members.push(other) }
       }
     }
     members.sort((a, b) => rankOf(a) - rankOf(b))
-    const anchored = members.filter(b => pose.anchors.has(b))
+    const anchored = members.filter(o => pose.anchors.has(o))
     const root = anchored[0] ?? members[0]
-    pose.figureAnchors.set(root, anchored.reduce((k, b) => k + (pose.anchors.get(b) ?? 0), 0))
+    pose.figureAnchors.set(root, anchored.reduce((k, o) => k + (pose.anchors.get(o) ?? 0), 0))
+    // walked out from the root
+    const order = [root], visited = new Set([root]), used = new Set<string>(), loops: Array<[string, string, string]> = []
     pose.rootOf.set(root, root)
-    const order = [root], visited = new Set([root]), from = new Map<string, string>()   // pivot -> the body it is reached from
-    const loops: Array<[string, string, string]> = []
     for (let k = 0; k < order.length; k++) {
-      const b = order[k]
-      for (const cid of pose.hangs.get(b) ?? []) {
-        const pid = pivotOf(cid)
-        if (from.has(pid)) {
-          // a pivot met again: the way this body came, another circle of its own pivot, or a loop
-          if (pose.parentOf.get(b)?.pivot !== pid && from.get(pid) !== b) loops.push([b, from.get(pid)!, pid])
-          continue
-        }
-        from.set(pid, b)
-        pose.nearOf.set(pid, cid)
-        for (const o of circles.get(pid) ?? []) {
-          for (const b2 of pose.onCircle.get(o.id) ?? []) {
-            if (b2 === b) continue
-            if (visited.has(b2)) { if (pose.parentOf.get(b2)?.pivot !== pid) loops.push([b, b2, pid]); continue }
-            visited.add(b2)
-            order.push(b2)
-            pose.parentOf.set(b2, { pivot: pid, circle: o.id, held: cid, parent: b })
-            pose.rootOf.set(b2, root)
-            pose.hangsFrom.set(b2, o.id)
-          }
-        }
+      const o = order[k]
+      for (const jid of near.get(o) ?? []) {
+        if (used.has(jid)) continue
+        used.add(jid)
+        const j = pose.joints.get(jid)!, other = j.from === o ? j.to : j.from
+        if (visited.has(other)) { loops.push([o, other, jid]); continue }
+        visited.add(other)
+        order.push(other)
+        pose.parentOf.set(other, { joint: jid, parent: o, sign: other === j.from ? 1 : -1 })
+        pose.rootOf.set(other, root)
       }
     }
-    // a pivot does not swing when its two sides meet again (each pivot round the loop), or when an anchor holds the side beyond it (each pivot between the root and that anchor)
-    const chain = (b: string): string[] => { const out = [b]; let x = b; while (pose.parentOf.has(x)) { x = pose.parentOf.get(x)!.parent; out.push(x) } return out }
+    // a pivot does not turn when its two sides meet again (each pivot round the loop), or when an anchor holds the side beyond it (each pivot between the root and that anchor)
+    const chain = (o: string): string[] => { const out = [o]; let x = o; while (pose.parentOf.has(x)) { x = pose.parentOf.get(x)!.parent; out.push(x) } return out }
     const blockBetween = (a: string, b: string) => {
       const ca = chain(a), cb = chain(b), inA = new Set(ca), meet = cb.find(x => inA.has(x)) ?? root
-      for (const x of [...ca.slice(0, ca.indexOf(meet)), ...cb.slice(0, cb.indexOf(meet))]) pose.blocked.add(pose.parentOf.get(x)!.pivot)
+      for (const x of [...ca.slice(0, ca.indexOf(meet)), ...cb.slice(0, cb.indexOf(meet))]) pose.blocked.add(pose.parentOf.get(x)!.joint)
     }
-    for (const [a, b, pid] of loops) { pose.blocked.add(pid); blockBetween(a, b) }
-    for (const b of anchored) if (b !== root) blockBetween(b, root)
-    // the root where it has been posed, and each body from the one it hangs from
-    bodyMat.set(root, placeMat(byId.get(root)?.place))
-    for (const b of order.slice(1)) {
-      const pp = pose.parentOf.get(b)!, Mp = bodyMat.get(pp.parent)!, pt = pivots.get(pp.pivot)!
-      const swing = pose.blocked.has(pp.pivot) || pp.circle === pp.held ? 0 : turnOf(pp.circle) - turnOf(pp.held)
-      bodyMat.set(b, swing ? mul(Mp, rotate(swing, pt.x, pt.y)) : Mp)
-    }
-    for (const [pid, b] of from) {
-      const Mb = bodyMat.get(b)!, pt = pivots.get(pid)!, near = pose.nearOf.get(pid)!
-      pose.points.set(pid, apply(Mb, pt.x, pt.y))
-      for (const o of circles.get(pid) ?? []) {
-        const swing = pose.blocked.has(pid) || o.id === near ? 0 : turnOf(o.id) - turnOf(near)
-        pose.mats.set(o.id, swing ? mul(Mb, rotate(swing, pt.x, pt.y)) : Mb)
-        pose.held.set(o.id, Mb)
-      }
-    }
-    if (from.size) {
-      for (const b of members) for (const id of pose.bodies.get(b) ?? []) pose.posable.add(id)
-      for (const pid of from.keys()) for (const o of circles.get(pid) ?? []) pose.posable.add(o.id)
+    for (const [a, b, jid] of loops) { pose.blocked.add(jid); blockBetween(a, b) }
+    for (const o of anchored) if (o !== root) blockBetween(o, root)
+    // the root where it has been posed, and each object from the one it hangs from
+    pose.objectMats.set(root, placeOfObject(root))
+    for (const o of order.slice(1)) {
+      const pp = pose.parentOf.get(o)!, Mp = pose.objectMats.get(pp.parent)!, j = pose.joints.get(pp.joint)!
+      const by = pose.blocked.has(pp.joint) ? 0 : pp.sign * j.turn
+      pose.objectMats.set(o, by ? mul(Mp, rotate(by, j.at[0], j.at[1])) : Mp)
     }
   }
-  for (const [b, M] of bodyMat) if (M !== IDENTITY) for (const id of pose.bodies.get(b) ?? []) pose.mats.set(id, M)
-  // pivots no body holds stay where they are drawn
-  for (const p of pivotsOf(c)) if (!pose.points.has(p.id)) pose.points.set(p.id, [p.x, p.y])
+  for (const [jid, j] of pose.joints) pose.points.set(jid, apply(pose.objectMats.get(j.to) ?? IDENTITY, j.at[0], j.at[1]))
+  for (const [o, M] of pose.objectMats) if (M !== IDENTITY) for (const id of pose.bodies.get(o) ?? []) pose.mats.set(id, M)
   return pose
 }
 
-// ---- edits ----
+// ---- converting old pivot circles (once, when the shape editor opens an old model) ----
 
-// A turn held to a circle's limits.
-export const heldTurn = (p: ModelShapePivot, turn: number): number => r2(Math.min(p.hi, Math.max(p.lo, turn)))
+// Whether a model still has what pivot points replaced: pivot circles, pivot points of circles, or a figure's place kept on a shape.
+export const needsJoints = (c: ModelContent): boolean => pivotsOf(c).length > 0 || c.shapes.some(s => s.kind === 'pivot' || !!s.place)
 
-// The sizes of a new pivot's circles (smallest first) and how many it may start with; how big a circle may be.
-export const PIVOT_RADII = [12, 18, 24, 30]
-export const PIVOT_CIRCLES = { min: 2, max: 4, start: 2 } as const
-export const RADIUS = { min: 2, max: 120 } as const
-const NEW_OUTLINE = 0.75
-
-function circleAround(id: string, name: string, pivotId: string, x: number, y: number, r: number): ModelShape {
-  const made = newShape(id, name, 'circle', { x: x - r, y: y - r, w: 2 * r, h: 2 * r })
-  return { ...made, kind: 'pivot', pivot: { at: pivotId, turn: 0, lo: -TURN_LIMIT, hi: TURN_LIMIT }, outline: NEW_OUTLINE }
-}
-const withShapes = (c: ModelContent, objectId: string, shapes: ModelShape[]): ModelContent => ({
-  ...c, shapes: [...c.shapes, ...shapes], objects: c.objects.map(o => (o.id === objectId ? { ...o, shapes: [...o.shapes, ...shapes.map(s => s.id)] } : o)),
-})
-
-// A new pivot at (x, y): its point and `circleIds.length` circles of growing sizes, in an object.
-export function addPivot(c: ModelContent, objectId: string, x: number, y: number, ids: { pivot: string; circles: string[] }): ModelContent {
-  const n = pivotsOf(c).length + 1, name = `Pivot ${n}`
-  const circles = ids.circles.map((id, k) => circleAround(id, `${name} circle ${k + 1}`, ids.pivot, r2(x), r2(y), PIVOT_RADII[k] ?? PIVOT_RADII[PIVOT_RADII.length - 1] + 6 * (k - PIVOT_RADII.length + 1)))
-  return withShapes({ ...c, pivots: [...pivotsOf(c), { id: ids.pivot, name, x: r2(x), y: r2(y) }] }, objectId, circles)
-}
-
-// One more circle on a pivot, a little bigger than its biggest.
-export function addCircle(c: ModelContent, pivotId: string, objectId: string, id: string): ModelContent | null {
-  const p = pivotById(c, pivotId)
-  if (!p) return null
-  const own = circlesOf(c, pivotId), r = Math.min(RADIUS.max, Math.max(PIVOT_RADII[0], ...own.map(s => radiusOf(c, s))) + 6)
-  return withShapes(c, objectId, [circleAround(id, `${p.name || 'Pivot'} circle ${own.length + 1}`, pivotId, p.x, p.y, r2(r))])
-}
-
-// A circle drawn again round its pivot point at another size (its turn and limits stay).
-export function setRadius(c: ModelContent, shapeId: string, r: number): ModelContent {
-  const s = c.shapes.find(x => x.id === shapeId), p = pivotById(c, s?.pivot?.at)
-  if (!s || !p) return c
-  const size = r2(Math.min(RADIUS.max, Math.max(RADIUS.min, r)))
-  const drawn = newShape(s.id, s.name, 'circle', { x: p.x - size, y: p.y - size, w: 2 * size, h: 2 * size })
-  return { ...c, shapes: c.shapes.map(x => (x.id === shapeId ? { ...x, pts: drawn.pts } : x)) }
-}
-
-// A pivot moved: its point and every one of its circles.
-export function movePivotBy(c: ModelContent, pivotId: string, dx: number, dy: number): ModelContent {
-  if (!pivotById(c, pivotId) || (!dx && !dy)) return c
+// Each shape hung on a circle is linked instead to the shape hung on that pivot's first circle (on its nearest point within half a unit, else locked on its nearest segment)
+// and the link is made a pivot with the circle's turn (from the first circle's) and limits; a shape alone on its pivot, and a shadow or a light held on a ring, is unlinked
+// where it is drawn. The circles and the pivot points go. A figure's place kept on its first shape moves to that shape's object.
+export function migrateJoints(c: ModelContent, solved: Solved): ModelContent {
+  const byId = new Map(c.shapes.map(s => [s.id, s])), rank = treeRank(c)
+  const circleIds = new Set(c.shapes.filter(s => s.kind === 'pivot').map(s => s.id))
+  const pts = new Map(c.shapes.map(s => [s.id, s.pts.map(p => ({ ...p }))]))
+  const drawnAt = (sid: string, i: number): [number, number] | null => {
+    const r = solved.shapes[sid], q = r?.local[i]
+    return r && q ? apply(r.matrix, q.x, q.y) : null
+  }
+  const ownSpace = (sid: string, w: [number, number]): [number, number] => {
+    const r = solved.shapes[sid]
+    return r ? apply(inverse(r.matrix), w[0], w[1]) : w
+  }
+  const unlink = (sid: string, i: number) => {
+    const list = pts.get(sid)!, at = drawnAt(sid, i), [x, y] = at ? ownSpace(sid, at) : [list[i].x, list[i].y]
+    list[i] = { ...list[i], x: r2(x), y: r2(y), bind: null }
+  }
+  for (const pivot of pivotsOf(c)) {
+    const circles = circlesOf(c, pivot.id).sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0))
+    const hung = circles.map(ci => c.shapes.flatMap(s => (circleIds.has(s.id) ? [] : s.pts.flatMap((p, i) => (p.bind?.s === ci.id ? [{ s: s.id, i }] : [])))))
+    const k0 = hung.findIndex(h => h.some(x => !byId.get(x.s)?.kind || byId.get(x.s)!.kind === 'base' || byId.get(x.s)!.kind === 'stretch'))
+    const holder = k0 >= 0 ? hung[k0].find(x => { const k = byId.get(x.s)?.kind ?? 'base'; return k === 'base' || k === 'stretch' })!.s : null
+    const r0 = circles[k0]?.pivot
+    hung.forEach((list, k) => list.forEach(({ s, i }) => {
+      const kind = byId.get(s)?.kind ?? 'base', at = drawnAt(s, i), T = holder ? solved.shapes[holder] : undefined
+      if (!holder || s === holder || kind === 'shadow' || kind === 'light' || !at || !T || T.local.length < 3) { unlink(s, i); return }
+      const built = build(T.local, byId.get(holder)!.closed, T.matrix)
+      let best = -1, bd = 0.5
+      built.forEach((q, j) => { const d = Math.hypot(q.x - at[0], q.y - at[1]); if (d <= bd) { bd = d; best = j } })
+      const ci = circles[k].pivot!, sameObject = objectOfShapeIn(c, s) === objectOfShapeIn(c, holder)
+      const pivot: ModelJoint | null = k === k0 || sameObject ? null : { turn: r2(Math.min(ci.hi, Math.max(ci.lo, wrap(ci.turn - (r0?.turn ?? 0))))), lo: ci.lo, hi: ci.hi }
+      let bind: ModelBind
+      if (best >= 0) bind = { kind: 'point', s: holder, i: best, d: [0, 0], e: 0, t: 0, o: 0 }
+      else {
+        const [lx, ly] = ownSpace(holder, at), hit = nearestEdge(T.local, lx, ly)
+        if (!hit) { unlink(s, i); return }
+        bind = { kind: 'edge', s: holder, i: 0, d: [0, 0], e: hit.e, t: r2(hit.t * 1000) / 1000, o: 0 }
+      }
+      const list = pts.get(s)!, [x, y] = ownSpace(s, at)
+      list[i] = { ...list[i], x: r2(x), y: r2(y), bind: { ...bind, ...(pivot ? { pivot } : {}) } }
+    }))
+  }
+  // anything else linked to a circle (a circle of no pivot, a slider on a ring) is let go where it is drawn
+  for (const s of c.shapes) if (!circleIds.has(s.id)) s.pts.forEach((p, i) => { const now = pts.get(s.id)![i]; if (now.bind && circleIds.has(now.bind.s)) unlink(s.id, i) })
+  // a figure's place goes to its object
+  const places = new Map<string, NonNullable<ModelShape['place']>>()
+  for (const s of c.shapes) { const o = objectOfShapeIn(c, s.id); if (s.place && o && !places.has(o)) places.set(o, s.place) }
   return {
     ...c,
-    pivots: pivotsOf(c).map(p => (p.id === pivotId ? { ...p, x: r2(p.x + dx), y: r2(p.y + dy) } : p)),
-    shapes: c.shapes.map(s => (isPivotCircle(s) && s.pivot!.at === pivotId ? { ...s, pts: s.pts.map(q => ({ ...q, x: r2(q.x + dx), y: r2(q.y + dy) })) } : s)),
+    pivots: [],
+    shapes: c.shapes.filter(s => !circleIds.has(s.id)).map(s => ({ ...s, pts: pts.get(s.id)!, place: null })),
+    objects: c.objects.map(o => ({ ...o, shapes: o.shapes.filter(id => !circleIds.has(id)), ...(places.has(o.id) && !o.place ? { place: places.get(o.id)! } : {}) })),
   }
-}
-
-export const renamePivot = (c: ModelContent, pivotId: string, name: string): ModelContent => ({ ...c, pivots: pivotsOf(c).map(p => (p.id === pivotId ? { ...p, name: name.slice(0, 40) } : p)) })
-
-// A circle's turn or its limits changed: the turn stays inside the limits, and the limits keep the rest (0) inside them.
-export function setPivotSetting(c: ModelContent, shapeId: string, key: 'turn' | 'lo' | 'hi', value: number): ModelContent {
-  return {
-    ...c,
-    shapes: c.shapes.map(s => {
-      if (s.id !== shapeId || !s.pivot) return s
-      const v = r2(Math.min(TURN_LIMIT, Math.max(-TURN_LIMIT, value)))
-      const lo = key === 'lo' ? Math.min(0, v) : s.pivot.lo, hi = key === 'hi' ? Math.max(0, v) : s.pivot.hi
-      const turn = Math.min(hi, Math.max(lo, key === 'turn' ? v : s.pivot.turn))
-      return { ...s, pivot: { ...s.pivot, lo, hi, turn } }
-    }),
-  }
-}
-
-// Pivot points no circle turns about any more go (after a circle, an object or a group was deleted).
-export function prunePivots(c: ModelContent): ModelContent {
-  if (!(c.pivots ?? []).length) return c
-  const used = new Set(c.shapes.flatMap(s => (isPivotCircle(s) ? [s.pivot!.at] : [])))
-  const kept = pivotsOf(c).filter(p => used.has(p.id))
-  return kept.length === pivotsOf(c).length ? c : { ...c, pivots: kept }
 }

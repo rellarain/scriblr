@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ModelBind, ModelContent, ModelShape } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import DesignerConsole from './DesignerConsole'
-import { addPivot } from './engine/pivots'
+import { NEW_JOINT } from './engine/pivots'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 // Sliders and posable points in the shape editor (shape types T5): the point form makes a point locked onto a segment a slider, whose two stops are dragged on the outline
@@ -24,18 +24,14 @@ function rail(slide = false): ModelContent {
   const bead = box('bead', 80, 20, 20, 20)
   return addShape(c, 'o', { ...bead, pts: bead.pts.map((p, i) => (i === 3 ? { ...p, bind: { ...lock('rail', 0, 0.5), slide: slide ? { lo: 0, hi: 1, at: null } : null } } : p)) })
 }
+// an anchored body (object Body) and an arm (object Arm) whose top middle (80, 100) is locked onto the body's bottom, a pivot point
 function figure(): ModelContent {
   let c = addGroup(blank('Posing'), newGroup('g', 'Group'))
-  c = addObject(c, 'g', { id: 'o', name: 'Part', layer: 'body', shapes: [] })
-  c = addShape(c, 'o', box('body', 60, 40, 40, 60))
-  c = addPivot(c, 'o', 80, 100, { pivot: 'p1', circles: ['c1', 'c2'] })
-  c = addShape(c, 'o', box('arm', 74, 100, 12, 60))
-  return {
-    ...c,
-    shapes: c.shapes.map(s => (s.id === 'body'
-      ? { ...s, pts: s.pts.map((p, i) => (i === 3 ? { ...p, bind: lock('c1', 0, 0.5) } : p)), marks: [{ id: 'k1', kind: 'anchor' as const, x: 60, y: 40, i: 0, name: '' }] }
-      : s.id === 'arm' ? { ...s, pts: s.pts.map((p, i) => (i === 0 ? { ...p, bind: lock('c2', 1, 0.5) } : p)) } : s)),
-  }
+  c = addObject(c, 'g', { id: 'ob', name: 'Body', layer: 'body', shapes: [] })
+  c = addObject(c, 'g', { id: 'oa', name: 'Arm', layer: 'body', shapes: [] })
+  c = addShape(c, 'ob', { ...box('body', 60, 40, 40, 60), marks: [{ id: 'k1', kind: 'anchor' as const, x: 60, y: 40, i: 0, name: '' }] })
+  const arm: ModelShape = { ...box('arm', 0, 0, 0, 0), pts: [[74, 100], [80, 100], [86, 100], [86, 160], [80, 160], [74, 160]].map(([x, y]) => ({ x, y, m: 's' as const })) }
+  return addShape(c, 'oa', { ...arm, pts: arm.pts.map((p, i) => (i === 1 ? { ...p, bind: { ...lock('body', 2, 0.5), pivot: { ...NEW_JOINT } } } : p)) })
 }
 async function open(c: ModelContent) {
   modelsBackend([draftEntry('m', c)])

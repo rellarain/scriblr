@@ -4,36 +4,37 @@ import { content as blank } from '../../../../../test/characterModelsBackend'
 import { addGroup, addObject, addShape, newGroup } from '../modelContent'
 import { addFreeAnchor, guardAnchors, placeMat, placeOf, repairMarks, toggleAnchor, togglePosable } from './anchors'
 import { apply, rotate, translate } from './geometry'
-import { addPivot, poseOf, setPivotSetting } from './pivots'
+import { NEW_JOINT, poseOf, setJointSetting } from './pivots'
 import { beginPose, beginReach, isPosed, movePose, resetPose, type PoseDrag } from './posing'
 import { solve, type Solved } from './rig'
 import { transformShape } from './transform'
 
-// Anchors and posing (shape types T4): an anchored point stays put, a shape with one anchor turns about it, two hold it; the figure's root is its anchored body; a drag swings
-// at a pivot, turns the figure about its one anchor, or (with no anchor) lets the figure hang from the part that is held.
+// Anchors and posing (shape types T4; joints J3): an anchored point stays put, a shape with one anchor turns about it, two hold it; objects are the posable segments, joined at
+// pivot points; the figure's root is its anchored object; a drag reaches through the pivots between the object and the anchor, turns the figure about its one anchor, or (with
+// no anchor) lets the figure hang from the object that is held.
 
 const box = (id: string, x: number, y: number, w: number, h: number): ModelShape => ({
   id, name: id, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null,
   pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(([px, py]) => ({ x: px, y: py, m: 's' as const })),
 })
+const outline = (id: string, pts: Array<[number, number]>): ModelShape => ({ ...box(id, 0, 0, 0, 0), pts: pts.map(([x, y]) => ({ x, y, m: 's' as const })) })
 const lock = (s: string, e: number, t: number): ModelBind => ({ kind: 'edge', s, i: 0, d: [0, 0], e, t, o: 0 })
+const weld = (s: string, i: number): ModelBind => ({ kind: 'point', s, i, d: [0, 0], e: 0, t: 0, o: 0 })
+const pivot = (b: ModelBind): ModelBind => ({ ...b, pivot: { ...NEW_JOINT } })
 const bind = (s: ModelShape, i: number, b: ModelBind): ModelShape => ({ ...s, pts: s.pts.map((p, k) => (k === i ? { ...p, bind: b } : p)) })
 const with_ = (c: ModelContent, id: string, f: (s: ModelShape) => ModelShape): ModelContent => ({ ...c, shapes: c.shapes.map(s => (s.id === id ? f(s) : s)) })
 const anchor = (c: ModelContent, id: string, i: number): ModelContent => with_(c, id, s => { const r = toggleAnchor(s, i); if (!r.ok) throw new Error(r.reason); return r.shape })
+const placed = (c: ModelContent, objectId: string, place: { dx: number; dy: number; turn: number }): ModelContent => ({ ...c, objects: c.objects.map(o => (o.id === objectId ? { ...o, place } : o)) })
+const turnOf = (c: ModelContent, shapeId: string, i: number) => c.shapes.find(x => x.id === shapeId)!.pts[i].bind!.pivot!.turn
 
-// a body (60..100 across, 40..100 down); pivot p1 at (80, 100) with c1 (body) and c2 (arm); the arm 74..86 across, 100..160 down; pivot p2 at (80, 160) with c3 (arm) and
-// c4 (forearm); the forearm 74..86 across, 160..200 down
+// three objects: a body (60..100 across, 40..100 down); an arm (74..86 across, 100..160 down) whose top middle (80, 100) is locked onto the body's bottom, a pivot (the
+// shoulder); a forearm (74..86 across, 160..200 down) whose top middle (80, 160) is welded to the arm's bottom middle, a pivot (the elbow)
 function figure(): ModelContent {
   let c = addGroup(blank('Posing'), newGroup('g', 'Group'))
-  c = addObject(c, 'g', { id: 'o', name: 'Part', layer: 'body', shapes: [] })
-  c = addShape(c, 'o', box('body', 60, 40, 40, 60))
-  c = addPivot(c, 'o', 80, 100, { pivot: 'p1', circles: ['c1', 'c2'] })
-  c = addShape(c, 'o', box('arm', 74, 100, 12, 60))
-  c = addPivot(c, 'o', 80, 160, { pivot: 'p2', circles: ['c3', 'c4'] })
-  c = addShape(c, 'o', box('fore', 74, 160, 12, 40))
-  c = with_(c, 'body', s => bind(s, 3, lock('c1', 0, 0.5)))
-  c = with_(c, 'arm', s => bind(bind(s, 0, lock('c2', 1, 0.5)), 3, lock('c3', 0, 0.5)))
-  return with_(c, 'fore', s => bind(s, 0, lock('c4', 1, 0.5)))
+  for (const o of ['ob', 'oa', 'of']) c = addObject(c, 'g', { id: o, name: o, layer: 'body', shapes: [] })
+  c = addShape(c, 'ob', box('body', 60, 40, 40, 60))
+  c = addShape(c, 'oa', bind(outline('arm', [[74, 100], [80, 100], [86, 100], [86, 160], [80, 160], [74, 160]]), 1, pivot(lock('body', 2, 0.5))))
+  return addShape(c, 'of', bind(outline('fore', [[74, 160], [80, 160], [86, 160], [86, 200], [74, 200]]), 1, pivot(weld('arm', 4))))
 }
 const drawn = (s: Solved, id: string) => s.shapes[id].local.map(p => { const [x, y] = apply(s.shapes[id].matrix, p.x, p.y); return { x, y } })
 const mid = (pts: { x: number; y: number }[]) => ({ x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length })
@@ -83,7 +84,7 @@ describe('an anchor', () => {
 
   it('is not put on a point that follows a shape', () => {
     const arm = figure().shapes.find(x => x.id === 'arm')!
-    expect(toggleAnchor(arm, 0)).toMatchObject({ ok: false })
+    expect(toggleAnchor(arm, 1)).toMatchObject({ ok: false })
   })
 
   it('is repaired as the server repairs it', () => {
@@ -94,21 +95,20 @@ describe('an anchor', () => {
 })
 
 describe('the root of a figure', () => {
-  it('is its anchored body: the other side swings', () => {
-    const c = setPivotSetting(anchor(figure(), 'arm', 1), 'c1', 'turn', 90)
+  it('is its anchored object: the other side turns', () => {
+    const c = setJointSetting(anchor(figure(), 'arm', 2), 'arm', 1, 'turn', -90)
     const pose = poseOf(c)
-    expect(pose.rootOf.get('body')).toBe('arm')
+    expect(pose.rootOf.get('ob')).toBe('oa')
     const s = solve(c)
-    near(drawn(s, 'arm')[1], 86, 100)
-    // the body went a quarter round the pivot point: its top left (60, 40) is now at (140, 80)
+    near(drawn(s, 'arm')[2], 86, 100)
+    // the arm turned -90 from the body is the body turned a quarter round the shoulder: its top left (60, 40) is now at (140, 80)
     near(drawn(s, 'body')[0], 140, 80)
   })
 
   it('is drawn where it has been posed, with what hangs from it', () => {
-    const c = with_(figure(), 'body', s => ({ ...s, place: { dx: 10, dy: 5, turn: 0 } }))
-    const s = solve(c)
+    const s = solve(placed(figure(), 'ob', { dx: 10, dy: 5, turn: 0 }))
     near(drawn(s, 'body')[0], 70, 45)
-    near(drawn(s, 'fore')[3], 84, 205)
+    near(drawn(s, 'fore')[3], 96, 205)
   })
 
   it('a place turns about the origin and then moves', () => {
@@ -116,17 +116,34 @@ describe('the root of a figure', () => {
     expect(apply(m, 10, 0).map(v => Math.round(v * 100) / 100)).toEqual([3, 14])
     expect(placeOf(m)).toEqual({ dx: 3, dy: 4, turn: 90 })
   })
+
+  it('joins only objects joined at a pivot point: a plain link joins nothing', () => {
+    const c = with_(figure(), 'fore', s => bind(s, 1, weld('arm', 4)))
+    expect([...poseOf(c).joints.keys()]).toEqual(['arm:1'])
+    expect(poseOf(c).rootOf.get('of')).toBe('of')
+  })
 })
 
 describe('posing with an anchor', () => {
-  it('swings a shape at the nearest pivot, and what hangs further out keeps its angle', () => {
+  it('reaches at the pivot between the object and the anchor, and what hangs further out keeps its angle', () => {
     const c = drag(anchor(figure(), 'body', 0), 'arm', [80, 160], [20, 100])
-    expect(c.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBeCloseTo(90, 1)
+    expect(turnOf(c, 'arm', 1)).toBeCloseTo(90, 1)
     const s = solve(c), rest = solve(figure()), quarter = (q: { x: number; y: number }) => { const [x, y] = apply(rotate(90, 80, 100), q.x, q.y); return { x, y } }
     const arm = quarter(mid(drawn(rest, 'arm'))), fore = quarter(mid(drawn(rest, 'fore')))
     near(mid(drawn(s, 'arm')), arm.x, arm.y)
     // the forearm went round with the arm and is still straight on from it
     near(mid(drawn(s, 'fore')), fore.x, fore.y)
+  })
+
+  it('reaches through every pivot to the anchor: the forearm dragged bends the shoulder and the elbow, and keeps its own angle', () => {
+    // the elbow taken 40 degrees round the shoulder, the forearm hanging straight from it
+    const [ex, ey] = apply(rotate(-40, 80, 100), 80, 160)
+    const c = drag(anchor(figure(), 'body', 0), 'fore', [80, 200], [ex, ey + 40])
+    const s = solve(c), m = s.shapes.fore.matrix
+    const [x, y] = apply(m, 80, 200)
+    expect(Math.hypot(x - ex, y - ey - 40)).toBeLessThan(1)
+    expect(turnOf(c, 'arm', 1)).toBeCloseTo(-40, 0)
+    expect(Math.abs((Math.atan2(m[1], m[0]) * 180) / Math.PI)).toBeLessThan(1)
   })
 
   it('turns the figure about its only anchor', () => {
@@ -137,22 +154,16 @@ describe('posing with an anchor', () => {
     expect(isPosed(c)).toBe(true)
   })
 
-  it('holds a figure with two anchors, and a shape held by a second anchor', () => {
+  it('holds a figure with two anchors, and an object held by a second anchor', () => {
     expect(beginPose(anchor(anchor(figure(), 'body', 0), 'body', 1), 'body', [100, 40])).toMatchObject({ ok: false })
     const c = anchor(anchor(figure(), 'body', 0), 'fore', 2)
     expect(beginPose(c, 'arm', [80, 150])).toMatchObject({ ok: false })
-    expect(poseOf(c).blocked).toEqual(new Set(['p1', 'p2']))
-  })
-
-  it('a circle on the root side holds still; another circle swings', () => {
-    const c = anchor(figure(), 'body', 0)
-    expect(beginPose(c, 'c1', [92, 100])).toMatchObject({ ok: false })
-    expect(beginPose(c, 'c2', [98, 100])).toMatchObject({ ok: true, drag: { kind: 'swing', circle: 'c2' } })
+    expect(poseOf(c).blocked).toEqual(new Set(['arm:1', 'fore:1']))
   })
 })
 
 describe('posing with no anchor', () => {
-  it('lets the figure hang from the shape that is held, which follows the pointer', () => {
+  it('lets the figure hang from the object that is held, which follows the pointer', () => {
     const c0 = figure()
     const r = beginPose(c0, 'arm', [80, 130])
     expect(r).toMatchObject({ ok: true, drag: { kind: 'dangle' } })
@@ -170,26 +181,28 @@ describe('posing with no anchor', () => {
   })
 
   it('within the limits of each pivot', () => {
-    const c0 = setPivotSetting(setPivotSetting(figure(), 'c2', 'hi', 45), 'c2', 'lo', -45)
+    const c0 = setJointSetting(setJointSetting(figure(), 'arm', 1, 'hi', 45), 'arm', 1, 'lo', -45)
     const r = beginPose(c0, 'arm', [80, 130])
     if (!r.ok) throw new Error(r.reason)
-    expect(Math.abs(r.content.shapes.find(x => x.id === 'c2')!.pivot!.turn)).toBeLessThanOrEqual(45)
+    expect(Math.abs(turnOf(r.content, 'arm', 1))).toBeLessThanOrEqual(45)
   })
 
-  it('a shape in no figure with a pivot is not posed', () => {
+  it('moves an object on its own with the pointer', () => {
     let c = addGroup(blank('Plain'), newGroup('g', 'Group'))
     c = addObject(c, 'g', { id: 'o', name: 'Part', layer: 'body', shapes: [] })
     c = addShape(c, 'o', box('a', 0, 0, 10, 10))
-    expect(beginPose(c, 'a', [5, 5])).toMatchObject({ ok: false })
+    const r = beginPose(c, 'a', [5, 5])
+    if (!r.ok) throw new Error(r.reason)
+    near(drawn(solve(movePose(r.content, r.drag, [9, 8])), 'a')[0], 4, 3)
   })
 })
 
 describe('Reset pose', () => {
   it('puts every turn and place back', () => {
     const c = drag(anchor(figure(), 'body', 0), 'arm', [80, 160], [20, 100])
-    const back = resetPose(with_(c, 'body', s => ({ ...s, place: { dx: 4, dy: 0, turn: 0 } })))
+    const back = resetPose(placed(c, 'ob', { dx: 4, dy: 0, turn: 0 }))
     expect(isPosed(back)).toBe(false)
-    expect(back.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBe(0)
+    expect(turnOf(back, 'arm', 1)).toBe(0)
   })
 })
 
@@ -203,8 +216,8 @@ describe('a posable point (T5)', () => {
     return movePose(c, r.drag, to)
   }
 
-  it('turns the pivots to reach, and the shape holding it keeps its angle', () => {
-    const c = posable(anchor(figure(), 'body', 0), 'fore', 2)
+  it('turns the pivots to reach, and the object holding it keeps its angle', () => {
+    const c = posable(anchor(figure(), 'body', 0), 'fore', 3)
     // the elbow's place a sixth of a turn round the shoulder, the forearm still hanging straight from it
     const [ex, ey] = apply(rotate(60, 80, 100), 80, 160), target: [number, number] = [ex + 6, ey + 40]
     const posed = reachTo(c, 'fore', target)
@@ -213,22 +226,22 @@ describe('a posable point (T5)', () => {
     expect(Math.abs((Math.atan2(m[1], m[0]) * 180) / Math.PI)).toBeLessThan(1)
   })
 
-  it('on a shape with one pivot to the anchor, swings it to reach', () => {
-    const c = posable(anchor(figure(), 'body', 0), 'arm', 2)
+  it('on an object with one pivot to the anchor, swings it to reach', () => {
+    const c = posable(anchor(figure(), 'body', 0), 'arm', 3)
     const [tx, ty] = apply(rotate(45, 80, 100), 86, 160)
     const posed = reachTo(c, 'arm', [tx, ty])
     near(markOf(posed, 'arm'), tx, ty, 0)
-    expect(posed.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBeCloseTo(45, 0)
+    expect(turnOf(posed, 'arm', 1)).toBeCloseTo(45, 0)
   })
 
   it('within the limits of each pivot', () => {
-    const c = setPivotSetting(posable(anchor(figure(), 'body', 0), 'arm', 2), 'c2', 'hi', 20)
+    const c = setJointSetting(posable(anchor(figure(), 'body', 0), 'arm', 3), 'arm', 1, 'hi', 20)
     const posed = reachTo(c, 'arm', apply(rotate(80, 80, 100), 86, 160))
-    expect(posed.shapes.find(x => x.id === 'c2')!.pivot!.turn).toBeLessThanOrEqual(20)
+    expect(turnOf(posed, 'arm', 1)).toBeLessThanOrEqual(20)
   })
 
   it('with no anchor lets the figure hang from it', () => {
-    const c = posable(figure(), 'fore', 2)
+    const c = posable(figure(), 'fore', 3)
     const m = c.shapes.find(x => x.id === 'fore')!.marks![0]
     expect(beginReach(c, 'fore', m.id, [86, 200])).toMatchObject({ ok: true, drag: { kind: 'dangle' } })
   })

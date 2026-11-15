@@ -5,11 +5,11 @@ import { MODES, MODE_NAMES } from './engine/geometry'
 
 // The point form of the shape editor (shape types T2): a right-click on a point opens it there. It holds the point's type (its curve: sharp, curve, curve then sharp, sharp then
 // curve); a choice is made at once and closes the form. Anchor pins the point (T4), Posable makes it a point to pose the figure with and Slider lets a point locked onto a
-// segment slide between two stops (T5), Pivot here starts a pivot on it (T3). Opened inside a shape (away from its points) it holds only what can lie inside one: an anchor
-// or a posable point there.
+// segment slide between two stops (T5), Pivot makes a linked point a pivot point, where the shapes on its two sides bend (joints J2). Opened inside a shape (away from its
+// points) it holds only what can lie inside one: an anchor or a posable point there.
 
-export function PointForm({ at, mode, onMode, onPivotHere, anchored, onAnchor, posable, onPosable, slider, onSlider, onClose }: {
-  at: { left: number; top: number }; mode?: ModelPointMode; onMode?: (m: ModelPointMode) => void; onPivotHere?: () => void; anchored?: boolean; onAnchor?: () => void
+export function PointForm({ at, mode, onMode, pivot, onPivot, anchored, onAnchor, posable, onPosable, slider, onSlider, onClose }: {
+  at: { left: number; top: number }; mode?: ModelPointMode; onMode?: (m: ModelPointMode) => void; pivot?: boolean; onPivot?: () => void; anchored?: boolean; onAnchor?: () => void
   posable?: boolean; onPosable?: () => void; slider?: boolean; onSlider?: () => void; onClose: () => void
 }) {
   return (
@@ -21,7 +21,7 @@ export function PointForm({ at, mode, onMode, onPivotHere, anchored, onAnchor, p
           ))}
         </div>
       )}
-      {(onPivotHere || onAnchor || onPosable || onSlider) && (
+      {(onPivot || onAnchor || onPosable || onSlider) && (
         <div className="cmPointFormRow" role="group" aria-label="Point types">
           {onAnchor && (
             <button
@@ -41,7 +41,12 @@ export function PointForm({ at, mode, onMode, onPivotHere, anchored, onAnchor, p
               title={slider ? 'Slider: let the point stay where it is put' : 'Slider: the point slides along the segment between two stops'} onClick={onSlider}
             ><SlidersIcon size={14} /></button>
           )}
-          {onPivotHere && <button type="button" className="cmIconBtn" aria-label="Pivot here" title="Pivot here: a pivot of two circles round this point" onClick={onPivotHere}><OrbitIcon size={14} /></button>}
+          {onPivot && (
+            <button
+              type="button" className={`cmIconBtn${pivot ? ' cmIconBtn--on' : ''}`} aria-pressed={!!pivot} aria-label="Pivot"
+              title={pivot ? 'Pivot: make it a plain link again' : 'Pivot: the shapes linked here bend about this point'} onClick={onPivot}
+            ><OrbitIcon size={14} /></button>
+          )}
         </div>
       )}
     </CanvasForm>

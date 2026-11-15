@@ -1350,6 +1350,29 @@ def _optional_id(value: Any) -> Optional[str]:
     return value if isinstance(value, str) and re.fullmatch(_MODEL_ID, value) else None
 
 
+class ModelJoint(BaseModel):
+    """A link made a pivot point (joints J2): the shapes on its two sides turn about the linked point. `turn` is how far the side of the point that follows is turned
+    from the side it follows, in degrees; `lo` and `hi` are the smallest and largest turn the admin allows (lo <= 0 <= hi, the turn held between them)."""
+
+    turn: float = 0.0
+    lo: float = -MODEL_TURN_LIMIT
+    hi: float = MODEL_TURN_LIMIT
+
+    @field_validator("turn", "lo", "hi", mode="before")
+    @classmethod
+    def _angle(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("an angle")
+        return round(_finite(value, 0.0, -MODEL_TURN_LIMIT, MODEL_TURN_LIMIT), 2)
+
+    @model_validator(mode="after")
+    def _held(self) -> "ModelJoint":
+        self.lo = min(0.0, self.lo)
+        self.hi = max(0.0, self.hi)
+        self.turn = min(self.hi, max(self.lo, self.turn))
+        return self
+
+
 class ModelSlide(BaseModel):
     """A slider (shape types T5): an edge link that moves along the other shape's outline between two stops. A place along an outline is its edge and how far
     along it (e + t), so the stops may lie on different segments (an arc of a pivot circle). `at` is where it has been posed (None: where it is drawn); it is
@@ -1402,11 +1425,18 @@ class ModelBind(BaseModel):
     segName: str = ""
     # Shape types T5: an edge link that slides between two stops (None: it stays where it is put).
     slide: Optional[ModelSlide] = None
+    # Joints J2: the link is a pivot point, with its turn and limits (None: a plain link).
+    pivot: Optional[ModelJoint] = None
 
     @field_validator("slide", mode="before")
     @classmethod
     def _slide(cls, value: Any) -> Any:
         return _optional_model(ModelSlide, value)
+
+    @field_validator("pivot", mode="before")
+    @classmethod
+    def _pivot(cls, value: Any) -> Any:
+        return _optional_model(ModelJoint, value)
 
     @model_validator(mode="after")
     def _slides_on_an_edge(self) -> "ModelBind":
@@ -2699,6 +2729,13 @@ class ModelObject(BaseModel):
     # Clones (Z4): the object this one is a clone of (its shapes are clones of the original's shapes) and where it stands.
     cloneOf: Optional[str] = None
     cloneAt: Optional[ModelCloneAt] = None
+    # Joints J3: where the object has been posed, as the first object of its figure (None: as drawn); the figure hangs from it, and Reset pose takes it away.
+    place: Optional[ModelPlace] = None
+
+    @field_validator("place", mode="before")
+    @classmethod
+    def _place(cls, value: Any) -> Any:
+        return _optional_model(ModelPlace, value)
 
     @field_validator("wrap", mode="before")
     @classmethod

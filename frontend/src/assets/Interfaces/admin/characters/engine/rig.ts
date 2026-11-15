@@ -672,8 +672,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const p = list[k], b = p.bind
       if (!b || b.s === sh.id) continue
       const target = shapeOut(b.s)
-      // a shadow or a light linked to a pivot circle stays where the circle is held: it does not swing with it (T3)
-      const a = isCast(sh) && target?.held ? target.held : target?.pre
+      const a = target?.pre
       if (!target || !a || a.length < 1) continue
       if (target.skin) {
         const rest = restBuilt(b.s, target.skin), m = rest.length
@@ -1254,11 +1253,9 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     if (!sh || busyShapes.has(id)) return undefined
     busyShapes.add(id)
     const gid = groupOfShape.get(id) ?? null, gm = gid ? groupMat(gid) : IDENTITY
-    // a shape that hangs on a pivot (shape types T3) is drawn through the turn the pivots give it
+    // a shape of an object turned at a pivot point, or of a figure placed where it has been posed (joints J2), is drawn through that
     const posed = pose.mats.get(id)
     place(sh, gid, posed ? mul(posed, gm) : gm)
-    const heldM = pose.held.get(id), done2 = out.shapes[id]
-    if (heldM && done2) done2.held = build(done2.rig, sh.closed, mul(heldM, gm))
     busyShapes.delete(id)
     return out.shapes[id]
   }

@@ -5,7 +5,7 @@ import type {
 import { NAME_LIMIT } from './engine/connect'
 import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
-import { repairPivot, repairShapePivot } from './engine/pivots'
+import { repairPivot, repairShapePivot, repairJoint } from './engine/pivots'
 import { repairMarks, repairPlace } from './engine/anchors'
 import { repairSlide } from './engine/sliders'
 import { LIMITS } from './engine/limits'
@@ -63,7 +63,7 @@ function bind(v: unknown): ModelBind | null {
   const s = idOf(v.s)
   if (!s) return null
   const at = (x: unknown) => Math.round(num(x, 0, 0, LIMITS.pointsMax - 1))
-  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName), ...(repairSlide(v.slide, v.kind === 'edge' ? 'edge' : 'point') ? { slide: repairSlide(v.slide, 'edge') } : {}) }
+  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName), ...(repairSlide(v.slide, v.kind === 'edge' ? 'edge' : 'point') ? { slide: repairSlide(v.slide, 'edge') } : {}), ...(repairJoint(v.pivot) ? { pivot: repairJoint(v.pivot) } : {}) }
 }
 
 function point(v: unknown): ModelPoint {
@@ -272,7 +272,7 @@ function object(v: Record<string, unknown>, id: string): ModelObject {
     id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string'),
     mirrorOf: idOrNull(v.mirrorOf), classOf: idOrNull(v.classOf), axes: withIds(list(v.axes), axis),
     fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null,
-    under: [...new Set(list(v.under).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.underMax), drape: repairDrape(v.drape), hsl: lockMap(v.hsl), wrap: idOrNull(v.wrap), mirrorLine: repairMirrorLine(v.mirrorLine), cloneOf: idOrNull(v.cloneOf), cloneAt: repairCloneAt(v.cloneAt),
+    under: [...new Set(list(v.under).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.underMax), drape: repairDrape(v.drape), hsl: lockMap(v.hsl), wrap: idOrNull(v.wrap), mirrorLine: repairMirrorLine(v.mirrorLine), cloneOf: idOrNull(v.cloneOf), cloneAt: repairCloneAt(v.cloneAt), place: repairPlace(v.place),
   }
 }
 

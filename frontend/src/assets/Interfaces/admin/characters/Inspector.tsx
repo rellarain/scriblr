@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { ArrangeSection, CloneSection, ConnectionsSection, LookSection, MarksSection, MirrorSection, PivotSection, SymmetrySection, TypeSection, type CloneActions, type MirrorActions, type PivotActions, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
+import { ArrangeSection, CloneSection, ConnectionsSection, LookSection, MarksSection, MirrorSection, JointSection, SymmetrySection, TypeSection, type CloneActions, type MirrorActions, type JointActions, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -85,8 +85,8 @@ export interface InspectorProps {
   connections?: ConnectionActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
-  // a pivot circle's own section (shape types T3)
-  pivot?: PivotActions
+  // the selected point's pivot section (joints J2)
+  joint?: JointActions
   // the shape editor's mirrors (Z3) and clones (Z4)
   mirrors?: MirrorActions
   clones?: CloneActions
@@ -210,12 +210,12 @@ function ShapeTab(p: InspectorProps) {
           {!shape.mirrorOf && !shape.cloneOf && <TypeSection shape={shape} onEditShape={p.onEditShape} />}
           {shape.cloneOf && p.clones && <CloneSection content={content} kind="shape" thing={shape} actions={p.clones} />}
           {p.mirrors && !shape.pivot && !shape.cloneOf && <MirrorSection content={content} kind="shape" thing={shape} actions={p.mirrors} clones={shape.mirrorOf ? undefined : p.clones} />}
-          {p.pivot && shape.pivot && <PivotSection shape={shape} actions={p.pivot} />}
           {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} />
           {!shape.mirrorOf && !shape.cloneOf && <MarksSection shape={shape} onEditShape={p.onEditShape} />}
           {p.symmetry && !shape.cloneOf && <SymmetrySection shape={shape} actions={p.symmetry} />}
           {p.connections && !shape.cloneOf && <ConnectionsSection content={content} shape={shape} selPoint={selPoint} actions={p.connections} />}
+          {p.joint && !shape.cloneOf && <JointSection actions={p.joint} />}
           {!shape.mirrorOf && !shape.cloneOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} simple />}
         </>
       )}
