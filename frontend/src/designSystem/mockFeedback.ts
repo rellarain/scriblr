@@ -1,9 +1,10 @@
+import type { ItemPatch, NewItem, PlanItem, PlanView, PlanStatus } from '../plan/planTypes'
 import type {
   FeedbackAdmin, FeedbackStatus, KeywordFlag, MineView, MyMessage, Role, StaffBundle, StaffMessage, Statement, StatusStep, Tone,
   ToneCategory, ToneSummary, VerbCategory,
 } from '../feedback/feedbackTypes'
 
-// The design system's pretend feedback store (backend storage/feedback.py, in memory): the same seed, the same statement
+// The design system's pretend feedback store and Project Plan (backend storage/feedback.py and project_plan.py, in memory): the same seed, the same statement
 // lumping (checked messages with one subject and one verb), roles per scope, and the same answers (the staff bundle, the
 // writer's own view), so the Help tile, the Inbox, the Office pages and Assignment work in the cards.
 
@@ -110,7 +111,22 @@ function flags(text: string, verbs: VerbCategory[]): KeywordFlag[] {
   return out.sort((a, b) => a.start - b.start || b.end - a.end)
 }
 
-export function createMockFeedback() {
+// A small plan for the design system's cards (tests start from an empty one): a release procedure on the Draft console with a process
+// and its tasks, a routine, and dated items for the Timeline.
+function seedPlan(): Omit<PlanItem, 'can'>[] {
+  const base = { notes: '', ordered: true, priority: 'normal' as const, start: null, due: null, assignee: null, claimedBy: '', statementIds: [], recurrence: null, createdAt: '2026-11-10T09:00:00.000Z', doneAt: null }
+  return [
+    { ...base, id: 'pi-1', nodeId: 'writer/draft', kind: 'procedure', title: 'Release the faster editor', parentId: null, order: 0, status: 'inProgress', start: '2026-11-10', due: '2026-11-28' },
+    { ...base, id: 'pi-2', nodeId: 'writer/draft', kind: 'process', title: 'Paste without freezing', parentId: 'pi-1', order: 0, status: 'inProgress', ordered: false },
+    { ...base, id: 'pi-3', nodeId: 'writer/draft', kind: 'task', title: 'Measure a large paste', parentId: 'pi-2', order: 0, status: 'done', assignee: { kind: 'staff', id: 'adm-dana' }, claimedBy: 'adm-dana', doneAt: '2026-11-12T10:00:00.000Z', start: '2026-11-10', due: '2026-11-12' },
+    { ...base, id: 'pi-4', nodeId: 'writer/draft', kind: 'task', title: 'Split the word count off the paste', parentId: 'pi-2', order: 1, status: 'inProgress', priority: 'high', assignee: { kind: 'staff', id: 'adm-dana' }, claimedBy: 'adm-dana', start: '2026-11-13', due: '2026-11-20' },
+    { ...base, id: 'pi-5', nodeId: 'writer/draft', kind: 'task', title: 'Write the release note', parentId: 'pi-1', order: 1, status: 'todo', due: '2026-11-27' },
+    { ...base, id: 'pi-6', nodeId: 'reader/library', kind: 'task', title: 'Search by author', parentId: null, order: 0, status: 'claimed', priority: 'urgent', assignee: { kind: 'staff', id: 'adm-sam' }, claimedBy: 'adm-sam', start: '2026-11-17', due: '2026-11-24' },
+    { ...base, id: 'pi-7', nodeId: 'helper/inbox', kind: 'routine', title: 'Check the Inbox', parentId: null, order: 0, status: 'todo', recurrence: { kind: 'weekly', every: 1, unit: 'day', days: [0, 3], rangeMax: null, anchor: '2026-11-10', until: null } },
+  ]
+}
+
+export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
   const admins = seedAdmins()
   let verbs = VERBS.map(v => ({ ...v, keywords: [...v.keywords] }))
   const messages = seedMessages()
@@ -157,7 +173,94 @@ export function createMockFeedback() {
     if (st.decision === 'vetoed') { steps.push({ step: 'declined', at: st.decidedAt }); return { status: 'declined', steps, note: st.decisionNote } }
     if (st.decision !== 'accepted') { steps.push({ step: 'voting', at: m.checkedAt }); return { status: 'voting', steps, note: '' } }
     steps.push({ step: 'planned', at: st.decidedAt })
-    return { status: 'planned', steps, note: st.decisionNote }
+    const work = workOf(st.id)
+    if (work === 'inProgress' || work === 'done') steps.push({ step: 'inProgress', at: null })
+    if (work === 'done') steps.push({ step: 'done', at: null })
+    return { status: work === 'done' ? 'done' : work === 'inProgress' ? 'inProgress' : 'planned', steps, note: st.decisionNote }
+  }
+
+  // --- the Project Plan ---------------------------------------------------------------
+  let items: Omit<PlanItem, 'can'>[] = opts.planSeed ? seedPlan() : []
+  const below = (id: string): Omit<PlanItem, 'can'>[] => items.filter(i => i.parentId === id).flatMap(i => [i, ...below(i.id)])
+  function workOf(sid: string): 'planned' | 'inProgress' | 'done' | null {
+    const linked = items.filter(i => i.statementIds.includes(sid))
+    if (!linked.length) return null
+    const all = [...linked, ...linked.flatMap(i => below(i.id))]
+    if (all.every(i => i.status === 'done')) return 'done'
+    return all.some(i => i.status === 'inProgress' || i.status === 'done') ? 'inProgress' : 'planned'
+  }
+  function planView(meId: string): PlanView {
+    const me = admin(meId)
+    return {
+      me: me.id,
+      items: [...items].sort((a, b) => a.nodeId.localeCompare(b.nodeId) || (a.parentId ?? '').localeCompare(b.parentId ?? '') || a.order - b.order).map(i => {
+        const planner = has(me, 'planner', scopeOf(i.nodeId))
+        const mineToo = i.assignee?.id === me.id || i.claimedBy === me.id
+        const claimable = (!i.assignee || i.assignee.id === me.id) && (!i.claimedBy || i.claimedBy === me.id) && i.status !== 'done'
+        return { ...i, can: { edit: planner, status: planner || mineToo, claim: claimable && i.claimedBy !== me.id } }
+      }),
+    }
+  }
+  const planItem = (id: string) => {
+    const it = items.find(i => i.id === id)
+    if (!it) throw new Refused(404, `Plan item ${id} not found`)
+    return it
+  }
+  const level = (nodeId: string, parentId: string | null) => items.filter(i => i.nodeId === nodeId && i.parentId === parentId).sort((a, b) => a.order - b.order)
+  function plan(method: string, parts: string[], body: Record<string, unknown>, meId: string): PlanView {
+    const me = admin(meId)
+    const [what, id, sub] = parts
+    const shape = (nodeId: string) => need(me, 'planner', scopeOf(nodeId), 'Planning')
+    if (method === 'GET' && parts.length === 0) return planView(me.id)
+    if (what === 'items' && method === 'POST' && !id) {
+      const b = body as unknown as NewItem
+      shape(b.nodeId)
+      items = [...items, {
+        id: `pi-${next++}`, nodeId: b.nodeId, kind: b.kind, title: b.title, notes: '', parentId: b.parentId ?? null, ordered: b.ordered ?? true,
+        order: level(b.nodeId, b.parentId ?? null).length, status: 'todo', priority: b.priority ?? 'normal', start: b.start ?? null, due: b.due ?? null,
+        assignee: b.assigneeId ? { kind: 'staff', id: b.assigneeId } : null, claimedBy: '', statementIds: b.statementIds ?? [],
+        recurrence: b.recurrence ?? null, createdAt: now(), doneAt: null,
+      }]
+      return planView(me.id)
+    }
+    if (what === 'items' && id === 'reorder' && method === 'PUT') {
+      shape(String(body.nodeId))
+      const ids = body.orderedIds as string[]
+      items = items.map(i => (ids.includes(i.id) ? { ...i, order: ids.indexOf(i.id) } : i))
+      return planView(me.id)
+    }
+    if (what === 'items' && method === 'PATCH') {
+      const it = planItem(id)
+      const patch = body as ItemPatch
+      const view = planView(me.id).items.find(i => i.id === id)!
+      if (Object.keys(patch).some(k => k !== 'status')) shape(it.nodeId)
+      else if (!view.can.status && !view.can.claim) throw new Refused(403, 'Only who it is assigned to, who claimed it, or a Planner moves an item along.')
+      const status = patch.status as PlanStatus | undefined
+      const { assigneeId, ...rest } = patch
+      Object.assign(it, rest, 'assigneeId' in patch ? { assignee: assigneeId ? { kind: 'staff', id: assigneeId } : null } : {})
+      if (status) {
+        if ((status === 'claimed' || status === 'inProgress') && !it.claimedBy) it.claimedBy = me.id
+        if (status === 'todo') it.claimedBy = ''
+        it.doneAt = status === 'done' ? now() : null
+      }
+      return planView(me.id)
+    }
+    if (what === 'items' && method === 'DELETE') {
+      const it = planItem(id)
+      shape(it.nodeId)
+      const gone = new Set([it.id, ...below(it.id).map(i => i.id)])
+      items = items.filter(i => !gone.has(i.id))
+      return planView(me.id)
+    }
+    if (what === 'items' && sub === 'claim') {
+      const it = planItem(id)
+      if (body.release) { it.claimedBy = ''; if (it.status === 'claimed') it.status = 'todo'; return planView(me.id) }
+      if (!planView(me.id).items.find(i => i.id === id)!.can.claim) throw new Refused(403, 'This item is assigned to or claimed by someone else.')
+      it.claimedBy = me.id
+      if (it.status === 'todo') it.status = 'claimed'
+      return planView(me.id)
+    }
+    throw new Refused(404, 'Not found')
   }
 
   function bundle(meId: string): StaffBundle {
@@ -181,7 +284,7 @@ export function createMockFeedback() {
         tone: summary(members.map(m => m.tone).filter((t): t is Tone => !!t)),
         votes: votes.map(v => ({ mine: v.adminId === me.id, approve: v.approve, deny: v.deny, passed: v.passed, approveNote: v.approveNote, denyNote: v.denyNote, passNote: v.passNote, updatedAt: v.updatedAt })),
         tally: { approve: votes.filter(v => v.approve).length, deny: votes.filter(v => v.deny).length, pass: votes.filter(v => v.passed).length },
-        decision: st.decision, decisionNote: st.decisionNote, decidedAt: st.decidedAt, work: null, history: hist(st.history),
+        decision: st.decision, decisionNote: st.decisionNote, decidedAt: st.decidedAt, work: workOf(st.id), history: hist(st.history),
         can: { vote: has(me, 'voter', scope) && st.decision === null, correct: has(me, 'channelManager', scope), decide: has(me, 'planner', scope) },
       }
     })
@@ -280,6 +383,15 @@ export function createMockFeedback() {
   }
 
   return {
+    // /project-plan... (adminId from the X-Admin-Id header)
+    planRoute(method: string, parts: string[], body: unknown, adminId: string): { status: number; body: unknown } {
+      try {
+        return { status: 200, body: plan(method, parts, (body ?? {}) as Record<string, unknown>, adminId) }
+      } catch (err) {
+        if (err instanceof Refused) return { status: err.status, body: { detail: err.message } }
+        throw err
+      }
+    },
     // /feedback... (adminId from the X-Admin-Id header; the user's routes need none)
     route(method: string, parts: string[], body: unknown, query: URLSearchParams, adminId: string): { status: number; body: unknown } {
       const b = (body ?? {}) as Record<string, unknown>

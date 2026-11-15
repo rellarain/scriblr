@@ -15,6 +15,7 @@ from .api import (
     export,
     facets,
     feedback,
+    project_plan,
     library,
     channels,
     character_models,
@@ -178,6 +179,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(admin_config.router)
     app.include_router(user_settings.router)
     app.include_router(feedback.router)
+    app.include_router(project_plan.router)
     app.include_router(resources.router)
     app.include_router(channels.router)
     app.include_router(training.router)

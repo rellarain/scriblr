@@ -7,6 +7,7 @@ import { mockFetch } from '../../test/mockFetch'
 
 vi.mock('./admin/RoleAssignment', () => ({ default: () => <div>role assignment</div> }))
 vi.mock('./admin/office/StatementPages', () => ({ VotingPage: () => <div>voting page</div>, ChannelManagementPage: () => <div>channel management page</div> }))
+vi.mock('./admin/plan/PlanPages', () => ({ NodePlanPage: () => <div>plan page</div>, MyWorkPage: () => <div>my work page</div>, TimelinePage: () => <div>timeline page</div>, BoardPage: () => <div>board page</div> }))
 // Resources' own internals (its tree, backend calls) are covered by
 // useResources.test.ts and its own component tests -- mocked here so this
 // file only exercises AUI's own section/page tile layout.
@@ -56,7 +57,7 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(within(tile('organizer')).queryByText('channel management page')).toBeNull()
     expect(within(tile('organizer')).getByText('Manage bookclubs here.')).toBeTruthy()
     expect(within(tile('projectPlan')).getByRole('heading', { name: /Project Plan/ })).toBeTruthy()
-    expect(within(tile('projectPlan')).getByText(/its phases, milestones and tasks on a timeline/)).toBeTruthy()
+    for (const page of ['plan page', 'my work page', 'timeline page', 'board page']) expect(within(tile('projectPlan')).getByText(page)).toBeTruthy()
     const bar = screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' })
     // the Dashboard is a house (the Reader's home icon) and the Project Plan bars on a graph
     expect(within(bar).getByRole('button', { name: 'Dashboard' }).querySelector('path')?.getAttribute('d')).toBe('M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6')

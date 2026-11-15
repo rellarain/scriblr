@@ -14,6 +14,7 @@ import { __resetWorldNavForTests } from '../assets/Interfaces/writer/links/world
 import { __resetChannelsForTests } from '../channels/channelStore'
 import { __resetStaffForTests } from '../feedback/staffStore'
 import { __resetMineForTests } from '../feedback/mineStore'
+import { __resetPlanForTests } from '../plan/projectPlanStore'
 
 // What one test leaves behind must not reach the next: stubbed globals (fetch, ResizeObserver, ...), the browser storage the stores read,
 // and the settings store itself. (React Testing Library unmounts what a test rendered on its own.)
@@ -35,4 +36,5 @@ afterEach(() => {
   __resetChannelsForTests()
   __resetStaffForTests()
   __resetMineForTests()
+  __resetPlanForTests()
 })

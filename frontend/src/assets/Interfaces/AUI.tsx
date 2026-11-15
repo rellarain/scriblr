@@ -1,11 +1,12 @@
 import RoleAssignment from './admin/RoleAssignment'
 import { ChannelManagementPage, VotingPage } from './admin/office/StatementPages'
+import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from './admin/plan/PlanPages'
 import HelpTile from '../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../channels/helpTargets'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon, ListIcon, GridViewIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -40,7 +41,7 @@ type AuiSectionKey = 'dashboard' | 'projectPlan' | 'organizer' | 'office' | 'con
 
 type AuiSubSectionKey =
   | 'notifications' | 'dashboardSchedule' | 'dashboardHelp'
-  | 'projectTimeline' | 'projectPlanHelp'
+  | 'projectNodePlan' | 'projectMyWork' | 'projectTimeline' | 'projectBoard' | 'projectPlanHelp'
   | 'voting' | 'channelManagement' | 'bookclubManagement' | 'organizerHelp'
   | 'allotment' | 'assignment' | 'teamSchedule'
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department'
@@ -98,8 +99,14 @@ const SECTIONS: AuiSectionDef[] = [
   {
     key: 'projectPlan', label: 'Project Plan', Icon: GanttIcon,
     subSections: [
+      { key: 'projectNodePlan', label: 'Plan', Icon: TreeIcon,
+        body: 'The plan of each part of the app: its feedback statements to accept or veto, and its procedures, processes, tasks and routines.' },
+      { key: 'projectMyWork', label: 'My work', Icon: ListIcon,
+        body: 'What is assigned to you or claimed by you, what you could claim, and what you finished.' },
       { key: 'projectTimeline', label: 'Timeline', Icon: GanttIcon,
-        body: 'Plan the project here: its phases, milestones and tasks on a timeline.' },
+        body: 'The dated items as bars, by part of the app.' },
+      { key: 'projectBoard', label: 'Board', Icon: GridViewIcon,
+        body: 'The items by status; drag a card to move it along.' },
       { key: 'projectPlanHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Project Plan console here.' },
     ],
@@ -205,6 +212,10 @@ function AUI() {
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />
         : page.key === 'voting' ? <VotingPage />
+        : page.key === 'projectNodePlan' ? <NodePlanPage />
+        : page.key === 'projectMyWork' ? <MyWorkPage />
+        : page.key === 'projectTimeline' ? <TimelinePage />
+        : page.key === 'projectBoard' ? <BoardPage />
         : page.key === 'channelManagement' ? <ChannelManagementPage />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
         : page.key === 'configMaps' ? <Suspense fallback={null}><MapsConfigConsole /></Suspense>

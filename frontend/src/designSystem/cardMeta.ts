@@ -57,6 +57,10 @@ export const CARD_META: CardMeta[] = [
     summary: "The feedback pipeline up to the Project Plan: a console's Help tile (guides, Send feedback as a statement, My feedback with where each stands and the questions asked of you), the Helper's Inbox (check each message's subject, verb and tone), the Office's Voting and Channel Management (the statements, lumped by subject and verb, with votes and corrections) and the user's Notifications.",
   },
   {
+    id: 'project-plan', dir: 'ProjectPlan', title: 'Project Plan: plans per part of the app', group: 'Feedback', height: 720,
+    summary: "Admin > Project Plan: the channel list beside a part's feedback statements (accept or veto) and its procedures, processes, tasks and routines, with My work, a Timeline and a Board over the same plan.",
+  },
+  {
     id: 'character-models', dir: 'CharacterModels', title: 'Character models: the designer', group: 'Outline', height: 900,
     summary: 'The Designer console, where the shapes characters are drawn from are designed: the list of models, a tree of groups, objects and shapes, a canvas with draggable points and curve handles, an inspector, previews at random sizes and the checks, with draft and publish like the Plot presets; and the Configuration page that sets the limits for the models writers design for themselves.',
   },
