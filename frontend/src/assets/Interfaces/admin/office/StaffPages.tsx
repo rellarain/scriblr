@@ -1,0 +1,260 @@
+import { useState, type ReactNode } from 'react'
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, RestoreIcon, TrashIcon, CloseIcon } from '../../../icons'
+import ActingAs from '../../../../feedback/ActingAs'
+import '../../../../feedback/feedback.scss'
+import { staffApi } from '../../../../staff/staffApi'
+import type { Person, PersonKind, Priority, StaffView } from '../../../../staff/staffTypes'
+import { changeRoster, clearRosterError, loadRoster, useRoster } from '../../../../staff/rosterStore'
+import './staff.scss'
+
+// Admin > Office's staff pages (Department Roster, Department Details, Allotment, Hire/Term Admin) and Configuration > SLA, over one
+// staff view (staff/rosterStore.ts). Support tiers are worked out: a helper is tier 1, an admin who supports console queues tier 2,
+// an admin with helper time tier 3. Changes act as the staff member in the Acting as chip.
+
+const TIER_LABEL: Record<number, string> = { 1: 'Tier 1', 2: 'Tier 2', 3: 'Tier 3' }
+const KIND_LABEL: Record<PersonKind, string> = { helper: 'Helper', admin: 'Admin' }
+const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' }
+
+function Frame({ label, children }: { label: string; children: (view: StaffView) => ReactNode }) {
+  const { view, status, error } = useRoster()
+  if (!view) {
+    return (
+      <div className="stPage fbScope" aria-label={label}>
+        {status === 'error'
+          ? <p className="fbError" role="alert">{error} <button type="button" className="fbIconBtn" onClick={() => void loadRoster()}>Retry</button></p>
+          : <p className="fbMuted">Loading…</p>}
+      </div>
+    )
+  }
+  return (
+    <div className="stPage fbScope" aria-label={label}>
+      <div className="fbBar"><ActingAs /></div>
+      {error && <p className="fbError" role="alert">{error} <button type="button" className="fbIconBtn" aria-label="Dismiss" title="Dismiss" onClick={clearRosterError}>×</button></p>}
+      {children(view)}
+    </div>
+  )
+}
+
+const nameOf = (view: StaffView, id: string | null) => (id ? view.people.find(p => p.id === id)?.name ?? id : '')
+const placeOf = (view: StaffView, p: Person) => {
+  const team = view.teams.find(t => t.id === p.teamId)
+  const dep = view.departments.find(d => d.id === (team?.departmentId ?? p.departmentId))
+  return [dep?.name, team?.name].filter(Boolean).join(' · ')
+}
+
+// A text field saved when left (or on Enter); Escape puts it back.
+function NameField({ value, label, onSave }: { value: string; label: string; onSave: (name: string) => void }) {
+  const [text, setText] = useState(value)
+  const save = () => { if (text.trim() && text !== value) onSave(text); else setText(value) }
+  return (
+    <input
+      className="fbField" value={text} maxLength={80} aria-label={label}
+      onChange={e => setText(e.target.value)} onBlur={save}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setText(value) }}
+    />
+  )
+}
+
+// --- Department Roster -----------------------------------------------------------------------------------------------------
+
+export function RosterPage() {
+  return (
+    <Frame label="Department Roster">
+      {view => {
+        const groups = [...view.departments.map(d => ({ id: d.id, name: d.name })), { id: '', name: 'No department' }]
+        return (
+          <div className="fbList">
+            {groups.map(g => {
+              const people = view.people.filter(p => (p.departmentId ?? '') === g.id)
+              if (people.length === 0) return null
+              return (
+                <section key={g.id || 'none'} className="stGroup" aria-label={g.name}>
+                  <h3 className="fbLabel">{g.name}</h3>
+                  <table className="stTable">
+                    <thead><tr><th scope="col">Name</th><th scope="col">Tier</th><th scope="col">Team</th><th scope="col">Helper hours</th><th scope="col">Supports</th></tr></thead>
+                    <tbody>
+                      {people.map(p => (
+                        <tr key={p.id} className={p.active ? undefined : 'stInactive'}>
+                          <th scope="row">{p.name}{!p.active && <span className="fbMuted"> (left)</span>}</th>
+                          <td>{p.tier ? TIER_LABEL[p.tier] : KIND_LABEL[p.kind]}</td>
+                          <td>{view.teams.find(t => t.id === p.teamId)?.name ?? ''}</td>
+                          <td>{p.allotment ? `${p.allotment} h` : ''}</td>
+                          <td>{p.supports.length || ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              )
+            })}
+          </div>
+        )
+      }}
+    </Frame>
+  )
+}
+
+// --- Department Details ----------------------------------------------------------------------------------------------------
+
+function LeaderSelect({ view, value, label, onChange }: { view: StaffView; value: string | null; label: string; onChange: (id: string | null) => void }) {
+  return (
+    <select className="fbSelect" value={value ?? ''} aria-label={label} onChange={e => onChange(e.target.value || null)}>
+      <option value="">Nobody</option>
+      {view.people.filter(p => p.active && p.kind === 'admin').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+    </select>
+  )
+}
+
+export function DepartmentsPage() {
+  const [newDep, setNewDep] = useState('')
+  const [newTeam, setNewTeam] = useState<Record<string, string>>({})
+  return (
+    <Frame label="Department Details">
+      {view => (
+        <div className="fbList">
+          {view.departments.map(d => (
+            <section key={d.id} className="stGroup" aria-label={d.name}>
+              <div className="fbRow">
+                <NameField value={d.name} label={`Name of ${d.name}`} onSave={name => void changeRoster(a => staffApi.editDepartment(a, d.id, { name }))} />
+                <span className="fbLabel">Director</span>
+                <LeaderSelect view={view} value={d.directorId} label={`Director of ${d.name}`} onChange={id => void changeRoster(a => staffApi.editDepartment(a, d.id, { directorId: id }))} />
+                <button type="button" className="fbIconBtn" aria-label={`Delete ${d.name}`} title="Delete the department (once it is empty)" onClick={() => void changeRoster(a => staffApi.removeDepartment(a, d.id))}><TrashIcon size={14} /></button>
+              </div>
+              <ul className="stTeams">
+                {view.teams.filter(t => t.departmentId === d.id).map(t => (
+                  <li key={t.id} className="fbRow" aria-label={t.name}>
+                    <NameField value={t.name} label={`Name of ${t.name}`} onSave={name => void changeRoster(a => staffApi.editTeam(a, t.id, { name }))} />
+                    <span className="fbLabel">Manager</span>
+                    <LeaderSelect view={view} value={t.managerId} label={`Manager of ${t.name}`} onChange={id => void changeRoster(a => staffApi.editTeam(a, t.id, { managerId: id }))} />
+                    <span className="fbMuted">{view.people.filter(p => p.teamId === t.id && p.active).length} people</span>
+                    <button type="button" className="fbIconBtn" aria-label={`Delete ${t.name}`} title="Delete the team (once it is empty)" onClick={() => void changeRoster(a => staffApi.removeTeam(a, t.id))}><TrashIcon size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+              <form className="fbRow" onSubmit={e => { e.preventDefault(); const n = newTeam[d.id]?.trim(); if (n) void changeRoster(a => staffApi.addTeam(a, n, d.id)).then(ok => { if (ok) setNewTeam(x => ({ ...x, [d.id]: '' })) }) }}>
+                <input className="fbField" value={newTeam[d.id] ?? ''} maxLength={80} aria-label={`New team in ${d.name}`} placeholder="New team…" onChange={e => setNewTeam(x => ({ ...x, [d.id]: e.target.value }))} />
+                <button type="submit" className="fbIconBtn" aria-label={`Add a team to ${d.name}`} title="Add a team" disabled={!newTeam[d.id]?.trim()}><PlusIcon size={14} /></button>
+              </form>
+            </section>
+          ))}
+          <form className="fbRow" onSubmit={e => { e.preventDefault(); if (newDep.trim()) void changeRoster(a => staffApi.addDepartment(a, newDep)).then(ok => { if (ok) setNewDep('') }) }}>
+            <input className="fbField" value={newDep} maxLength={80} aria-label="New department" placeholder="New department…" onChange={e => setNewDep(e.target.value)} />
+            <button type="submit" className="fbIconBtn" aria-label="Add a department" title="Add a department" disabled={!newDep.trim()}><PlusIcon size={14} /></button>
+          </form>
+        </div>
+      )}
+    </Frame>
+  )
+}
+
+// --- Allotment -------------------------------------------------------------------------------------------------------------
+
+export function AllotmentPage() {
+  return (
+    <Frame label="Allotment">
+      {view => (
+        <table className="stTable">
+          <thead><tr><th scope="col">Name</th><th scope="col">Place</th><th scope="col">Helper hours a week</th></tr></thead>
+          <tbody>
+            {view.people.filter(p => p.active).map(p => (
+              <tr key={p.id}>
+                <th scope="row">{p.name} <span className="fbMuted">{p.tier ? TIER_LABEL[p.tier] : KIND_LABEL[p.kind]}</span></th>
+                <td>{placeOf(view, p)}</td>
+                <td>
+                  <div className="fbVerbs" role="group" aria-label={`Helper hours of ${p.name}`}>
+                    {[null, ...view.allotments].map(h => (
+                      <button key={h ?? 0} type="button" className="fbVerbChip" aria-pressed={p.allotment === h} onClick={() => void changeRoster(a => staffApi.editPerson(a, p.id, { allotment: h }))}>
+                        {h ? `${h} h` : 'None'}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Frame>
+  )
+}
+
+// --- Hire/Term Admin -------------------------------------------------------------------------------------------------------
+
+export function HirePage() {
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState<PersonKind>('admin')
+  const [team, setTeam] = useState('')
+  return (
+    <Frame label="Hire/Term Admin">
+      {view => (
+        <div className="fbList">
+          <form className="fbRow" aria-label="Hire" onSubmit={e => { e.preventDefault(); if (name.trim()) void changeRoster(a => staffApi.hire(a, { name, kind, teamId: team || null })).then(ok => { if (ok) setName('') }) }}>
+            <input className="fbField" value={name} maxLength={80} aria-label="Name" placeholder="Name…" onChange={e => setName(e.target.value)} />
+            <select className="fbSelect" value={kind} aria-label="Helper or admin" onChange={e => setKind(e.target.value as PersonKind)}>
+              <option value="admin">Admin</option>
+              <option value="helper">Helper</option>
+            </select>
+            <select className="fbSelect" value={team} aria-label="Team" onChange={e => setTeam(e.target.value)}>
+              <option value="">No team</option>
+              {view.departments.map(d => (
+                <optgroup key={d.id} label={d.name}>{view.teams.filter(t => t.departmentId === d.id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
+              ))}
+            </select>
+            <button type="submit" className="fbIconBtn fbIconBtn--primary" aria-label="Hire" title="Hire" disabled={!name.trim()}><PlusIcon size={14} /></button>
+          </form>
+          <table className="stTable">
+            <tbody>
+              {view.people.map(p => (
+                <tr key={p.id} className={p.active ? undefined : 'stInactive'}>
+                  <th scope="row">{p.name}{!p.active && <span className="fbMuted"> (left)</span>}</th>
+                  <td>{KIND_LABEL[p.kind]}</td>
+                  <td>{placeOf(view, p)}</td>
+                  <td>
+                    {p.active
+                      ? <button type="button" className="fbIconBtn" aria-label={`Term ${p.name}`} title="Term: marked as left, never deleted" onClick={() => void changeRoster(a => staffApi.editPerson(a, p.id, { active: false }))}><CloseIcon size={14} /></button>
+                      : <button type="button" className="fbIconBtn" aria-label={`Rehire ${p.name}`} title="Rehire" onClick={() => void changeRoster(a => staffApi.editPerson(a, p.id, { active: true }))}><RestoreIcon size={14} /></button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Frame>
+  )
+}
+
+// --- Configuration > SLA ---------------------------------------------------------------------------------------------------
+
+const hours = (h: number) => (h % 24 === 0 ? `${h / 24} ${h === 24 ? 'day' : 'days'}` : `${h} h`)
+// Steps: an hour at a time up to a day, then whole days.
+const step = (h: number, dir: -1 | 1, big: boolean) => {
+  const by = big ? 24 : h > 24 || (h === 24 && dir > 0) ? 24 : 1
+  return Math.min(24 * 90, Math.max(1, h + dir * by))
+}
+
+export function SlaPage() {
+  return (
+    <Frame label="SLA">
+      {view => (
+        <table className="stTable">
+          <thead><tr><th scope="col">Priority</th><th scope="col">Time to do it, from when it is assigned</th></tr></thead>
+          <tbody>
+            {(['urgent', 'high', 'normal', 'low'] as Priority[]).map(p => (
+              <tr key={p}>
+                <th scope="row">{PRIORITY_LABEL[p]}</th>
+                <td>
+                  <div className="stStep" role="group" aria-label={`SLA for ${PRIORITY_LABEL[p]}`}>
+                    <button type="button" className="fbIconBtn" aria-label={`Shorten the ${PRIORITY_LABEL[p]} SLA`} title="Shorter (Shift: by a day)" disabled={view.sla[p] <= 1} onClick={e => void changeRoster(a => staffApi.setSla(a, { [p]: step(view.sla[p], -1, e.shiftKey) }))}><ChevronLeftIcon size={12} /></button>
+                    <span className="stStepValue" aria-live="polite">{hours(view.sla[p])}</span>
+                    <button type="button" className="fbIconBtn" aria-label={`Lengthen the ${PRIORITY_LABEL[p]} SLA`} title="Longer (Shift: by a day)" disabled={view.sla[p] >= 24 * 90} onClick={e => void changeRoster(a => staffApi.setSla(a, { [p]: step(view.sla[p], 1, e.shiftKey) }))}><ChevronRightIcon size={12} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Frame>
+  )
+}

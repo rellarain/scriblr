@@ -7,27 +7,31 @@ How the pieces fit:
     not; procedures are in order within their node) or a routine (a task that comes back, with the writer's recurrence).
     A task can sit in a process or a procedure, a process in a procedure; procedures and routines are at the top of their
     node's plan. Children are always in the same node as their parent.
-  - Items are assigned to a staff member (teams and departments come with the staff roster) and claimed by whoever does
-    them; their status runs to do, claimed, in progress, done.
+  - Items are assigned to a staff member, a team or a department (staff.py) and claimed by whoever does them; their
+    status runs to do, claimed, in progress, done. Each is due within the SLA of its priority, counted from when it was
+    assigned. Past it, worked out when the plan is read (no background timer): a person's item goes up to their team's
+    manager (a manager's to their director); a team item nobody claimed goes to the manager, who must do it; a department
+    item no manager claimed waits for the director to hand it out.
   - Items can carry the feedback statements they answer. What the writers of those statements see follows (`work_of`):
     accepted is planned, a linked item started (or done, while others are not) is in progress, every linked item done
     is done.
   - Who may do what: the Planner of the node's console (feedback roles, `feedback.scope_of`) shapes its plan (adds,
     edits, moves, deletes and assigns items); the item's assignee, its claimer or a Planner move its status; anyone may
-    claim an item that is unassigned or assigned to them and not claimed by someone else.
+    claim an item that is unassigned or assigned to them (or to their team, or, for a manager, to their department) and
+    not claimed by someone else; an item that came up to someone is theirs to do.
 """
 
 import json
 import re
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from . import channels, feedback, project_store
+from . import channels, feedback, project_store, staff
 from .schema import Recurrence, utcnow
 
 Kind = Literal["task", "process", "procedure", "routine"]
@@ -73,7 +77,7 @@ def _day(v: Optional[str]) -> Optional[str]:
 
 
 class Assignee(BaseModel):
-    kind: Literal["staff"] = "staff"
+    kind: Literal["staff", "team", "department"] = "staff"
     id: str = Field(min_length=1, max_length=120)
 
 
@@ -91,6 +95,7 @@ class PlanItem(BaseModel):
     start: Optional[str] = None
     due: Optional[str] = None
     assignee: Optional[Assignee] = None
+    assignedAt: Optional[datetime] = None
     claimedBy: str = ""
     statementIds: list[str] = Field(default_factory=list, max_length=STATEMENTS_MAX)
     recurrence: Optional[Recurrence] = None
@@ -202,19 +207,76 @@ def work_for(root: Path) -> feedback.WorkOf:
     return lambda sid: work_of(file, sid)
 
 
-def _can(fb: feedback.FeedbackFile, admin: feedback.Admin, item: PlanItem) -> dict:
+def _manager_of(sf: staff.StaffFile, pid: str) -> Optional[str]:
+    """Who a person's late work goes up to: their team's manager, or their director when they manage the team."""
+    p = next((x for x in sf.people if x.id == pid), None)
+    if p is None:
+        return None
+    t = next((x for x in sf.teams if x.id == p.teamId), None)
+    if t and t.managerId and t.managerId != pid:
+        return t.managerId
+    dep_id = (t.departmentId if t else None) or p.departmentId
+    d = next((x for x in sf.departments if x.id == dep_id), None)
+    return d.directorId if d and d.directorId != pid else None
+
+
+def sla_of(item: PlanItem, sf: staff.StaffFile, now: datetime) -> Optional[dict]:
+    """When an assigned item is due under its priority's SLA and, past it, who it came up to: a person's item to their
+    manager; a team item nobody claimed to the manager; a department item no manager claimed to the director."""
+    if item.assignee is None or item.status == "done":
+        return None
+    since = item.assignedAt or item.createdAt
+    due = since + timedelta(hours=sf.sla.get(item.priority, staff.DEFAULT_SLA[item.priority]))
+    out = {"dueAt": due.isoformat(), "late": now > due, "level": None, "to": None}
+    if not out["late"]:
+        return out
+    owner = item.claimedBy or (item.assignee.id if item.assignee.kind == "staff" else "")
+    if owner:
+        out.update(level="manager", to=_manager_of(sf, owner))
+    elif item.assignee.kind == "team":
+        t = next((x for x in sf.teams if x.id == item.assignee.id), None)
+        out.update(level="manager", to=t.managerId if t else None)
+    else:
+        d = next((x for x in sf.departments if x.id == item.assignee.id), None)
+        out.update(level="director", to=d.directorId if d else None)
+    return out
+
+
+def _assigned_to_me(sf: staff.StaffFile, me: str, item: PlanItem) -> bool:
+    a = item.assignee
+    if a is None:
+        return False
+    if a.kind == "staff":
+        return a.id == me
+    p = next((x for x in sf.people if x.id == me), None)
+    if a.kind == "team":
+        t = next((x for x in sf.teams if x.id == a.id), None)
+        return bool(p and (p.teamId == a.id or (t and t.managerId == me)))
+    # A department's work is claimed by its managers (and its director).
+    d = next((x for x in sf.departments if x.id == a.id), None)
+    return bool(d and (d.directorId == me or any(t.managerId == me for t in sf.teams if t.departmentId == a.id)))
+
+
+def _can(fb: feedback.FeedbackFile, admin: feedback.Admin, item: PlanItem, sf: Optional[staff.StaffFile] = None, now: Optional[datetime] = None) -> dict:
+    sf = sf or staff.StaffFile()
     planner = feedback.has_role(admin, "planner", feedback.scope_of(item.nodeId))
-    mine = (item.assignee is not None and item.assignee.id == admin.id) or item.claimedBy == admin.id
-    claimable = (item.assignee is None or item.assignee.id == admin.id) and item.claimedBy in ("", admin.id) and item.status != "done"
+    sla = sla_of(item, sf, now or utcnow())
+    came_up = bool(sla and sla["to"] == admin.id)
+    mine = (item.assignee is not None and item.assignee.kind == "staff" and item.assignee.id == admin.id) or item.claimedBy == admin.id or came_up
+    claimable = (item.assignee is None or _assigned_to_me(sf, admin.id, item) or came_up) and item.claimedBy in ("", admin.id) and item.status != "done"
     return {"edit": planner, "status": planner or mine, "claim": claimable and item.claimedBy != admin.id}
 
 
-def view(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str) -> dict:
+def view(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, sf: Optional[staff.StaffFile] = None, now: Optional[datetime] = None) -> dict:
     admin = feedback.admin_by_id(fb, admin_id)
+    sf = sf or staff.StaffFile()
+    now = now or utcnow()
     items = []
     for i in sorted(file.items, key=lambda i: (i.nodeId, i.parentId or "", i.order)):
         d = i.model_dump(mode="json")
-        d["can"] = _can(fb, admin, i)
+        d["can"] = _can(fb, admin, i, sf, now)
+        d["sla"] = sla_of(i, sf, now)
+        d["mineToClaim"] = _assigned_to_me(sf, admin.id, i) and not i.claimedBy and i.status != "done"
         items.append(d)
     return {"me": admin.id, "items": items}
 
@@ -255,12 +317,23 @@ def _check_parent(file: PlanFile, kind: str, node_id: str, parent_id: Optional[s
         raise PlanError("An item cannot go inside itself.")
 
 
-def _check_assignee(fb: feedback.FeedbackFile, assignee_id: Optional[str]) -> Optional[Assignee]:
-    if not assignee_id:
+def _check_assignee(fb: feedback.FeedbackFile, assignee: Optional[dict], sf: Optional[staff.StaffFile] = None) -> Optional[Assignee]:
+    """A staff member (active), a team or a department; `assignee` is {kind, id} or a staff id."""
+    if not assignee:
         return None
-    if not any(a.id == assignee_id for a in fb.admins):
-        raise PlanError(f"No staff member {assignee_id}.")
-    return Assignee(id=assignee_id)
+    a = Assignee(**assignee) if isinstance(assignee, dict) else Assignee(id=str(assignee))
+    sf = sf or staff.StaffFile()
+    if a.kind == "staff":
+        person = next((p for p in sf.people if p.id == a.id), None)
+        if person is None and not any(x.id == a.id for x in fb.admins):
+            raise PlanError(f"No staff member {a.id}.")
+        if person is not None and not person.active:
+            raise PlanError(f"{person.name} has left.")
+    elif a.kind == "team" and not any(t.id == a.id for t in sf.teams):
+        raise PlanError(f"No team {a.id}.")
+    elif a.kind == "department" and not any(d.id == a.id for d in sf.departments):
+        raise PlanError(f"No department {a.id}.")
+    return a
 
 
 def _check_dates(start: Optional[str], due: Optional[str]) -> None:
@@ -302,6 +375,7 @@ def add_item(
     parent_id: Optional[str] = None, ordered: bool = True, notes: str = "", priority: str = "normal",
     start: Optional[str] = None, due: Optional[str] = None, assignee_id: Optional[str] = None,
     statement_ids: Optional[list[str]] = None, recurrence: Optional[Recurrence] = None,
+    assignee: Optional[dict] = None, sf: Optional[staff.StaffFile] = None,
 ) -> PlanItem:
     if node_id not in known:
         raise PlanError(f"No part of the app {node_id}.")
@@ -315,9 +389,11 @@ def add_item(
     item = PlanItem(
         id=f"pi-{uuid.uuid4().hex[:10]}", nodeId=node_id, kind=kind, title=_clean_title(title), notes=notes[:NOTES_MAX],  # type: ignore[arg-type]
         parentId=parent_id, ordered=ordered, order=len(siblings(file, node_id, parent_id)), priority=priority,  # type: ignore[arg-type]
-        start=start, due=due, assignee=_check_assignee(fb, assignee_id),
+        start=start, due=due, assignee=_check_assignee(fb, assignee or assignee_id, sf),
         statementIds=_check_statements(fb, statement_ids or []), recurrence=recurrence,
     )
+    if item.assignee:
+        item.assignedAt = utcnow()
     file.items.append(item)
     return item
 
@@ -325,7 +401,7 @@ def add_item(
 _UNSET = object()
 
 
-def edit_item(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id: str, changes: dict) -> None:
+def edit_item(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id: str, changes: dict, sf: Optional[staff.StaffFile] = None) -> None:
     """Changes to an item. A status change alone needs the assignee, the claimer or a Planner; anything else needs a
     Planner of its node."""
     item = _item(file, item_id)
@@ -334,7 +410,8 @@ def edit_item(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id:
     if shaping:
         _require_planner(fb, admin_id, item.nodeId, "Changing the plan")
     if "status" in changes:
-        if not _can(fb, admin, item)["status"] and not _can(fb, admin, item)["claim"]:
+        can = _can(fb, admin, item, sf)
+        if not can["status"] and not can["claim"]:
             raise Forbidden("Only who it is assigned to, who claimed it, or a Planner moves an item along.")
     if "title" in changes:
         item.title = _clean_title(changes["title"])
@@ -348,9 +425,12 @@ def edit_item(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id:
     due = changes.get("due", item.due)
     _check_dates(start, due)
     item.start, item.due = start, due
-    if "assigneeId" in changes:
-        item.assignee = _check_assignee(fb, changes["assigneeId"])
-        if item.assignee and item.claimedBy and item.claimedBy != item.assignee.id:
+    if "assigneeId" in changes or "assignee" in changes:
+        before = item.assignee
+        item.assignee = _check_assignee(fb, changes.get("assignee") or changes.get("assigneeId"), sf)
+        if item.assignee != before:
+            item.assignedAt = utcnow() if item.assignee else None
+        if item.assignee and item.claimedBy and not (item.assignee.kind == "staff" and item.claimedBy == item.assignee.id) and item.assignee.kind == "staff":
             item.claimedBy = ""
             if item.status == "claimed":
                 item.status = "todo"
@@ -394,7 +474,7 @@ def reorder(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, node_id: s
         i.order = at[i.id]
 
 
-def claim(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id: str, release: bool = False) -> None:
+def claim(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id: str, release: bool = False, sf: Optional[staff.StaffFile] = None) -> None:
     item = _item(file, item_id)
     admin = feedback.admin_by_id(fb, admin_id)
     if release:
@@ -404,7 +484,7 @@ def claim(file: PlanFile, fb: feedback.FeedbackFile, admin_id: str, item_id: str
         if item.status == "claimed":
             item.status = "todo"
         return
-    if not _can(fb, admin, item)["claim"]:
+    if not _can(fb, admin, item, sf)["claim"]:
         raise Forbidden("This item is assigned to or claimed by someone else.")
     item.claimedBy = admin.id
     if item.status == "todo":

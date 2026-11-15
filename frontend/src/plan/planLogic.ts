@@ -51,15 +51,27 @@ export function movedBefore(ids: string[], id: string, beforeId: string | null):
 const byUrgency = (a: PlanItem, b: PlanItem) =>
   PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || (a.due ?? '9999').localeCompare(b.due ?? '9999') || a.title.localeCompare(b.title)
 
-// My work: what is mine (assigned to me or claimed by me) and not done, most urgent first; then what I could claim (nobody's,
-// not done); then what I finished.
-export function myWork(items: PlanItem[], me: string): { mine: PlanItem[]; open: PlanItem[]; done: PlanItem[] } {
-  const isMine = (i: PlanItem) => i.assignee?.id === me || i.claimedBy === me
+// My work: what came up to me (someone's work past its SLA that I must do or hand out); what is mine (assigned to me or claimed
+// by me) and not done, most urgent first; what I could claim (nobody's, or my team's or department's, not done); what I finished.
+export function myWork(items: PlanItem[], me: string): { cameUp: PlanItem[]; mine: PlanItem[]; open: PlanItem[]; done: PlanItem[] } {
+  const isMine = (i: PlanItem) => (i.assignee?.kind === 'staff' && i.assignee.id === me) || i.claimedBy === me
+  const cameUp = (i: PlanItem) => !!i.sla?.late && i.sla.to === me && i.status !== 'done' && !isMine(i)
+  const work = (i: PlanItem) => i.kind !== 'procedure' && i.kind !== 'process'
   return {
+    cameUp: items.filter(cameUp).sort(byUrgency),
     mine: items.filter(i => isMine(i) && i.status !== 'done').sort(byUrgency),
-    open: items.filter(i => !isMine(i) && !i.assignee && !i.claimedBy && i.status !== 'done' && i.kind !== 'procedure' && i.kind !== 'process').sort(byUrgency),
+    open: items.filter(i => !isMine(i) && !cameUp(i) && i.status !== 'done' && work(i) && ((!i.assignee && !i.claimedBy) || i.mineToClaim)).sort(byUrgency),
     done: items.filter(i => isMine(i) && i.status === 'done').sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? '')),
   }
+}
+
+// How long assigned work has left under its SLA, in words ("3 h left", "2 days late"); null with no clock.
+export function slaLeft(item: PlanItem, now: number = Date.now()): string | null {
+  if (!item.sla) return null
+  const ms = Date.parse(item.sla.dueAt) - now
+  const h = Math.round(Math.abs(ms) / 3_600_000)
+  const span = h >= 48 ? `${Math.round(h / 24)} days` : `${h} h`
+  return ms >= 0 ? `${span} left` : `${span} late`
 }
 
 // The Board's columns.

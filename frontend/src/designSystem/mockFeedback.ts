@@ -1,4 +1,5 @@
 import type { ItemPatch, NewItem, PlanItem, PlanView, PlanStatus } from '../plan/planTypes'
+import type { Department, Person, StaffView, Team } from '../staff/staffTypes'
 import type {
   FeedbackAdmin, FeedbackStatus, KeywordFlag, MineView, MyMessage, Role, StaffBundle, StaffMessage, Statement, StatusStep, Tone,
   ToneCategory, ToneSummary, VerbCategory,
@@ -179,6 +180,74 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
     return { status: work === 'done' ? 'done' : work === 'inProgress' ? 'inProgress' : 'planned', steps, note: st.decisionNote }
   }
 
+  // --- the staff (backend storage/staff.py) ---------------------------------------------
+  const departments: Department[] = [{ id: 'dep-product', name: 'Product', directorId: 'adm-dana' }, { id: 'dep-support', name: 'Support', directorId: 'adm-sam' }]
+  const teams: Team[] = [
+    { id: 'team-writing', name: 'Writing tools', departmentId: 'dep-product', managerId: 'adm-dana' },
+    { id: 'team-reading', name: 'Reading', departmentId: 'dep-product', managerId: 'adm-lee' },
+    { id: 'team-help', name: 'Help desk', departmentId: 'dep-support', managerId: 'adm-sam' },
+  ]
+  type Stored = Omit<Person, 'tier'>
+  const people: Stored[] = [
+    { id: 'adm-dana', name: 'Dana Ruiz', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-writing', allotment: null, supports: [] },
+    { id: 'adm-lee', name: 'Lee Park', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-reading', allotment: null, supports: ['reader/library', 'reader/nook'] },
+    { id: 'adm-sam', name: 'Sam Ortiz', kind: 'admin', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [] },
+    { id: 'hlp-ari', name: 'Ari Chen', kind: 'helper', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 20, supports: [] },
+    { id: 'hlp-noor', name: 'Noor Haddad', kind: 'helper', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [] },
+  ]
+  for (const pp of people) if (!admins.some(a => a.id === pp.id)) admins.push({ id: pp.id, name: pp.name, roles: { [INBOX]: ['checker'] } })
+  let sla = { urgent: 4, high: 24, normal: 72, low: 168 }
+  const tierOf = (pp: Stored): Person['tier'] => (pp.kind === 'helper' ? 1 : pp.allotment ? 3 : pp.supports.length ? 2 : null)
+  function staffView(): StaffView {
+    const depAt = (id: string | null) => { const n = departments.findIndex(d => d.id === id); return n < 0 ? departments.length : n }
+    const list = people.map(pp => ({ ...pp, supports: [...pp.supports], tier: tierOf(pp) }))
+      .sort((a, b) => depAt(a.departmentId) - depAt(b.departmentId) || (a.tier ?? 9) - (b.tier ?? 9) || Number(!a.active) - Number(!b.active) || a.name.localeCompare(b.name))
+    return { people: list, departments: departments.map(d => ({ ...d })), teams: teams.map(t => ({ ...t })), sla: { ...sla }, allotments: [5, 10, 20, 30] }
+  }
+  function roster(method: string, parts: string[], body: Record<string, unknown>, meId: string): StaffView {
+    admin(meId)
+    const [what, id] = parts
+    if (method === 'GET' && parts.length === 0) return staffView()
+    if (what === 'people' && method === 'POST') {
+      const name = String(body.name ?? '').trim()
+      if (!name) throw new Refused(400, 'A staff member needs a name.')
+      const teamId = (body.teamId as string | null) ?? null
+      const pid = `${body.kind === 'helper' ? 'hlp' : 'adm'}-${next++}`
+      people.push({ id: pid, name, kind: body.kind === 'helper' ? 'helper' : 'admin', active: true, teamId, departmentId: teams.find(t => t.id === teamId)?.departmentId ?? null, allotment: null, supports: [] })
+      admins.push({ id: pid, name, roles: {} })
+      return staffView()
+    }
+    if (what === 'people' && method === 'PATCH') {
+      const pp = people.find(x => x.id === id)
+      if (!pp) throw new Refused(404, `No staff member ${id}`)
+      if ('allotment' in body && body.allotment !== null && ![5, 10, 20, 30].includes(Number(body.allotment))) throw new Refused(400, 'Helper hours are 5, 10, 20 or 30 a week.')
+      Object.assign(pp, body)
+      if (body.active === false) {
+        for (const d of departments) if (d.directorId === pp.id) d.directorId = null
+        for (const t of teams) if (t.managerId === pp.id) t.managerId = null
+      }
+      const fa = admins.find(a => a.id === pp.id)
+      if (fa) fa.name = pp.name
+      return staffView()
+    }
+    if (what === 'departments' && method === 'POST') { departments.push({ id: `dep-${next++}`, name: String(body.name ?? ''), directorId: null }); return staffView() }
+    if (what === 'departments' && method === 'PATCH') { Object.assign(departments.find(d => d.id === id) ?? {}, body); return staffView() }
+    if (what === 'departments' && method === 'DELETE') {
+      if (teams.some(t => t.departmentId === id) || people.some(x => x.departmentId === id)) throw new Refused(400, 'Move its teams and people out first.')
+      departments.splice(departments.findIndex(d => d.id === id), 1)
+      return staffView()
+    }
+    if (what === 'teams' && method === 'POST') { teams.push({ id: `team-${next++}`, name: String(body.name ?? ''), departmentId: String(body.departmentId ?? ''), managerId: null }); return staffView() }
+    if (what === 'teams' && method === 'PATCH') { Object.assign(teams.find(t => t.id === id) ?? {}, body); return staffView() }
+    if (what === 'teams' && method === 'DELETE') {
+      if (people.some(x => x.teamId === id)) throw new Refused(400, 'Move its people out first.')
+      teams.splice(teams.findIndex(t => t.id === id), 1)
+      return staffView()
+    }
+    if (what === 'sla' && method === 'PUT') { sla = { ...sla, ...(body as typeof sla) }; return staffView() }
+    throw new Refused(404, 'Not found')
+  }
+
   // --- the Project Plan ---------------------------------------------------------------
   let items: Omit<PlanItem, 'can'>[] = opts.planSeed ? seedPlan() : []
   const below = (id: string): Omit<PlanItem, 'can'>[] => items.filter(i => i.parentId === id).flatMap(i => [i, ...below(i.id)])
@@ -218,7 +287,7 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
       items = [...items, {
         id: `pi-${next++}`, nodeId: b.nodeId, kind: b.kind, title: b.title, notes: '', parentId: b.parentId ?? null, ordered: b.ordered ?? true,
         order: level(b.nodeId, b.parentId ?? null).length, status: 'todo', priority: b.priority ?? 'normal', start: b.start ?? null, due: b.due ?? null,
-        assignee: b.assigneeId ? { kind: 'staff', id: b.assigneeId } : null, claimedBy: '', statementIds: b.statementIds ?? [],
+        assignee: b.assignee ?? (b.assigneeId ? { kind: 'staff', id: b.assigneeId } : null), claimedBy: '', statementIds: b.statementIds ?? [],
         recurrence: b.recurrence ?? null, createdAt: now(), doneAt: null,
       }]
       return planView(me.id)
@@ -383,6 +452,15 @@ export function createMockFeedback(opts: { planSeed?: boolean } = {}) {
   }
 
   return {
+    // /staff... (adminId from the X-Admin-Id header)
+    rosterRoute(method: string, parts: string[], body: unknown, adminId: string): { status: number; body: unknown } {
+      try {
+        return { status: 200, body: roster(method, parts, (body ?? {}) as Record<string, unknown>, adminId) }
+      } catch (err) {
+        if (err instanceof Refused) return { status: err.status, body: { detail: err.message } }
+        throw err
+      }
+    },
     // /project-plan... (adminId from the X-Admin-Id header)
     planRoute(method: string, parts: string[], body: unknown, adminId: string): { status: number; body: unknown } {
       try {

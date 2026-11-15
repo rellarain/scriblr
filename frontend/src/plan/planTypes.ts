@@ -6,6 +6,9 @@ import type { Recurrence } from '../lib/facets'
 export type PlanKind = 'task' | 'process' | 'procedure' | 'routine'
 export type PlanStatus = 'todo' | 'claimed' | 'inProgress' | 'done'
 export type PlanPriority = 'urgent' | 'high' | 'normal' | 'low'
+export interface Assignee { kind: 'staff' | 'team' | 'department'; id: string }
+// When assigned work is due under its priority's SLA and, past it, who it came up to (a manager, or a director to hand it out).
+export interface PlanSla { dueAt: string; late: boolean; level: 'manager' | 'director' | null; to: string | null }
 
 export interface PlanItem {
   id: string
@@ -21,7 +24,8 @@ export interface PlanItem {
   priority: PlanPriority
   start: string | null
   due: string | null
-  assignee: { kind: 'staff'; id: string } | null
+  assignee: Assignee | null
+  assignedAt?: string | null
   claimedBy: string
   statementIds: string[]
   recurrence: Recurrence | null
@@ -29,6 +33,9 @@ export interface PlanItem {
   doneAt: string | null
   // What the staff member acting may do with it.
   can: { edit: boolean; status: boolean; claim: boolean }
+  sla?: PlanSla | null
+  // Assigned to the acting staff member's team (or, for a manager, department) and not claimed yet.
+  mineToClaim?: boolean
 }
 
 export interface PlanView { me: string; items: PlanItem[] }
@@ -43,6 +50,7 @@ export interface NewItem {
   start?: string | null
   due?: string | null
   assigneeId?: string | null
+  assignee?: Assignee | null
   statementIds?: string[]
   recurrence?: Recurrence | null
 }
@@ -57,6 +65,7 @@ export type ItemPatch = Partial<{
   start: string | null
   due: string | null
   assigneeId: string | null
+  assignee: Assignee | null
   statementIds: string[]
   recurrence: Recurrence | null
 }>

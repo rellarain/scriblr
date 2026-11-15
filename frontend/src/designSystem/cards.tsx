@@ -25,6 +25,7 @@ import ChannelsConsole from '../assets/Interfaces/admin/channels/ChannelsConsole
 import { ChannelManagementPage, VotingPage } from '../assets/Interfaces/admin/office/StatementPages'
 import InboxSection from '../assets/Interfaces/helper/inbox/InboxSection'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from '../assets/Interfaces/admin/plan/PlanPages'
+import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage } from '../assets/Interfaces/admin/office/StaffPages'
 import UserNotifications from '../assets/Interfaces/user/UserNotifications'
 import HelpTile from '../components/help/HelpTile'
 import { HELP_TARGETS } from '../channels/helpTargets'
@@ -321,6 +322,17 @@ function ProjectPlanCard({ view }: { view: string }) {
   )
 }
 
+// The staff pages on the shared pretend store (mockFeedback.ts).
+const STAFF_VIEWS = [{ id: 'roster', label: 'Roster' }, { id: 'details', label: 'Departments' }, { id: 'allotment', label: 'Allotment' }, { id: 'hire', label: 'Hire/Term' }, { id: 'sla', label: 'SLA' }]
+function StaffCard({ view }: { view: string }) {
+  const page = view === 'details' ? <DepartmentsPage /> : view === 'allotment' ? <AllotmentPage /> : view === 'hire' ? <HirePage /> : view === 'sla' ? <SlaPage /> : <RosterPage />
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'hidden', boxSizing: 'border-box', padding: 14, display: 'flex', flexDirection: 'column' }}>{page}</div>
+    </div>
+  )
+}
+
 function MapBiomesCard() {
   return (
     <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
@@ -473,6 +485,7 @@ export const CARDS: CardDef[] = [
   card('items', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ItemsCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),
   card('channels', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ChannelsCard /> }),
+  card('staff', { frame: 'plain', views: STAFF_VIEWS, defaults: { view: 'roster', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <StaffCard key={view} view={view} /> }),
   card('project-plan', { frame: 'plain', views: PLAN_VIEWS, defaults: { view: 'plan', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <ProjectPlanCard key={view} view={view} /> }),
   card('feedback', { frame: 'plain', views: FEEDBACK_VIEWS, defaults: { view: 'help', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <FeedbackCard key={view} view={view} /> }),
   card('map-biomes', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapBiomesCard /> }),

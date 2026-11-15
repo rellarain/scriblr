@@ -17,9 +17,11 @@ import { beginPointerDrag, zoneRef } from '../../../../lib/pointerDrag'
 import { planApi } from '../../../../plan/planApi'
 import {
   HOLDS, KIND_LABEL, PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, TOP_KINDS, boardColumns, childrenOf, movedBefore, myWork, nextStatus,
-  openCounts, progressOf, timeline,
+  openCounts, progressOf, slaLeft, timeline,
 } from '../../../../plan/planLogic'
-import type { ItemPatch, PlanItem, PlanKind, PlanStatus, PlanView } from '../../../../plan/planTypes'
+import type { Assignee, ItemPatch, PlanItem, PlanKind, PlanStatus, PlanView } from '../../../../plan/planTypes'
+import { useRoster } from '../../../../staff/rosterStore'
+import type { StaffView } from '../../../../staff/staffTypes'
 import { changePlan, clearPlanError, loadPlan, usePlan } from '../../../../plan/projectPlanStore'
 import { ReorderList } from '../characters/ReorderList'
 import './plan.scss'
@@ -67,6 +69,34 @@ function Frame({ label, bar, children }: { label: string; bar?: ReactNode; child
 }
 
 const nameOf = (bundle: StaffBundle | null, id: string | undefined | null) => (id ? bundle?.admins.find(a => a.id === id)?.name ?? id : '')
+// Who an item is assigned to, in words: a person, a team or a department.
+function assigneeName(bundle: StaffBundle | null, roster: StaffView | null, a: Assignee | null): string {
+  if (!a) return ''
+  if (a.kind === 'team') return roster?.teams.find(t => t.id === a.id)?.name ?? a.id
+  if (a.kind === 'department') return roster?.departments.find(d => d.id === a.id)?.name ?? a.id
+  return roster?.people.find(p => p.id === a.id)?.name ?? nameOf(bundle, a.id)
+}
+
+// The assignee select: the people still here, then the teams, then the departments (value "kind:id").
+function AssigneeSelect({ item, bundle, disabled }: { item: PlanItem; bundle: StaffBundle | null; disabled: boolean }) {
+  const roster = useRoster().view
+  const people = roster ? roster.people.filter(p => p.active).map(p => ({ id: p.id, name: p.name })) : (bundle?.admins ?? [])
+  const value = item.assignee ? `${item.assignee.kind}:${item.assignee.id}` : ''
+  return (
+    <select
+      className="fbSelect" value={value} disabled={disabled} aria-label={`Assigned to, ${item.title}`}
+      onChange={e => {
+        const [kind, ...rest] = e.target.value.split(':')
+        void edit(item.id, { assignee: e.target.value ? { kind: kind as Assignee['kind'], id: rest.join(':') } : null })
+      }}
+    >
+      <option value="">Nobody</option>
+      <optgroup label="People">{people.map(p => <option key={p.id} value={`staff:${p.id}`}>{p.name}</option>)}</optgroup>
+      {roster && roster.teams.length > 0 && <optgroup label="Teams">{roster.teams.map(t => <option key={t.id} value={`team:${t.id}`}>{t.name}</option>)}</optgroup>}
+      {roster && roster.departments.length > 0 && <optgroup label="Departments">{roster.departments.map(d => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}</optgroup>}
+    </select>
+  )
+}
 
 // --- one item, in the node's plan --------------------------------------------------------------------------------------
 
@@ -111,10 +141,7 @@ function ItemRow({ item, items, bundle, grip }: { item: PlanItem; items: PlanIte
         <select className="fbSelect" value={item.priority} disabled={!can.edit} aria-label={`Priority of ${item.title}`} onChange={e => void edit(item.id, { priority: e.target.value as PlanItem['priority'] })}>
           {PRIORITIES.map(p => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
         </select>
-        <select className="fbSelect" value={item.assignee?.id ?? ''} disabled={!can.edit} aria-label={`Assigned to, ${item.title}`} onChange={e => void edit(item.id, { assigneeId: e.target.value || null })}>
-          <option value="">Nobody</option>
-          {(bundle?.admins ?? []).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        <AssigneeSelect item={item} bundle={bundle} disabled={!can.edit} />
         <input type="date" className="fbSelect" value={item.start ?? ''} disabled={!can.edit} aria-label={`Start of ${item.title}`} onChange={e => void edit(item.id, { start: e.target.value || null })} />
         <input type="date" className="fbSelect" value={item.due ?? ''} disabled={!can.edit} aria-label={`Due date of ${item.title}`} onChange={e => void edit(item.id, { due: e.target.value || null })} />
         {holds.length > 0 && (
@@ -123,6 +150,7 @@ function ItemRow({ item, items, bundle, grip }: { item: PlanItem; items: PlanIte
           </button>
         )}
         {item.claimedBy && <span className="fbMuted">Claimed by {nameOf(bundle, item.claimedBy)}</span>}
+        <SlaNote item={item} bundle={bundle} />
         {can.claim && (
           <button type="button" className="fbIconBtn" aria-label={`Claim ${item.title}`} title="Claim it" onClick={() => void changePlan(a => planApi.claim(a, item.id))}>
             <HandIcon size={14} />
@@ -291,10 +319,22 @@ export function NodePlanPage() {
   )
 }
 
+// How long assigned work has left under its SLA, and who it came up to once late.
+function SlaNote({ item, bundle }: { item: PlanItem; bundle: StaffBundle | null }) {
+  const left = slaLeft(item)
+  if (!left || !item.sla) return null
+  return (
+    <span className={`plSla${item.sla.late ? ' plSla--late' : ''}`} title={`Due by ${new Date(item.sla.dueAt).toLocaleString()}`}>
+      {left}{item.sla.late && item.sla.to ? `, up to ${nameOf(bundle, item.sla.to)}` : ''}
+    </span>
+  )
+}
+
 // --- a compact card (My work, the Board) ---------------------------------------------------------------------------------
 
 function ItemCard({ item, bundle, children }: { item: PlanItem; bundle: StaffBundle | null; children?: ReactNode }) {
   const { index } = useChannels()
+  const roster = useRoster().view
   return (
     <article className={`plCard plCard--${item.priority}`} aria-label={item.title} data-plan-card={item.id}>
       <div className="plCardTitle">{item.title}</div>
@@ -302,7 +342,8 @@ function ItemCard({ item, bundle, children }: { item: PlanItem; bundle: StaffBun
         <span>{KIND_LABEL[item.kind]} · {labelOf(index, item.nodeId)}</span>
         <span className="plPriority">{PRIORITY_LABEL[item.priority]}</span>
         {item.due && <span title="Due">{item.due}</span>}
-        {(item.assignee || item.claimedBy) && <span>{nameOf(bundle, item.claimedBy || item.assignee?.id)}</span>}
+        {(item.assignee || item.claimedBy) && <span>{item.claimedBy ? nameOf(bundle, item.claimedBy) : assigneeName(bundle, roster, item.assignee)}</span>}
+        <SlaNote item={item} bundle={bundle} />
       </div>
       {children}
     </article>
@@ -335,6 +376,7 @@ export function MyWorkPage() {
         )
         return (
           <div className="plColumns">
+            {w.cameUp.length > 0 && list('Came up to me', w.cameUp, '')}
             {list('Mine', w.mine, 'Nothing assigned to you.')}
             {list('To claim', w.open, 'Nothing waiting.')}
             {list('Done', w.done, 'Nothing finished yet.')}

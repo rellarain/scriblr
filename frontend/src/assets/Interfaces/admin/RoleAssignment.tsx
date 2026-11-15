@@ -4,12 +4,15 @@ import { childrenOf, labelOf } from '../../../channels/channelTree'
 import { staffFeedbackApi } from '../../../feedback/feedbackApi'
 import { changeStaff, clearStaffError, useStaff } from '../../../feedback/staffStore'
 import type { Role } from '../../../feedback/feedbackTypes'
+import { staffApi } from '../../../staff/staffApi'
+import { changeRoster, useRoster } from '../../../staff/rosterStore'
 
 // Admin > Office > Assignment: which roles each admin holds on each console of the channel list (or on an interface, for
 // statements about the interface itself). A Checker checks feedback in the Inbox (on Helper > Inbox), a Voter votes on the
 // console's statements, a Channel manager corrects them (and, on Helper > Inbox, keeps the verbs), a Planner accepts or vetoes
 // them. The changes are made as the staff member acting (there is no login yet) and kept in a role history; nobody can remove
-// their own Channel manager role on Helper > Inbox.
+// their own Channel manager role on Helper > Inbox. On a console, Supports puts the person on its support queue (channel support: tier 2 for
+// an admin).
 
 const ROLES: Array<{ key: Role; label: string; hint: string }> = [
   { key: 'checker', label: 'Checker', hint: 'Checks feedback in the Inbox (on Helper > Inbox)' },
@@ -24,6 +27,8 @@ export default function RoleAssignment() {
   const [console, setConsole] = useState('helper/inbox')
   const pretty = (scope: string) => labelOf(index, scope)
   const scopes = childrenOf(index, null).flatMap(i => [i, ...childrenOf(index, i.id)])
+  const roster = useRoster().view
+  const isConsole = index.byId.get(console)?.kind === 'console'
 
   if (!bundle) return <p className="feedbackCardMeta">{status === 'error' ? error : 'Loading…'}</p>
 
@@ -51,6 +56,7 @@ export default function RoleAssignment() {
           <tr>
             <th scope="col">Admin</th>
             {ROLES.map(r => <th key={r.key} scope="col" title={r.hint}>{r.label}</th>)}
+            {isConsole && roster && <th scope="col" title="On this console's support queue">Supports</th>}
           </tr>
         </thead>
         <tbody>
@@ -67,6 +73,19 @@ export default function RoleAssignment() {
                     />
                   </td>
                 ))}
+                {isConsole && roster && (() => {
+                  const person = roster.people.find(p => p.id === admin.id)
+                  if (!person) return <td />
+                  const on = person.supports.includes(console)
+                  return (
+                    <td>
+                      <input
+                        type="checkbox" checked={on} disabled={!person.active} aria-label={`${admin.name}: supports ${pretty(console)}`}
+                        onChange={() => void changeRoster(a => staffApi.editPerson(a, person.id, { supports: on ? person.supports.filter(x => x !== console) : [...person.supports, console] }))}
+                      />
+                    </td>
+                  )
+                })()}
               </tr>
             )
           })}

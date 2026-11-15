@@ -61,6 +61,10 @@ export const CARD_META: CardMeta[] = [
     summary: "Admin > Project Plan: the channel list beside a part's feedback statements (accept or veto) and its procedures, processes, tasks and routines, with My work, a Timeline and a Board over the same plan.",
   },
   {
+    id: 'staff', dir: 'Staff', title: 'Staff: roster, organisation and SLA', group: 'Feedback', height: 640,
+    summary: 'Admin > Office and Configuration > SLA: one roster by department and support tier, departments and teams with their directors and managers, helper hours, hiring and terming, and the time plan work has per priority before it goes up.',
+  },
+  {
     id: 'character-models', dir: 'CharacterModels', title: 'Character models: the designer', group: 'Outline', height: 900,
     summary: 'The Designer console, where the shapes characters are drawn from are designed: the list of models, a tree of groups, objects and shapes, a canvas with draggable points and curve handles, an inspector, previews at random sizes and the checks, with draft and publish like the Plot presets; and the Configuration page that sets the limits for the models writers design for themselves.',
   },

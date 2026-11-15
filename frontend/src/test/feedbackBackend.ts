@@ -21,6 +21,7 @@ export function feedbackBackend() {
     const answer = parts[0] === 'feedback'
       ? feedback.route(method, parts.slice(1), body, new URLSearchParams(search), headers.get('X-Admin-Id') ?? '')
       : parts[0] === 'project-plan' ? feedback.planRoute(method, parts.slice(1), body, headers.get('X-Admin-Id') ?? '')
+      : parts[0] === 'staff' ? feedback.rosterRoute(method, parts.slice(1), body, headers.get('X-Admin-Id') ?? '')
       : parts[0] === 'channels' ? channels.channels()
       : parts[0] === 'resources' ? channels.resources(method, parts.slice(1), body)
       : { status: 404, body: { detail: `unexpected ${method} ${path}` } }

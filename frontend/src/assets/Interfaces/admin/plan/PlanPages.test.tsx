@@ -47,6 +47,18 @@ describe('Project Plan > Plan', () => {
     expect(items().map(i => [i.kind, i.parentId === null])).toEqual(expect.arrayContaining([['procedure', true], ['task', false]]))
   })
 
+  it('assigns an item to a person, a team or a department', async () => {
+    render(<NodePlanPage />)
+    await pick('Draft')
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a task' }))
+    const task = await screen.findByRole('group', { name: 'Task: New task' })
+    const select = within(task).getByLabelText('Assigned to, New task')
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'Help desk' })).toBeInTheDocument())
+    expect(within(select).getByRole('option', { name: 'Support' })).toBeInTheDocument()
+    fireEvent.change(select, { target: { value: 'team:team-help' } })
+    await waitFor(() => expect(items()[0].assignee).toEqual({ kind: 'team', id: 'team-help' }))
+  })
+
   it('leaves the plan read-only where the staff member acting is not a Planner', async () => {
     __resetStaffForTests('adm-lee')
     render(<NodePlanPage />)

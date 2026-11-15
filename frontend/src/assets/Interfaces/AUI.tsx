@@ -1,12 +1,13 @@
 import RoleAssignment from './admin/RoleAssignment'
 import { ChannelManagementPage, VotingPage } from './admin/office/StatementPages'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from './admin/plan/PlanPages'
+import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage } from './admin/office/StaffPages'
 import HelpTile from '../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../channels/helpTargets'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon, ListIcon, GridViewIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon, ListIcon, GridViewIcon, ClockIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -46,7 +47,7 @@ type AuiSubSectionKey =
   | 'allotment' | 'assignment' | 'teamSchedule'
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
-  | 'configOverview' | 'configPlot' | 'configMaps' | 'configChannels' | 'configWriterDesigner' | 'configHelp'
+  | 'configOverview' | 'configPlot' | 'configMaps' | 'configChannels' | 'configSla' | 'configWriterDesigner' | 'configHelp'
   | 'designerWork' | 'designerHelp'
 
 interface AuiSubSection {
@@ -165,6 +166,8 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Set the biomes every project draws its maps with: their colours, names, groups and the map levels they are offered on.' },
       { key: 'configChannels', label: 'Channels', Icon: TreeIcon,
         body: 'The interfaces, consoles, components and features that feedback, plans, chats and guides point at.' },
+      { key: 'configSla', label: 'SLA', Icon: ClockIcon,
+        body: 'The time plan work has per priority before it goes up to a manager or director.' },
       // the writers' own designer is off the screen for now (designerFeatures.ts)
       ...(WRITER_DESIGNER ? [{ key: 'configWriterDesigner' as const, label: "Writers' designer", Icon: MannequinIcon,
         body: "Set how big the models a writer designs for themselves may be: points in a shape, shapes in an object, objects in a group, the totals in a model, the size of a character's copy and the models in a writer's library." }] : []),
@@ -220,6 +223,11 @@ function AUI() {
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
         : page.key === 'configMaps' ? <Suspense fallback={null}><MapsConfigConsole /></Suspense>
         : page.key === 'configChannels' ? <Suspense fallback={null}><ChannelsConsole /></Suspense>
+        : page.key === 'configSla' ? <SlaPage />
+        : page.key === 'departmentRoster' ? <RosterPage />
+        : page.key === 'departmentDetails' ? <DepartmentsPage />
+        : page.key === 'allotment' ? <AllotmentPage />
+        : page.key === 'hireTermAdmin' ? <HirePage />
         : page.key === 'configWriterDesigner' ? <Suspense fallback={null}><WriterLimitsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),

@@ -4,6 +4,7 @@ import { setChannels } from '../../../channels/channelStore'
 import { createMockChannels } from '../../../designSystem/mockChannels'
 import { __resetStaffForTests, loadStaff } from '../../../feedback/staffStore'
 import { staffBundle } from '../../../feedback/testData'
+import { feedbackBackend } from '../../../test/feedbackBackend'
 import type { ResourceNode } from '../../../api/types'
 import RoleAssignment from './RoleAssignment'
 
@@ -40,6 +41,22 @@ describe('Admin > Office > Assignment', () => {
     expect(url).toBe('/api/feedback/admins/adm-lee/roles')
     expect(init).toMatchObject({ method: 'PUT', headers: expect.objectContaining({ 'X-Admin-Id': 'adm-dana' }) })
     expect(JSON.parse(String(init?.body))).toEqual({ scope: 'helper/inbox', roles: ['checker', 'voter'] })
+  })
+
+  it("puts a person on a console's support queue (channel support)", async () => {
+    const backend = feedbackBackend()
+    __resetStaffForTests('adm-dana')
+    await loadStaff()
+    render(<RoleAssignment />)
+    fireEvent.change(screen.getByLabelText('Console'), { target: { value: 'writer/draft' } })
+    const box = await screen.findByRole('checkbox', { name: 'Dana Ruiz: supports Writer > Draft' })
+    expect(box).not.toBeChecked()
+    fireEvent.click(box)
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Dana Ruiz: supports Writer > Draft' })).toBeChecked())
+    expect(backend.calls).toContain('PATCH /staff/people/adm-dana')
+    // An interface has no queue of its own.
+    fireEvent.change(screen.getByLabelText('Console'), { target: { value: 'writer' } })
+    expect(screen.queryByRole('checkbox', { name: /supports/ })).toBeNull()
   })
 
   it('switches console and shows the reason when the server refuses a change', async () => {

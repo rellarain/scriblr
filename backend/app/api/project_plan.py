@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -8,6 +8,7 @@ from ..deps import get_app_data_storage_root
 from ..storage import feedback as fb_store
 from ..storage import project_plan as store
 from ..storage import resources
+from ..storage import staff as staff_store
 from ..storage.schema import Recurrence
 from . import feedback as feedback_api
 
@@ -27,17 +28,23 @@ def _guard(fn: Callable[[], Any]) -> Any:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
 
-def _run(root: Path, admin_id: str, fn: Callable[[store.PlanFile, fb_store.FeedbackFile], None]) -> dict:
+def _run(root: Path, admin_id: str, fn: Callable[[store.PlanFile, fb_store.FeedbackFile, staff_store.StaffFile], None]) -> dict:
     def go() -> dict:
+        sf = staff_store.load(root)
         fb = fb_store.load(root)
         fb_store.admin_by_id(fb, admin_id)
-        plan = store.mutate(root, lambda f: fn(f, fb))
-        return store.view(plan, fb, admin_id)
+        plan = store.mutate(root, lambda f: fn(f, fb, sf))
+        return store.view(plan, fb, admin_id, sf)
     return _guard(go)
 
 
 def _known(root: Path) -> set[str]:
     return {n.id for n in resources.load_resources(root).nodes}
+
+
+class AssigneeBody(BaseModel):
+    kind: Literal["staff", "team", "department"] = "staff"
+    id: str = Field(min_length=1, max_length=120)
 
 
 class ItemBody(BaseModel):
@@ -51,6 +58,7 @@ class ItemBody(BaseModel):
     start: Optional[str] = None
     due: Optional[str] = None
     assigneeId: Optional[str] = None
+    assignee: Optional[AssigneeBody] = None
     statementIds: list[str] = Field(default_factory=list, max_length=store.STATEMENTS_MAX)
     recurrence: Optional[Recurrence] = None
 
@@ -65,6 +73,7 @@ class ItemPatch(BaseModel):
     start: Optional[str] = None
     due: Optional[str] = None
     assigneeId: Optional[str] = None
+    assignee: Optional[AssigneeBody] = None
     statementIds: Optional[list[str]] = Field(default=None, max_length=store.STATEMENTS_MAX)
     recurrence: Optional[Recurrence] = None
 
@@ -81,16 +90,17 @@ class ClaimBody(BaseModel):
 
 @router.get("")
 def get_plan(admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
-    return _guard(lambda: store.view(store.load(root), fb_store.load(root), admin_id))
+    return _guard(lambda: store.view(store.load(root), fb_store.load(root), admin_id, staff_store.load(root)))
 
 
 @router.post("/items")
 def post_item(body: ItemBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
     known = _known(root)
-    return _run(root, admin_id, lambda f, fb: store.add_item(
+    return _run(root, admin_id, lambda f, fb, sf: store.add_item(
         f, fb, admin_id, known, node_id=body.nodeId, kind=body.kind, title=body.title, parent_id=body.parentId,
         ordered=body.ordered, notes=body.notes, priority=body.priority, start=body.start, due=body.due,
-        assignee_id=body.assigneeId, statement_ids=body.statementIds, recurrence=body.recurrence))
+        assignee_id=body.assigneeId, statement_ids=body.statementIds, recurrence=body.recurrence,
+        assignee=body.assignee.model_dump() if body.assignee else None, sf=sf))
 
 
 @router.patch("/items/{item_id}")
@@ -105,19 +115,21 @@ def patch_item(item_id: str, body: ItemPatch, admin_id: str = Depends(feedback_a
                 changes[key] = store._day(changes[key])
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail=f"{key}: {exc}") from exc
-    return _run(root, admin_id, lambda f, fb: store.edit_item(f, fb, admin_id, item_id, changes))
+    if "assignee" in changes and body.assignee is not None:
+        changes["assignee"] = body.assignee.model_dump()
+    return _run(root, admin_id, lambda f, fb, sf: store.edit_item(f, fb, admin_id, item_id, changes, sf))
 
 
 @router.delete("/items/{item_id}")
 def delete_item(item_id: str, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
-    return _run(root, admin_id, lambda f, fb: store.delete_item(f, fb, admin_id, item_id))
+    return _run(root, admin_id, lambda f, fb, sf: store.delete_item(f, fb, admin_id, item_id))
 
 
 @router.put("/items/reorder")
 def put_reorder(body: ReorderBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
-    return _run(root, admin_id, lambda f, fb: store.reorder(f, fb, admin_id, body.nodeId, body.parentId, body.orderedIds))
+    return _run(root, admin_id, lambda f, fb, sf: store.reorder(f, fb, admin_id, body.nodeId, body.parentId, body.orderedIds))
 
 
 @router.post("/items/{item_id}/claim")
 def post_claim(item_id: str, body: ClaimBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
-    return _run(root, admin_id, lambda f, fb: store.claim(f, fb, admin_id, item_id, body.release))
+    return _run(root, admin_id, lambda f, fb, sf: store.claim(f, fb, admin_id, item_id, body.release, sf))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardColumns, childrenOf, movedBefore, myWork, nextStatus, openCounts, progressOf, timeline } from './planLogic'
+import { boardColumns, childrenOf, movedBefore, myWork, nextStatus, openCounts, progressOf, slaLeft, timeline } from './planLogic'
 import type { PlanItem } from './planTypes'
 
 const item = (id: string, over: Partial<PlanItem> = {}): PlanItem => ({
@@ -35,6 +35,20 @@ describe('planLogic', () => {
     expect(w.mine.map(i => i.id)).toEqual(['urgent', 'soon', 'later', 'low'])
     expect(w.open.map(i => i.id)).toEqual(['free'])
     expect(w.done.map(i => i.id)).toEqual(['finished'])
+    // A team's item for me to claim, and someone's late work that came up to me.
+    const more = myWork([
+      item('team', { assignee: { kind: 'team', id: 't' }, mineToClaim: true }),
+      item('up', { assignee: { kind: 'staff', id: 'them' }, sla: { dueAt: '2026-11-01T00:00:00Z', late: true, level: 'manager', to: 'me' } }),
+    ], 'me')
+    expect(more.open.map(i => i.id)).toEqual(['team'])
+    expect(more.cameUp.map(i => i.id)).toEqual(['up'])
+  })
+
+  it('says how long assigned work has left', () => {
+    const now = Date.parse('2026-11-15T12:00:00Z')
+    expect(slaLeft(item('a', { sla: { dueAt: '2026-11-15T15:00:00Z', late: false, level: null, to: null } }), now)).toBe('3 h left')
+    expect(slaLeft(item('b', { sla: { dueAt: '2026-11-12T12:00:00Z', late: true, level: 'manager', to: 'x' } }), now)).toBe('3 days late')
+    expect(slaLeft(item('c'), now)).toBeNull()
   })
 
   it('splits the board by status and moves an item along', () => {
