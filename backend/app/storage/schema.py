@@ -1239,6 +1239,7 @@ MODEL_BIND_NAME_MAX = 40   # shape editor S5: the name of a connection, and of a
 MODEL_SYM_AXES_MAX = 6     # shape editor S6: the most axes a symmetric shape has
 MODEL_PIVOTS_MAX = 32      # shape types T3: the most pivot points a model has
 MODEL_TURN_LIMIT = 180.0   # shape types T3: a pivot circle turns at most this far each way
+MODEL_MARKS_MAX = 8        # shape types T4: the most marks (anchors, posable points) a shape has
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
@@ -1321,6 +1322,8 @@ ModelBlend = Literal["multiply", "screen", "overlay"]
 # Shape types T1: a base shape (a stretch shape acts as one once every point follows another shape), a pivot circle, a shadow or a light (black and white, see-through, drawn
 # above every other shape and kept inside them).
 ModelShapeKind = Literal["base", "stretch", "pivot", "shadow", "light"]
+# Shape types T4: a mark on a shape: an anchor (pinned on the grid) or (T5) a posable point.
+ModelMarkKind = Literal["anchor", "pose"]
 
 
 def _keep_valid(cls: Any, value: Any) -> list[Any]:
@@ -1670,6 +1673,64 @@ class ModelShapePivot(BaseModel):
         return self
 
 
+class ModelMark(BaseModel):
+    """A mark on a shape (shape types T4): an anchor pins the shape where it is (one lets it turn about the mark, two or more hold it still); a posable point (T5) is
+    dragged to pose the figure. It lies in the shape's own drawing space, on one of its points (`i`, which then cannot be dragged) or inside it (`i` None)."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    kind: ModelMarkKind = "anchor"
+    x: float = 0.0
+    y: float = 0.0
+    i: Optional[int] = None
+    name: str = Field(default="", max_length=MODEL_BIND_NAME_MAX)
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> str:
+        return value if value in ("anchor", "pose") else "anchor"
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_BIND_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _place(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("a place")
+        return round(_finite(value, 0.0, -1e5, 1e5), 2)
+
+    @field_validator("i", mode="before")
+    @classmethod
+    def _point(cls, value: Any) -> Optional[int]:
+        return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+class ModelPlace(BaseModel):
+    """Where a figure's first shape has been posed (shape types T4): turned by `turn` degrees about the origin of the model's space, then moved by (dx, dy). The figure
+    hangs from it; Reset pose takes it away."""
+
+    dx: float = 0.0
+    dy: float = 0.0
+    turn: float = 0.0
+
+    @field_validator("dx", "dy", mode="before")
+    @classmethod
+    def _move(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("a distance")
+        return round(_finite(value, 0.0, -1e5, 1e5), 2)
+
+    @field_validator("turn", mode="before")
+    @classmethod
+    def _turn(cls, value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("an angle")
+        a = _finite(value, 0.0, -1e6, 1e6) % 360.0
+        return round(a - 360.0 if a > 180.0 else a, 2)
+
+
 class ModelPivot(BaseModel):
     """A pivot point (shape types T3): the shared middle of a pivot's circles, in the model's space as drawn."""
 
@@ -1753,6 +1814,9 @@ class ModelShape(BaseModel):
     kind: ModelShapeKind = "base"
     # Shape types T3: on a pivot circle, the pivot point it turns about, its turn and the admin's limits (see ModelShapePivot); None on any other shape.
     pivot: Optional[ModelShapePivot] = None
+    # Shape types T4: the shape's marks (anchors; T5 adds posable points), and where a figure's first shape has been posed (None: as drawn).
+    marks: list[ModelMark] = Field(default_factory=list, max_length=MODEL_MARKS_MAX)
+    place: Optional[ModelPlace] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1768,6 +1832,21 @@ class ModelShape(BaseModel):
     @classmethod
     def _pivot(cls, value: Any) -> Any:
         return _optional_model(ModelShapePivot, value)
+
+    @field_validator("place", mode="before")
+    @classmethod
+    def _place(cls, value: Any) -> Any:
+        return _optional_model(ModelPlace, value)
+
+    @field_validator("marks", mode="before")
+    @classmethod
+    def _marks(cls, value: Any) -> list[ModelMark]:
+        # a bad mark is dropped, and a second mark with the same id too; more than the limit is refused
+        out: list[ModelMark] = []
+        for m in _keep_valid(ModelMark, value):
+            if all(x.id != m.id for x in out):
+                out.append(m)
+        return out
 
     @field_validator("turn", mode="before")
     @classmethod
@@ -1794,6 +1873,10 @@ class ModelShape(BaseModel):
         # per-point depth (phase A1): one per point too, when there is any
         if self.turn is not None and self.turn.dz and len(self.turn.dz) != n:
             self.turn.dz = (self.turn.dz + [0.0] * n)[:n]
+        # a mark on a point that is not there lies inside the shape instead (shape types T4)
+        for m in self.marks:
+            if m.i is not None and m.i >= n:
+                m.i = None
         # symmetry (shape editor S6) that does not fit the points is let go; the points stay
         if self.sym is not None and n != 2 * self.sym.n * (self.sym.m + 1):
             self.sym = None

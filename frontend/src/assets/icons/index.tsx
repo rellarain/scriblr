@@ -895,6 +895,15 @@ export function PipetteIcon(props: IconProps) {
   </IconBase>
 }
 
+// An anchor: a point that pins a shape where it is (shape types T4).
+export function AnchorIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="5" r="2" />
+    <path d="M12 7v13M8 11h8" />
+    <path d="M5 14a7 7 0 0 0 14 0" />
+  </IconBase>
+}
+
 // An open hand: drag the view.
 export function HandIcon(props: IconProps) {
   return <IconBase {...props}>

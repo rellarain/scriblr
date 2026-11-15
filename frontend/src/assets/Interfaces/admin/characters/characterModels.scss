@@ -265,6 +265,9 @@
 .cmPivot--off .cmPivotRing { stroke: var(--ink-muted); }
 // the pivot points of the shape editor (shape types T3): where a pivot's circles turn; they are not grabbed (a circle is)
 .cmPivotPt { pointer-events: none; .cmPivotRing { stroke: var(--ink); } }
+// an anchor (shape types T4): a small diamond in the ink, edged in the raised surface so it reads on any shape
+.cmAnchorMark { fill: var(--ink); stroke: var(--surface-raised); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmMarkRow { align-items: flex-end; .cmField { flex: 1 1 auto; min-width: 0; } }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }
 // a helper shape is never drawn in the previews: on the canvas it is an outline, so it can still be picked and edited

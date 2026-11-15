@@ -11,7 +11,8 @@ let held: ModelShape | null = null
 const unlinked = (p: ModelPoint): ModelPoint => { const { bind: _bind, ...rest } = p; return rest }
 
 export function copyShape(shape: ModelShape): void {
-  held = { ...structuredClone(shape), pts: shape.pts.map(unlinked), mirrorOf: null, copyOf: null }
+  // a pasted shape follows nothing and is drawn where it was drawn, not where it was posed (its anchors come with it)
+  held = { ...structuredClone(shape), pts: shape.pts.map(unlinked), mirrorOf: null, copyOf: null, place: null }
 }
 export const hasCopy = (): boolean => held !== null
 // forget what was copied (for tests)

@@ -2,6 +2,7 @@ import { normTurn } from './engine/transform'
 import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
+import { repairMarks, repairPlace } from './engine/anchors'
 import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
@@ -84,6 +85,7 @@ function paintFields(s: ModelShape) {
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
     cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round), outline: outlineOf(s.outline), rot: rotValue(s.rot), sym: symmetryOf(s.sym, s.pts.length), skin: skinOf(s), over: [...new Set(s.over ?? [])].slice(0, LIMITS.overMax),
     turn: repairTurn(s.turn, s.pts.length, p => p as ModelShape['pts'][number]), kind: kindOf(s.kind), pivot: kindOf(s.kind) === 'pivot' ? repairShapePivot(s.pivot) : null,
+    marks: repairMarks(s.marks, s.pts.length), place: repairPlace(s.place),
   }
 }
 // Skin weights as the server keeps them (phase O1): one entry per group, at most LIMITS.skinMax, each with one weight per point (0..1 in hundredths; a short list is filled with 0,

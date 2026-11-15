@@ -1,4 +1,5 @@
 import type { ModelBind, ModelContent, ModelPoint, ModelShape } from '../../../../../api/types'
+import { isAnchored } from './anchors'
 import { outlineSize, shapeById } from '../modelContent'
 import { addPoint, movePoint } from './edit'
 import { apply, bezierAt, build, inverse, nearestEdge, r2, transformList, type BuiltPoint, type Mat } from './geometry'
@@ -69,6 +70,7 @@ export function followRefusal(c: ModelContent, shapeId: string, i: number, targe
   // a symmetric shape's point may follow (shape types T1), but only one copy of each point: the copies follow it
   if (s.sym && orbitOf(s, i).some(j => j !== i && !!s.pts[j]?.bind)) return 'Another copy of this point already follows a shape: the copies of a symmetric shape\'s point follow one shape together.'
   if (!s.pts[i]) return 'There is no such point.'
+  if (isAnchored(s, i)) return 'An anchored point follows nothing: take its anchor off first.'
   if (target === shapeId) return 'A point cannot be connected to its own shape.'
   const t = shapeById(c, target)
   if (!t || outlineSize(c, t) < 3) return 'Pick a shape with an outline.'

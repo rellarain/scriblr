@@ -79,6 +79,8 @@ import {
 import { LIMITS } from './engine/limits'
 import type { ArrangeActions, ConnectionActions, PivotActions, SymmetryActions } from './ShapePanels'
 import { addCircle, addPivot, isPivotCircle, movePivotBy, pivotById, poseOf, radiusOf, renamePivot, setPivotSetting, setRadius } from './engine/pivots'
+import { addFreeAnchor, anchorOn, anchorsOf, guardAnchors, toggleAnchor } from './engine/anchors'
+import { beginPose, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag } from './engine/posing'
 import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
 import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
 import { PointForm } from './PointForm'
@@ -248,7 +250,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const worldRef = useRef<((clientX: number, clientY: number) => [number, number]) | null>(null)
   const closeShapeForm = useCallback(() => setShapeForm(null), [])
   // the point form (T2): the point it was opened for and where; and the last place the pointer was over the canvas (a paste goes there)
-  const [pointForm, setPointForm] = useState<{ id: string; i: number; left: number; top: number } | null>(null)
+  // i is -1 for a form opened inside a shape (shape types T4), with `inside` the spot in the shape's own space
+  const [pointForm, setPointForm] = useState<{ id: string; i: number; left: number; top: number; inside?: [number, number] } | null>(null)
+  // a drag in the shape editor's Pose mode (T4): what it does, the content when it began, and whether it has changed anything yet (its undo step is made then)
+  const shapePoseRef = useRef<{ drag: ShapePoseDrag; start: ModelContent; changed: boolean } | null>(null)
   const closePointForm = useCallback(() => setPointForm(null), [])
   const pointerRef = useRef<[number, number] | null>(null)
   const turnAngle = angleOf(view)
@@ -408,6 +413,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       models.edit(entry.id, c => { const o = shapeById(c, id); const d = o && pivotShift(o, next); return d ? movePivotBy(c, o!.pivot!.at, d[0], d[1]) : c }, false)
       return
     }
+    // an anchor stays put (shape types T4): a drag that would move it stops, one that turns or resizes its shape goes about it
+    const anchored = shapesOnly ? shapeById(content, id) : undefined
+    if (anchored && anchorsOf(anchored).length) {
+      const followed = anchored.sym && next.sym ? followSymmetry(anchored, next).shape : next
+      const g = guardAnchors(anchored, followed)
+      if (!g.ok) { setNote(g.reason); return }
+      models.edit(entry.id, c => updateShape(c, id, () => g.shape), false)
+      return
+    }
     // a drag that would push a light into a shadow stops where it was (shape types T1)
     if (shapesOnly && hasBothCasts(content)) {
       const before = shapeById(content, id), followed = before?.sym && next.sym ? followSymmetry(before, next).shape : next
@@ -450,6 +464,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const f = followSymmetry(old, next)
       if (f.refused) { setNote(f.refused); return }
       next = f.shape
+    }
+    // an anchor stays put, and the marks go with their points (shape types T4)
+    if (shapesOnly) {
+      const g = guardAnchors(old, next)
+      if (!g.ok) { setNote(g.reason); return }
+      next = g.shape
     }
     // a change of the shape's settings (view, opacity, template name) leaves its points as they are stored
     if (JSON.stringify(next.pts) === JSON.stringify(canvasSolved.shapes[id]?.local ?? old.pts)) {
@@ -581,7 +601,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (t.kind === 'grid') { setSel(rightClickGrid()); setPart('shape'); return }
     const other = !(sel.kind === 'shape' && sel.id === t.id)
     if (other) choose(rightClickShape(t.id))
-    if (t.kind === 'shape') { setPart('shape'); return }
+    if (t.kind === 'shape') {
+      // in the shape editor a right-click inside a shape (away from its points and segments) opens the point form there, to put an anchor inside it (T4)
+      const s = shapeById(content, t.id), r = canvasSolved.shapes[t.id]
+      if (shapesOnly && at && s && r && !s.mirrorOf) {
+        const [x, y] = apply(inverse(r.matrix), at.x, at.y), box = stageRef.current?.getBoundingClientRect()
+        setPointForm({ id: s.id, i: -1, inside: [x, y], left: at.clientX - (box?.left ?? 0), top: at.clientY - (box?.top ?? 0) })
+      }
+      setPart('shape')
+      return
+    }
     const s = shapeById(content, t.id)
     // the shape the click is on can be changed when it is the selected one and editable, or another shape that is plain (not a twin, nothing away from rest)
     const changeable = !!s && (other ? !s.mirrorOf && !s.hide && atRest && awayAll === 0 : editable)
@@ -1615,6 +1644,40 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (next && commit(next, true)) choose({ kind: 'shape', id })
     },
   } : undefined
+  // Pose mode in the shape editor (shape types T4): on while the model (nothing below it) or a group is selected. A press that moves on a shape of a figure with a pivot
+  // poses it (with a group selected, only that group's shapes); one that stays put selects as usual, which leaves Pose mode. Each drag is one undo step.
+  const posingOn = shapesOnly && !recording && !through && (sel.kind === 'none' || sel.kind === 'group')
+  function shapePoseBegin(grab: PoseGrab, world: [number, number]): boolean {
+    if (grab.kind !== 'part') return false
+    const r = beginPose(content, grab.shapeId, toModel(solved, world[0], world[1]))
+    if (!r.ok) { setNote(r.reason); return false }
+    shapePoseRef.current = { drag: r.drag, start: content, changed: r.content !== content }
+    if (r.content !== content) { setHistory(h => remember(h, content)); models.edit(entry.id, () => r.content, false) }
+    setNote('')
+    return true
+  }
+  function shapePoseMove(world: [number, number]) {
+    const d = shapePoseRef.current
+    if (!d) return
+    const next = movePose(d.start, d.drag, toModel(solved, world[0], world[1]))
+    if (!d.changed) { setHistory(h => remember(h, d.start)); d.changed = true }
+    models.edit(entry.id, () => next, false)
+  }
+  function shapePoseCancel() {
+    const d = shapePoseRef.current
+    shapePoseRef.current = null
+    if (d?.changed) models.edit(entry.id, () => d.start, false)
+  }
+  const shapePose: PoseCanvas | null = posingOn && poseOf(content).posable.size > 0 ? {
+    joints: [], scales: [], slides: [], light: true,
+    canPose: id => poseOf(content).posable.has(id) && (sel.kind !== 'group' || groupOfShape(content, id) === sel.id),
+    onDown: shapePoseBegin, onMove: shapePoseMove, onUp: () => { shapePoseRef.current = null }, onCancel: shapePoseCancel,
+  } : null
+  // the anchors where they are drawn now
+  const anchorMarks = shapesOnly ? content.shapes.flatMap(s => anchorsOf(s).map(m => {
+    const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
+    return { id: `${s.id}:${m.id}`, x, y, name: m.name }
+  })) : undefined
   // where the pivot points are now (they move with the side that holds them)
   const pivotPoints = shapesOnly ? (content.pivots ?? []).map(p => { const at = poseOf(content).points.get(p.id) ?? [p.x, p.y]; return { id: p.id, x: at[0], y: at[1], name: p.name } }) : undefined
 
@@ -1649,7 +1712,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
           <DesignerCanvas
             content={canvasContent} solved={canvasSolved} sel={sel} part={part} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
-            editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
+            editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={shapesOnly ? shapePose : poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
             onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
@@ -1657,7 +1720,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             onShape={live} onEditShape={editShape}
             onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
             onDeleteShape={shapesOnly ? id => deleteSelection({ kind: 'shape', id }) : undefined} onRemove={shapesOnly ? removeAt : undefined}
-            rigid={!!selPivot} pivotPoints={pivotPoints}
+            rigid={!!selPivot} pivotPoints={pivotPoints} anchorMarks={anchorMarks}
             onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
@@ -1668,11 +1731,32 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {!shapesOnly && <p className="cmStageNote" aria-live="polite">{stageNote}</p>}
           </div>
 
-          {pointForm && shapeById(content, pointForm.id)?.pts[pointForm.i] && (
+          {pointForm && pointForm.inside && shapeById(content, pointForm.id) && (
+            <PointForm
+              at={{ left: pointForm.left, top: pointForm.top }}
+              onAnchor={() => {
+                const s = shapeById(content, pointForm.id), spot = pointForm.inside
+                setPointForm(null)
+                if (!s || !spot) return
+                const r = addFreeAnchor(s, spot[0], spot[1])
+                if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape)
+              }}
+              onClose={closePointForm}
+            />
+          )}
+          {pointForm && !pointForm.inside && shapeById(content, pointForm.id)?.pts[pointForm.i] && (
             <PointForm
               at={{ left: pointForm.left, top: pointForm.top }} mode={shapeById(content, pointForm.id)!.pts[pointForm.i].m}
               onMode={m => { const s = shapeById(content, pointForm.id); if (s) editShape(s.id, setMode(s, pointForm.i, m, { axis: content.axis }), pointForm.i); setPointForm(null) }}
               onPivotHere={() => { const s = shapeById(content, pointForm.id), pt = s?.pts[pointForm.i]; setPointForm(null); if (s && pt) makePivot(objectOfShape(content, s.id)?.id ?? null, pt.x, pt.y, 2) }}
+              anchored={!!anchorOn(shapeById(content, pointForm.id)!, pointForm.i)}
+              onAnchor={() => {
+                const s = shapeById(content, pointForm.id), i = pointForm.i
+                setPointForm(null)
+                if (!s) return
+                const r = toggleAnchor(s, i)
+                if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape, i)
+              }}
               onClose={closePointForm}
             />
           )}
@@ -1830,6 +1914,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 setFitAll(!same); setZoom(1); setViewMoved(false); setViewNonce(n => n + 1)
               }}
               zoom={zoom} onZoom={setZoom} drawerOpen={drawer} onDrawer={() => setDrawer(d => !d)} checks={faults.length} simple={shapesOnly}
+              onResetPose={posingOn && isPosed(content) ? () => { commit(resetPose(content), true) } : undefined}
               layerNotes={{ heads: content.headBone && boneById(content, content.headBone) ? undefined : 'There is no head bone yet: add a bone in the Proportions tab and press Use as the head.' }}
             />
           </div>

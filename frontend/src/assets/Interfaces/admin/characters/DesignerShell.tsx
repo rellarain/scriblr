@@ -5,7 +5,7 @@ import { beginPointerDrag, dragJustEnded, zoneRef, type DropZone } from '../../.
 import type { AutosaveMode } from '../../../../theme/types'
 import SideResizer from '../../writer/levels/SideResizer'
 import {
-  BackIcon, BodyIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon, WrenchIcon,
+  BackIcon, BodyIcon, CheckIcon, RestoreIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FitIcon, FocusIcon, FrontIcon, GridLinesIcon, MannequinIcon, PathIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, SwapIcon, UndoIcon, WeightIcon, WrenchIcon,
   type IconProps,
 } from '../../../icons'
 import { SHAPE_LAYERS, isShown, layerInfo, moveLayer, nudgeLayer, shapeLayerInfo, toggleLayer, type LayerId, type LayerState } from './layerStack'
@@ -109,6 +109,8 @@ export interface ViewBarProps {
   layerNotes?: Partial<Record<LayerId, string>>
   // The shape editor (designerFeatures.ts): its layers only, no front, back or angle, and a Checks button for the drawer.
   simple?: boolean
+  // Pose mode in the shape editor (shape types T4): puts every pivot's turn and every figure's place back (shown while something is posed)
+  onResetPose?: () => void
 }
 
 // The angle the figure is seen from (phase A3): a menu of the eight named angles, and a Turn slider for any angle between (in whole degrees; the arrow keys step one,
@@ -182,6 +184,7 @@ export function ViewBar(p: ViewBarProps) {
       {!p.simple && <button type="button" className={`cmIconBtn${angleOf(p.view) === 180 ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={angleOf(p.view) === 180} disabled={p.viewOff} onClick={() => p.onView('back')}><BackIcon size={14} /></button>}
       {!p.simple && <AngleControls view={p.view} onView={p.onView} off={p.viewOff} />}
       <span className="cmSpacer" />
+      {p.onResetPose && <button type="button" className="cmIconBtn" aria-label="Reset pose" title="Reset pose: every pivot back to no turn and every figure where it was drawn" onClick={p.onResetPose}><RestoreIcon size={14} /></button>}
       <button
         type="button" className={`cmIconBtn${p.fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit to screen" aria-pressed={p.fitAll}
         title="Fit everything that is drawn to the screen, with little blank space (press again to fit the selection instead)" onClick={p.onFit}

@@ -2,15 +2,18 @@ import type { ModelContent, ModelPivot, ModelShape, ModelShapePivot } from '../.
 import { newShape } from './edit'
 import { IDENTITY, apply, mul, rotate, type Mat } from './geometry'
 import { actsAs } from './kinds'
+import { anchorsOf, placeMat } from './anchors'
 import { treeRank } from './order'
 
 // Pivots (shape types T3). A pivot point is the middle that two or more pivot circles (of different sizes) share. A base shape hangs on a circle when one of its points follows that
 // circle (a weld on one of its points or a lock on one of its segments); base shapes connected to each other move as one body. Turning a circle swings everything that hangs on it,
 // and whatever hangs on that further out, round the pivot point. What is saved is the drawing plus an angle per circle, so a turn can be put back.
 //
-// How it is worked out (`poseOf`): the bodies and pivots that hang together are a figure. Each figure is walked out from its root (its first body in the tree; T4 adds anchors):
+// How it is worked out (`poseOf`): the bodies and pivots that hang together are a figure. Each figure is walked out from its root (its first anchored body, else its first body
+// in the tree; T4), placed where it has been posed (`place`):
 // at each pivot, the circle on the root's side is held (the pivot point moves with that side) and every other circle swings by its turn less the held circle's, carrying the
-// bodies on it. A body met again from another side closes a loop: that pivot does not swing. Shadows, lights and stretch shapes do not swing; they follow their links.
+// bodies on it. A body met again from another side closes a loop: the pivots round it do not swing, and neither do those between the root and another anchored body.
+// Shadows, lights and stretch shapes do not swing; they follow their links.
 
 export const TURN_LIMIT = 180
 const r2 = (v: number): number => Math.round(v * 100) / 100
@@ -49,7 +52,7 @@ export interface Pose {
   held: Map<string, Mat>
   // each pivot point where it is now
   points: Map<string, [number, number]>
-  // pivots that do not swing (their two sides meet again)
+  // pivots that do not swing (their two sides meet again, or an anchor holds the side beyond them)
   blocked: Set<string>
   // each body's shapes, by the body's first shape (what swings together)
   bodies: Map<string, string[]>
@@ -58,6 +61,18 @@ export interface Pose {
   // each figure's root body, and the pivot circle each body hangs from on the way to the root (its own side's circle)
   rootOf: Map<string, string>
   hangsFrom: Map<string, string>
+  // the way from each body (other than a root) back toward its root: the pivot, the circle the body is on, the circle held on the root's side, the body it hangs from
+  parentOf: Map<string, { pivot: string; circle: string; held: string; parent: string }>
+  // each pivot's circle on the root's side (it holds still while the others swing)
+  nearOf: Map<string, string>
+  // the circles each body hangs on, and the bodies on each circle
+  hangs: Map<string, string[]>
+  onCircle: Map<string, string[]>
+  // how many anchors each body has, and each figure (by its root)
+  anchors: Map<string, number>
+  figureAnchors: Map<string, number>
+  // the shapes a drag in Pose mode can pose: the bodies of a figure with a pivot, and the circles of its pivots
+  posable: Set<string>
 }
 
 const cache = new WeakMap<ModelContent, Pose>()
@@ -71,14 +86,17 @@ export function poseOf(c: ModelContent): Pose {
 }
 
 function work(c: ModelContent): Pose {
-  const pose: Pose = { mats: new Map(), held: new Map(), points: new Map(), blocked: new Set(), bodies: new Map(), bodyOf: new Map(), rootOf: new Map(), hangsFrom: new Map() }
+  const pose: Pose = {
+    mats: new Map(), held: new Map(), points: new Map(), blocked: new Set(), bodies: new Map(), bodyOf: new Map(), rootOf: new Map(), hangsFrom: new Map(),
+    parentOf: new Map(), nearOf: new Map(), hangs: new Map(), onCircle: new Map(), anchors: new Map(), figureAnchors: new Map(), posable: new Set(),
+  }
   const byId = new Map(c.shapes.map(s => [s.id, s]))
   const isBody = (s: ModelShape | undefined): boolean => !!s && !s.mirrorOf && actsAs(s) === 'base'
   // bodies: base shapes joined by their links to each other
   const parent = new Map<string, string>()
   const find = (id: string): string => { let r = id; while (parent.get(r) !== r) r = parent.get(r)!; return r }
-  const rank = treeRank(c)
-  const bodyShapes = c.shapes.filter(isBody).sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0))
+  const rank = treeRank(c), rankOf = (id: string) => rank.get(id) ?? 0
+  const bodyShapes = c.shapes.filter(isBody).sort((a, b) => rankOf(a.id) - rankOf(b.id))
   for (const s of bodyShapes) parent.set(s.id, s.id)
   for (const s of bodyShapes) {
     for (const p of s.pts) {
@@ -86,7 +104,7 @@ function work(c: ModelContent): Pose {
       if (t && parent.has(t.id)) {
         const a = find(s.id), b = find(t.id)
         // the body is named by its first shape in the tree
-        if (a !== b) { if ((rank.get(a) ?? 0) <= (rank.get(b) ?? 0)) parent.set(b, a); else parent.set(a, b) }
+        if (a !== b) { if (rankOf(a) <= rankOf(b)) parent.set(b, a); else parent.set(a, b) }
       }
     }
   }
@@ -95,57 +113,97 @@ function work(c: ModelContent): Pose {
     pose.bodyOf.set(s.id, b)
     pose.bodies.set(b, [...(pose.bodies.get(b) ?? []), s.id])
   }
+  for (const [b, ids] of pose.bodies) {
+    const n = ids.reduce((k, id) => k + anchorsOf(byId.get(id)).length, 0)
+    if (n) pose.anchors.set(b, n)
+  }
   // what hangs on what: a body on each circle one of its points follows
-  const hangs = new Map<string, Set<string>>()   // body -> circles
-  const onCircle = new Map<string, Set<string>>()   // circle -> bodies
+  const pivots = new Map(pivotsOf(c).map(p => [p.id, p]))
   for (const s of bodyShapes) {
     for (const p of s.pts) {
       const t = p.bind ? byId.get(p.bind.s) : undefined
-      if (!t || !isPivotCircle(t)) continue
+      if (!t || !isPivotCircle(t) || !pivots.has(t.pivot!.at)) continue
       const b = pose.bodyOf.get(s.id)!
-      if (!hangs.has(b)) hangs.set(b, new Set())
-      hangs.get(b)!.add(t.id)
-      if (!onCircle.has(t.id)) onCircle.set(t.id, new Set())
-      onCircle.get(t.id)!.add(b)
+      if (!(pose.hangs.get(b) ?? []).includes(t.id)) pose.hangs.set(b, [...(pose.hangs.get(b) ?? []), t.id])
+      if (!(pose.onCircle.get(t.id) ?? []).includes(b)) pose.onCircle.set(t.id, [...(pose.onCircle.get(t.id) ?? []), b])
     }
   }
-  const pivots = new Map(pivotsOf(c).map(p => [p.id, p]))
   const circles = new Map<string, ModelShape[]>()
   for (const s of c.shapes) if (isPivotCircle(s) && pivots.has(s.pivot!.at)) circles.set(s.pivot!.at, [...(circles.get(s.pivot!.at) ?? []), s])
+  const pivotOf = (cid: string) => byId.get(cid)!.pivot!.at
+  const turnOf = (cid: string) => byId.get(cid)!.pivot!.turn ?? 0
   const bodyMat = new Map<string, Mat>()
-  const seenPivot = new Set<string>()
-  // each figure, from its root
-  for (const root of pose.bodies.keys()) {
-    if (bodyMat.has(root)) continue
-    bodyMat.set(root, IDENTITY)
+  const seen = new Set<string>()
+  // each figure (the bodies joined through pivots), walked out from its root: its first anchored body, else its first body in the tree
+  for (const first of pose.bodies.keys()) {
+    if (seen.has(first)) continue
+    const members = [first]
+    seen.add(first)
+    for (let k = 0; k < members.length; k++) {
+      for (const cid of pose.hangs.get(members[k]) ?? []) {
+        for (const o of circles.get(pivotOf(cid)) ?? []) for (const b2 of pose.onCircle.get(o.id) ?? []) if (!seen.has(b2)) { seen.add(b2); members.push(b2) }
+      }
+    }
+    members.sort((a, b) => rankOf(a) - rankOf(b))
+    const anchored = members.filter(b => pose.anchors.has(b))
+    const root = anchored[0] ?? members[0]
+    pose.figureAnchors.set(root, anchored.reduce((k, b) => k + (pose.anchors.get(b) ?? 0), 0))
     pose.rootOf.set(root, root)
-    const queue = [root]
-    while (queue.length) {
-      const b = queue.shift()!, Mb = bodyMat.get(b)!
-      for (const cid of hangs.get(b) ?? []) {
-        const circle = byId.get(cid)!, pid = circle.pivot!.at, p = pivots.get(pid)
-        if (!p || seenPivot.has(pid)) continue
-        seenPivot.add(pid)
-        pose.points.set(pid, apply(Mb, p.x, p.y))
-        for (const other of circles.get(pid) ?? []) {
-          const swing = other.id === cid ? 0 : (other.pivot!.turn ?? 0) - (circle.pivot!.turn ?? 0)
-          const Mc = swing ? mul(Mb, rotate(swing, p.x, p.y)) : Mb
-          pose.mats.set(other.id, Mc)
-          pose.held.set(other.id, Mb)
-          for (const b2 of onCircle.get(other.id) ?? []) {
+    const order = [root], visited = new Set([root]), from = new Map<string, string>()   // pivot -> the body it is reached from
+    const loops: Array<[string, string, string]> = []
+    for (let k = 0; k < order.length; k++) {
+      const b = order[k]
+      for (const cid of pose.hangs.get(b) ?? []) {
+        const pid = pivotOf(cid)
+        if (from.has(pid)) {
+          // a pivot met again: the way this body came, another circle of its own pivot, or a loop
+          if (pose.parentOf.get(b)?.pivot !== pid && from.get(pid) !== b) loops.push([b, from.get(pid)!, pid])
+          continue
+        }
+        from.set(pid, b)
+        pose.nearOf.set(pid, cid)
+        for (const o of circles.get(pid) ?? []) {
+          for (const b2 of pose.onCircle.get(o.id) ?? []) {
             if (b2 === b) continue
-            if (bodyMat.has(b2)) { if (other.id !== cid) pose.blocked.add(pid); continue }
-            bodyMat.set(b2, other.id === cid ? Mb : Mc)
+            if (visited.has(b2)) { if (pose.parentOf.get(b2)?.pivot !== pid) loops.push([b, b2, pid]); continue }
+            visited.add(b2)
+            order.push(b2)
+            pose.parentOf.set(b2, { pivot: pid, circle: o.id, held: cid, parent: b })
             pose.rootOf.set(b2, root)
-            pose.hangsFrom.set(b2, other.id)
-            queue.push(b2)
+            pose.hangsFrom.set(b2, o.id)
           }
         }
       }
     }
+    // a pivot does not swing when its two sides meet again (each pivot round the loop), or when an anchor holds the side beyond it (each pivot between the root and that anchor)
+    const chain = (b: string): string[] => { const out = [b]; let x = b; while (pose.parentOf.has(x)) { x = pose.parentOf.get(x)!.parent; out.push(x) } return out }
+    const blockBetween = (a: string, b: string) => {
+      const ca = chain(a), cb = chain(b), inA = new Set(ca), meet = cb.find(x => inA.has(x)) ?? root
+      for (const x of [...ca.slice(0, ca.indexOf(meet)), ...cb.slice(0, cb.indexOf(meet))]) pose.blocked.add(pose.parentOf.get(x)!.pivot)
+    }
+    for (const [a, b, pid] of loops) { pose.blocked.add(pid); blockBetween(a, b) }
+    for (const b of anchored) if (b !== root) blockBetween(b, root)
+    // the root where it has been posed, and each body from the one it hangs from
+    bodyMat.set(root, placeMat(byId.get(root)?.place))
+    for (const b of order.slice(1)) {
+      const pp = pose.parentOf.get(b)!, Mp = bodyMat.get(pp.parent)!, pt = pivots.get(pp.pivot)!
+      const swing = pose.blocked.has(pp.pivot) || pp.circle === pp.held ? 0 : turnOf(pp.circle) - turnOf(pp.held)
+      bodyMat.set(b, swing ? mul(Mp, rotate(swing, pt.x, pt.y)) : Mp)
+    }
+    for (const [pid, b] of from) {
+      const Mb = bodyMat.get(b)!, pt = pivots.get(pid)!, near = pose.nearOf.get(pid)!
+      pose.points.set(pid, apply(Mb, pt.x, pt.y))
+      for (const o of circles.get(pid) ?? []) {
+        const swing = pose.blocked.has(pid) || o.id === near ? 0 : turnOf(o.id) - turnOf(near)
+        pose.mats.set(o.id, swing ? mul(Mb, rotate(swing, pt.x, pt.y)) : Mb)
+        pose.held.set(o.id, Mb)
+      }
+    }
+    if (from.size) {
+      for (const b of members) for (const id of pose.bodies.get(b) ?? []) pose.posable.add(id)
+      for (const pid of from.keys()) for (const o of circles.get(pid) ?? []) pose.posable.add(o.id)
+    }
   }
-  // a loop: the pivot does not swing after all (every circle and what hangs on it is drawn as the held side)
-  for (const pid of pose.blocked) for (const s of circles.get(pid) ?? []) { const h = pose.held.get(s.id); if (h) pose.mats.set(s.id, h) }
   for (const [b, M] of bodyMat) if (M !== IDENTITY) for (const id of pose.bodies.get(b) ?? []) pose.mats.set(id, M)
   // pivots no body holds stay where they are drawn
   for (const p of pivotsOf(c)) if (!pose.points.has(p.id)) pose.points.set(p.id, [p.x, p.y])

@@ -467,6 +467,10 @@ described, now stale, in `docs/data-model.md`).
   32) and on a shape `pivot` (`ModelShapePivot`: `at` a pivot id, `turn`, `lo`, `hi` in degrees, -180..180, with lo <= 0 <= hi
   and the turn held between them; null: not a pivot circle). A shape linked to a circle's outline turns with it about the pivot
   point; the side of the figure's first shape holds still. A circle about a pivot that does not exist stops a publish.
+  Shape types T4 adds, with a default: on a shape `marks` (`ModelMark`: `id`, `kind` `anchor` or `pose`, `x`, `y` in the shape's own
+  space, `i` the point it lies on or null inside the shape, `name`; at most 8; a mark on a point that is not there lies inside) and
+  `place` (`ModelPlace`: `dx`, `dy`, `turn` in -180..180; null: as drawn), where a figure's first shape has been posed. An
+  anchored body is a figure's root; Pose mode keeps what it does as the circles' turns and the root's place.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

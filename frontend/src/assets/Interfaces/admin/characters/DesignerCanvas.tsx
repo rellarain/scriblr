@@ -73,6 +73,10 @@ export interface PoseCanvas {
   onMove: (world: [number, number]) => void
   onUp: () => void
   onCancel: () => void
+  // the shape editor's Pose mode (shape types T4): the canvas works as when editing, except that a press that moves on a shape `canPose` says yes to poses it (a press that
+  // stays put selects as usual); there are no markers of its own and the view stays where it is
+  light?: boolean
+  canPose?: (shapeId: string) => boolean
 }
 
 // Frames (phase 5a): every frame of the model as a rectangle in the view (the one being edited has handles, and is moved and resized by dragging; the arrow keys
@@ -210,6 +214,8 @@ export interface CanvasProps {
   // the shape editor (T3): the selected shape moves only as a whole (a pivot circle keeps its shape: no points or box handles), and the pivot points, where they are now
   rigid?: boolean
   pivotPoints?: Array<{ id: string; x: number; y: number; name: string }>
+  // the anchors of the shapes (shape types T4), where they are drawn now, on the Pivots and anchors layer
+  anchorMarks?: Array<{ id: string; x: number; y: number; name: string }>
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -222,6 +228,7 @@ type Drag =
   | { kind: 'move'; shapeId: string; last: [number, number]; start: [number, number]; from: ModelShape; box: Box | null; world0: [number, number]; box0: Box | null; x0: number; y0: number; moved: boolean }
   | { kind: 'pivot' }
   | { kind: 'pose' }
+  | { kind: 'posePress'; shapeId: string; x0: number; y0: number; world: [number, number] }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
   // the box of the selected shape (shape editor S4): a resize from one of its handles, or a turn by its round handle, worked out from the shape as it was when it began
   | { kind: 'resize'; shapeId: string; handle: BoxHandle; from: ModelShape; frame: Frame; x0: number; y0: number; moved: boolean }
@@ -285,14 +292,16 @@ export function DesignerCanvas(p: CanvasProps) {
   const focusIds = new Set(focus.map(s => s.id))
   const none = sel.kind === 'none'
   const through = p.through ?? null
+  // the Pose mode of the full designer: the figure is grabbed instead of edited (the shape editor's lighter Pose mode leaves editing as it is)
+  const legacyPose = !!p.pose && !p.pose.light
   const throughOn = !!through
   // The box the view is fitted to is found when Fit is pressed, the view (front or back) or Pose mode changes, or a selection is made that cannot be seen in the view, and then
   // held: the view never follows what a drag does to the selection. A selection that is in view leaves the view where it is (however it was made: a click, a right-click
   // that moves on through the modes, the tree), and so does selecting nothing. Fit takes the box round everything that is drawn; a selection (or Pose mode) gets room round
   // it for its handles.
-  const forceKey = `${fitAll ? 'all' : 'sel'}|${p.pose ? 1 : 0}|${p.viewKey ?? ''}|${p.viewNonce ?? 0}`
+  const forceKey = `${fitAll ? 'all' : 'sel'}|${legacyPose ? 1 : 0}|${p.viewKey ?? ''}|${p.viewNonce ?? 0}`
   const selKey = fitAll ? '' : `${sel.kind}:${sel.id}`
-  const live: Box | null = fitAll ? boxOfSolved(solved, content.shapes) : none || p.pose ? FIGURE : boxOfSolved(solved, focus)
+  const live: Box | null = fitAll ? boxOfSolved(solved, content.shapes) : none || legacyPose ? FIGURE : boxOfSolved(solved, focus)
   const vbRef = useRef<Box | null>(null)   // the view as it was last drawn
   const fitted = useRef<{ force: string; sel: string; box: Box; found: boolean; stamp: number } | null>(null)
   if (!through) {
@@ -327,7 +336,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const shape = activeShape(content, sel)
   const solvedShape = shape ? solved.shapes[shape.id] : undefined
   const matrix = solvedShape?.matrix
-  const overlay = !!shape && !p.pose && !through && !!solvedShape?.visible && shape.pts.length >= 3
+  const overlay = !!shape && !legacyPose && !through && !!solvedShape?.visible && shape.pts.length >= 3
   // in the shape editor the points are drawn where the links put them (a welded point on its target, a shared segment with its handles)
   const builtFrom = p.connect && solvedShape && solvedShape.local.length === shape?.pts.length ? solvedShape.local : shape?.pts
   const built = overlay && matrix && builtFrom ? build(builtFrom, shape!.closed, matrix) : []
@@ -335,7 +344,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
   const lockOn = !!p.lock?.enabled && overlay && !p.weights && !p.skin
-  const hoverOk = !p.pose && !p.pick && !through && !p.frames && !p.taper
+  const hoverOk = !legacyPose && !p.pick && !through && !p.frames && !p.taper
 
   function rect() {
     const r = svgRef.current?.getBoundingClientRect()
@@ -551,7 +560,7 @@ export function DesignerCanvas(p: CanvasProps) {
   }
   // A press on what the pointer is over. Returns whether it was used. A press on the body of a shape leaves the outlines of other shapes alone: it selects the shape it is on.
   function hoverDown(e: ReactPointerEvent, onBody = false): boolean {
-    if (e.button !== 0 || p.pose || p.pick || p.frames || through) return false
+    if (e.button !== 0 || legacyPose || p.pick || p.frames || through) return false
     if (p.skin && shape) {
       const h = hitTest(e)
       beginPaint(e, h?.kind === 'point' ? h.i : -1)
@@ -584,7 +593,7 @@ export function DesignerCanvas(p: CanvasProps) {
   }
   // What a right press is on: a point or a segment (of the selected shape, or of another the pointer is over), else what it was pressed on.
   function rightTarget(e: { clientX: number; clientY: number }, fallback: RightTarget): RightTarget {
-    const h = p.pose || p.pick || through ? null : hitTest(e)
+    const h = legacyPose || p.pick || through ? null : hitTest(e)
     if (h?.kind === 'point') return { kind: 'point', id: h.shapeId, i: h.i }
     if (h?.kind === 'edge') return { kind: 'segment', id: h.shapeId, e: h.e }
     return fallback
@@ -600,7 +609,7 @@ export function DesignerCanvas(p: CanvasProps) {
     if (p.taper) { addTaper(e); return }
     if (hoverDown(e)) return
     // a click on the empty grid unselects everything (not while a tool is waiting for a click of its own)
-    if (!p.pick && !p.pose && !p.frames && !p.weights && !p.skin && !through && sel.kind !== 'none') p.onSelect(NONE)
+    if (!p.pick && !legacyPose && !p.frames && !p.weights && !p.skin && !through && sel.kind !== 'none') p.onSelect(NONE)
   }
   function onShapeDown(e: ReactPointerEvent, id: string) {
     e.stopPropagation()
@@ -612,7 +621,9 @@ export function DesignerCanvas(p: CanvasProps) {
     if (e.button !== 0) return
     if (ctrlRemove(e)) return
     if (p.taper) { addTaper(e); return }
-    if (p.pose) { if (p.pose.onDown({ kind: 'part', shapeId: id }, toWorld(e), e.altKey)) { dragRef.current = { kind: 'pose' }; capture(e) } return }
+    if (p.pose && !p.pose.light) { if (p.pose.onDown({ kind: 'part', shapeId: id }, toWorld(e), e.altKey)) { dragRef.current = { kind: 'pose' }; capture(e) } return }
+    // the shape editor's Pose mode (T4): a press on a shape that can be posed waits to see whether it moves (it poses) or stays put (it selects)
+    if (p.pose?.light && (p.pose.canPose?.(id) ?? true) && !p.pick && !through) { dragRef.current = { kind: 'posePress', shapeId: id, x0: e.clientX, y0: e.clientY, world: toWorld(e) }; capture(e); return }
     if (p.pick) {
       if (picking.has(id)) { const [x, y] = toWorld(e); p.onPick?.(id, x, y) }
       return
@@ -667,7 +678,7 @@ export function DesignerCanvas(p: CanvasProps) {
   }
   // Ctrl + click on a point removes it, on a segment joins its two points (shape types T2); true when it was one
   function ctrlRemove(e: ReactPointerEvent): boolean {
-    if (e.button !== 0 || !(e.ctrlKey || e.metaKey) || !p.onRemove || p.pose || p.pick || through) return false
+    if (e.button !== 0 || !(e.ctrlKey || e.metaKey) || !p.onRemove || legacyPose || p.pick || through) return false
     const h = hitTest(e)
     if (h?.kind === 'point') { p.onRemove({ kind: 'point', id: h.shapeId, i: h.i }); return true }
     if (h?.kind === 'edge') { p.onRemove({ kind: 'segment', id: h.shapeId, e: h.e }); return true }
@@ -783,6 +794,11 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
+    if (d.kind === 'posePress') {
+      if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
+      if (p.pose?.onDown({ kind: 'part', shapeId: d.shapeId }, d.world, false)) { dragRef.current = { kind: 'pose' }; p.pose.onMove(toWorld(e)) } else dragRef.current = null
+      return
+    }
     if (d.kind === 'frame') {
       const [wx, wy] = toWorld(e)
       let dx = wx - d.start[0], dy = wy - d.start[1]
@@ -884,6 +900,7 @@ export function DesignerCanvas(p: CanvasProps) {
     targetsRef.current = null
     setGuides(null)
     if (d && d.kind === 'pose') p.pose?.onUp()
+    if (d && d.kind === 'posePress') p.onSelect({ kind: 'shape', id: d.shapeId })
     if (d && d.kind === 'point' && d.moved && dropRef.current && p.connect) p.connect.onConnect(d.shapeId, d.index, dropRef.current)
     showDrop(null)
     if (d && d.kind === 'pan' && !d.moved) {
@@ -896,7 +913,7 @@ export function DesignerCanvas(p: CanvasProps) {
   function onDouble(e: ReactMouseEvent) {
     e.stopPropagation()
     if (p.taper) { e.preventDefault(); p.taper.onFinish(); return }
-    if (p.pick || p.pose || through) return
+    if (p.pick || legacyPose || through) return
     const h = hitTest(e)
     if (!h || h.kind !== 'edge') return
     const s = shapesById.get(h.shapeId), r = solved.shapes[h.shapeId]
@@ -1175,8 +1192,13 @@ export function DesignerCanvas(p: CanvasProps) {
             <line x1={pt.x} y1={pt.y - 7 * u} x2={pt.x} y2={pt.y + 7 * u} className="cmPivotCross" />
           </g>
         ))}
-        {anchor && !p.pose && !through && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
-        {pivot && !p.pose && !through && (
+        {(p.anchorMarks ?? []).map(m => (
+          <rect key={m.id} x={m.x - 3.5 * u} y={m.y - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${m.x} ${m.y})`} className="cmAnchorMark" data-anchor={m.id} aria-hidden="true">
+            <title>{m.name || 'Anchor'}</title>
+          </rect>
+        ))}
+        {anchor && !legacyPose && !through && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
+        {pivot && !legacyPose && !through && (
           <g
             className={`cmPivot${pivot.draggable ? '' : ' cmPivot--off'}`} role="button" tabIndex={0} aria-label={`Pivot of ${pivot.name}${pivot.draggable ? '. Drag it, or press the arrow keys' : ''}`}
             onPointerDown={onPivotDown} onKeyDown={onPivotKey}
@@ -1247,7 +1269,7 @@ export function DesignerCanvas(p: CanvasProps) {
 
   return (
     <svg
-      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}${p.skin ? ' cmCanvas--skin' : ''}${p.taper ? ' cmCanvas--taper' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
+      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${legacyPose ? ' cmCanvas--pose' : ''}${p.skin ? ' cmCanvas--skin' : ''}${p.taper ? ' cmCanvas--taper' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
       aria-label={`Designer canvas. ${nudgeHint}. Click the empty grid to unselect everything, or right-click it.`}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => { setHover(null); setBrush(null); if (p.pointerRef) p.pointerRef.current = null }} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
       onDoubleClick={onDouble}

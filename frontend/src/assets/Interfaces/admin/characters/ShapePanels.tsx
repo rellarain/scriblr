@@ -4,6 +4,7 @@ import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon } from '../../../icons'
 import { RADIUS, TURN_LIMIT } from './engine/pivots'
+import { removeMark, renameMark } from './engine/anchors'
 import { LIMITS } from './engine/limits'
 import { CAST_OPACITY, KIND_NAMES, actsAs, isCast, kindOf, unlinkedCount } from './engine/kinds'
 import { SYM_AXES_MAX } from './engine/symmetry'
@@ -74,6 +75,23 @@ export function TypeSection({ shape, onEditShape }: { shape: ModelShape; onEditS
       </div>
       {acts === 'stretch' && <p className="cmInsText" role="status">Stretch: every point follows a shape</p>}
       {missing > 0 && <p className="cmInsText" role="status">Stretch: {missing} {missing === 1 ? 'point follows' : 'points follow'} nothing yet</p>}
+    </div>
+  )
+}
+
+// The shape's anchors (shape types T4): each with a name and a Delete. They are placed from the point form (a right-click on a point, or inside the shape).
+export function MarksSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: (id: string, next: ModelShape) => void }) {
+  const marks = (shape.marks ?? []).filter(m => m.kind === 'anchor')
+  if (!marks.length) return null
+  return (
+    <div className="cmMarksPanel" role="group" aria-label="Anchors">
+      <h3 className="cmInsSub">Anchors</h3>
+      {marks.map((m, k) => (
+        <div key={m.id} className="cmInline cmMarkRow">
+          <label className="cmField"><span>{`Name of anchor ${k + 1}`}</span><input value={m.name} maxLength={NAME_LIMIT} placeholder={m.i === null ? 'Inside the shape' : `On point ${m.i + 1}`} onChange={e => onEditShape(shape.id, renameMark(shape, m.id, e.target.value))} /></label>
+          <button type="button" className="cmIconBtn" aria-label={`Delete anchor ${k + 1}`} title="Delete the anchor" onClick={() => onEditShape(shape.id, removeMark(shape, m.id))}><CloseIcon size={14} /></button>
+        </div>
+      ))}
     </div>
   )
 }

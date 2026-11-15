@@ -120,6 +120,9 @@ describe('turning a pivot', () => {
   it('moves a circle as a whole, with its pivot and its other circles', async () => {
     await open(model(true))
     const c1 = boxOf('c1'), point = () => canvas().querySelector('[data-pivot-point] circle')!
+    // selected first: with the model selected a drag would pose it (T4)
+    pointer(pathOf('c2'), 'pointerdown', pixelOf(80, 116))
+    pointer(canvas(), 'pointerup', pixelOf(80, 116))
     pointer(pathOf('c2'), 'pointerdown', pixelOf(80, 116))
     pointer(canvas(), 'pointermove', pixelOf(100, 116))
     pointer(canvas(), 'pointerup', pixelOf(100, 116))
