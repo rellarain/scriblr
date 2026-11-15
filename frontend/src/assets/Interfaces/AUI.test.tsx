@@ -37,16 +37,24 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(within(tile('help')).getByText(/using the Project Plan console/)).toBeTruthy()
   })
 
-  it('has the Manager and Director pages in the Office, a Project Plan in place of the Processor (its Voting in the Organizer) and a house for the Dashboard', () => {
+  it('has the Manager and Director pages, Voting and Channel Management in the Office, a Project Plan in place of the Processor and a house for the Dashboard', () => {
     render(<AUI />)
     for (const gone of ['processor', 'manager', 'director']) expect(tile(gone)).toBeNull()
-    const office = within(within(tile('office').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Office tiles tabs' }))
-    expect(office.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual([
+    const tabs = (id: string, name: string) =>
+      within(within(tile(id).querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: `${name} tiles tabs` }))
+        .getAllByRole('button').map(b => b.getAttribute('aria-label'))
+    expect(tabs('office', 'Office')).toEqual([
       'Allotment', 'Assignment', 'Team Schedule', 'Department Details', 'Department Roster', 'Department Analytics', 'Department', 'Monitor Training', 'Department Schedules', 'Hire/Term Admin',
+      'Voting', 'Channel Management',
     ])
+    expect(within(tile('office')).getByText(/Approve and\/or deny explicated/)).toBeTruthy()
+    expect(within(tile('office')).getByText(/a second processing pass after Voting/)).toBeTruthy()
+    // the Organizer keeps only Bookclub Management
+    expect(within(tile('organizer')).queryByText(/Approve and\/or deny explicated/)).toBeNull()
+    expect(within(tile('organizer')).queryByText(/second processing pass/)).toBeNull()
+    expect(within(tile('organizer')).getByText('Manage bookclubs here.')).toBeTruthy()
     expect(within(tile('projectPlan')).getByRole('heading', { name: /Project Plan/ })).toBeTruthy()
     expect(within(tile('projectPlan')).getByText(/its phases, milestones and tasks on a timeline/)).toBeTruthy()
-    expect(within(tile('organizer')).getByText(/Approve and\/or deny explicated/)).toBeTruthy()
     const bar = screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' })
     // the Dashboard is a house (the Reader's home icon) and the Project Plan bars on a graph
     expect(within(bar).getByRole('button', { name: 'Dashboard' }).querySelector('path')?.getAttribute('d')).toBe('M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6')

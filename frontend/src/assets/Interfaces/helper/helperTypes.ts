@@ -103,7 +103,7 @@ export const CHANNEL_TAXONOMY: ChannelTaxonomyPage[] = [
   },
   {
     name: 'Admin', components: [
-      { name: 'Organizer', features: ['Voting'] },
+      { name: 'Office', features: ['Voting', 'Channel Management'] },
     ],
   },
   {

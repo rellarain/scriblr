@@ -22,7 +22,8 @@ const WriterLimitsConsole = lazy(() => import('./admin/characters/WriterLimitsCo
 import { DESIGNER_TOOLS, WRITER_DESIGNER } from './admin/characters/designerFeatures'
 
 // The consoles of scrilbrPlan.md's "Admin Page (AUI)" section, as the user has since reshaped them (2026-11-15: the Manager and Director consoles merged
-// into Office, and a Project Plan console in place of the Processor, whose Voting page went to the Organizer). Resources -- not in that doc -- is built separately
+// into Office, and a Project Plan console in place of the Processor; the Processor's Voting and the Organizer's Channel Management are pages of the Office).
+// Resources -- not in that doc -- is built separately
 // below, since it isn't this shape: one console, no per-page children, just
 // the article/quiz builder). This is a full structural skeleton -- every
 // named component present and selectable, placeholder body text
@@ -101,11 +102,6 @@ const SECTIONS: AuiSectionDef[] = [
   {
     key: 'organizer', label: 'Organizer', Icon: LibraryIcon,
     subSections: [
-      // the first processing pass (it was the Processor console's page)
-      { key: 'voting', label: 'Voting', Icon: VotingIcon,
-        body: 'Approve and/or deny explicated, toned, and sorted feedback, and set the admin-defined processing order for tones and feature sorting, here.' },
-      { key: 'channelManagement', label: 'Channel Management', Icon: SortingIcon,
-        body: 'Review processed feedback here, as a second processing pass after Voting.' },
       { key: 'bookclubManagement', label: 'Bookclub Management', Icon: LibraryIcon,
         body: 'Manage bookclubs here.' },
       { key: 'organizerHelp', label: 'Help', Icon: HelpIcon,
@@ -114,7 +110,8 @@ const SECTIONS: AuiSectionDef[] = [
   },
   {
     key: 'office', label: 'Office', Icon: BriefcaseIcon,
-    // The Manager's pages, then the Director's, then the Office's own (the doc gives these as bullets instead of named components).
+    // The Manager's pages, then the Director's, then the Office's own (the doc gives these as bullets instead of named components),
+    // then the two feedback passes in their order: Voting (the Processor's page) and Channel Management (the Organizer's).
     subSections: [
       { key: 'allotment', label: 'Allotment', Icon: PeopleIcon,
         body: 'Manage team and user allotments here.' },
@@ -136,6 +133,10 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'View and manage department schedules here.' },
       { key: 'hireTermAdmin', label: 'Hire/Term Admin', Icon: PeopleIcon,
         body: 'Hire or terminate admin users here.' },
+      { key: 'voting', label: 'Voting', Icon: VotingIcon,
+        body: 'Approve and/or deny explicated, toned, and sorted feedback, and set the admin-defined processing order for tones and feature sorting, here.' },
+      { key: 'channelManagement', label: 'Channel Management', Icon: SortingIcon,
+        body: 'Review processed feedback here, as a second processing pass after Voting.' },
       { key: 'officeHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Office console here.' },
     ],
