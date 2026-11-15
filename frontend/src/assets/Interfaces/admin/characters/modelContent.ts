@@ -3,7 +3,7 @@ import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
 import { repairMarks, repairPlace } from './engine/anchors'
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { DEPTH_MAX, chainOf } from './engine/rig'
@@ -50,8 +50,8 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, mirrorLine: repairMirrorLine(o.mirrorLine), classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states), depth: repairDepth(g.depth) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
@@ -70,6 +70,15 @@ export function normalizeContent(c: ModelContent): ModelContent {
     pivots: (c.pivots ?? []).map(repairPivot),
     zones: repairZones(c.zones, c.groups),
   }
+}
+
+// A mirror line as the server keeps it (Z3): a symmetric shape's id and an axis 0..5, else none (the model's centre line).
+export function repairMirrorLine(v: unknown): ModelMirrorLine | null {
+  if (!v || typeof v !== 'object') return null
+  const { shape, k } = v as { shape?: unknown; k?: unknown }
+  if (typeof shape !== 'string' || !/^[A-Za-z0-9_.-]{1,80}$/.test(shape)) return null
+  const axis = typeof k === 'number' && Number.isInteger(k) ? k : 0
+  return axis >= 0 && axis < 6 ? { shape, k: axis } : null
 }
 
 // The zones as the server keeps them (Z2): a zone that repeats an id goes, a name is trimmed and cut to length, and a zone keeps only groups that exist and are in no zone before it.
@@ -971,6 +980,14 @@ function patternFaults(c: ModelContent): string[] {
   return faults
 }
 
+// Mirrors (Z3; the server's _mirror_faults says the same words): a twin reflected across a shape that does not exist or is not symmetric.
+export function mirrorFaults(c: ModelContent): string[] {
+  const symmetric = new Set(c.shapes.filter(s => s.sym).map(s => s.id)), faults: string[] = []
+  for (const o of c.objects) if (o.mirrorLine && !symmetric.has(o.mirrorLine.shape)) faults.push(`Object ${label(o.name, o.id)} is reflected across a shape that does not exist or is not symmetric.`)
+  for (const s of c.shapes) if (s.mirrorLine && !symmetric.has(s.mirrorLine.shape)) faults.push(`Shape ${label(s.name, s.id)} is reflected across a shape that does not exist or is not symmetric.`)
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
@@ -1012,6 +1029,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...proportionFaults(c))
   faults.push(...handFaults(c))
   faults.push(...pivotFaults(c))
+  faults.push(...mirrorFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

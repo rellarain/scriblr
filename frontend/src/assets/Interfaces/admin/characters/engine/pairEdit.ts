@@ -8,6 +8,7 @@ import { attachGroup, done, fail, type Edit } from './rigEdit'
 import { drawOrder } from './order'
 import { mirroredSkin } from './skin'
 import { wornUnder } from './wear'
+import { usesMirrorLine } from './mirrorLine'
 
 // The pure operations behind pairs, point links and the back view: making a twin of a shape, an object or a group (a derived mirror image that follows
 // every edit of the original) and breaking the pair into two independent things; welding or following a point, or locking it to the edge of another shape
@@ -154,7 +155,9 @@ function breakShape(c: ModelContent, id: string): Edit {
   const axis = c.axis ?? 100, orig = shapeById(c, s.mirrorOf)
   if (!orig || orig.mirrorOf) return done({ ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null } : x)) }, 'Its original is missing, so it has no outline until you draw one.')
   const rest = solveAtRest(c), o = rest.shapes[orig.id]
-  const pts: ModelPoint[] = o ? reflectList(o.rig, axis) : []
+  // a twin across a line (Z3) keeps the outline it is drawn with now; an older twin the reflection about the model's axis
+  const across = usesMirrorLine(c, s)
+  const pts: ModelPoint[] = across ? (rest.shapes[id]?.rig ?? []).map(p => ({ ...p })) : o ? reflectList(o.rig, axis) : []
   let back: ModelPoint[] | null = null
   if (orig.back && orig.back.length >= 3) {
     const ob = solveAtRest(c, 'back').shapes[orig.id]
@@ -167,7 +170,7 @@ function breakShape(c: ModelContent, id: string): Edit {
   // and the skin weights of its original, on the twin groups (phase O1)
   const ownGroup = c.groups.find(g => g.objects.includes(c.objects.find(ob => ob.shapes.includes(id))?.id ?? ''))?.id ?? null
   const skin = mirroredSkin(c, orig.skin, ownGroup)
-  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0, ...paint, opBy: x.opBy ?? orig.opBy ?? null, ...(skin.length ? { skin } : {}) } : x)) }
+  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, mirrorLine: null, pts, back, half: 0, ...paint, opBy: x.opBy ?? orig.opBy ?? null, ...(skin.length ? { skin } : {}) } : x)) }
   next = mirrorShapeDrives(next, orig.id, id, pts.length)
   return done(next, linked ? 'Its point links are not copied: link its points again.' : undefined)
 }
@@ -193,7 +196,7 @@ function breakObject(c: ModelContent, id: string): Edit {
     fitFields = { fit: fit.fit, fitTo: fit.fit === 'stretch' ? partner?.id ?? target?.id ?? null : null }
   }
   const under = wornUnder(c, o)
-  next = { ...next, objects: next.objects.map(x => (x.id === id ? { ...x, mirrorOf: null, ...fitFields, ...(under.length > 0 ? { under } : {}) } : x)) }
+  next = { ...next, objects: next.objects.map(x => (x.id === id ? { ...x, mirrorOf: null, mirrorLine: null, ...fitFields, ...(under.length > 0 ? { under } : {}) } : x)) }
   return done(next, notes[0])
 }
 

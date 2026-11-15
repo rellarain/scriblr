@@ -94,10 +94,11 @@ export function removeZone(c: ModelContent, id: string): ModelContent {
 // A zone put before another in the stored order (null: last, the top of the tree).
 export const moveZone = (c: ModelContent, id: string, beforeId: string | null): ModelContent => ({ ...c, zones: moveBefore(zonesOf(c), id, beforeId) })
 
-// Puts `id` before `beforeId` in a list of ids (null, or an id not in it: at the end), taking it from where it was.
-function placeIn(list: readonly string[], id: string, beforeId: string | null): string[] {
-  const rest = list.filter(x => x !== id), at = beforeId === null ? -1 : rest.indexOf(beforeId)
-  return at < 0 ? [...rest, id] : [...rest.slice(0, at), id, ...rest.slice(at)]
+// Puts `id` (with `along`, its copies, just before it) before `beforeId` in a list of ids (null, or an id not in it: at the end), taking them from where they were.
+function placeIn(list: readonly string[], id: string, beforeId: string | null, along: readonly string[] = []): string[] {
+  const moving = [...along.filter(x => x !== id), id]
+  const rest = list.filter(x => !moving.includes(x)), at = beforeId === null || moving.includes(beforeId) ? -1 : rest.indexOf(beforeId)
+  return at < 0 ? [...rest, ...moving] : [...rest.slice(0, at), ...moving, ...rest.slice(at)]
 }
 
 // A new group, at the top of a zone.
@@ -119,8 +120,11 @@ export function moveObjectTo(c: ModelContent, objectId: string, groupId: string,
   if (!target) return fail('There is no such group.')
   if (target.mirrorOf) return fail('A twin group follows its original: choose the original group.')
   const from = groupOfObject(c, objectId)
-  if (from?.id !== groupId && target.objects.length >= most) return fail(`A group may have at most ${most} objects.`)
-  return done({ ...c, groups: c.groups.map(g => (g.id === groupId ? { ...g, objects: placeIn(g.objects, objectId, beforeId) } : g.objects.includes(objectId) ? { ...g, objects: g.objects.filter(x => x !== objectId) } : g)) })
+  // its mirrors in the same group go with it (Z3)
+  const along = c.objects.filter(x => x.mirrorOf === objectId && from?.objects.includes(x.id)).map(x => x.id)
+  if (from?.id !== groupId && target.objects.length + along.length >= most) return fail(`A group may have at most ${most} objects.`)
+  const moving = new Set([objectId, ...along])
+  return done({ ...c, groups: c.groups.map(g => (g.id === groupId ? { ...g, objects: placeIn(g.objects, objectId, beforeId, along) } : g.objects.some(x => moving.has(x)) ? { ...g, objects: g.objects.filter(x => !moving.has(x)) } : g)) })
 }
 
 // A shape moved into an object (its own or another), before a shape of that object in the stored order (null: last, the front). Its points stay as they are.
@@ -130,8 +134,11 @@ export function moveShapeTo(c: ModelContent, shapeId: string, objectId: string, 
   if (!target) return fail('There is no such object.')
   if (s.copyOf) return fail('A shape that follows the pattern stays in its member.')
   const from = objectOfShape(c, shapeId)
-  if (from?.id !== objectId && target.shapes.length >= most) return fail(`An object may have at most ${most} shapes.`)
-  return done({ ...c, objects: c.objects.map(o => (o.id === objectId ? { ...o, shapes: placeIn(o.shapes, shapeId, beforeId) } : o.shapes.includes(shapeId) ? { ...o, shapes: o.shapes.filter(x => x !== shapeId) } : o)) })
+  // its mirrors in the same object go with it (Z3)
+  const along = c.shapes.filter(x => x.mirrorOf === shapeId && from?.shapes.includes(x.id)).map(x => x.id)
+  if (from?.id !== objectId && target.shapes.length + along.length >= most) return fail(`An object may have at most ${most} shapes.`)
+  const moving = new Set([shapeId, ...along])
+  return done({ ...c, objects: c.objects.map(o => (o.id === objectId ? { ...o, shapes: placeIn(o.shapes, shapeId, beforeId, along) } : o.shapes.some(x => moving.has(x)) ? { ...o, shapes: o.shapes.filter(x => !moving.has(x)) } : o)) })
 }
 
 // ---- where new things go ----

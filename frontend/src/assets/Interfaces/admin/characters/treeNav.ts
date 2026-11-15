@@ -152,16 +152,23 @@ const DEPTH: Record<TreeKind, number> = { zone: 0, group: 1, object: 2, shape: 3
 // Is a card expanded: what the author chose for it, else zones yes and the rest no.
 export const isExpanded = (kind: TreeKind | 'model', id: string, chosen: Readonly<Record<string, boolean>>): boolean => chosen[id] ?? (kind === 'zone' || kind === 'model')
 
-// The cards a selection lies in, outermost first: a shape's zone, group and object; an object's zone and group; a group's zone. A selected point's shape is in it too.
+// The cards a selection lies in, outermost first: a shape's zone, group and object; an object's zone and group; a group's zone. A selected point's shape is in it too, and a
+// mirror's original (Z3: a mirror is listed inside its original's card when they are side by side).
 export function pathTo(c: ModelContent, sel: Selection, point = false): string[] {
   const zoneOf = (groupId: string) => (c.zones ?? []).find(z => z.groups.includes(groupId))?.id
   const out: string[] = []
   const group = (id: string | undefined) => { if (!id) return; const z = zoneOf(id); if (z) out.push(z); out.push(id) }
+  const object = (o: ModelObject) => {
+    const g = groupOfObject(c, o.id)
+    group(g?.id)
+    if (o.mirrorOf && g?.objects.includes(o.mirrorOf)) out.push(o.mirrorOf)
+  }
   if (sel.kind === 'shape') {
-    const o = objectOfShape(c, sel.id)
-    if (o) { group(groupOfObject(c, o.id)?.id); out.push(o.id) }
+    const o = objectOfShape(c, sel.id), s = shapeById(c, sel.id)
+    if (o) { object(o); out.push(o.id) }
+    if (o && s?.mirrorOf && o.shapes.includes(s.mirrorOf)) out.push(s.mirrorOf)
     if (point) out.push(sel.id)
-  } else if (sel.kind === 'object') group(groupOfObject(c, sel.id)?.id)
+  } else if (sel.kind === 'object') { const o = objectById(c, sel.id); if (o) object(o) }
   else if (sel.kind === 'group') { const z = zoneOf(sel.id); if (z) out.push(z) }
   return out
 }

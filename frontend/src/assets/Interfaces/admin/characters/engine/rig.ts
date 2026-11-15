@@ -7,6 +7,7 @@ import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './pr
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
 import { texturedPath } from './texture'
 import { followBound } from './symmetry'
+import { mirrorLineMat, mirrorPoints, usesMirrorLine } from './mirrorLine'
 import { poseOf } from './pivots'
 import { slidPlace } from './sliders'
 import { isCast } from './kinds'
@@ -1097,14 +1098,24 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
-    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = '', skin: SolvedSkin | undefined, states: Moved[] = []
+    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = '', skin: SolvedSkin | undefined, states: Moved[] = [], acrossLine = false
     // a shape of a class member follows a shape of the template; with no points of its own it is drawn as the template's shape is, in the member's own group,
     // under the member's own choice of form
     const followed = !twin && sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
     const tpl = followed && !followed.mirrorOf && !followed.copyOf ? followed : undefined
     const memberObject = tpl ? objectMap.get(objectOfShape.get(sh.id) ?? '') : undefined
     const memberId = memberObject?.classOf ? memberObject.id : undefined
-    if (twin) {
+    if (twin && usesMirrorLine(c, sh)) {
+      // a twin across a line (Z3): its original as drawn (posed too), reflected across the line in the model's space (the model's centre line, or a symmetric shape's
+      // axis where that shape is drawn now), brought into the twin's own space
+      const o = shapeOut(twin.id)
+      const R = mirrorLineMat(c, sh.mirrorLine, id => shapeOut(id)?.frame, [twin.id, sh.id])
+      const T = o ? mul(inverse(Mg), mul(R, o.frame)) : null
+      rig = o && T ? mirrorPoints(o.rig, T) : []
+      drawn = o && T ? mirrorPoints(o.local, T) : []
+      closed = twin.closed
+      acrossLine = true
+    } else if (twin) {
       // a twin is the mirror image of its original as the original is drawn: its points are the reflection of the original's (in the group's own space,
       // so a group turned with the original is turned the other way round on the twin's side)
       const o = shapeOut(twin.id)
@@ -1152,7 +1163,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     let fin = ok ? build(shown, closed, matrix) : []
     // phase A1: a turned figure turns each outline here, from where the front put it
     let turned: { depth: number; face: number } | null = null, weights: ModelPoint[] = shown, angleSpot: SolvedAngle | undefined, seenAt: [number, number] | undefined
-    if (twin) states = twinStates(twin.id, drawn)
+    if (twin && !acrossLine) states = twinStates(twin.id, drawn)
     if (ok && !flat) {
       statesOf.set(sh.id, states)
       frontBoxes.set(sh.id, boxOf(flatten(fin, closed)))

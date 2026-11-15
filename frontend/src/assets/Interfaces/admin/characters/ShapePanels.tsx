@@ -1,8 +1,9 @@
-import type { ModelContent, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
+import type { ModelContent, ModelMirrorLine, ModelObject, ModelPivot, ModelShape, ModelShapeKind } from '../../../../api/types'
+import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, sharedSegment, sharersOf, weldedTo } from './engine/connect'
 import { shapeById } from './modelContent'
-import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon } from '../../../icons'
+import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { RADIUS, TURN_LIMIT } from './engine/pivots'
 import { removeMark, renameMark } from './engine/anchors'
 import { LIMITS } from './engine/limits'
@@ -17,6 +18,48 @@ type EditShape = (id: string, next: ModelShape, selectPoint?: number) => void
 
 // What the Arrange section needs from the page: whether resizing keeps the proportions, the middle of the model in the shape's space, and moving the shape one place
 // within its object (forward: in front).
+// ---- mirrors (Z3) ----
+
+export interface MirrorActions {
+  // the lines a mirror of this shape or object may take
+  options: (kind: 'shape' | 'object', twinId: string) => LineOption[]
+  onMirror: (kind: 'shape' | 'object', id: string) => void
+  onLine: (kind: 'shape' | 'object', twinId: string, line: ModelMirrorLine | null) => void
+  onDetach: (kind: 'shape' | 'object', twinId: string) => void
+}
+
+// A shape's or an object's mirror: the Mirror button on an original (one mirror each); on a mirror, what it mirrors, its line, and Detach.
+export function MirrorSection({ content, kind, thing, actions }: { content: ModelContent; kind: 'shape' | 'object'; thing: ModelShape | ModelObject; actions: MirrorActions }) {
+  const name = thing.name.trim() || `the ${kind}`
+  if (thing.mirrorOf) {
+    const list = kind === 'shape' ? content.shapes : content.objects
+    const original = (list as Array<ModelShape | ModelObject>).find(x => x.id === thing.mirrorOf)
+    const options = actions.options(kind, thing.id), at = Math.max(0, options.findIndex(o => sameLine(o.line, thing.mirrorLine)))
+    return (
+      <div className="cmMirror" role="group" aria-label="Mirror">
+        <h3 className="cmInsSub">Mirror of {original?.name.trim() || `an untitled ${kind}`}</h3>
+        <label className="cmField">
+          <span>Mirror line</span>
+          <select aria-label="Mirror line" value={at} onChange={e => actions.onLine(kind, thing.id, options[Number(e.target.value)]?.line ?? null)}>
+            {options.map((o, i) => <option key={i} value={i}>{o.name}</option>)}
+          </select>
+        </label>
+        <button type="button" className="cmIconBtn" aria-label={`Detach ${name}`} title={`Detach ${name}: it keeps its outline and stops following its original`} onClick={() => actions.onDetach(kind, thing.id)}><UnlockIcon size={14} /></button>
+      </div>
+    )
+  }
+  const list = kind === 'shape' ? content.shapes : content.objects
+  const has = (list as Array<ModelShape | ModelObject>).some(x => x.mirrorOf === thing.id)
+  return (
+    <div className="cmMirror" role="group" aria-label="Copies">
+      <button
+        type="button" className="cmIconBtn" aria-label={`Mirror ${name}`} disabled={has}
+        title={has ? `${name} has a mirror already` : `Mirror ${name}: a copy across a line of symmetry that follows every edit`} onClick={() => actions.onMirror(kind, thing.id)}
+      ><SwapIcon size={14} /></button>
+    </div>
+  )
+}
+
 export interface ArrangeActions {
   keep: boolean
   onKeep: (on: boolean) => void

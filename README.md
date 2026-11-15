@@ -478,6 +478,9 @@ described, now stale, in `docs/data-model.md`).
   groups back to front; at most 24; repaired, never refused: a zone that repeats an id goes, and a zone keeps only groups that
   exist and are in no zone before it). A model with zones is drawn in the order of its tree (zone, group, object, shape), not by
   z and layer; the shape editor gives a model the starter zones Head, Hair, Torso, Arms and Legs, its groups in Torso.
+  Mirrors (Z3) add, with a default: on a twin shape and a twin object `mirrorLine` (`ModelMirrorLine`: `shape` a symmetric shape's id, `k`
+  its axis 0..5; null: the model's centre line). A twin of a model with zones, or with a line, is its original as drawn reflected
+  across the line in the model's space; a line across a shape that does not exist or is not symmetric stops a publish.
   Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
   once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
   none its class's template).

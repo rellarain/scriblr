@@ -84,6 +84,8 @@ export interface PoseCanvas {
   // which shapes' posable points and sliders can be grabbed (those of the selected group): the others are drawn as when editing
   canGrab?: (shapeId: string) => boolean
 }
+// The line a selected mirror (or the original of one) is reflected across (Z3), in canvas space: a point of it and its way.
+export interface MirrorAxis { x: number; y: number; dx: number; dy: number }
 
 // Frames (phase 5a): every frame of the model as a rectangle in the view (the one being edited has handles, and is moved and resized by dragging; the arrow keys
 // nudge it, Shift with them resizes it, Alt makes the step five). The boxes are in canvas space, as seen from the view being edited.
@@ -228,6 +230,8 @@ export interface CanvasProps {
   onStop?: (shapeId: string, i: number, which: 'lo' | 'hi', world: [number, number]) => void
   // the shape editor (Z1): a box dragged out on the empty grid makes a rectangle there (Shift: a square)
   onDrawBox?: (box: Box) => void
+  // the line a selected mirror is reflected across (Z3), drawn on the Symmetry axes layer
+  mirrorAxis?: MirrorAxis | null
   // Which mode the caller's keys set (the canvas itself only reports).
   onEscape: () => void
 }
@@ -1302,7 +1306,15 @@ export function DesignerCanvas(p: CanvasProps) {
         })}
       </>
     ),
-    mirror: p.transform ? symAxes : <line x1={axis} y1={vb.y} x2={axis} y2={vb.y + vb.h} className={`cmMirrorLine${mirror ? ' cmMirrorLine--on' : ''}`} />,
+    mirror: p.transform ? (
+      <>
+        {symAxes}
+        {p.mirrorAxis && (() => {
+          const m = p.mirrorAxis, l = Math.hypot(m.dx, m.dy) || 1, reach = (Math.max(vb.w, vb.h) * 2) / l
+          return <line x1={m.x - m.dx * reach} y1={m.y - m.dy * reach} x2={m.x + m.dx * reach} y2={m.y + m.dy * reach} className="cmSymAxis cmMirrorAxis" data-mirror-axis="" aria-hidden="true" />
+        })()}
+      </>
+    ) : <line x1={axis} y1={vb.y} x2={axis} y2={vb.y + vb.h} className={`cmMirrorLine${mirror ? ' cmMirrorLine--on' : ''}`} />,
     guides: guides ? (
       <g className="cmLayer" data-layer="guides" aria-hidden="true">
         {guides.x !== null && <line x1={guides.x} y1={vb.y} x2={guides.x} y2={vb.y + vb.h} className="cmGuide" data-guide="x" />}

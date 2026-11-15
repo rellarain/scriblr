@@ -706,6 +706,19 @@ def _pivot_faults(content: ModelContent) -> list[str]:
     return [f"Pivot circle {_label(s.name, s.id)} turns about a pivot point that does not exist." for s in content.shapes if s.pivot is not None and s.pivot.at not in pivot_ids]
 
 
+def _mirror_faults(content: ModelContent) -> list[str]:
+    """Mirrors (Z3; the frontend's mirrorFaults says the same words): a twin reflected across a shape that does not exist or is not symmetric."""
+    symmetric = {s.id for s in content.shapes if s.sym is not None}
+    faults: list[str] = []
+    for o in content.objects:
+        if o.mirrorLine is not None and o.mirrorLine.shape not in symmetric:
+            faults.append(f"Object {_label(o.name, o.id)} is reflected across a shape that does not exist or is not symmetric.")
+    for s in content.shapes:
+        if s.mirrorLine is not None and s.mirrorLine.shape not in symmetric:
+            faults.append(f"Shape {_label(s.name, s.id)} is reflected across a shape that does not exist or is not symmetric.")
+    return faults
+
+
 def _proportion_faults(content: ModelContent) -> list[str]:
     """What is wrong with the skeleton, the fit of objects and the frames (phase 5a; the frontend's proportionFaults says the same words)."""
     faults: list[str] = []
@@ -807,6 +820,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_proportion_faults(content))
     faults.extend(_hand_faults(content))
     faults.extend(_pivot_faults(content))
+    faults.extend(_mirror_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

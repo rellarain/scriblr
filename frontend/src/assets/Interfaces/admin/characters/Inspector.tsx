@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { ArrangeSection, ConnectionsSection, LookSection, MarksSection, PivotSection, SymmetrySection, TypeSection, type PivotActions, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
+import { ArrangeSection, ConnectionsSection, LookSection, MarksSection, MirrorSection, PivotSection, SymmetrySection, TypeSection, type MirrorActions, type PivotActions, type ArrangeActions, type ConnectionActions, type SymmetryActions } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -87,6 +87,8 @@ export interface InspectorProps {
   symmetry?: SymmetryActions
   // a pivot circle's own section (shape types T3)
   pivot?: PivotActions
+  // the shape editor's mirrors (Z3)
+  mirrors?: MirrorActions
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -184,6 +186,7 @@ function ShapeTab(p: InspectorProps) {
         <input value={name} maxLength={NAME_MAX} aria-label={`${sel.kind === 'shape' ? 'Shape' : sel.kind === 'object' ? 'Object' : 'Group'} name`} onChange={e => p.onRename(sel, e.target.value)} />
       </label>
 
+      {sel.kind === 'object' && object && simple && p.mirrors && <MirrorSection content={content} kind="object" thing={object} actions={p.mirrors} />}
       {sel.kind === 'object' && object && !simple && (
         <>
           <label className="cmField">
@@ -203,6 +206,7 @@ function ShapeTab(p: InspectorProps) {
       {shape && simple && (
         <>
           {!shape.mirrorOf && <TypeSection shape={shape} onEditShape={p.onEditShape} />}
+          {p.mirrors && !shape.pivot && <MirrorSection content={content} kind="shape" thing={shape} actions={p.mirrors} />}
           {p.pivot && shape.pivot && <PivotSection shape={shape} actions={p.pivot} />}
           {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} />

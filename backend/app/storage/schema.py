@@ -1800,6 +1800,14 @@ class ModelPivot(BaseModel):
         return round(_finite(value, 0.0, -1e5, 1e5), 2)
 
 
+class ModelMirrorLine(BaseModel):
+    """Mirrors (Z3): the line a twin is reflected across, when it is not the model's centre line: axis `k` of a symmetric shape (the chest's line of symmetry, for
+    the breasts). An axis past the shape's last is read as its first."""
+
+    shape: str = Field(pattern=_MODEL_ID)
+    k: int = Field(default=0, ge=0, le=MODEL_SYM_AXES_MAX - 1)
+
+
 class ModelZone(BaseModel):
     """A zone (Z2): a block of the tree between the model and its groups (Head, Hair, Torso...). Its groups are listed back to front, as the model's are; a model
     with zones is drawn in the order of its tree (zone, group, object, shape), not by z and layer."""
@@ -1890,6 +1898,8 @@ class ModelShape(BaseModel):
     # Shape types T4: the shape's marks (anchors; T5 adds posable points), and where a figure's first shape has been posed (None: as drawn).
     marks: list[ModelMark] = Field(default_factory=list, max_length=MODEL_MARKS_MAX)
     place: Optional[ModelPlace] = None
+    # Mirrors (Z3): on a twin, the line it is reflected across (None: the model's centre line).
+    mirrorLine: Optional[ModelMirrorLine] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1959,6 +1969,11 @@ class ModelShape(BaseModel):
     @classmethod
     def _sym(cls, value: Any) -> Any:
         return _optional_model(ModelSymmetry, value)
+
+    @field_validator("mirrorLine", mode="before")
+    @classmethod
+    def _mirror_line(cls, value: Any) -> Any:
+        return _optional_model(ModelMirrorLine, value)
 
     @field_validator("opBy", mode="before")
     @classmethod
@@ -2638,11 +2653,18 @@ class ModelObject(BaseModel):
     # Phase A1: the shape the object lies on (an eye on the skull): each of its points stands as far toward the viewer as that shape's rounded surface does there, so it slides
     # round the head as the head turns. None: its shapes stand at their own depths.
     wrap: Optional[str] = None
+    # Mirrors (Z3): on a twin object, the line it is reflected across (None: the model's centre line); its shapes carry the same line.
+    mirrorLine: Optional[ModelMirrorLine] = None
 
     @field_validator("wrap", mode="before")
     @classmethod
     def _wrap(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("mirrorLine", mode="before")
+    @classmethod
+    def _mirror_line(cls, value: Any) -> Any:
+        return _optional_model(ModelMirrorLine, value)
 
     @field_validator("drape", mode="before")
     @classmethod

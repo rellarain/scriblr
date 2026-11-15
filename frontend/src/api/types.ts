@@ -754,6 +754,8 @@ export interface ModelShapePivot { at: string; turn: number; lo: number; hi: num
 export interface ModelPivot { id: string; name: string; x: number; y: number }
 // A zone (Z2): a block of the tree between the model and its groups (Head, Hair, Torso...), its groups listed back to front. A model with zones is drawn in the order of its tree.
 export interface ModelZone { id: string; name: string; groups: string[] }
+// Mirrors (Z3): the line a twin is reflected across when it is not the model's centre line: axis `k` of a symmetric shape.
+export interface ModelMirrorLine { shape: string; k: number }
 // Shape types T4: a mark on a shape, in its own drawing space, on point i or inside it (i null): an anchor pins the shape (T5: a posable point); and where a figure's first
 // shape has been posed (turned about the origin, then moved; null as drawn)
 export type ModelMarkKind = 'anchor' | 'pose'
@@ -763,7 +765,7 @@ export interface ModelPlace { dx: number; dy: number; turn: number }
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null; marks?: ModelMark[]; place?: ModelPlace | null }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null; marks?: ModelMark[]; place?: ModelPlace | null; mirrorLine?: ModelMirrorLine | null }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }
@@ -797,7 +799,7 @@ export type ModelFit = 'scale' | 'keep' | 'stretch'
 // Which parts of a colour an object (or a style) holds at one value (phase D3a): hue 0..359, saturation and lightness 0..100. A part that is null is free: it comes from the colour chosen for the slot.
 export interface ModelHsl { h: number | null; s: number | null; l: number | null }
 // drape (phase O6): how far, in percent, the object's weighted points hang back toward the way they were drawn when the body moves (a hem keeps hanging when the hips tilt); 0 leaves them where the body takes them.
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number; wrap?: string | null }
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; under?: string[]; fitTo?: string | null; hsl?: Record<string, ModelHsl>; drape?: number; wrap?: string | null; mirrorLine?: ModelMirrorLine | null }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }

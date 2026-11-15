@@ -61,6 +61,8 @@ describe('the model types match the backend schema', () => {
     ['ModelSlide', 'ModelSlide'],
     // zones (Z2)
     ['ModelZone', 'ModelZone'],
+    // mirrors (Z3)
+    ['ModelMirrorLine', 'ModelMirrorLine'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {

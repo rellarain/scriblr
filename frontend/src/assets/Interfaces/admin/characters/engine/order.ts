@@ -30,7 +30,21 @@ export function treeRank(c: ModelContent): Map<string, number> {
 function zoneRank(c: ModelContent): Map<string, number> {
   const rank = new Map<string, number>()
   const objects = new Map(c.objects.map(o => [o.id, o])), groups = new Map(c.groups.map(g => [g.id, g]))
-  const take = (shapeIds: string[]) => { for (const id of shapeIds) if (!rank.has(id)) rank.set(id, rank.size) }
+  // a shape's mirrors in its object are drawn just behind it (Z3)
+  const twinsIn = new Map<string, string[]>()
+  for (const s of c.shapes) if (s.mirrorOf) twinsIn.set(s.mirrorOf, [...(twinsIn.get(s.mirrorOf) ?? []), s.id])
+  const mirrorOf = new Map(c.shapes.map(s => [s.id, s.mirrorOf ?? null]))
+  const take = (shapeIds: string[]) => {
+    const mine = new Set(shapeIds)
+    for (const id of shapeIds) {
+      if (rank.has(id)) continue
+      const of = mirrorOf.get(id)
+      if (of && mine.has(of)) continue
+      for (const t of twinsIn.get(id) ?? []) if (mine.has(t) && !rank.has(t)) rank.set(t, rank.size)
+      rank.set(id, rank.size)
+    }
+    for (const id of shapeIds) if (!rank.has(id)) rank.set(id, rank.size)
+  }
   const walk = (groupId: string) => { for (const oid of groups.get(groupId)?.objects ?? []) take(objects.get(oid)?.shapes ?? []) }
   const zoned = new Set((c.zones ?? []).flatMap(z => z.groups))
   const grouped = new Set(c.groups.flatMap(g => g.objects))
