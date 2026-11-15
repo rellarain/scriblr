@@ -259,4 +259,10 @@ describe('the Designer fills its console', () => {
   it('pins the view toolbar to the bottom of the stage', () => {
     expect(block('.dzFoot')).toMatch(/position: absolute; bottom: 0/)
   })
+
+  // the tree is a nav: a page whose lists in a nav wrap (the design-system previews) made each card as wide as the widest card under it, out past the panel
+  it('keeps the tree lists from wrapping, so every card fits the tree', () => {
+    expect(block('.dzCardList')).toMatch(/flex-direction: column; flex-wrap: nowrap/)
+    expect(block('.dzHits')).toMatch(/flex-direction: column; flex-wrap: nowrap/)
+  })
 })

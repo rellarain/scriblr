@@ -32,7 +32,7 @@ function devHtml(): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scriblr design system previews</title>
 <link rel="stylesheet" href="project/components/bundle.css">
-<style>body { margin: 0; font: 14px system-ui, sans-serif; } nav ul { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 12px; margin: 0; list-style: none; }</style>
+<style>body { margin: 0; font: 14px system-ui, sans-serif; } body > nav ul { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 12px; margin: 0; list-style: none; }</style>
 <nav><ul>${list}</ul></nav>
 <div id="root"></div>
 <script src="project/components/bundle.js"></script>
