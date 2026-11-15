@@ -27,7 +27,7 @@ def _plotlines(client: TestClient) -> dict:
 
 def test_get_seeds_the_tree_from_the_app_screens(client: TestClient) -> None:
     body = _tree(client)
-    assert body["schemaVersion"] == 1
+    assert body["schemaVersion"] == 2
     assert body["content"] == {}
     assert body["assessments"] == {}
     kinds = {n["kind"] for n in body["nodes"]}
@@ -161,16 +161,15 @@ def test_guide_tutorials_and_faq_round_trip(client: TestClient) -> None:
 
 def test_assessment_only_allowed_on_console_component_or_feature(client: TestClient) -> None:
     interface = _find(_tree(client)["nodes"], "interface", "Writer")
-    resp = client.put(f"/api/resources/nodes/{interface['id']}/assessment", json={"questions": []})
+    resp = client.put(f"/api/resources/nodes/{interface['id']}/assessment", json={"text": ""})
     assert resp.status_code == 400
 
     feature = _plotlines(client)
-    questions = [{"id": "q1", "prompt": "Pick one", "options": [
-        {"id": "o1", "text": "Right", "isCorrect": True}, {"id": "o2", "text": "Wrong", "isCorrect": False},
-    ]}]
-    resp = client.put(f"/api/resources/nodes/{feature['id']}/assessment", json={"questions": questions})
+    text = "????#q1 Pick one\n?! Right\n?? Wrong"
+    resp = client.put(f"/api/resources/nodes/{feature['id']}/assessment", json={"text": text})
     assert resp.status_code == 200
-    assert resp.json()["assessments"][feature["id"]]["questions"] == questions
+    assert resp.json()["assessments"][feature["id"]] == {"text": text}
+    assert client.put(f"/api/resources/nodes/{feature['id']}/assessment", json={"text": "x" * 100_001}).status_code == 422
 
 
 def test_unknown_node_id_is_404(client: TestClient) -> None:

@@ -93,6 +93,10 @@ export const CARD_META: CardMeta[] = [
     summary: "A level's colour as one row: an Inherit toggle, the hue's degrees in a chip, the track (30 to 180 degrees round the parent's hue, or the whole wheel at 360) and a range button, drawn at the zone's own saturation and lightness.",
   },
   {
+    id: 'markup', dir: 'Markup', title: 'Markup: the editor and the formatted text', group: 'Controls', height: 760,
+    summary: "Scriblr's own markup for Resources articles and Training lessons: headings from ###### down to #, lists from > to >>>>, quotes, bold and italic, and knowledge checks; the editor's Write, Read-only and Side by side views, its checks and cheat sheet, and Copy as plain text.",
+  },
+  {
     id: 'reader', dir: 'Reader', title: 'Reader: pages, rails and consoles', group: 'Reader', height: 760,
     summary: 'The Nook, the Library and a book: earlier pages as rails, consoles as an icon, a tile or the full console, the credit pill, the Book page with its level badge, edge tabs, clubs and reviews, the e-reader (Pages), and the plan, borrow and review dialogs.',
   },

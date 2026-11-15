@@ -101,11 +101,11 @@ describe('useResources', () => {
     expect(result.current.contentOf(feature.id).guide).toBe('first edit, second edit')
   })
 
-  it('assessmentOf defaults to an empty question list for a node with none', async () => {
+  it('assessmentOf defaults to an empty text for a node with none', async () => {
     const console_ = node('writer/shelf', 'console', null, 0, 'Shelf')
     vi.spyOn(resourcesApi, 'getResources').mockResolvedValue(file([console_]))
     const { result } = renderHook(() => useResources())
     await waitFor(() => expect(result.current.status).toBe('idle'))
-    expect(result.current.assessmentOf(console_.id)).toEqual({ questions: [] })
+    expect(result.current.assessmentOf(console_.id)).toEqual({ text: '' })
   })
 })

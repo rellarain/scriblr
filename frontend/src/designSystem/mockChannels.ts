@@ -41,7 +41,7 @@ export function consoleIds(nodes: Array<{ id: string; kind: string; parentId: st
 export function createMockChannels() {
   let nodes = sampleNodes()
   let next = 1
-  const file = (): ResourcesFile => ({ schemaVersion: 1, nodes, content: {}, assessments: {}, screensVersion: 1 })
+  const file = (): ResourcesFile => ({ schemaVersion: 2, nodes, content: {}, assessments: {}, screensVersion: 1 })
   const ok = (body: unknown) => ({ status: 200, body })
 
   return {

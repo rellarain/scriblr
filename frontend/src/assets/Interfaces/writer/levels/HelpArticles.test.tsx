@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import * as resourcesApi from '../../../../api/resourcesApi'
 import type { ResourceContent, ResourceNode, ResourcesFile } from '../../../../api/types'
-import HelpArticles, { articlesFor } from './HelpArticles'
+import HelpArticles, { articleText, articlesFor } from './HelpArticles'
 
 const node = (id: string, kind: ResourceNode['kind'], parentId: string | null, name: string, order = 0): ResourceNode => ({ id, kind, parentId, name, order })
 const content = (over: Partial<ResourceContent> = {}): ResourceContent => ({ guide: '', tutorials: [], faq: [], ...over })
-const file = (nodes: ResourceNode[], contents: Record<string, ResourceContent>): ResourcesFile => ({ schemaVersion: 1, nodes, content: contents, assessments: {} })
+const file = (nodes: ResourceNode[], contents: Record<string, ResourceContent>): ResourcesFile => ({ schemaVersion: 2, nodes, content: contents, assessments: {} })
 
 const FILE = file(
   [node('w', 'interface', null, 'Writer'), node('d', 'console', 'w', 'Dashboard'), node('s', 'component', 'd', 'Scratchpad'), node('p', 'console', 'w', 'Project', 1)],
@@ -39,6 +39,21 @@ describe('HelpArticles', () => {
     expect(await screen.findByText('The dashboard guide.')).toBeTruthy()
     expect(screen.getByText('Where do notes go?')).toBeTruthy()
     expect(screen.queryByText('Default help.')).toBeNull()
+  })
+
+  it('formats the markup: headings below the article title, lists, bold', async () => {
+    const formatted = file([node('d', 'console', null, 'Dashboard')], { d: content({ guide: '###### Getting started\n\n>> Open a **project**\n>> Write' }) })
+    vi.spyOn(resourcesApi, 'getResources').mockResolvedValue(formatted)
+    render(<HelpArticles target={t('d')} fallback="Default help." />)
+    expect(await screen.findByRole('heading', { level: 5, name: 'Getting started' })).toBeTruthy()
+    expect(screen.getByText('project').tagName).toBe('STRONG')
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Copy Dashboard as plain text' })).toBeTruthy()
+  })
+
+  it('makes one text of an article for copying, its titles escaped', () => {
+    expect(articleText(content({ guide: 'Guide.', tutorials: [{ id: 't', title: 'Step *one*', body: '>> a' }], faq: [{ id: 'f', question: 'Why?', answer: 'So.', source: 'authored', sourceMessageId: null }] })))
+      .toBe('Guide.\n\n##### Step \\*one\\*\n\n>> a\n\n##### Why?\n\nSo.')
   })
 
   it('falls back to the default text when nothing is written, or the articles cannot load', async () => {

@@ -5,7 +5,7 @@ import { sideVars, useSidebar } from '../writer/sidebarState'
 import BookScope from '../writer/BookScope'
 import LevelPanel from '../writer/levels/LevelPanel'
 import SideResizer from '../writer/levels/SideResizer'
-import { TrainingEmpty, TrainingPage } from './TrainingPage'
+import { RowDetail, TrainingAbout, TrainingEmpty, TrainingPage } from './TrainingPage'
 import { TRAINING_PAGES } from './trainingPages'
 import { courseHue, courseById, exerciseOf, lessonOf, moduleOf, projectOf } from './trainingContent'
 import { levelsOf, sizesFor, type TrainingLevel, type TrainingPath } from './trainingPath'
@@ -120,12 +120,12 @@ function ReadyLevels({ training, actionError, startAt }: { training: TrainingDat
         return (
           <LevelPanel key={level} level={level} size="max" title={item?.title ?? TRAINING_PAGES[kind].label} hue={hue} onPromote={() => t.promote(level)} onSetSize={t.setSize(level)}>
             <TrainingPage page={kind} done={item ? doneAction(t, item.id, item.title) : undefined}>
-              {item?.description && <p className="trAbout">{item.description}</p>}
+              {item && <TrainingAbout text={item.description} />}
               {project && (exercisesOfProject.length === 0
                 ? <TrainingEmpty>No exercises in it yet.</TrainingEmpty>
                 : (
                   <ul className="trList" aria-label={`Exercises of ${project.title}`}>
-                    {exercisesOfProject.map(e => <li key={e.id} className="trRow trRow--static"><span className="trRowText trRowText--static"><span className="trRowTitle">{e.title}</span>{e.description && <span className="trRowDetail">{e.description}</span>}</span></li>)}
+                    {exercisesOfProject.map(e => <li key={e.id} className="trRow trRow--static"><span className="trRowText trRowText--static"><span className="trRowTitle">{e.title}</span><RowDetail about={e.description} /></span></li>)}
                   </ul>
                 ))}
               {exercise && <TrainingEmpty>Nothing to practise yet.</TrainingEmpty>}

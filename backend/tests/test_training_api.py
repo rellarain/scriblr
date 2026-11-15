@@ -31,21 +31,21 @@ def _draft(content: dict) -> dict:
 def test_the_first_load_seeds_five_curricula_each_with_a_course(client: TestClient, app_data_root: Path) -> None:
     body = client.get("/api/training").json()
     content = body["content"]
-    assert content["schemaVersion"] == 1
+    assert content["schemaVersion"] == 2
     assert [c["id"] for c in content["curricula"]] == ["user", "reader", "translator", "writer", "admin"]
     assert [c["title"] for c in content["curricula"]] == ["User Training", "Reader Training", "Translator Training", "Writer Training", "Admin Training"]
     assert [c["hue"] for c in content["curricula"]] == [200, 280, 160, 30, 340]
     writer = next(c for c in content["courses"] if c["id"] == "writer-c1")
     assert [m["id"] for m in writer["modules"]] == ["writer-c1-m1"]
     lesson = writer["modules"][0]["lessons"][0]
-    assert lesson["id"] == "writer-c1-m1-l1" and lesson["body"].startswith("# Lesson 1")
+    assert lesson["id"] == "writer-c1-m1-l1" and lesson["body"].startswith("#### Lesson 1")
     assert [e["id"] for e in lesson["exercises"]] == ["writer-c1-m1-l1-e1"]
     assert [q["id"] for q in lesson["quizzes"]] == ["writer-c1-m1-l1-q1"]
     assert [t["id"] for t in writer["modules"][0]["tests"]] == ["writer-c1-m1-t1"]
     assert [x["id"] for x in writer["exams"]] == ["writer-c1-x1"]
     assert writer["projects"][0]["exerciseIds"] == ["writer-c1-m1-l1-e1"]
     assert all(a["passMark"] == 70 for a in lesson["quizzes"] + writer["exams"])
-    assert body["progress"] == {"schemaVersion": 1, "enrolled": {}, "completed": {}, "attempts": {}}
+    assert body["progress"] == {"schemaVersion": 2, "enrolled": {}, "completed": {}, "attempts": {}}
     assert (app_data_root / "training.json").exists()
 
 
@@ -72,7 +72,7 @@ def test_saving_the_courses_round_trips_and_is_kept(client: TestClient, app_data
     })
     saved = client.put("/api/training/content", json=_draft(content))
     assert saved.status_code == 200
-    assert saved.json()["content"]["schemaVersion"] == 1
+    assert saved.json()["content"]["schemaVersion"] == 2
     assert [c["id"] for c in saved.json()["content"]["curricula"]][-1] == "craft"
     assert (app_data_root / "training.json").exists()
     again = create_app()
@@ -83,7 +83,7 @@ def test_saving_the_courses_round_trips_and_is_kept(client: TestClient, app_data
 
 def test_a_client_cannot_set_the_schema_version(client: TestClient, app_data_root: Path) -> None:
     client.put("/api/training/content", json={**_draft(_content(client)), "schemaVersion": 99})
-    assert json.loads((app_data_root / "training.json").read_text(encoding="utf-8"))["schemaVersion"] == 1
+    assert json.loads((app_data_root / "training.json").read_text(encoding="utf-8"))["schemaVersion"] == 2
 
 
 def _bad(client: TestClient, change) -> str:
@@ -143,11 +143,11 @@ def test_a_file_from_a_newer_version_is_refused_not_overwritten(client: TestClie
     client.get("/api/training")
     path = app_data_root / "training.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    data["schemaVersion"] = 2
+    data["schemaVersion"] = 3
     path.write_text(json.dumps(data), encoding="utf-8")
     assert client.get("/api/training").status_code == 409
     assert client.put("/api/training/content", json=_draft(data)).status_code == 409
-    assert json.loads(path.read_text(encoding="utf-8"))["schemaVersion"] == 2
+    assert json.loads(path.read_text(encoding="utf-8"))["schemaVersion"] == 3
 
 
 # ---------------------------------------------------------------- the learner

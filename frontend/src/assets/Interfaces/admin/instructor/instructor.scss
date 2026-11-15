@@ -61,16 +61,15 @@
 .instEdHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); }
 .instKind { display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-3); background: var(--ov-sink-2); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .instConfirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--alert); font-size: var(--text-small); }
-.instField { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; padding: 0; border: 0; &--short { max-width: 140px; } }
+.instField { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; padding: 0; border: 0; }
 .instFieldHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .instLabel { padding: 0; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
-.instInput, .instText, .instSelect {
+.instInput, .instSelect {
   display: block; width: 100%; box-sizing: border-box; border: 0; border-radius: var(--radius-none); background: var(--ov-sink-1); color: var(--ink);
   font: inherit; font-size: var(--text-field); padding: var(--space-3) var(--space-4); outline: none;
   &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
   &[aria-invalid='true'] { box-shadow: inset 0 0 0 1px var(--alert); }
 }
-.instText { resize: vertical; &--body { min-height: 220px; font-family: ui-monospace, Consolas, monospace; font-size: var(--text-ui); line-height: 1.5; } }
 .instSelect { cursor: pointer; }
 .instHint { margin: 0; font-size: var(--text-small); color: var(--ink-muted); }
 .instHueNone { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: var(--text-field); color: var(--ink-muted); }
@@ -83,17 +82,9 @@
 .instRef { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); background: var(--ov-sink-1); }
 .instRefName { flex: 1 1 auto; min-width: 0; font-size: var(--text-field); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-// A lesson's material, rendered: the Markdown on the panel's own surface.
-.instMarkdown {
-  padding: var(--space-4) var(--space-5); background: var(--ov-sink-1); font-size: var(--text-field); line-height: 1.5; overflow-wrap: anywhere;
-  h1, h2, h3, h4 { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-heading); font-weight: 700; }
-  > :first-child { margin-top: 0; }
-  p, ul, ol, pre, blockquote { margin: 0 0 var(--space-4); }
-  ul, ol { padding-left: var(--space-7); }
-  code { font-family: ui-monospace, Consolas, monospace; font-size: var(--text-ui); background: var(--ov-sink-2); padding: 0 var(--space-1); }
-  pre { overflow-x: auto; padding: var(--space-4); background: var(--ov-sink-2); code { background: none; padding: 0; } }
-  a { color: inherit; text-decoration: underline; }
-}
+// A quiz's, test's or exam's pass mark: a stepper.
+.instStep { display: flex; align-items: center; gap: var(--space-2); .instLabel { margin-right: var(--space-2); } }
+.instStepValue { min-width: 3.5em; text-align: center; font-size: var(--text-field); font-variant-numeric: tabular-nums; }
 
 // ---- a narrow page: the tree stacks above the editor ----
 @container (max-width: 639px) {

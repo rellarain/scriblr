@@ -20,11 +20,11 @@ function course(key: string, role: string): TrainingCourse {
     id: c, title: `${role} Course`, description: '', hue: null,
     modules: [{
       id: m, title: `${role} Module`, description: '',
-      lessons: [{ id: l, title: `${role} Lesson`, description: '', body: '', exercises: [{ id: `${l}-e1`, title: `${role} Exercise`, description: '' }], quizzes: [{ id: `${l}-q1`, title: `${role} Quiz`, description: '', passMark: 70 }] }],
-      tests: [{ id: `${m}-t1`, title: `${role} Test`, description: '', passMark: 70 }],
+      lessons: [{ id: l, title: `${role} Lesson`, description: '', body: '', exercises: [{ id: `${l}-e1`, title: `${role} Exercise`, description: '' }], quizzes: [{ id: `${l}-q1`, title: `${role} Quiz`, description: '', passMark: 70, text: '' }] }],
+      tests: [{ id: `${m}-t1`, title: `${role} Test`, description: '', passMark: 70, text: '' }],
     }],
     projects: [{ id: `${c}-p1`, title: `${role} Project`, description: '', exerciseIds: [`${l}-e1`] }],
-    exams: [{ id: `${c}-x1`, title: `${role} Exam`, description: '', passMark: 70 }],
+    exams: [{ id: `${c}-x1`, title: `${role} Exam`, description: '', passMark: 70, text: '' }],
   }
 }
 const fixture = (): TrainingContent => ({
@@ -141,26 +141,31 @@ describe('the Instructor console: adding, deleting and ordering', () => {
     expect(within(tree().getByRole('group', { name: 'Courses of New curriculum' })).getByRole('button', { name: 'New course' })).toBeInTheDocument()
   })
 
-  it('adds a module, a project and an exam to a course, a lesson and a test to a module, an exercise and a quiz to a lesson', async () => {
+  it('adds a module and a project to a course, a lesson to a module, an exercise to a lesson; one quiz, test and exam each, with the reason on the button', async () => {
     const user = userEvent.setup()
     await open()
     await user.click(row('Writer Course'))
-    for (const [kind, text] of [['module', 'New module'], ['project', 'New project'], ['exam', 'New exam']] as const) {
+    for (const [kind, text] of [['module', 'New module'], ['project', 'New project']] as const) {
       await user.click(row('Writer Course'))
-      await user.click(editor('Course').getByRole('button', { name: `Add ${kind === 'exam' ? 'an' : 'a'} ${kind}` }))
+      await user.click(editor('Course').getByRole('button', { name: `Add a ${kind}` }))
       expect(editor(kind[0].toUpperCase() + kind.slice(1)).getByLabelText('Title')).toHaveValue(text)
       expect(row(text)).toBeInTheDocument()
     }
+    await user.click(row('Writer Course'))
+    expect(editor('Course').getByRole('button', { name: 'Add an exam' })).toBeDisabled()
+    expect(editor('Course').getByRole('button', { name: 'Add an exam' })).toHaveAttribute('title', 'A course has one exam: write more questions in it.')
     await user.click(row('Writer Module'))
     await user.click(editor('Module').getByRole('button', { name: 'Add a lesson' }))
     expect(row('New lesson')).toBeInTheDocument()
     await user.click(row('Writer Module'))
-    await user.click(editor('Module').getByRole('button', { name: 'Add a test' }))
-    expect(row('New test')).toBeInTheDocument()
+    expect(editor('Module').getByRole('button', { name: 'Add a test' })).toBeDisabled()
     await user.click(row('Writer Lesson'))
     await user.click(editor('Lesson').getByRole('button', { name: 'Add an exercise' }))
     expect(row('New exercise')).toBeInTheDocument()
     await user.click(row('Writer Lesson'))
+    expect(editor('Lesson').getByRole('button', { name: 'Add a quiz' })).toBeDisabled()
+    // the new lesson has none yet
+    await user.click(row('New lesson'))
     await user.click(editor('Lesson').getByRole('button', { name: 'Add a quiz' }))
     expect(row('New quiz')).toBeInTheDocument()
   })
@@ -275,30 +280,32 @@ describe('the Instructor console: the fields of each kind', () => {
     expect(backend.state.content.curricula.find(c => c.id === 'writer')!.hue).toBe(200)
   })
 
-  it('keeps a pass mark between 0 and 100', async () => {
-    await open()
+  it('steps a pass mark between 0 and 100, and writes the questions in the markup', async () => {
+    const backend = await open()
     fireEvent.click(row('Writer Exam'))
-    const field = editor('Exam').getByLabelText('Pass mark (%)')
-    expect(field).toHaveValue(70)
-    fireEvent.change(field, { target: { value: '150' } })
-    expect(field).toHaveValue(100)
-    fireEvent.change(field, { target: { value: '-5' } })
-    expect(field).toHaveValue(0)
-    fireEvent.change(field, { target: { value: '82.6' } })
-    expect(field).toHaveValue(83)
+    const mark = within(editor('Exam').getByRole('group', { name: 'Pass mark' }))
+    expect(mark.getByText('70%')).toBeInTheDocument()
+    fireEvent.click(mark.getByRole('button', { name: 'Raise Pass mark' }))
+    expect(mark.getByText('71%')).toBeInTheDocument()
+    for (let k = 0; k < 4; k++) fireEvent.click(mark.getByRole('button', { name: 'Raise Pass mark' }), { shiftKey: true })
+    expect(mark.getByText('100%')).toBeInTheDocument()
+    expect(mark.getByRole('button', { name: 'Raise Pass mark' })).toBeDisabled()
+    fireEvent.change(editor('Exam').getByRole('textbox', { name: 'Questions' }), { target: { value: '???? Which act?\n?! The second\n?? The first' } })
+    fireEvent.click(save())
+    await waitFor(() => expect(backend.state.content.courses.find(c => c.id === 'writer-c1')!.exams[0]).toMatchObject({ passMark: 100, text: '???? Which act?\n?! The second\n?? The first' }))
   })
 
-  it('writes a lesson\'s material in Markdown and reads it rendered', async () => {
+  it('writes a lesson\'s material in the markup and reads it formatted', async () => {
     const user = userEvent.setup()
     const backend = await open()
     await user.click(row('Writer Lesson'))
-    fireEvent.change(editor('Lesson').getByLabelText('Material (Markdown)'), { target: { value: '# Acts\n\nThree of them.' } })
-    await user.click(editor('Lesson').getByRole('button', { name: 'Read the material as it will look' }))
-    const rendered = within(editor('Lesson').getByLabelText('Material, rendered'))
+    fireEvent.change(editor('Lesson').getByRole('textbox', { name: 'Material' }), { target: { value: '###### Acts\n\nThree of them.' } })
+    await user.click(within(editor('Lesson').getByRole('group', { name: 'View of Material' })).getByRole('button', { name: 'Read-only' }))
+    const rendered = within(editor('Lesson').getByRole('region', { name: 'Material, formatted' }))
     expect(rendered.getByRole('heading', { name: 'Acts' })).toBeInTheDocument()
     expect(rendered.getByText('Three of them.')).toBeInTheDocument()
-    await user.click(editor('Lesson').getByRole('button', { name: 'Write the material' }))
-    expect(editor('Lesson').getByLabelText('Material (Markdown)')).toHaveValue('# Acts\n\nThree of them.')
+    await user.click(within(editor('Lesson').getByRole('group', { name: 'View of Material' })).getByRole('button', { name: 'Write' }))
+    expect(editor('Lesson').getByRole('textbox', { name: 'Material' })).toHaveValue('###### Acts\n\nThree of them.')
     await user.click(save())
     await waitFor(() => expect(backend.state.content.courses.find(c => c.id === 'writer-c1')!.modules[0].lessons[0].body).toContain('Three of them.'))
   })

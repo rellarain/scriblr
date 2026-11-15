@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..deps import get_app_data_storage_root
 from ..storage import feedback as feedback_store
@@ -43,7 +43,7 @@ class FaqBody(BaseModel):
 
 
 class AssessmentBody(BaseModel):
-    questions: list[store.Question]
+    text: str = Field(default="", max_length=store.MAX_TEXT)
 
 
 @router.get("")
@@ -107,7 +107,7 @@ def put_faq(node_id: str, body: FaqBody, root: Path = Depends(get_app_data_stora
 @router.put("/nodes/{node_id:path}/assessment")
 def put_assessment(node_id: str, body: AssessmentBody, root: Path = Depends(get_app_data_storage_root)) -> store.ResourcesFile:
     try:
-        return store.set_assessment(root, node_id, body.questions)
+        return store.set_assessment(root, node_id, body.text)
     except store.ResourcesError as exc:
         raise _error(exc) from exc
 

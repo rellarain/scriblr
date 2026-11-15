@@ -2,7 +2,8 @@
 assessment results, in training-progress.json). The two are separate documents, so saving the courses can never wipe what the learner did.
 
 A curriculum is a collection of courses (a course may be in several curricula, or none). A course has modules, projects and exams; a module has
-lessons and tests; a lesson has exercises and quizzes; a lesson's material is Markdown. A project is a system of exercises of its course. A quiz, a
+lessons and tests; a lesson has exercises and quizzes; a lesson's material, every description and an assessment's questions are written in
+Scriblr's markup (markup_convert.py; a file from before it is converted once on read, markup_migration.py, schema version 2). A project is a system of exercises of its course. A quiz, a
 test and an exam are the same thing (an assessment with a pass mark) in a lesson, a module and a course: passing one marks that lesson, module or
 course complete. List order is the display order. Ids are chosen by whoever writes the courses and are unique across the whole document."""
 
@@ -13,7 +14,7 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from .schema import utcnow
 
-TRAINING_SCHEMA_VERSION = 1
+TRAINING_SCHEMA_VERSION = 2
 
 ID_PATTERN = r"^[A-Za-z0-9_-]{1,80}$"
 Id = Annotated[str, StringConstraints(pattern=ID_PATTERN)]
@@ -27,19 +28,22 @@ MAX_MODULES = 100
 MAX_LESSONS = 200
 MAX_EXERCISES = 100
 MAX_PROJECTS = 50
-MAX_ASSESSMENTS = 50
+# One quiz per lesson, one test per module, one exam per course (several were merged into the first when the markup came in).
+MAX_ASSESSMENTS = 1
 MAX_BODY = 100_000
 MAX_ATTEMPTS = 20
 DEFAULT_PASS_MARK = 70
 
 
 class Assessment(BaseModel):
-    """A quiz (in a lesson), a test (in a module) or an exam (in a course). No questions yet: a result is a score the learner got."""
+    """A quiz (in a lesson), a test (in a module) or an exam (in a course): its questions and the text between them, written in the
+    markup, each `????` line with its permanent id (`????#q7f3a`, given by the editor when it saves). A result is a score the learner got."""
 
     id: Id
     title: Title
     description: Description = ""
     passMark: int = Field(default=DEFAULT_PASS_MARK, ge=0, le=100)
+    text: str = Field(default="", max_length=MAX_BODY)
 
 
 class Exercise(BaseModel):
@@ -52,7 +56,7 @@ class Lesson(BaseModel):
     id: Id
     title: Title
     description: Description = ""
-    # The lesson's material, Markdown.
+    # The lesson's material, in the markup.
     body: str = Field(default="", max_length=MAX_BODY)
     exercises: list[Exercise] = Field(default_factory=list, max_length=MAX_EXERCISES)
     quizzes: list[Assessment] = Field(default_factory=list, max_length=MAX_ASSESSMENTS)

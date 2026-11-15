@@ -12,12 +12,17 @@
   .trPageTitleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
   .trRow--static { padding: var(--space-3) var(--space-4); }
   .trRowText--static { padding: 0; }
-  // A lesson's material (Markdown), in the level's own ink.
-  .trMarkdown { font-size: var(--text-ui); line-height: 1.5; overflow-wrap: anywhere; h1, h2, h3, h4 { margin: var(--space-4) 0 var(--space-2); font-size: var(--text-ui); font-weight: 700; } > :first-child { margin-top: 0; } p, ul, ol, pre, blockquote { margin: 0 0 var(--space-3); } ul, ol { padding-left: var(--space-7); } code { font-family: ui-monospace, monospace; font-size: 0.92em; background: var(--level-wash-lo); padding: 0 var(--space-1); } pre { overflow-x: auto; padding: var(--space-3); background: var(--level-wash-lo); code { background: none; padding: 0; } } a { color: inherit; text-decoration: underline; } }
+  // A lesson's material and the descriptions (the markup, components/markup), in the level's own ink; recesses and buttons in the level's washes.
+  .trMaterial { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-ui); }
+  .trMaterialBar { display: flex; justify-content: flex-end; }
+  .trMaterial, .trAbout, .trGroupDefinition {
+    .mkQuestion, .mkPullin { background: var(--level-wash-lo); }
+  }
+  .trMaterialBar .mkIconBtn { background: var(--level-wash-lo); color: inherit; &:hover { background: var(--level-wash); } &:focus-visible { outline-color: var(--wr-accent-light); } }
   // A curriculum in the Catalog: its name, what it is, and its courses.
   .trGroup { display: flex; flex-direction: column; gap: var(--space-3); }
   .trGroupTitle { margin: 0; font-size: var(--text-ui); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-  .trGroupDefinition { margin: 0; font-size: var(--text-small); opacity: 0.85; }
+  .trGroupDefinition { margin: 0; font-size: var(--text-small); }
   .trList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
   .trRow { display: flex; align-items: stretch; gap: var(--space-2); background: var(--level-wash-lo); }
   .trRowOpen, .trRowAction { color: inherit; text-align: left; font: inherit; &:hover { background: var(--level-wash); } &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: -2px; } }

@@ -6,6 +6,18 @@ import {
 } from './instructorModel'
 
 const draft = (): Draft => draftOf(seedContent())
+// The seed with no quizzes, tests or exams (each place holds one at most).
+const bare = (): Draft => {
+  const d = draft()
+  for (const c of d.courses) {
+    c.exams = []
+    for (const m of c.modules) {
+      m.tests = []
+      for (const l of m.lessons) l.quizzes = []
+    }
+  }
+  return d
+}
 const course = (d: Draft, id: string) => d.courses.find(c => c.id === id)!
 
 // A draft with one more exercise and a project in the writer course that names both.
@@ -39,7 +51,7 @@ describe('ids', () => {
 
 describe('adding', () => {
   it('adds each kind last in its list with a title that is not blank, and leaves the old draft alone', () => {
-    const d = draft()
+    const d = bare()
     const made: Array<[Parameters<typeof add>[1], string | null]> = [
       ['curriculum', null], ['course', null], ['module', 'writer-c1'], ['project', 'writer-c1'], ['exam', 'writer-c1'], ['lesson', 'writer-c1-m1'], ['test', 'writer-c1-m1'],
       ['exercise', 'writer-c1-m1-l1'], ['quiz', 'writer-c1-m1-l1'],
@@ -76,8 +88,17 @@ describe('adding', () => {
     const r = add(d, 'module', d.courses[0].id)
     expect(r.id).toBeNull()
     expect(r.draft).toBe(d)
-    expect(canAdd(d, 'exam', d.courses[0].id)).toBeNull()
     expect(canAdd(d, 'lesson', null)).toMatch(/nothing to add/)
+  })
+
+  it('holds one quiz to a lesson, one test to a module and one exam to a course, and says why', () => {
+    const d = draft()
+    expect(canAdd(d, 'exam', 'writer-c1')).toBe('A course has one exam: write more questions in it.')
+    expect(canAdd(d, 'test', 'writer-c1-m1')).toBe('A module has one test: write more questions in it.')
+    expect(canAdd(d, 'quiz', 'writer-c1-m1-l1')).toBe('A lesson has one quiz: write more questions in it.')
+    expect(add(d, 'quiz', 'writer-c1-m1-l1').id).toBeNull()
+    const made = add(bare(), 'quiz', 'writer-c1-m1-l1')
+    expect(find(made.draft, made.id!)?.item).toMatchObject({ passMark: 70, text: '' })
   })
 })
 
@@ -175,8 +196,12 @@ describe('moving to another parent', () => {
     expect(course(d, 'writer-c1').modules[0].lessons).toEqual([])
     expect(find(d, 'writer-c1-m1-l1-e1')?.parentId).toBe('writer-c1-m1-l1')
     expect(takenIds(d)).toEqual(takenIds(draft()))
-    const quiz = moveTo(draft(), 'writer-c1-m1-l1-q1', 'reader-c1-m1-l1')
-    expect(course(quiz, 'reader-c1').modules[0].lessons[0].quizzes.map(q => q.id)).toEqual(['reader-c1-m1-l1-q1', 'writer-c1-m1-l1-q1'])
+    // a quiz moves only to a lesson with none
+    expect(moveTo(draft(), 'writer-c1-m1-l1-q1', 'reader-c1-m1-l1')).toEqual(draft())
+    const open = draft()
+    open.courses.find(c => c.id === 'reader-c1')!.modules[0].lessons[0].quizzes = []
+    const quiz = moveTo(open, 'writer-c1-m1-l1-q1', 'reader-c1-m1-l1')
+    expect(course(quiz, 'reader-c1').modules[0].lessons[0].quizzes.map(q => q.id)).toEqual(['writer-c1-m1-l1-q1'])
   })
 
   it('stops a project naming an exercise that left its course, and a moved project names only its new course\'s exercises', () => {

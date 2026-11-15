@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from 'react'
-import ReactMarkdown from 'react-markdown'
 import type { TrainingAssessment, TrainingProgress } from '../../../api/types'
+import CopyPlainText from '../../../components/markup/CopyPlainText'
+import Markup, { MarkupInline } from '../../../components/markup/Markup'
 import { CheckboxIcon, type IconProps } from '../../icons'
 import { assessmentResult, resultText } from './trainingContent'
 import { TRAINING_PAGES, type TrainingPageKey } from './trainingPages'
@@ -48,7 +49,8 @@ export interface RowAction {
 export interface TrainingRow {
   id: string
   title: string
-  // A second line under the title.
+  // A second line under the title: what it is (a description in the markup, its first line's words only), then `detail`.
+  about?: string
   detail?: string
   onOpen: () => void
   // Icon buttons at the row's right end (Enrol, Leave, mark complete).
@@ -64,7 +66,7 @@ export function TrainingList({ label, openLabel, Icon, rows }: { label: string; 
         <li key={row.id} className="trRow">
           <button type="button" className="trRowOpen" aria-label={openLabel(row.title)} title={openLabel(row.title)} onClick={row.onOpen}>
             <Icon size={18} />
-            <span className="trRowText"><span className="trRowTitle">{row.title}</span>{row.detail && <span className="trRowDetail">{row.detail}</span>}</span>
+            <span className="trRowText"><span className="trRowTitle">{row.title}</span><RowDetail about={row.about} detail={row.detail} /></span>
           </button>
           {row.actions?.map(a => (
             <button
@@ -81,6 +83,19 @@ export function TrainingList({ label, openLabel, Icon, rows }: { label: string; 
   )
 }
 
+// A row's second line: the first line of its description (in the markup) and the rest, with a dot between.
+export function RowDetail({ about, detail }: { about?: string; detail?: string }) {
+  const hasAbout = !!about && about.trim() !== ''
+  if (!hasAbout && !detail) return null
+  return <span className="trRowDetail">{hasAbout && <MarkupInline text={about} />}{hasAbout && detail ? ' · ' : ''}{detail}</span>
+}
+
+// What a course, module, lesson, exercise or project is: its description in the markup.
+export function TrainingAbout({ text }: { text: string }) {
+  if (text.trim() === '') return null
+  return <Markup text={text} baseLevel={3} className="trAbout" />
+}
+
 // The quizzes, tests or exams of something: each with its pass mark and how the learner did. (There is no taking one yet: a result is kept
 // when there is one, through the API.)
 export function TrainingAssessments({ label, items, progress, none }: { label: string; items: TrainingAssessment[]; progress: TrainingProgress; none: string }) {
@@ -91,7 +106,7 @@ export function TrainingAssessments({ label, items, progress, none }: { label: s
         <li key={item.id} className="trRow trRow--static">
           <span className="trRowText trRowText--static">
             <span className="trRowTitle">{item.title}</span>
-            <span className="trRowDetail">{[item.description, `Pass mark ${item.passMark}%`, resultText(assessmentResult(progress, item.id))].filter(Boolean).join(' · ')}</span>
+            <RowDetail about={item.description} detail={[`Pass mark ${item.passMark}%`, resultText(assessmentResult(progress, item.id))].filter(Boolean).join(' · ')} />
           </span>
         </li>
       ))}
@@ -99,7 +114,12 @@ export function TrainingAssessments({ label, items, progress, none }: { label: s
   )
 }
 
-// A lesson's material: Markdown.
-export function TrainingMarkdown({ source }: { source: string }) {
-  return <div className="trMarkdown"><ReactMarkdown>{source}</ReactMarkdown></div>
+// A lesson's material, formatted from the markup, with Copy as plain text.
+export function TrainingMaterial({ source, title }: { source: string; title: string }) {
+  return (
+    <div className="trMaterial">
+      <div className="trMaterialBar"><CopyPlainText text={source} label={`Copy ${title} as plain text`} /></div>
+      <Markup text={source} baseLevel={3} />
+    </div>
+  )
 }

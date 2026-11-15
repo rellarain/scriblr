@@ -259,20 +259,10 @@ export interface ResourceContent {
   faq: ResourceFaqEntry[]
 }
 
-export interface ResourceQuestionOption {
-  id: string
-  text: string
-  isCorrect: boolean
-}
-
-export interface ResourceQuestion {
-  id: string
-  prompt: string
-  options: ResourceQuestionOption[]
-}
-
+// An Exam, Test or Quiz of a console, component or feature: its questions written in the markup (lib/markup), each `????` line with its
+// permanent id. Not taken: articles and lessons pull its questions in as practice.
 export interface ResourceAssessment {
-  questions: ResourceQuestion[]
+  text: string
 }
 
 export interface ResourcesFile {
@@ -351,7 +341,8 @@ export interface BookProgress {
 
 // ---- Training: the courses (authored; training.json) and one learner's progress (training-progress.json); mirrors backend/app/storage/training_schema.py
 // A curriculum is a collection of courses. A quiz (in a lesson), a test (in a module) and an exam (in a course) are an assessment with a pass mark.
-export interface TrainingAssessment { id: string; title: string; description: string; passMark: number }
+// Its questions and the text between them are `text`, in the markup (each `????` line with its permanent id).
+export interface TrainingAssessment { id: string; title: string; description: string; passMark: number; text: string }
 export interface TrainingExercise { id: string; title: string; description: string }
 export interface TrainingLesson { id: string; title: string; description: string; body: string; exercises: TrainingExercise[]; quizzes: TrainingAssessment[] }
 export interface TrainingModule { id: string; title: string; description: string; lessons: TrainingLesson[]; tests: TrainingAssessment[] }

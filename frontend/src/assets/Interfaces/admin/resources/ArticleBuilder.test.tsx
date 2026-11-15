@@ -51,7 +51,7 @@ describe('ArticleBuilder', () => {
     render(<Harness />)
     await vi.waitFor(() => expect(screen.queryByDisplayValue('Existing guide')).toBeTruthy())
 
-    const textarea = screen.getByPlaceholderText('# Write a markdown guide for this node…')
+    const textarea = screen.getByRole('textbox', { name: 'Guide' })
     fireEvent.change(textarea, { target: { value: 'Existing guide!' } })
     fireEvent.change(textarea, { target: { value: 'Existing guide!!' } })
     expect(putGuide).not.toHaveBeenCalled()

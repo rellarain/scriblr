@@ -1,7 +1,9 @@
 """Global (not project-scoped) storage for the app's own help content: the
 Interface > Console > Component > Feature structural tree, and, per node, a
 Guide/Tutorials/FAQ article plus (for console/component/feature nodes) an
-Exam/Test/Quiz question bank. Lives at %APPDATA%\\Scriblr\\resources.json, a
+Exam/Test/Quiz question bank. Everything is written in Scriblr's markup
+(markup_convert.py); a file from before it is converted once on read
+(markup_migration.py, schema version 2). Lives at %APPDATA%\\Scriblr\\resources.json, a
 sibling of user-settings.json, and reuses project_store's atomic-write
 helpers (quarantine on corruption, like every other global store here).
 
@@ -21,7 +23,9 @@ from pydantic import BaseModel, Field
 from . import project_store
 from . import channels
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+# The longest an article's text or an assessment's text may be.
+MAX_TEXT = 100_000
 NodeKind = channels.NodeKind
 
 _lock = threading.RLock()
@@ -72,20 +76,12 @@ class ResourceContent(BaseModel):
     faq: list[FaqEntry] = Field(default_factory=list)
 
 
-class QuestionOption(BaseModel):
-    id: str
-    text: str = ""
-    isCorrect: bool = False
-
-
-class Question(BaseModel):
-    id: str
-    prompt: str = ""
-    options: list[QuestionOption] = Field(default_factory=list)
-
-
 class Assessment(BaseModel):
-    questions: list[Question] = Field(default_factory=list)
+    """An Exam (a console's), a Test (a component's) or a Quiz (a feature's): its questions written in the markup, each `????` line
+    with its permanent id (`????#q7f3a`, given by the editor when it saves). Not taken: its questions are pulled into articles and
+    lessons as practice."""
+
+    text: str = Field(default="", max_length=MAX_TEXT)
 
 
 class ResourcesFile(BaseModel):
@@ -131,6 +127,9 @@ def _load(root: Path) -> ResourcesFile:
         file = _default_file()
         _save(root, file)
         return file
+    from . import markup_migration  # here, not at the top: it reads the models of this module
+
+    markup_migration.upgrade_resources(root, path, ResourcesFile)
     file = project_store._read_shard(path, ResourcesFile)
     if file.screensVersion < channels.SCREENS_VERSION:
         channels.merge_screens(file.nodes, _make_node)
@@ -299,13 +298,13 @@ def get_assessment(file: ResourcesFile, node_id: str) -> Assessment:
     return file.assessments.get(node_id, Assessment())
 
 
-def set_assessment(root: Path, node_id: str, questions: list[Question]) -> ResourcesFile:
+def set_assessment(root: Path, node_id: str, text: str) -> ResourcesFile:
     with _lock:
         file = _load(root)
         node = _find(file, node_id)
         if node.kind not in ("console", "component", "feature"):
             raise ResourcesError("only a console, component or feature can hold an Exam/Test/Quiz")
-        file.assessments[node_id] = Assessment(questions=questions)
+        file.assessments[node_id] = Assessment(text=text)
         _save(root, file)
         return file
 

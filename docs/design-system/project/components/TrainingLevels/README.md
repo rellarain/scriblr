@@ -34,12 +34,12 @@ On this machine (`scriblr.training.*`): where you are (the open course, module, 
 
 ## Data
 
-The courses and one learner's progress come from the backend (`/api/training`; `training.json` and `training-progress.json`), through `training/trainingStore.ts`; the levels are not drawn until they have loaded (a **loading line** `.trStatus`, or the error and a **try again** icon button). A **curriculum is a collection of courses** (a course may be in several, or none: those are listed under **Other courses** in the Catalog); a course has modules, projects and exams, a module has lessons and tests, a lesson has exercises, quizzes and Markdown material; a project names exercises of its course. A course's colour is its own hue, else its first curriculum's.
+The courses and one learner's progress come from the backend (`/api/training`; `training.json` and `training-progress.json`), through `training/trainingStore.ts`; the levels are not drawn until they have loaded (a **loading line** `.trStatus`, or the error and a **try again** icon button). A **curriculum is a collection of courses** (a course may be in several, or none: those are listed under **Other courses** in the Catalog); a course has modules, projects and exams, a module has lessons and tests, a lesson has exercises, one quiz and its material (in the [markup](../Markup/README.md), as every description and an assessment's questions are); a project names exercises of its course. A course's colour is its own hue, else its first curriculum's.
 
 - **Progress on the Desk**: an enrolled course's row says how far through it is ("2 of 5 lessons complete", or "Complete").
 - **Completion buttons**: a lesson, module, exercise, project or course (the first tab's page head, and the Practice page's) has a button that marks it complete, `aria-pressed` when it is (a 32px box, the 18px checkbox icon, `aria-label` "Mark X complete" / "Mark X not complete").
 - **Assessments**: Exams, Tests and Quizzes list each with its description, **pass mark** and how the learner did ("Not tried yet", "Best 85.5%, passed"); there is no taking one yet (a result is a score kept through the API, and a pass marks the lesson, module or course it checks complete).
-- **Material**: a lesson's Markdown, in the level's ink (`.trMarkdown`).
+- **Material**: a lesson's markup, formatted in the level's ink (`.trMaterial`), with **Copy as plain text** above it; a knowledge check sits on the level's own wash. An About paragraph shows a description in full, a row's second line only its first line (`MarkupInline`).
 - A failed change shows its message (`role="alert"`) on the Desk and leaves things as they were.
 
 ## Don't

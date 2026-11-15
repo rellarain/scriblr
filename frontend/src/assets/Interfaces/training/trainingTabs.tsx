@@ -4,9 +4,10 @@ import {
 import type { TrainingCourse, TrainingLesson, TrainingModule } from '../../../api/types'
 import ThemeSettingsPanel from '../../../theme/ThemeSettingsPanel'
 import HelpTile from '../../../components/help/HelpTile'
+import Markup from '../../../components/markup/Markup'
 import { HELP_TARGETS } from '../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from '../writer/levels/LevelTabs'
-import { TrainingAssessments, TrainingEmpty, TrainingList, TrainingMarkdown, TrainingPage, type DoneAction, type TrainingRow } from './TrainingPage'
+import { TrainingAbout, TrainingAssessments, TrainingEmpty, TrainingList, TrainingMaterial, TrainingPage, type DoneAction, type TrainingRow } from './TrainingPage'
 import { courseProgress, looseCourses, progressText } from './trainingContent'
 import { TRAINING_PAGES } from './trainingPages'
 import type { TrainingLevel } from './trainingPath'
@@ -30,7 +31,8 @@ const courseRow = (t: TrainingState, c: TrainingCourse, withProgress: boolean): 
   const enrolled = t.isEnrolled(c.id)
   return {
     id: c.id, title: c.title,
-    detail: [c.description, withProgress && enrolled ? progressText(c, t.progress) : ''].filter(Boolean).join(' · '),
+    about: c.description,
+    detail: withProgress && enrolled ? progressText(c, t.progress) : '',
     onOpen: () => t.openCourse(c.id),
     actions: [enrolled
       ? { label: `Leave ${c.title}`, Icon: CheckIcon, pressed: true, onClick: () => t.toggleEnrolled(c.id) }
@@ -61,7 +63,7 @@ export function deskTabs(t: TrainingState): LevelTab[] {
           {content.curricula.map(cur => (
             <section key={cur.id} className="trGroup" aria-label={cur.title}>
               <h4 className="trGroupTitle">{cur.title}</h4>
-              <p className="trGroupDefinition" title={TRAINING_PAGES.curriculum.definition}>{cur.description}</p>
+              {cur.description.trim() !== '' && <div className="trGroupDefinition" title={TRAINING_PAGES.curriculum.definition}><Markup text={cur.description} baseLevel={4} /></div>}
               {cur.courseIds.length === 0
                 ? <TrainingEmpty>No courses in it yet.</TrainingEmpty>
                 : <TrainingList
@@ -91,12 +93,12 @@ export function courseTabs(t: TrainingState, course: TrainingCourse): LevelTab[]
       id: 'modules', label: 'Modules', Icon: OutlineIcon,
       render: () => (
         <TrainingPage page="module" done={doneAction(t, course.id, course.title)}>
-          {course.description && <p className="trAbout">{course.description}</p>}
+          <TrainingAbout text={course.description} />
           {course.modules.length === 0
             ? <TrainingEmpty>No modules yet.</TrainingEmpty>
             : <TrainingList
               label={`Modules of ${course.title}`} openLabel={title => `Open ${title}`} Icon={StackIcon}
-              rows={course.modules.map(m => ({ id: m.id, title: m.title, detail: [m.description, plural(m.lessons.length, 'lesson')].filter(Boolean).join(' · '), onOpen: () => t.openModule(m.id), done: doneAction(t, m.id, m.title) }))}
+              rows={course.modules.map(m => ({ id: m.id, title: m.title, about: m.description, detail: plural(m.lessons.length, 'lesson'), onOpen: () => t.openModule(m.id), done: doneAction(t, m.id, m.title) }))}
             />}
         </TrainingPage>
       ),
@@ -113,7 +115,7 @@ export function courseTabs(t: TrainingState, course: TrainingCourse): LevelTab[]
             ? <TrainingEmpty>No projects yet.</TrainingEmpty>
             : <TrainingList
               label={`Projects of ${course.title}`} openLabel={title => `Open ${title}`} Icon={BriefcaseIcon}
-              rows={course.projects.map(p => ({ id: p.id, title: p.title, detail: [p.description, plural(p.exerciseIds.length, 'exercise')].filter(Boolean).join(' · '), onOpen: () => t.openProject(p.id), done: doneAction(t, p.id, p.title) }))}
+              rows={course.projects.map(p => ({ id: p.id, title: p.title, about: p.description, detail: plural(p.exerciseIds.length, 'exercise'), onOpen: () => t.openProject(p.id), done: doneAction(t, p.id, p.title) }))}
             />}
         </TrainingPage>
       ),
@@ -127,12 +129,12 @@ export function moduleTabs(t: TrainingState, mod: TrainingModule): LevelTab[] {
       id: 'lessons', label: 'Lessons', Icon: NoteIcon,
       render: () => (
         <TrainingPage page="lesson" done={doneAction(t, mod.id, mod.title)}>
-          {mod.description && <p className="trAbout">{mod.description}</p>}
+          <TrainingAbout text={mod.description} />
           {mod.lessons.length === 0
             ? <TrainingEmpty>No lessons yet.</TrainingEmpty>
             : <TrainingList
               label={`Lessons of ${mod.title}`} openLabel={title => `Open ${title}`} Icon={NoteIcon}
-              rows={mod.lessons.map(l => ({ id: l.id, title: l.title, detail: l.description, onOpen: () => t.openLesson(l.id), done: doneAction(t, l.id, l.title) }))}
+              rows={mod.lessons.map(l => ({ id: l.id, title: l.title, about: l.description, onOpen: () => t.openLesson(l.id), done: doneAction(t, l.id, l.title) }))}
             />}
         </TrainingPage>
       ),
@@ -150,8 +152,8 @@ export function lessonTabs(t: TrainingState, lesson: TrainingLesson): LevelTab[]
       id: 'material', label: 'Material', Icon: PageIcon,
       render: () => (
         <TrainingPage page="lesson" done={doneAction(t, lesson.id, lesson.title)}>
-          {lesson.description && <p className="trAbout">{lesson.description}</p>}
-          {lesson.body.trim() === '' ? <TrainingEmpty>No material yet.</TrainingEmpty> : <TrainingMarkdown source={lesson.body} />}
+          <TrainingAbout text={lesson.description} />
+          {lesson.body.trim() === '' ? <TrainingEmpty>No material yet.</TrainingEmpty> : <TrainingMaterial source={lesson.body} title={lesson.title} />}
         </TrainingPage>
       ),
     },
@@ -167,7 +169,7 @@ export function lessonTabs(t: TrainingState, lesson: TrainingLesson): LevelTab[]
             ? <TrainingEmpty>No exercises yet.</TrainingEmpty>
             : <TrainingList
               label={`Exercises of ${lesson.title}`} openLabel={title => `Open ${title}`} Icon={RevisionIcon}
-              rows={lesson.exercises.map(e => ({ id: e.id, title: e.title, detail: e.description, onOpen: () => t.openExercise(e.id), done: doneAction(t, e.id, e.title) }))}
+              rows={lesson.exercises.map(e => ({ id: e.id, title: e.title, about: e.description, onOpen: () => t.openExercise(e.id), done: doneAction(t, e.id, e.title) }))}
             />}
         </TrainingPage>
       ),

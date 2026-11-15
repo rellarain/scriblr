@@ -4,14 +4,14 @@ import {
   putResourceTutorials, renameResourceNode,
 } from '../../../../api/resourcesApi'
 import type {
-  ResourceAssessment, ResourceContent, ResourceFaqEntry, ResourceNode, ResourceNodeKind, ResourceQuestion,
+  ResourceAssessment, ResourceContent, ResourceFaqEntry, ResourceNode, ResourceNodeKind,
   ResourceTutorial, ResourcesFile,
 } from '../../../../api/types'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
 const EMPTY_CONTENT: ResourceContent = { guide: '', tutorials: [], faq: [] }
-const EMPTY_ASSESSMENT: ResourceAssessment = { questions: [] }
+const EMPTY_ASSESSMENT: ResourceAssessment = { text: '' }
 
 // The next kind a node's own "+ Add" button creates -- null once you're at a
 // feature, the tree's leaf.
@@ -136,10 +136,10 @@ export function useResources() {
     const content = { ...current.content, [nodeId]: { ...(current.content[nodeId] ?? EMPTY_CONTENT), ...patch } }
     applyFile({ ...current, content })
   }
-  function optimisticAssessment(nodeId: string, questions: ResourceQuestion[]) {
+  function optimisticAssessment(nodeId: string, text: string) {
     const current = fileRef.current
     if (!current) return
-    applyFile({ ...current, assessments: { ...current.assessments, [nodeId]: { questions } } })
+    applyFile({ ...current, assessments: { ...current.assessments, [nodeId]: { text } } })
   }
 
   async function setGuide(nodeId: string, guide: string): Promise<void> {
@@ -154,9 +154,9 @@ export function useResources() {
     optimisticContent(nodeId, { faq })
     try { await putResourceFaq(nodeId, faq) } catch (err) { console.error('Failed to save the FAQ', err) }
   }
-  async function setAssessment(nodeId: string, questions: ResourceQuestion[]): Promise<void> {
-    optimisticAssessment(nodeId, questions)
-    try { await putResourceAssessment(nodeId, questions) } catch (err) { console.error('Failed to save the assessment', err) }
+  async function setAssessment(nodeId: string, text: string): Promise<void> {
+    optimisticAssessment(nodeId, text)
+    try { await putResourceAssessment(nodeId, text) } catch (err) { console.error('Failed to save the assessment', err) }
   }
 
   return {

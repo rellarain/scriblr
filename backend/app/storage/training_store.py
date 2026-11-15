@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import project_store
+from . import markup_migration, project_store
 from .schema import utcnow
 from .training_schema import (
     DEFAULT_PASS_MARK,
@@ -75,7 +75,7 @@ def default_content() -> TrainingContent:
             modules=[Module(
                 id=m, title="Module 1", description="Placeholder module.",
                 lessons=[Lesson(
-                    id=lesson, title="Lesson 1", description="Placeholder lesson.", body=f"# Lesson 1\n\nPlaceholder material for the {role.lower()} course.",
+                    id=lesson, title="Lesson 1", description="Placeholder lesson.", body=f"#### Lesson 1\n\nPlaceholder material for the {role.lower()} course.",
                     exercises=[Exercise(id=f"{lesson}-e1", title="Exercise 1", description="Placeholder exercise.")],
                     quizzes=[Assessment(id=f"{lesson}-q1", title="Quiz 1", description="Placeholder quiz.")],
                 )],
@@ -112,6 +112,7 @@ def load_content(root: Path) -> TrainingContent:
             _save_content(root, content)
             return content
         _refuse_newer(path)
+        markup_migration.upgrade_training(root, path, TrainingContent)
         return project_store._read_shard(path, TrainingContent)
 
 

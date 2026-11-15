@@ -1,0 +1,88 @@
+// Scriblr's markup (Markup.tsx) and its editor (MarkupEditor.tsx). The text takes the ink of what holds it (a level's ink in Training, the
+// panel's in Admin), so nothing here sets a text colour on the formatted text; recesses are --ov-sink-*. Theme tokens only.
+
+.mk {
+  font-size: inherit; line-height: 1.55; overflow-wrap: anywhere;
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+}
+.mkP { margin: 0 0 var(--space-3); }
+// The app's reset (App.scss) makes strong and em plain: the markup's styles put them back.
+.mk, .mkInline {
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+}
+
+// Headings, largest to smallest: ###### largest, bolder, underlined; ##### largest, bolder; #### larger, bold, underlined; ### larger, bold;
+// ## bold, underlined; # bold.
+.mkH { margin: var(--space-4) 0 var(--space-2); font-size: 1em; font-weight: 700; line-height: 1.3; }
+.mkH6, .mkH5 { margin: var(--space-6) 0 var(--space-3); font-size: 1.45em; font-weight: 800; }
+.mkH4, .mkH3 { margin: var(--space-5) 0 var(--space-2); font-size: 1.2em; }
+.mkH6, .mkH4, .mkH2 { text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: from-font; }
+
+// Lists: the label is drawn (a dot, a number, a ring, 1.1), so dots and numbers can sit side by side in one list.
+.mkList { margin: 0 0 var(--space-3); padding: 0; list-style: none; }
+.mkList--sub { margin: var(--space-1) 0 0; padding-left: 1.6em; }
+.mkItem { display: flex; gap: 0.5em; margin: 0 0 var(--space-1); }
+.mkItem--bare { display: block; }
+.mkLabel { flex: 0 0 auto; min-width: 1.1em; font-variant-numeric: tabular-nums; }
+.mkItem--d2 > .mkLabel, .mkItem--d4 > .mkLabel { min-width: 1.6em; }
+.mkItemText { flex: 1 1 auto; min-width: 0; }
+
+.mkQuote { margin: 0 0 var(--space-3); padding: var(--space-1) 0 var(--space-1) var(--space-4); border-left: 3px solid currentColor; font-style: italic; p { margin: 0; } }
+
+// A knowledge check, shown as its question and options (it becomes practice in a later slice).
+.mkQuestion { margin: 0 0 var(--space-3); padding: var(--space-3) var(--space-4); background: var(--ov-sink-1); }
+.mkPrompt { margin: 0 0 var(--space-2); font-weight: 600; }
+.mkOptions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.mkOption { display: flex; align-items: baseline; gap: 0.5em; }
+.mkMark { flex: 0 0 auto; width: 0.8em; height: 0.8em; border: 1.5px solid currentColor; transform: translateY(0.08em); }
+.mkMark--choice { border-radius: 50%; }
+.mkAnswerField {
+  width: 100%; max-width: 320px; box-sizing: border-box; padding: var(--space-1) var(--space-2); border: 0; box-shadow: inset 0 0 0 1px var(--hairline);
+  background: var(--surface-base); color: var(--ink); font: inherit;
+  &::placeholder { color: var(--ink-faint); }
+}
+.mkPullin { display: flex; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); background: var(--ov-sink-1); font-style: italic; }
+
+// The editor: a bar (views, the checks count, the cheat sheet), the field and/or the formatted text, then the checks.
+.mkEditor { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; container-type: inline-size; }
+.mkBar { display: flex; align-items: center; gap: var(--space-2); }
+.mkViews { display: inline-flex; gap: 2px; margin-right: auto; }
+.mkIconBtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px; padding: 0; border: 0;
+  background: var(--ov-sink-1); color: var(--ink); cursor: pointer;
+  &:hover { background: var(--ov-sink-2); }
+  &[aria-pressed='true'], &[aria-expanded='true'] { background: var(--accent); color: var(--on-accent); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+}
+.mkCheckCount { display: inline-flex; align-items: center; gap: 3px; padding: 0 var(--space-2); height: 22px; font-size: var(--text-small); font-weight: 700; background: var(--alert); color: var(--on-alert); }
+.mkPanes { display: grid; grid-template-columns: 1fr; gap: var(--space-3); min-width: 0; }
+.mkEditor--side .mkPanes { grid-template-columns: 1fr 1fr; }
+@container (max-width: 520px) { .mkEditor--side .mkPanes { grid-template-columns: 1fr; } }
+.mkField {
+  display: block; width: 100%; box-sizing: border-box; min-height: 4.5em; resize: vertical; padding: var(--space-2) var(--space-3); border: 0;
+  box-shadow: inset 0 0 0 1px var(--hairline); background: var(--surface-base); color: var(--ink); font: inherit; font-size: var(--text-field);
+  line-height: 1.5; tab-size: 4;
+  &:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
+  &::placeholder { color: var(--ink-faint); }
+}
+.mkPreview { min-width: 0; padding: var(--space-3) var(--space-4); background: var(--ov-sink-1); color: var(--ink); font-size: var(--text-field); overflow-wrap: anywhere; }
+.mkEmpty { margin: 0; color: var(--ink-muted); }
+.mkChecks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.mkCheck {
+  display: flex; align-items: baseline; gap: var(--space-2); width: 100%; padding: var(--space-1) var(--space-2); border: 0; text-align: left;
+  font: inherit; font-size: var(--text-small); background: var(--ov-sink-1); color: var(--ink); cursor: pointer;
+  svg { flex: 0 0 auto; align-self: center; }
+  &:hover { background: var(--ov-sink-2); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+}
+.mkCheckLine { font-weight: 700; white-space: nowrap; }
+.mkCheat { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3) var(--space-5); padding: var(--space-3) var(--space-4); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--ink); }
+.mkCheatTitle { margin: 0 0 var(--space-1); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.mkCheatList { margin: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.mkCheatRow { display: flex; flex-direction: column; dt, dd { margin: 0; } dd { font-size: var(--text-small); color: var(--ink-muted); } code { font-family: ui-monospace, monospace; font-size: 0.92em; } }
+
+// Copy as plain text, and what it said.
+.mkCopy { display: inline-flex; align-items: center; gap: var(--space-2); }
+.mkCopyNote { font-size: var(--text-small); &:empty { display: none; } }

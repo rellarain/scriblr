@@ -21,21 +21,21 @@ export function seedContent(): TrainingContent {
       modules: [{
         id: m, title: 'Module 1', description: 'Placeholder module.',
         lessons: [{
-          id: l, title: 'Lesson 1', description: 'Placeholder lesson.', body: `# Lesson 1\n\nPlaceholder material for the ${role.toLowerCase()} course.`,
+          id: l, title: 'Lesson 1', description: 'Placeholder lesson.', body: `#### Lesson 1\n\nPlaceholder material for the ${role.toLowerCase()} course.`,
           exercises: [{ id: `${l}-e1`, title: 'Exercise 1', description: 'Placeholder exercise.' }],
-          quizzes: [{ id: `${l}-q1`, title: 'Quiz 1', description: 'Placeholder quiz.', passMark: 70 }],
+          quizzes: [{ id: `${l}-q1`, title: 'Quiz 1', description: 'Placeholder quiz.', passMark: 70, text: '' }],
         }],
-        tests: [{ id: `${m}-t1`, title: 'Test 1', description: 'Placeholder test.', passMark: 70 }],
+        tests: [{ id: `${m}-t1`, title: 'Test 1', description: 'Placeholder test.', passMark: 70, text: '' }],
       }],
       projects: [{ id: `${c}-p1`, title: 'Project 1', description: 'Placeholder project.', exerciseIds: [`${l}-e1`] }],
-      exams: [{ id: `${c}-x1`, title: 'Exam 1', description: 'Placeholder exam.', passMark: 70 }],
+      exams: [{ id: `${c}-x1`, title: 'Exam 1', description: 'Placeholder exam.', passMark: 70, text: '' }],
     })
     return { id: key, title: `${role} Training`, description: `Access ${role.toLowerCase()} training resources here.`, hue, courseIds: [c] }
   })
-  return { schemaVersion: 1, curricula, courses }
+  return { schemaVersion: 2, curricula, courses }
 }
 
-export const emptyProgress = (): TrainingProgress => ({ schemaVersion: 1, enrolled: {}, completed: {}, attempts: {} })
+export const emptyProgress = (): TrainingProgress => ({ schemaVersion: 2, enrolled: {}, completed: {}, attempts: {} })
 
 const ASSESSMENT_KINDS = ['quiz', 'test', 'exam']
 
@@ -50,7 +50,7 @@ export function createMockTraining(initial: TrainingContent = seedContent(), pro
     if (parts.length === 0 && method === 'GET') return ok(snapshot())
     if (what === 'content' && method === 'PUT') {
       const draft = body as TrainingContentDraft
-      state.content = { schemaVersion: 1, curricula: structuredClone(draft.curricula), courses: structuredClone(draft.courses) }
+      state.content = { schemaVersion: 2, curricula: structuredClone(draft.curricula), courses: structuredClone(draft.courses) }
       const kept = indexOf(state.content)
       const kind = (i: string) => kept.get(i)?.kind
       state.progress.enrolled = Object.fromEntries(Object.entries(state.progress.enrolled).filter(([i]) => kind(i) === 'course'))

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
 import type { TrainingCourse, TrainingCurriculum, TrainingLesson, TrainingProject } from '../../../../api/types'
 import DragGap from '../../../../components/DragGap'
-import { CheckIcon, CloseIcon, EyeIcon, GripIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon } from '../../../icons'
+import MarkupEditor from '../../../../components/markup/MarkupEditor'
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, GripIcon, PlusIcon, TrashIcon, UndoIcon } from '../../../icons'
 import HueSlider from '../../writer/HueSlider'
 import { useReorder } from '../plot/useReorder'
 import {
@@ -66,21 +66,25 @@ function HueField({ label, hue, parentHue, onChange }: { label: string; hue: num
   )
 }
 
-// A lesson's material: Markdown, written in a field or read as it will look.
+// A lesson's material, in the markup editor.
 function Material({ lesson, ins }: { lesson: TrainingLesson; ins: Instructor }) {
-  const [view, setView] = useState<'write' | 'read'>('write')
   return (
     <div className="instField">
-      <div className="instFieldHead">
-        <span className="instLabel">Material (Markdown)</span>
-        <span className="instTools" role="group" aria-label="Material view">
-          <button type="button" className="instIconBtn" aria-label="Write the material" title="Write" aria-pressed={view === 'write'} onClick={() => setView('write')}><PencilIcon size={14} /></button>
-          <button type="button" className="instIconBtn" aria-label="Read the material as it will look" title="Rendered" aria-pressed={view === 'read'} onClick={() => setView('read')}><EyeIcon size={14} /></button>
-        </span>
-      </div>
-      {view === 'write'
-        ? <textarea className="instText instText--body" aria-label="Material (Markdown)" rows={14} maxLength={FIELD_MAX.body} value={lesson.body} onChange={e => ins.edit(lesson.id, { body: e.target.value })} />
-        : <div className="instMarkdown" aria-label="Material, rendered">{lesson.body.trim() ? <ReactMarkdown>{lesson.body}</ReactMarkdown> : <p className="instNote">No material yet.</p>}</div>}
+      <span className="instLabel">Material</span>
+      <MarkupEditor label="Material" baseLevel={3} rows={14} maxLength={FIELD_MAX.body} value={lesson.body} onChange={body => ins.edit(lesson.id, { body })} />
+    </div>
+  )
+}
+
+// A quiz's, test's or exam's pass mark, by steps of 1 (Shift: 10).
+function PassMark({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const step = (dir: -1 | 1, big: boolean) => onChange(Math.max(0, Math.min(100, value + dir * (big ? 10 : 1))))
+  return (
+    <div className="instStep" role="group" aria-label="Pass mark">
+      <span className="instLabel">Pass mark</span>
+      <button type="button" className="instIconBtn" aria-label="Lower Pass mark" title="Lower (Shift: by 10)" disabled={value <= 0} onClick={e => step(-1, e.shiftKey)}><ChevronLeftIcon size={14} /></button>
+      <span className="instStepValue" aria-live="polite">{value}%</span>
+      <button type="button" className="instIconBtn" aria-label="Raise Pass mark" title="Raise (Shift: by 10)" disabled={value >= 100} onClick={e => step(1, e.shiftKey)}><ChevronRightIcon size={14} /></button>
     </div>
   )
 }
@@ -212,10 +216,10 @@ export function InstructorEditor({ draft, ins, id, focusTitle, onAdded, onRemove
         <input ref={title} className="instInput" aria-label="Title" maxLength={FIELD_MAX.title} value={item.title} aria-invalid={item.title.trim() === ''} onChange={e => ins.edit(id, { title: e.target.value })} />
         {ins.faultOf(id) && <span className="instFault" role="note">{ins.faultOf(id)}</span>}
       </label>
-      <label className="instField">
+      <div className="instField">
         <span className="instLabel">Description</span>
-        <textarea className="instText" aria-label="Description" rows={3} maxLength={FIELD_MAX.description} value={item.description} onChange={e => ins.edit(id, { description: e.target.value })} />
-      </label>
+        <MarkupEditor label="Description" baseLevel={3} rows={3} maxLength={FIELD_MAX.description} value={item.description} onChange={description => ins.edit(id, { description })} />
+      </div>
 
       {kind === 'curriculum' && (
         <>
@@ -231,13 +235,16 @@ export function InstructorEditor({ draft, ins, id, focusTitle, onAdded, onRemove
       )}
       {kind === 'lesson' && <Material lesson={found.item as unknown as TrainingLesson} ins={ins} />}
       {(kind === 'quiz' || kind === 'test' || kind === 'exam') && (
-        <label className="instField instField--short">
-          <span className="instLabel">Pass mark (%)</span>
-          <input
-            className="instInput" type="number" min={0} max={100} step={1} aria-label="Pass mark (%)" value={typed.passMark as number}
-            onChange={e => { const n = Math.round(Number(e.target.value)); if (!Number.isNaN(n)) ins.edit(id, { passMark: Math.max(0, Math.min(100, n)) }) }}
-          />
-        </label>
+        <>
+          <PassMark value={typed.passMark as number} onChange={passMark => ins.edit(id, { passMark })} />
+          <div className="instField">
+            <span className="instLabel">Questions</span>
+            <MarkupEditor
+              label="Questions" baseLevel={3} rows={14} maxLength={FIELD_MAX.body} value={(typed.text as string | undefined) ?? ''} onChange={text => ins.edit(id, { text })}
+              placeholder={'???? A question\n?! The right choice\n?? A wrong choice'}
+            />
+          </div>
+        </>
       )}
       {kind === 'project' && course && <ProjectExercises project={found.item as unknown as TrainingProject} course={course} ins={ins} />}
 

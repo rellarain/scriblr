@@ -1,6 +1,6 @@
 import { api } from './client'
 import type {
-  PromotableFeedbackMessage, ResourceFaqEntry, ResourceNodeKind, ResourceQuestion, ResourceTutorial, ResourcesFile,
+  PromotableFeedbackMessage, ResourceFaqEntry, ResourceNodeKind, ResourceTutorial, ResourcesFile,
 } from './types'
 
 const id = encodeURIComponent
@@ -37,8 +37,8 @@ export function putResourceFaq(nodeId: string, faq: ResourceFaqEntry[]): Promise
   return api.put<ResourcesFile>(`/resources/nodes/${id(nodeId)}/faq`, { faq })
 }
 
-export function putResourceAssessment(nodeId: string, questions: ResourceQuestion[]): Promise<ResourcesFile> {
-  return api.put<ResourcesFile>(`/resources/nodes/${id(nodeId)}/assessment`, { questions })
+export function putResourceAssessment(nodeId: string, text: string): Promise<ResourcesFile> {
+  return api.put<ResourcesFile>(`/resources/nodes/${id(nodeId)}/assessment`, { text })
 }
 
 export function getPromotableFeedback(nodeId: string): Promise<PromotableFeedbackMessage[]> {

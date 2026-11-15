@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { useEffect, useState } from 'react'
 import { getPromotableFeedback } from '../../../../api/resourcesApi'
 import type { PromotableFeedbackMessage, ResourceFaqEntry, ResourceTutorial } from '../../../../api/types'
+import Markup from '../../../../components/markup/Markup'
+import MarkupEditor from '../../../../components/markup/MarkupEditor'
 import ResourceTree from './ResourceTree'
+import { useNodeText } from './useNodeText'
 import type { ResourcesWorkspace } from './useResources'
 import './resources.scss'
 
@@ -13,16 +15,14 @@ function newLocalId(prefix: string): string {
 // AUI's Resources tile, redesigned as an article builder: the shared
 // Interface > Console > Component > Feature tree (ResourceTree.tsx) on the
 // left, and a Guide/Tutorials/FAQ editor for whichever node is selected on
-// the right, with a Preview toggle that renders the same content as it
-// would look inside a console's Help panel or Training page (no consoles
-// actually read from this yet -- see the plan's "no live wiring this phase").
+// the right (each written in the markup editor), with a Preview toggle that
+// shows the same content as a console's Help panel or Training page would.
 function ArticleBuilder({ resources, selectedId, onSelectNode }: {
   resources: ResourcesWorkspace
   selectedId: string | null
   onSelectNode: (id: string) => void
 }) {
   const [contentTab, setContentTab] = useState<'guide' | 'tutorials' | 'faq'>('guide')
-  const [guideView, setGuideView] = useState<'write' | 'rendered'>('write')
   const [previewOn, setPreviewOn] = useState(false)
   const [previewAs, setPreviewAs] = useState<'help' | 'training'>('help')
   const [promoteOpen, setPromoteOpen] = useState(false)
@@ -33,44 +33,13 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
   const path = selectedId ? resources.pathTo(selectedId) : []
   const breadcrumb = path.map(n => n.name || `Untitled ${n.kind}`).join(' › ')
 
-  // Local guide text, debounced to the server (typing shouldn't save on
-  // every keystroke) -- flushed immediately if the selection changes while
-  // an edit is still waiting, so switching nodes quickly never drops it.
-  const [guideText, setGuideText] = useState(content.guide)
-  const guideTextRef = useRef(content.guide)
-  const guideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const savingForId = useRef<string | null>(null)
+  // The guide's text while typing, saved a moment after the last key (and at once to its own node when another is chosen).
+  const [guideText, onGuideChange] = useNodeText(selectedId, content.guide, (id, text) => { void resources.setGuide(id, text) })
 
   useEffect(() => {
     setPreviewOn(false)
-    setPromoteOpen(false); setContentTab('guide'); setGuideView('write')
+    setPromoteOpen(false); setContentTab('guide')
   }, [selectedId])
-
-  useEffect(() => {
-    const previousId = savingForId.current
-    guideTextRef.current = content.guide
-    setGuideText(content.guide)
-    savingForId.current = selectedId
-    return () => {
-      if (guideTimer.current && previousId) {
-        clearTimeout(guideTimer.current)
-        guideTimer.current = null
-        void resources.setGuide(previousId, guideTextRef.current)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId])
-
-  function onGuideChange(value: string) {
-    setGuideText(value)
-    guideTextRef.current = value
-    if (!selectedId) return
-    if (guideTimer.current) clearTimeout(guideTimer.current)
-    guideTimer.current = setTimeout(() => {
-      guideTimer.current = null
-      void resources.setGuide(selectedId, value)
-    }, 600)
-  }
 
   async function openPromote() {
     const opening = !promoteOpen
@@ -139,7 +108,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                 <span className="resBadge">{previewAs === 'help' ? 'Help' : 'Training'}</span>
                 <h2>{node.name || `Untitled ${node.kind}`}</h2>
               </div>
-              <div className="resMarkdown"><ReactMarkdown>{content.guide || '*No guide written yet.*'}</ReactMarkdown></div>
+              <div className="resArticle"><Markup text={content.guide} baseLevel={2} empty={<p className="mkEmpty">No guide written yet.</p>} /></div>
 
               {content.tutorials.length > 0 && (
                 <>
@@ -147,7 +116,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                   {content.tutorials.map(t => (
                     <div key={t.id} className="resTutorialPreview">
                       <div className="resTutorialTitle">{t.title || 'Untitled tutorial'}</div>
-                      <div className="resMarkdown"><ReactMarkdown>{t.body}</ReactMarkdown></div>
+                      <div className="resArticle"><Markup text={t.body} baseLevel={3} /></div>
                     </div>
                   ))}
                 </>
@@ -164,7 +133,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                           {f.source === 'feedback' ? 'From feedback' : 'Hand-authored'}
                         </span>
                       </div>
-                      <div className="resFaqA">{f.answer}</div>
+                      <div className="resFaqA"><Markup text={f.answer} baseLevel={3} /></div>
                     </div>
                   ))}
                 </>
@@ -175,7 +144,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                   <div className="resFeedbackSectionHead">
                     <h3 className="resSubheading">Check your understanding</h3>
                     <span className="resComingSoon">
-                      {resources.assessmentOf(selectedId).questions.length > 0 ? 'Assessment preview only' : 'No assessment written yet'}
+                      {resources.assessmentOf(selectedId).text.trim() !== '' ? 'Assessment preview only' : 'No assessment written yet'}
                     </span>
                   </div>
                 </div>
@@ -194,23 +163,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
             </div>
 
             {contentTab === 'guide' && (
-              <>
-                <div className="resPillGroup resPillGroup--sub">
-                  <button type="button" className={guideView === 'write' ? 'resPill resPill--active' : 'resPill'} onClick={() => setGuideView('write')}>Write</button>
-                  <button type="button" className={guideView === 'rendered' ? 'resPill resPill--active' : 'resPill'} onClick={() => setGuideView('rendered')}>Rendered</button>
-                </div>
-                {guideView === 'write' ? (
-                  <textarea
-                    className="resTextarea resTextarea--guide" value={guideText}
-                    placeholder="# Write a markdown guide for this node…"
-                    onChange={e => onGuideChange(e.target.value)}
-                  />
-                ) : (
-                  <div className="resMarkdown resMarkdown--card">
-                    <ReactMarkdown>{guideText || '*Nothing written yet.*'}</ReactMarkdown>
-                  </div>
-                )}
-              </>
+              <MarkupEditor value={guideText} onChange={onGuideChange} label="Guide" baseLevel={2} rows={14} placeholder="###### A guide for this part" />
             )}
 
             {contentTab === 'tutorials' && (
@@ -221,9 +174,9 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                       type="text" className="resCardTitle" value={t.title} placeholder="Tutorial title"
                       onChange={e => updateTutorial(i, { title: e.target.value })}
                     />
-                    <textarea
-                      className="resTextarea" rows={4} value={t.body} placeholder={'1. Step one\n2. Step two…'}
-                      onChange={e => updateTutorial(i, { body: e.target.value })}
+                    <MarkupEditor
+                      value={t.body} onChange={body => updateTutorial(i, { body })} label={`${t.title || 'Tutorial'} steps`} baseLevel={3} rows={4}
+                      placeholder={'>> Step one\n>> Step two'}
                     />
                   </div>
                 ))}
@@ -244,10 +197,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                         {f.source === 'feedback' ? 'From feedback' : 'Hand-authored'}
                       </span>
                     </div>
-                    <textarea
-                      className="resTextarea" rows={2} value={f.answer} placeholder="Answer"
-                      onChange={e => updateFaq(i, { answer: e.target.value })}
-                    />
+                    <MarkupEditor value={f.answer} onChange={answer => updateFaq(i, { answer })} label={`Answer to ${f.question || 'the question'}`} baseLevel={3} rows={2} placeholder="Answer" />
                   </div>
                 ))}
                 <div className="resButtonRow">

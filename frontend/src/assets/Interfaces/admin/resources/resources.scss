@@ -164,23 +164,6 @@ $res-surface: var(--surface-raised);
 }
 .resButtonRow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-.resTextarea {
-  display: block;
-  width: 100%;
-  max-width: 720px;
-  padding: 12px 14px;
-  border: 0;
-  border-radius: 0;
-  box-shadow: inset 0 0 0 1px var(--hairline);
-  background: var(--surface-base);
-  color: var(--ink);
-  font-size: 13px;
-  line-height: 1.6;
-  resize: vertical;
-  &:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
-  &--guide { height: 380px; font-family: ui-monospace, Menlo, monospace; }
-  &::placeholder { color: var(--ink-faint); }
-}
 
 .resCard {
   max-width: 720px;
@@ -253,34 +236,14 @@ $res-surface: var(--surface-raised);
 .resSubheading { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin: 20px 0 10px; }
 .resQuizTitle { margin: 0; font-size: 17px; color: var(--ink); }
 
-.resMarkdown {
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--ink);
-  h1, h2, h3 { color: var(--ink); }
-  p { margin: 0 0 10px; }
-  ul, ol { margin: 0 0 10px; padding-left: 20px; }
-  &--card { max-width: 720px; min-height: 380px; padding: 20px 24px; border-radius: 0; box-shadow: inset 0 0 0 1px var(--hairline); background: var(--surface-base); }
-}
+// An article's text in the preview (the markup, components/markup/Markup.tsx).
+.resArticle { font-size: 13.5px; color: var(--ink); }
 .resTutorialPreview, .resFaqPreview { border-left: 2px solid var(--hairline); padding-left: 12px; margin-bottom: 12px; }
 .resTutorialTitle, .resFaqQ { font-weight: 700; font-size: 13.5px; margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
-.resFaqA { font-size: 13px; color: var(--ink-muted); line-height: 1.6; }
+.resFaqA { font-size: 13px; color: var(--ink); }
 
 .resFeedbackSection { border-top: 1px solid var(--hairline); margin-top: 20px; padding-top: 18px; }
 .resFeedbackSectionHead { display: flex; align-items: center; justify-content: space-between; }
 .resComingSoon { font-size: 11px; color: var(--ink-faint); font-style: italic; }
 .resError { font-size: 12px; color: var(--alert); margin: 6px 0 0; }
 
-.resOptionRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.resOptionText {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: inset 0 0 0 1px var(--hairline);
-  background: var(--surface-base);
-  color: var(--ink);
-  padding: 6px 10px;
-  font-size: 13px;
-  &:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
-}

@@ -2,6 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { getResources } from '../../../../api/resourcesApi'
 import type { ResourceContent, ResourceNode, ResourcesFile } from '../../../../api/types'
 import type { HelpTarget } from '../../../../channels/helpTargets'
+import CopyPlainText from '../../../../components/markup/CopyPlainText'
+import Markup from '../../../../components/markup/Markup'
+import { escapeText } from '../../../../lib/markup/escape'
 
 export interface Article { node: ResourceNode; content: ResourceContent }
 
@@ -33,7 +36,15 @@ export function articlesFor(file: ResourcesFile, target: HelpTarget): Article[] 
   return out
 }
 
-// A level's Help tab: the resource articles written for it (the Resources builder in the AUI), or its
+// An article as one markup text, for Copy as plain text: the guide, then each tutorial and FAQ entry under its title.
+export function articleText(content: ResourceContent): string {
+  const parts = [content.guide]
+  for (const t of content.tutorials) parts.push(`##### ${escapeText(t.title || 'Tutorial')}`, t.body)
+  for (const f of content.faq) parts.push(`##### ${escapeText(f.question)}`, f.answer)
+  return parts.filter(p => p.trim() !== '').join('\n\n')
+}
+
+// A level's Help tab: the resource articles written for it (the Resources builder in the AUI), formatted from the markup, or its
 // short default text (or what the panel shows instead) while none are authored.
 export function HelpArticles({ target, fallback }: { target: HelpTarget; fallback: ReactNode }) {
   const [articles, setArticles] = useState<Article[] | null>(null)
@@ -50,13 +61,13 @@ export function HelpArticles({ target, fallback }: { target: HelpTarget; fallbac
     <div className="wrHelp">
       {articles.map(({ node, content }) => (
         <article key={node.id} className="wrHelpArticle">
-          <h4>{node.name}</h4>
-          {content.guide.trim() && <p className="wrHelpText">{content.guide}</p>}
+          <div className="wrHelpHead"><h4>{node.name}</h4><CopyPlainText text={articleText(content)} label={`Copy ${node.name} as plain text`} /></div>
+          {content.guide.trim() && <Markup text={content.guide} baseLevel={4} />}
           {content.tutorials.map(t => (
-            <details key={t.id}><summary>{t.title || 'Tutorial'}</summary><p className="wrHelpText">{t.body}</p></details>
+            <details key={t.id}><summary>{t.title || 'Tutorial'}</summary><Markup text={t.body} baseLevel={5} /></details>
           ))}
           {content.faq.map(f => (
-            <details key={f.id}><summary>{f.question}</summary><p className="wrHelpText">{f.answer}</p></details>
+            <details key={f.id}><summary>{f.question}</summary><Markup text={f.answer} baseLevel={5} /></details>
           ))}
         </article>
       ))}

@@ -5,6 +5,9 @@ import { getKv, setKv } from '../../settings/settingsStore'
 import { emptyProgress, seedContent, trainingBackend } from '../../test/trainingBackend'
 import TUI from './TUI'
 
+// A row's second line, read whole (its description's words are drawn in an element of their own).
+const detail = (text: string) => (_: string, el: Element | null) => !!el && el.classList.contains('trRowDetail') && el.textContent === text
+
 const level = (name: string) => screen.getByRole('region', { name })
 const tab = (levelName: string, label: string) => within(level(levelName)).getByRole('button', { name: label })
 type User = ReturnType<typeof userEvent.setup>
@@ -83,13 +86,13 @@ describe('Training (TUI)', () => {
     render(<TUI />)
     await desk()
     const list = within(screen.getByRole('list', { name: 'Enrolled courses' }))
-    expect(list.getByText('The first reader course. · 0 of 1 lesson complete')).toBeInTheDocument()
+    expect(list.getByText(detail('The first reader course. · 0 of 1 lesson complete'))).toBeInTheDocument()
     await user.click(list.getByRole('button', { name: 'Open Reader Course 1' }))
     await user.click(screen.getByRole('button', { name: 'Open Module 1' }))
     await user.click(await screen.findByRole('button', { name: 'Mark Lesson 1 complete' }))
     expect(backend.calls).toContain('PUT /training/completions/reader-c1-m1-l1')
     await user.click(screen.getByRole('button', { name: 'Training Desk', description: 'Open Training Desk' }))
-    expect(await within(await screen.findByRole('list', { name: 'Enrolled courses' })).findByText('The first reader course. · 1 of 1 lesson complete')).toBeInTheDocument()
+    expect(await within(await screen.findByRole('list', { name: 'Enrolled courses' })).findByText(detail('The first reader course. · 1 of 1 lesson complete'))).toBeInTheDocument()
   })
 
   it('stacks a level for each thing opened: course, module, lesson, exercise, with the focus on the deepest', async () => {
@@ -190,7 +193,7 @@ describe('Training (TUI): what the courses hold', () => {
     expect(backend.calls).toContain('DELETE /training/completions/writer-c1-m1')
   })
 
-  it('shows a lesson\'s Markdown material, and its description', async () => {
+  it('shows a lesson\'s material formatted from the markup, and its description', async () => {
     const user = userEvent.setup()
     trainingBackend()
     render(<TUI />)
@@ -199,7 +202,7 @@ describe('Training (TUI): what the courses hold', () => {
     await user.click(screen.getByRole('button', { name: 'Open Module 1' }))
     await user.click(screen.getByRole('button', { name: 'Open Lesson 1' }))
     const material = within(level('Lesson 1 (max)'))
-    expect(await material.findByRole('heading', { name: 'Lesson 1', level: 1 })).toBeInTheDocument()
+    expect(await material.findByRole('heading', { name: 'Lesson 1', level: 6 })).toBeInTheDocument()
     expect(material.getByText('Placeholder material for the writer course.')).toBeInTheDocument()
     expect(material.getByText('Placeholder lesson.')).toBeInTheDocument()
   })
@@ -214,13 +217,13 @@ describe('Training (TUI): what the courses hold', () => {
     await desk()
     await openFromCatalog(user, 'Writer Course 1')
     await user.click(tab('Writer Course 1 (max)', 'Exams'))
-    expect(within(screen.getByRole('list', { name: 'Exams of Writer Course 1' })).getByText('Placeholder exam. · Pass mark 70% · Best 85.5%, passed')).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Exams of Writer Course 1' })).getByText(detail('Placeholder exam. · Pass mark 70% · Best 85.5%, passed'))).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Open Module 1' }))
     await user.click(tab('Module 1 (max)', 'Tests'))
-    expect(within(screen.getByRole('list', { name: 'Tests of Module 1' })).getByText('Placeholder test. · Pass mark 70% · Best 50%, not passed')).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Tests of Module 1' })).getByText(detail('Placeholder test. · Pass mark 70% · Best 50%, not passed'))).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Open Lesson 1' }))
     await user.click(tab('Lesson 1 (max)', 'Quizzes'))
-    expect(within(screen.getByRole('list', { name: 'Quizzes of Lesson 1' })).getByText('Placeholder quiz. · Pass mark 70% · Not tried yet')).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Quizzes of Lesson 1' })).getByText(detail('Placeholder quiz. · Pass mark 70% · Not tried yet'))).toBeInTheDocument()
   })
 
   it('shows a curriculum with no courses, and courses that are in no curriculum', async () => {

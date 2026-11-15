@@ -76,7 +76,8 @@
   // An editor's tab: a light surface of the level's hue with the ink colour.
   .wrTabPane--surface, .wrTabTileBody--surface { color: var(--ink); background: var(--surface-side); padding: var(--space-4); }
   .wrHelp { display: flex; flex-direction: column; gap: var(--space-5); font-size: var(--text-ui); line-height: 1.5; }
-  .wrHelpArticle { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: var(--text-ui); text-transform: uppercase; letter-spacing: 1px; } summary { cursor: pointer; font-weight: 700; } }
+  .wrHelpArticle { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: var(--text-ui); text-transform: uppercase; letter-spacing: 1px; } summary { cursor: pointer; font-weight: 700; } details > .mk { margin-top: var(--space-2); } }
+  .wrHelpHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
   .wrHelpText { margin: 0; font-size: var(--text-ui); line-height: 1.5; white-space: pre-wrap; }
 
   // The tiles beside the Dash at Max: one per project, stacked, with empty space beneath.

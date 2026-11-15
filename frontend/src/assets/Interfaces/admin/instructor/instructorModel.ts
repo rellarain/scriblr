@@ -10,7 +10,8 @@ export type Draft = TrainingContentDraft
 export type Kind = TrainingItemKind
 export type MakeRandom = () => number
 
-export const LIMITS = { curricula: 50, courses: 500, modules: 100, lessons: 200, exercises: 100, projects: 50, assessments: 50 } as const
+// One quiz per lesson, one test per module, one exam per course: more questions go into it.
+export const LIMITS = { curricula: 50, courses: 500, modules: 100, lessons: 200, exercises: 100, projects: 50, assessments: 1 } as const
 export const FIELD_MAX = { title: 200, description: 2000, body: 100_000 } as const
 
 export const KIND_LABEL: Record<Kind, string> = {
@@ -96,6 +97,8 @@ const clone = (draft: Draft): Draft => structuredClone(draft)
 // ---- adding ----
 
 const count = (n: number, cap: number, what: string): string | null => (n >= cap ? `There can be at most ${cap} ${what} here.` : null)
+// A lesson, module or course has one quiz, test or exam.
+const one = (n: number, owner: string, what: string): string | null => (n >= LIMITS.assessments ? `A ${owner} has one ${what}: write more questions in it.` : null)
 
 // Why a thing of this kind cannot be added inside `parentId` (a cap), or null when it can.
 export function canAdd(draft: Draft, kind: Kind, parentId: string | null): string | null {
@@ -108,11 +111,11 @@ export function canAdd(draft: Draft, kind: Kind, parentId: string | null): strin
       const course = parent.item as TrainingCourse, mod = parent.item as TrainingModule, lesson = parent.item as TrainingLesson
       if (kind === 'module') return count(course.modules.length, LIMITS.modules, 'modules')
       if (kind === 'project') return count(course.projects.length, LIMITS.projects, 'projects')
-      if (kind === 'exam') return count(course.exams.length, LIMITS.assessments, 'exams')
+      if (kind === 'exam') return one(course.exams.length, 'course', 'exam')
       if (kind === 'lesson') return count(mod.lessons.length, LIMITS.lessons, 'lessons')
-      if (kind === 'test') return count(mod.tests.length, LIMITS.assessments, 'tests')
+      if (kind === 'test') return one(mod.tests.length, 'module', 'test')
       if (kind === 'exercise') return count(lesson.exercises.length, LIMITS.exercises, 'exercises')
-      return count(lesson.quizzes.length, LIMITS.assessments, 'quizzes')
+      return one(lesson.quizzes.length, 'lesson', 'quiz')
     }
   }
 }
@@ -133,18 +136,18 @@ export function add(draft: Draft, kind: Kind, parentId: string | null, random: M
     const parent = locate(next, parentId as string)!.item as TrainingCourse & TrainingModule & TrainingLesson
     if (kind === 'module') parent.modules.push({ id, title, description: '', lessons: [], tests: [] })
     else if (kind === 'project') parent.projects.push({ id, title, description: '', exerciseIds: [] })
-    else if (kind === 'exam') parent.exams.push({ id, title, description: '', passMark: 70 })
+    else if (kind === 'exam') parent.exams.push({ id, title, description: '', passMark: 70, text: '' })
     else if (kind === 'lesson') parent.lessons.push({ id, title, description: '', body: '', exercises: [], quizzes: [] })
-    else if (kind === 'test') parent.tests.push({ id, title, description: '', passMark: 70 })
+    else if (kind === 'test') parent.tests.push({ id, title, description: '', passMark: 70, text: '' })
     else if (kind === 'exercise') parent.exercises.push({ id, title, description: '' })
-    else parent.quizzes.push({ id, title, description: '', passMark: 70 })
+    else parent.quizzes.push({ id, title, description: '', passMark: 70, text: '' })
   }
   return { draft: next, id }
 }
 
 // ---- changing ----
 
-export interface Fields { title: string; description: string; hue: number | null; body: string; passMark: number }
+export interface Fields { title: string; description: string; hue: number | null; body: string; passMark: number; text: string }
 
 export function patch(draft: Draft, id: string, fields: Partial<Fields>): Draft {
   const next = clone(draft)

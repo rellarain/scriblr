@@ -9,7 +9,7 @@ function node(id: string, kind: ResourceNode['kind'], parentId: string | null, o
   return { id, kind, parentId, order, name }
 }
 function file(nodes: ResourceNode[]): ResourcesFile {
-  return { schemaVersion: 1, nodes, content: {}, assessments: {} }
+  return { schemaVersion: 2, nodes, content: {}, assessments: {} }
 }
 
 const writer = node('writer', 'interface', null, 0, 'Writer')
@@ -45,39 +45,23 @@ describe('QuizBuilder', () => {
     expect(await screen.findByText('Quiz')).toBeTruthy()
   })
 
-  it('adds a question with four options, the first marked correct by default', async () => {
+  it('writes the questions in the markup editor and saves them a moment after the last key', async () => {
     const setAssessment = vi.spyOn(resourcesApi, 'putResourceAssessment').mockResolvedValue(file([writer, shelf, plot, plotlines]))
     render(<Harness selectedId={plotlines.id} />)
-    fireEvent.click(await screen.findByText('+ Add question'))
-    await waitFor(() => expect(setAssessment).toHaveBeenCalledTimes(1))
-    const [, questions] = setAssessment.mock.calls[0]
-    expect(questions).toHaveLength(1)
-    expect(questions[0].options).toHaveLength(4)
-    expect(questions[0].options.filter(o => o.isCorrect)).toHaveLength(1)
-    expect(questions[0].options[0].isCorrect).toBe(true)
+    const field = await screen.findByRole('textbox', { name: 'Quiz questions' })
+    fireEvent.change(field, { target: { value: '???? Pick one\n?! Right\n?? Wrong' } })
+    expect(setAssessment).not.toHaveBeenCalled()
+    await waitFor(() => expect(setAssessment).toHaveBeenCalledWith(plotlines.id, '???? Pick one\n?! Right\n?? Wrong'))
+    expect(setAssessment).toHaveBeenCalledTimes(1)
   })
 
-  it('marking a different option correct un-marks the others', async () => {
+  it('shows what is written, and checks a question with no right option', async () => {
     vi.spyOn(resourcesApi, 'getResources').mockResolvedValue({
-      schemaVersion: 1, nodes: [writer, shelf, plot, plotlines], content: {},
-      assessments: {
-        [plotlines.id]: {
-          questions: [{
-            id: 'q1', prompt: 'Pick one',
-            options: [
-              { id: 'o1', text: 'A', isCorrect: true }, { id: 'o2', text: 'B', isCorrect: false },
-              { id: 'o3', text: 'C', isCorrect: false }, { id: 'o4', text: 'D', isCorrect: false },
-            ],
-          }],
-        },
-      },
+      schemaVersion: 2, nodes: [writer, shelf, plot, plotlines], content: {},
+      assessments: { [plotlines.id]: { text: '????#q1 Pick one\n?? A\n?? B' } },
     })
-    const setAssessment = vi.spyOn(resourcesApi, 'putResourceAssessment').mockResolvedValue(file([writer, shelf, plot, plotlines]))
     render(<Harness selectedId={plotlines.id} />)
-    const radios = await screen.findAllByRole('radio')
-    fireEvent.click(radios[2])
-    await waitFor(() => expect(setAssessment).toHaveBeenCalledTimes(1))
-    const [, questions] = setAssessment.mock.calls[0]
-    expect(questions[0].options.map((o: { isCorrect: boolean }) => o.isCorrect)).toEqual([false, false, true, false])
+    expect(await screen.findByRole('textbox', { name: 'Quiz questions' })).toHaveValue('????#q1 Pick one\n?? A\n?? B')
+    expect(await screen.findByRole('button', { name: /Line 1 This question has no right option/ })).toBeInTheDocument()
   })
 })

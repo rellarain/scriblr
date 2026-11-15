@@ -51,6 +51,7 @@ import { useThemeState } from '../theme/useTheme'
 import SkyToggle from '../theme/SkyToggle'
 import ThemeSettingsPanel from '../theme/ThemeSettingsPanel'
 import { CARD_META } from './cardMeta'
+import MarkupCard from './MarkupCard'
 import { FIXTURE_IDS, FIXTURE_PROJECT_ID, createMockBackend, installMockBackend, previewTheme } from './mockBackend'
 import type { CardDef } from './Preview'
 
@@ -515,6 +516,7 @@ export const CARDS: CardDef[] = [
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),
   card('hue-slider', { defaults: { zones: ['day', 'night'] }, render: () => <HueCard /> }),
+  card('markup', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MarkupCard /> }),
   card('reader', { frame: 'plain', views: READER_VIEWS, defaults: { view: 'nook', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <ReaderCard view={view} /> }),
   card('training', { frame: 'plain', views: TRAINING_VIEWS, defaults: { view: 'lesson', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <div className="uiPvTraining"><TUI key={view} startAt={TRAINING_PATHS[view]} /></div> }),
   card('app-shell', { frame: 'plain', defaults: { zones: ['day'], width: 1200 }, render: () => <MemoryRouter initialEntries={['/write']}><App /></MemoryRouter> }),

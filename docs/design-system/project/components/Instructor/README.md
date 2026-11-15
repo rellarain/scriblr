@@ -9,11 +9,11 @@ Code: `admin/instructor/` (`InstructorConsole.tsx`, `InstructorTree.tsx`, `Instr
 `.instPage` holds a bar (the title and the **Save cluster**) and `.instSplit`: the **tree** (`.instTree`, 300px) and the **open item** (`.instEditor`). Below 640px of its own width the tree stacks above the editor. The page keeps the Admin's accent.
 
 - **Tree**: a curriculum with its courses under it (a course in two curricula appears under both), then **Other courses** (in none). Under a course: modules (each with lessons, and under a lesson its exercises and quizzes; a module's tests), projects and exams. A row is a **grip**, a fold caret (when something is under it), the kind's icon and the title. The two buttons in the head add a **curriculum** and a **course** (a course joins the curriculum that is selected).
-- **Editor**: the kind of the open item in a chip, the buttons that add what it holds (icons with a "+"), **delete**, then the fields: **Title** (1-200 characters, required), **Description**, and by kind:
+- **Editor**: the kind of the open item in a chip, the buttons that add what it holds (icons with a "+"), **delete**, then the fields: **Title** (1-200 characters, required), **Description** (in the [markup](../Markup/README.md) editor), and by kind:
   - *curriculum*: **colour** (the hue slider; a button takes the colour away), and **its courses** in order (reorder, take out, an Add course select);
   - *course*: **colour** (a course follows its curriculum's unless it is given one: the *inherit* button), and **In curricula** check boxes;
-  - *lesson*: the **material** in Markdown, with a Write / Rendered switch (`.instMarkdown`);
-  - *quiz, test, exam*: the **pass mark** (a whole number, clamped to 0-100);
+  - *lesson*: the **material**, in the markup editor (Write, Read-only, Side by side, its checks and cheat sheet);
+  - *quiz, test, exam*: the **pass mark** (a stepper, `.instStep`: 1 a click, 10 with Shift, 0-100) and the **Questions**, written in the markup editor. A lesson holds **one quiz**, a module **one test**, a course **one exam**: the add button is turned off with the reason (*A lesson has one quiz: write more questions in it.*);
   - *project*: its **exercises**, only those of its own course, in order (an Add exercise select lists the rest).
 - **Move to** (module, lesson, exercise, quiz, test, project, exam): a select of the places it can go ("Course › Module"). It says what else changes: a project stops naming an exercise that left its course.
 
