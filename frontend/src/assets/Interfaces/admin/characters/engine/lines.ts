@@ -3,6 +3,7 @@ import { updateShape } from '../modelContent'
 import { guardAnchors } from './anchors'
 import { apply, inverse, mul, scaleAlong, type Mat } from './geometry'
 import type { Solved } from './rig'
+import { axisEnds } from './symmetry'
 import { transformShape } from './transform'
 
 // Lines of symmetry as handles (Z5, the user: "lengthen/shrink the torso length along the spine/line of symmetry"). A symmetric shape with one axis has a line of symmetry
@@ -17,12 +18,14 @@ const PLACE_TOL = 0.5
 export const LINE_MIN = 2
 const WIDTH_MIN = 0.05
 
-// A symmetric shape's line of symmetry where it is drawn: from the first point on its axis to the other (the outline's points 0 and m + 1). Null for a shape with no
-// symmetry or more than one axis.
+// A symmetric shape's line of symmetry where it is drawn: between the two places its outline meets its axis (its points there, or where it crosses the axis when a point
+// there was taken away). Null for a shape with no symmetry or more than one axis.
 export function lineOf(s: ModelShape | undefined, solved: Solved): { a: P; b: P } | null {
   const sym = s?.sym, r = s ? solved.shapes[s.id] : undefined
-  if (!s || !sym || sym.n !== 1 || !r || s.pts.length !== 2 * (sym.m + 1) || r.local.length !== s.pts.length) return null
-  const p = r.local[0], q = r.local[sym.m + 1], a = apply(r.matrix, p.x, p.y), b = apply(r.matrix, q.x, q.y)
+  if (!s || !sym || sym.n !== 1 || !r || r.local.length !== s.pts.length) return null
+  const ends = axisEnds(s, r.local)
+  if (!ends) return null
+  const [p, q] = ends, a = apply(r.matrix, p[0], p[1]), b = apply(r.matrix, q[0], q[1])
   return Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-6 ? null : { a, b }
 }
 

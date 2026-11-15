@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ModelPoint, ModelShape } from '../../../../../api/types'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, newShape } from './edit'
 import { apply, build, flatten } from './geometry'
-import { disableSymmetry, enableSymmetry, followSymmetry, orbitOf, reflectAbout, symmetryOf, wedgeAt } from './symmetry'
+import { axisEnds, crossesAxis, disableSymmetry, enableSymmetry, followSymmetry, orbitOf, reflectAbout, restoreLinePoint, symmetryOf, wedgeAt } from './symmetry'
 import { content as blank } from '../../../../../test/characterModelsBackend'
 import { addGroup, addObject, addShape, newGroup } from '../modelContent'
 import { connect, followRefusal } from './connect'
@@ -105,7 +105,7 @@ describe('editing a symmetric shape', () => {
     expect(symmetricAbout(curved)).toBe(true)
   })
 
-  it('adds a point to every copy, and deletes one from every copy, but not one on an axis', () => {
+  it('adds a point to every copy, and deletes one from every copy, a point on an axis too (with its copies on the matching axes)', () => {
     const s = quartered()
     const added = followSymmetry(s, addPoint(s, 5).shape).shape
     expect(added.pts).toHaveLength(12)
@@ -115,10 +115,23 @@ describe('editing a symmetric shape', () => {
     const fewer = followSymmetry(s, deletePoint(s, corner)!)
     expect(fewer.refused).toBeUndefined()
     expect(fewer.shape.pts).toHaveLength(4)
+    // the bottom middle is on the up-down axis: it goes, and so does the top middle; the sides' middles stay
     const axisPoint = s.pts.findIndex(p => p.x === 80 && p.y === 140)
-    const refused = followSymmetry(s, deletePoint(s, axisPoint)!)
-    expect(refused.refused).toMatch(/axis/)
-    expect(refused.shape).toBe(s)
+    const gone = followSymmetry(s, deletePoint(s, axisPoint)!)
+    expect(gone.refused).toBeUndefined()
+    expect(gone.shape.pts).toHaveLength(6)
+    expect(gone.shape.pts.some(p => p.x === 80)).toBe(false)
+    expect(gone.shape.pts.filter(p => p.y === 120)).toHaveLength(2)
+    expect(symmetricAbout(gone.shape)).toBe(true)
+    // then a side's middle: no point on any axis is left, only the corners
+    const side = gone.shape.pts.findIndex(p => p.y === 120)
+    const corners = followSymmetry(gone.shape, deletePoint(gone.shape, side)!)
+    expect(corners.shape.pts).toHaveLength(4)
+    expect(corners.shape.sym!.ends).toEqual([false, false])
+    expect(symmetricAbout(corners.shape)).toBe(true)
+    // fewer than three points is refused
+    const last = followSymmetry(corners.shape, deletePoint(corners.shape, 0)!)
+    expect(last.refused).toBeTruthy()
   })
 
   it('keeps every point where it is when symmetry is turned off', () => {
@@ -198,5 +211,66 @@ describe('a symmetric shape whose points follow other shapes (shape types T1)', 
     const moved = followSymmetry(withBind, movePoint(withBind, 0, withBind.pts[0].x + 2, withBind.pts[0].y)).shape
     expect(moved.pts[1].bind).toMatchObject({ s: 't', i: 0 })
     expect(moved.pts.filter(p => p.bind)).toHaveLength(1)
+  })
+})
+
+describe('points on the axes are optional (the user, 2026-11-16)', () => {
+  const half = () => ok(enableSymmetry(circle(), { a: 90, n: 1 }, 0, 60))
+  const onAxis = (s: ModelShape) => s.pts.map((p, i) => [i, p] as const).filter(([, p]) => Math.abs(p.x - 100) < 0.01).map(([i]) => i)
+  it('takes away one point on the axis of a circle, keeps the other, and the outline crosses the axis smoothly', () => {
+    const s = half()
+    const [top, bottom] = onAxis(s).sort((i, j) => s.pts[i].y - s.pts[j].y)
+    const gone = followSymmetry(s, deletePoint(s, top)!)
+    expect(gone.refused).toBeUndefined()
+    expect(gone.shape.pts).toHaveLength(s.pts.length - 1)
+    expect(onAxis(gone.shape)).toHaveLength(1)
+    expect(gone.shape.pts[onAxis(gone.shape)[0]].y).toBeCloseTo(s.pts[bottom].y, 1)
+    expect(symmetricAbout(gone.shape)).toBe(true)
+    // where the outline now meets the axis at the top: on the axis, between the point that went and the middle
+    const ends = axisEnds(gone.shape, gone.shape.pts)!
+    const topEnd = ends.find(e => e[1] < 100)!
+    expect(topEnd[0]).toBeCloseTo(100, 1)
+    expect(topEnd[1]).toBeLessThan(100)
+    expect(topEnd[1]).toBeGreaterThan(80)
+  })
+
+  it('puts the point back on the axis from the side that crosses it, and only there', () => {
+    const s = half()
+    const [top] = onAxis(s).sort((i, j) => s.pts[i].y - s.pts[j].y)
+    const gone = followSymmetry(s, deletePoint(s, top)!).shape
+    const crossing = gone.pts.findIndex((_, i) => crossesAxis(gone, i))
+    expect(crossing).toBeGreaterThanOrEqual(0)
+    expect(gone.pts.filter((_, i) => crossesAxis(gone, i))).toHaveLength(1)
+    expect(crossesAxis(s, 0)).toBe(false)
+    const back = restoreLinePoint(gone, crossing)!
+    expect(back.pts).toHaveLength(s.pts.length)
+    expect(back.sym!.ends).toBeUndefined()
+    expect(onAxis(back)).toHaveLength(2)
+    expect(symmetricAbout(back)).toBe(true)
+    expect(restoreLinePoint(back, 0)).toBeNull()
+    // adding a point on the crossing side does the same
+    const added = followSymmetry(gone, addPoint(gone, crossing).shape).shape
+    expect(onAxis(added)).toHaveLength(2)
+  })
+
+  it('keeps following edits, moves, turns and flips without its points on the axes', () => {
+    const s = half()
+    const [top] = onAxis(s).sort((i, j) => s.pts[i].y - s.pts[j].y)
+    const gone = followSymmetry(s, deletePoint(s, top)!).shape
+    // drag a point of the copy (the far half): the source follows and it stays symmetric
+    const far = gone.pts.length - 2
+    const dragged = followSymmetry(gone, movePoint(gone, far, gone.pts[far].x + 4, gone.pts[far].y)).shape
+    expect(symmetricAbout(dragged)).toBe(true)
+    const moved = moveShape(gone, 10, -5), turned = setTurn(moved, 40), flipped = flipShape(turned, 'across')
+    for (const t of [moved, turned, flipped]) {
+      expect(t.sym!.ends).toEqual(gone.sym!.ends)
+      expect(symmetricAbout(t)).toBe(true)
+    }
+  })
+
+  it('loads a spec with points left off the axes only when the count fits', () => {
+    expect(symmetryOf({ a: 90, n: 1, cx: 0, cy: 0, m: 1, ends: [false, true] }, 3)).toMatchObject({ m: 1, ends: [false, true] })
+    expect(symmetryOf({ a: 90, n: 1, cx: 0, cy: 0, m: 1, ends: [false, true] }, 4)).toBeNull()
+    expect(symmetryOf({ a: 90, n: 1, cx: 0, cy: 0, m: 1 }, 4)!.ends).toBeUndefined()
   })
 })

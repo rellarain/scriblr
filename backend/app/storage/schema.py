@@ -1702,8 +1702,10 @@ class ModelTurn(BaseModel):
 
 class ModelSymmetry(BaseModel):
     """Shape editor S6: a symmetric shape. `n` axes (1 to MODEL_SYM_AXES_MAX) through (`cx`, `cy`), evenly spaced, the first at `a` degrees in the shape's own frame;
-    `side` is the wedge its source was taken from and `m` the number of its points strictly inside that wedge. The shape's points are the whole outline, 2n(m + 1) of
-    them, the source first; a spec that does not fit the points is let go (the points stay)."""
+    `side` is the wedge its source was taken from and `m` the number of its points strictly inside that wedge. `ends`: whether the source's first and last points lie
+    on their axes (both when None); the points on the axes are optional, and without one the outline crosses that axis between a point and its mirror image. The
+    shape's points are the whole outline, 2n·m + n·(points on axes per source) of them, the source first; a spec that does not fit the points is let go (the points
+    stay)."""
 
     a: float = 0.0
     n: int = Field(default=1, ge=1, le=MODEL_SYM_AXES_MAX)
@@ -1711,6 +1713,20 @@ class ModelSymmetry(BaseModel):
     cx: float = 0.0
     cy: float = 0.0
     m: int = Field(default=0, ge=0, le=MODEL_POINTS_MAX)
+    ends: Optional[list[bool]] = None
+
+    @field_validator("ends", mode="before")
+    @classmethod
+    def _ends(cls, value: Any) -> Any:
+        if not isinstance(value, list) or len(value) != 2:
+            return None
+        pair = [v is not False for v in value]
+        return None if all(pair) else pair
+
+    def count(self) -> int:
+        """How many points the whole outline has."""
+        on_axes = 2 if self.ends is None else sum(1 for v in self.ends if v)
+        return 2 * self.n * self.m + self.n * on_axes
 
     @field_validator("a", mode="before")
     @classmethod
@@ -2022,7 +2038,7 @@ class ModelShape(BaseModel):
             if m.i is not None and m.i >= n:
                 m.i = None
         # symmetry (shape editor S6) that does not fit the points is let go; the points stay
-        if self.sym is not None and n != 2 * self.sym.n * (self.sym.m + 1):
+        if self.sym is not None and n != self.sym.count():
             self.sym = None
         return self
 

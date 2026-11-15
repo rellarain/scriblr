@@ -91,7 +91,7 @@ import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, guardAnchors, marks
 import { isSlider, makeSlider, nearestPlace, placeAt, setStop, stopSlider } from './engine/sliders'
 import { drawnOf } from './engine/connect'
 import { beginPose, beginReach, beginSlide, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag } from './engine/posing'
-import { disableSymmetry, enableSymmetry, followSymmetry } from './engine/symmetry'
+import { disableSymmetry, enableSymmetry, followSymmetry, restoreLinePoint } from './engine/symmetry'
 import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
 import { PointForm } from './PointForm'
 import * as clipboard from './shapeClipboard'
@@ -1762,6 +1762,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const next = addPointShared(content, canvasSolved, sid, e, x, y, policy.max.points)
       if (!next) { setNote(`A shape may have at most ${policy.max.points} points.`); return }
       commit(next, true)
+    },
+    // a symmetric shape's point back on the axis its side crosses (its copies on the matching axes too)
+    onRestoreLinePoint: (sid, e) => {
+      const sh = shapeById(content, sid), restored = sh ? restoreLinePoint(sh, e) : null
+      if (!sh || !restored) return
+      if (restored.pts.length > policy.max.points) { setNote(`A shape may have at most ${policy.max.points} points.`); return }
+      editShape(sid, restored, undefined, true)
     },
   } : null
   // The shape editor's symmetry (S6): choosing the axes in the panel, then the side on the canvas; turning it on lets go of the shape's own connections (a symmetric shape's

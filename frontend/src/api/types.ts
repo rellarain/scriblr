@@ -755,7 +755,9 @@ export interface ModelOverride { shape: string; pts: ModelPoint[]; angles?: Mode
 // What one form does to the paint of one shape: the colour slot it is painted from, or a fixed gray (no slot), and a tone (-2..2). null leaves the shape's own value.
 // round (phase D4) is the radius the shape's sharp corners are rounded to in this form; null leaves the shape's own.
 // Shape editor S6: a symmetric shape's axes (n of them through cx, cy, the first at a degrees in the shape's frame), the wedge its source came from and the points inside it.
-export interface ModelSymmetry { a: number; n: number; side: number; cx: number; cy: number; m: number }
+// ends (the user 2026-11-16): whether the source's first and last points are on their axes; both when left out. Without one, the outline crosses that axis between a point
+// and its mirror image. The shape has 2n·m + n·(points on axes per source) points.
+export interface ModelSymmetry { a: number; n: number; side: number; cx: number; cy: number; m: number; ends?: [boolean, boolean] }
 export interface ModelLook { shape: string; slot: string | null; gray: number | null; tone: number | null; round?: number | null }
 export interface ModelForm { id: string; name: string; ovr: ModelOverride[]; looks?: ModelLook[] }
 // A way an object can vary (eye shape, expression, style): its forms, and the one it shows unless another is chosen (initial). An object shows one form of every axis.

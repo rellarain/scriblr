@@ -3,9 +3,11 @@ import { SWAP, apply, build, hasIn, hasOut, inverse, mul, r2, type Mat } from '.
 import { frameOf, rotOf } from './transform'
 
 // Symmetry in the shape editor (S6). A symmetric shape has `n` axes (1 to 6) through its middle, evenly spaced, the first at `a` degrees in the shape's own frame; they
-// split it into 2n wedges. One wedge's part of the outline is the source (the first m + 2 points: a point on an axis, m points inside the wedge, a point on the next axis),
-// and the rest of the outline is made from it by reflecting it across one axis after the next. The whole outline is kept in the points (2n(m + 1) of them), so drawing it
-// needs nothing new; an edit of any copy is taken back to the source and the copies are made again. Turning symmetry off keeps every point where it is.
+// split it into 2n wedges. One wedge's part of the outline is the source (the first points: a point on an axis, m points inside the wedge, a point on the next axis),
+// and the rest of the outline is made from it by reflecting it across one axis after the next. The whole outline is kept in the points, so drawing it needs nothing new;
+// an edit of any copy is taken back to the source and the copies are made again. Turning symmetry off keeps every point where it is.
+// The points on the axes are optional (`ends`, the user 2026-11-16): without one the outline goes straight from a point to its mirror image across that axis, crossing it
+// smoothly. Deleting a point on an axis takes it (and its copies on the matching axes) away; adding a point on a side that crosses an axis puts it back, on the axis.
 
 export const SYM_AXES_MAX = 6
 // How near (model units) a point of the outline has to be to an axis to count as on it.
@@ -49,6 +51,47 @@ const roundPt = (p: ModelPoint): ModelPoint => ({
   ...p, x: r2(p.x), y: r2(p.y), hi: p.hi ? [r2(p.hi[0]), r2(p.hi[1])] : null, ho: p.ho ? [r2(p.ho[0]), r2(p.ho[1])] : null,
 })
 
+// Which ends of the source lie on an axis (its first point, its last point); both unless one was taken away.
+export const endsOf = (sym: Pick<ModelSymmetry, 'ends'>): [boolean, boolean] => (Array.isArray(sym.ends) && sym.ends.length === 2 ? [sym.ends[0] !== false, sym.ends[1] !== false] : [true, true])
+const endCount = (sym: Pick<ModelSymmetry, 'ends'>): number => endsOf(sym).filter(Boolean).length
+// How many points the source has (m inside the wedge and its ends on the axes), and the whole outline.
+export const runLength = (sym: ModelSymmetry): number => sym.m + endCount(sym)
+export const symCount = (sym: Pick<ModelSymmetry, 'n' | 'm' | 'ends'>): number => 2 * sym.n * sym.m + sym.n * endCount(sym)
+// The spec with these ends (kept off the data when both are there, as before ends existed).
+const withEnds = (sym: ModelSymmetry, ends: [boolean, boolean]): ModelSymmetry => { const { ends: _old, ...rest } = sym; return ends[0] && ends[1] ? rest : { ...rest, ends } }
+
+// For every point of the outline: the copy it is in (copy 0 is the source; odd copies run the other way) and the point of the source it copies. A copy leaves out its
+// last point when that point is on an axis (the next copy starts with it).
+function layout(sym: ModelSymmetry): Array<{ k: number; src: number }> {
+  const [s, e] = endsOf(sym), L = runLength(sym), out: Array<{ k: number; src: number }> = []
+  for (let k = 0; k < 2 * sym.n; k++) {
+    const trailing = k % 2 === 0 ? e : s, len = L - (trailing ? 1 : 0)
+    for (let q = 0; q < len; q++) out.push({ k, src: k % 2 === 0 ? q : L - 1 - q })
+  }
+  return out
+}
+// Whether copy k's last point is on an axis (copy 0 ends on the source's end, the next on its start, and so on).
+const trailingOf = (sym: ModelSymmetry, k: number): boolean => { const [s, e] = endsOf(sym); return k % 2 === 0 ? e : s }
+
+// The ray (0 .. 2n - 1) nearest the direction of a place from the middle.
+function nearestRay(sym: ModelSymmetry, rot: number, x: number, y: number): number {
+  const span = 180 / sym.n, t = deg(Math.atan2(y - sym.cy, x - sym.cx)) - rot - sym.a
+  return ((Math.round(t / span) % (2 * sym.n)) + 2 * sym.n) % (2 * sym.n)
+}
+// The rays the source starts and ends on: the two sides of its wedge, in the order the outline runs. Read from its points on the axes, or (with neither) from the way its
+// points go round the middle.
+function runRays(sym: ModelSymmetry, rot: number, run: ModelPoint[]): { start: number; end: number } {
+  const n2 = 2 * sym.n, a = sym.side % n2, b = (sym.side + 1) % n2, [s, e] = endsOf(sym)
+  const fwd = { start: a, end: b }, back = { start: b, end: a }
+  if (!run.length) return fwd
+  if (s) return nearestRay(sym, rot, run[0].x, run[0].y) === b && a !== b ? back : fwd
+  if (e) return nearestRay(sym, rot, run[run.length - 1].x, run[run.length - 1].y) === a && a !== b ? back : fwd
+  if (run.length < 2) return fwd
+  const base = rot + sym.a + (sym.side * 180) / sym.n
+  const off = (p: ModelPoint) => (((deg(Math.atan2(p.y - sym.cy, p.x - sym.cx)) - base) % 360) + 360) % 360
+  return off(run[0]) <= off(run[run.length - 1]) ? fwd : back
+}
+
 // The axis line (degrees, mod 180) nearest the direction of a place from the middle.
 function nearestLine(cx: number, cy: number, rot: number, a: number, n: number, x: number, y: number): number {
   const span = 180 / n, t = deg(Math.atan2(y - cy, x - cx)) - rot - a
@@ -56,12 +99,14 @@ function nearestLine(cx: number, cy: number, rot: number, a: number, n: number, 
 }
 
 // The copies of the source, one per wedge going round from it: each is the one before reflected across the axis at its end (and turned the other way round). `maps[k]`
-// takes the source to copy k; `flipped[k]` says copy k runs the other way.
+// takes the source to copy k; `flipped[k]` says copy k runs the other way. The axes come from the spec (the rays the source runs between), so a source without its points
+// on the axes unfolds the same way.
 function unfold(sym: ModelSymmetry, rot: number, run: ModelPoint[]): { runs: ModelPoint[][]; maps: Mat[]; flipped: boolean[] } {
   const runs: ModelPoint[][] = [run], maps: Mat[] = [[1, 0, 0, 1, 0, 0]], flipped = [false]
+  const n2 = 2 * sym.n, { start, end } = runRays(sym, rot, run), step = (start + 1) % n2 === end ? 1 : -1
   let cur = run
-  for (let k = 1; k < 2 * sym.n; k++) {
-    const end = cur[cur.length - 1], line = nearestLine(sym.cx, sym.cy, rot, sym.a, sym.n, end.x, end.y), refl = reflectAbout(sym.cx, sym.cy, line)
+  for (let k = 1; k < n2; k++) {
+    const ray = (((end + (k - 1) * step) % n2) + n2) % n2, refl = reflectAbout(sym.cx, sym.cy, rot + sym.a + (ray * 180) / sym.n)
     cur = reversed(cur.map(p => movePt(p, refl)))
     runs.push(cur); maps.push(mul(refl, maps[k - 1])); flipped.push(!flipped[k - 1])
   }
@@ -71,14 +116,14 @@ function unfold(sym: ModelSymmetry, rot: number, run: ModelPoint[]): { runs: Mod
 // The point without what it follows (a copy made by reflection must not follow what its source follows).
 const unbound = (p: ModelPoint): ModelPoint => { const { bind: _bind, ...rest } = p; return rest }
 
-// The whole outline made from its source (the first m + 2 points). The copies are geometry only: what a point follows is put back by the caller (see `withBinds`).
+// The whole outline made from its source (its first points). The copies are geometry only: what a point follows is put back by the caller (see `withBinds`).
 export function regenerate(shape: ModelShape): ModelShape {
   const sym = shape.sym
   if (!sym) return shape
-  const run = shape.pts.slice(0, sym.m + 2)
-  if (run.length < 2) return shape
+  const run = shape.pts.slice(0, runLength(sym))
+  if (run.length < 1) return shape
   const { runs } = unfold(sym, rotOf(shape), run)
-  return { ...shape, pts: runs.flatMap(r => r.slice(0, -1)).map(roundPt).map(unbound) }
+  return { ...shape, pts: runs.flatMap((r, k) => (trailingOf(sym, k) ? r.slice(0, -1) : r)).map(roundPt).map(unbound) }
 }
 
 // What the points of `from` follow, put back on the made outline: by number when the count is the same, else on the point at the same place (shape types T1: a symmetric shape's
@@ -98,30 +143,68 @@ function withBinds(made: ModelShape, from: ModelPoint[]): ModelShape {
 // The points of the outline that are copies of the same point of the source (that point's orbit), point i among them.
 export function orbitOf(shape: Pick<ModelShape, 'sym' | 'pts'>, i: number): number[] {
   const sym = shape.sym
-  if (!sym || shape.pts.length !== 2 * sym.n * (sym.m + 1)) return [i]
-  const per = sym.m + 1, src = (j: number) => { const k = Math.floor(j / per), o = j % per; return k % 2 === 1 ? per - o : o }
-  const mine = src(i)
-  return shape.pts.flatMap((_, j) => (src(j) === mine ? [j] : []))
+  if (!sym || shape.pts.length !== symCount(sym)) return [i]
+  const at = layout(sym), mine = at[i]?.src
+  if (mine === undefined) return [i]
+  return at.flatMap((x, j) => (x.src === mine ? [j] : []))
 }
 
 // The outline of a symmetric shape after its points that follow other shapes were moved there (`list`, in the solver): each moved point goes back to the source and the copies
 // follow it, so the shape stays symmetric. A shape that is not symmetric, or whose count differs, is left as it is.
 export function followBound(shape: ModelShape, list: ModelPoint[]): ModelPoint[] {
   const sym = shape.sym
-  if (!sym || list.length !== shape.pts.length || list.length !== 2 * sym.n * (sym.m + 1)) return list
-  const rot = rotOf(shape), runLen = sym.m + 2, per = sym.m + 1
-  const source = shape.pts.slice(0, runLen)
+  if (!sym || list.length !== shape.pts.length || list.length !== symCount(sym)) return list
+  const rot = rotOf(shape), source = shape.pts.slice(0, runLength(sym)), at = layout(sym)
   const { maps, flipped } = unfold(sym, rot, source)
   const src = source.map(p => ({ ...p }))
   let any = false
   // every point that follows, where the link put it (whether or not that is where it is kept), goes back to the source
   shape.pts.forEach((p, i) => {
     if (!p.bind) return
-    const k = Math.floor(i / per), o = i % per, at = flipped[k] ? per - o : o
-    src[at] = pinToAxis(sym, rot, source, backToSource(list[i], maps[k], flipped[k]), at)
+    const { k, src: s } = at[i]
+    src[s] = pinToAxis(sym, rot, source, backToSource(list[i], maps[k], flipped[k]), s)
     any = true
   })
   return any ? regenerate({ ...shape, pts: src }).pts : list
+}
+
+// The places where a one-axis shape's outline (as drawn, `pts`) meets its axis: its point there, or where it crosses it between a point and its mirror image. Null for
+// a shape with no symmetry, more than one axis or another count.
+export function axisEnds(shape: Pick<ModelShape, 'sym'>, pts: ModelPoint[]): [V, V] | null {
+  const sym = shape.sym
+  if (!sym || sym.n !== 1 || pts.length !== symCount(sym) || pts.length < 2) return null
+  const [s, e] = endsOf(sym), len0 = runLength(sym) - (e ? 1 : 0), cubics = cubicsOf(pts, true)
+  const start: V = s ? [pts[0].x, pts[0].y] : at(cubics[pts.length - 1], 0.5)
+  const end: V = e ? [pts[len0].x, pts[len0].y] : at(cubics[len0 - 1], 0.5)
+  return [start, end]
+}
+
+// Whether side i of a symmetric shape (from point i to the next) crosses an axis with no point on it: adding a point there puts the point back on the axis.
+export function crossesAxis(shape: Pick<ModelShape, 'sym' | 'pts'>, i: number): boolean {
+  const sym = shape.sym
+  if (!sym || shape.pts.length !== symCount(sym)) return false
+  const at = layout(sym), here = at[i], next = at[(i + 1) % at.length]
+  return !!here && !!next && here.k !== next.k && !trailingOf(sym, here.k)
+}
+
+// Put a point back on the axis that side i crosses (where the outline crosses it, its handles split there): the source gets that end again and the copies are made again.
+// Null when the side does not cross an axis without a point.
+export function restoreLinePoint(shape: ModelShape, i: number): ModelShape | null {
+  const sym = shape.sym
+  if (!sym || !crossesAxis(shape, i)) return null
+  const rot = rotOf(shape), source = shape.pts.slice(0, runLength(sym)), at = layout(sym), { k } = at[i]
+  const { maps, flipped } = unfold(sym, rot, source)
+  const c = cubicsOf(shape.pts, true)[i], [, after] = split(c, 0.5), [before] = split(c, 0.5)
+  const g = after[0], curvedIn = Math.hypot(before[2][0] - g[0], before[2][1] - g[1]) > 1e-6, curvedOut = Math.hypot(after[1][0] - g[0], after[1][1] - g[1]) > 1e-6
+  const made: ModelPoint = { x: g[0], y: g[1], m: curvedIn || curvedOut ? 'c' : 's', hi: curvedIn ? [before[2][0] - g[0], before[2][1] - g[1]] : null, ho: curvedOut ? [after[1][0] - g[0], after[1][1] - g[1]] : null }
+  const back = backToSource(made, maps[k], flipped[k])
+  // copy k ends on the source's end when k is even, on its start when it is odd
+  const [s, e] = endsOf(sym), atEnd = k % 2 === 0
+  const ends: [boolean, boolean] = atEnd ? [s, true] : [true, e]
+  const next: ModelShape = { ...shape, sym: withEnds(sym, ends) }
+  const run = atEnd ? [...source, back] : [back, ...source]
+  const pinned = run.map((p, j) => pinToAxis(next.sym!, rot, run, p, j))
+  return withBinds(regenerate({ ...next, pts: pinned }), shape.pts)
 }
 
 // ---- turning it on ----
@@ -247,9 +330,11 @@ function backToSource(p: ModelPoint, map: Mat, flipped: boolean): ModelPoint {
 
 export type SymmetryEdit = { shape: ModelShape; refused?: string }
 
-// A point of the source that lies on an axis (its first or its last) kept on that axis line: the handle that was changed is kept and mirrored to the other side.
+// A point of the source that lies on an axis (its first or its last, when there is a point there) kept on that axis line: the handle that was changed is kept and mirrored to
+// the other side.
 function pinToAxis(sym: ModelSymmetry, rot: number, source: ModelPoint[], p: ModelPoint, src: number): ModelPoint {
-  if (src !== 0 && src !== source.length - 1) return p
+  const [s, e] = endsOf(sym)
+  if (!((src === 0 && s) || (src === source.length - 1 && e))) return p
   const ref = source[src], line = nearestLine(sym.cx, sym.cy, rot, sym.a, sym.n, ref.x, ref.y), u: V = [Math.cos(rad(line)), Math.sin(rad(line))]
   const d = (p.x - sym.cx) * u[0] + (p.y - sym.cy) * u[1], refl = reflectAbout(sym.cx, sym.cy, line)
   const keep: 'hi' | 'ho' = JSON.stringify(p.ho ?? null) !== JSON.stringify(ref.ho ?? null) ? 'ho' : 'hi'
@@ -258,25 +343,25 @@ function pinToAxis(sym: ModelSymmetry, rot: number, source: ModelPoint[], p: Mod
 }
 
 // After an edit of a symmetric shape's points (`next`, from `old`): the edited points are taken back to the source and the copies are made again. A point added to any copy
-// is added to the source (so to every copy); a point deleted from a copy is deleted from the source, but a point on an axis cannot be. An edit that moved the middle or the
-// axes (a move or a turn of the whole shape) is kept as it is.
+// is added to the source (so to every copy), and one added on a side that crosses an axis with no point puts that point back on the axis; a point deleted from a copy is
+// deleted from the source, and deleting a point on an axis takes that end away. An edit that moved the middle or the axes (a move or a turn of the whole shape) is kept as
+// it is.
 export function followSymmetry(old: ModelShape, next: ModelShape): SymmetryEdit {
   const sym = old.sym
   if (!sym || !next.sym) return { shape: next }
   const ns = next.sym
-  if (ns.a !== sym.a || ns.n !== sym.n || ns.cx !== sym.cx || ns.cy !== sym.cy || ns.m !== sym.m || rotOf(next) !== rotOf(old)) return { shape: next }
-  const rot = rotOf(old), runLen = sym.m + 2, per = sym.m + 1
-  const source = old.pts.slice(0, runLen)
+  if (ns.a !== sym.a || ns.n !== sym.n || ns.cx !== sym.cx || ns.cy !== sym.cy || ns.m !== sym.m || endsOf(ns).join() !== endsOf(sym).join() || rotOf(next) !== rotOf(old)) return { shape: next }
+  if (old.pts.length !== symCount(sym)) return { shape: next }
+  const rot = rotOf(old), L = runLength(sym), [s0, e0] = endsOf(sym)
+  const source = old.pts.slice(0, L), at = layout(sym)
   const { maps, flipped } = unfold(sym, rot, source)
-  const place = (index: number) => { const k = Math.floor(index / per), o = index % per; return { k, o, src: flipped[k] ? per - o : o } }
-  const onAxis = (src: number) => src === 0 || src === runLen - 1
   const pin = (p: ModelPoint, src: number): ModelPoint => pinToAxis(sym, rot, source, p, src)
   if (next.pts.length === old.pts.length) {
     const src = source.map(p => ({ ...p }))
     let changed = false
     next.pts.forEach((p, i) => {
       if (samePt(p, old.pts[i])) return
-      const { k, src: s } = place(i)
+      const { k, src: s } = at[i]
       src[s] = pin(backToSource(p, maps[k], flipped[k]), s)
       changed = true
     })
@@ -285,24 +370,31 @@ export function followSymmetry(old: ModelShape, next: ModelShape): SymmetryEdit 
   }
   if (next.pts.length === old.pts.length + 1) {
     // the new point and the side of the old outline it went into
-    let at = 0
-    while (at < old.pts.length && samePt(next.pts[at], old.pts[at])) at++
-    const before = (at - 1 + old.pts.length) % old.pts.length
-    const { k, o } = place(before)
-    // the side from (k, o) to the next point of copy k is, in the source, the side after point o (or, the other way round, after point per - o - 1)
-    const after = flipped[k] ? per - o - 1 : o
-    const added = backToSource(next.pts[at], maps[k], flipped[k])
-    const src = [...source.slice(0, after + 1), added, ...source.slice(after + 1)]
+    let ins = 0
+    while (ins < old.pts.length && samePt(next.pts[ins], old.pts[ins])) ins++
+    const before = (ins - 1 + old.pts.length) % old.pts.length
+    // on a side that crosses an axis with no point: the point goes back on the axis
+    if (crossesAxis(old, before)) {
+      const restored = restoreLinePoint(old, before)
+      return restored ? { shape: withBinds(restored, next.pts) } : { shape: old, refused: 'That point cannot be added.' }
+    }
+    const { k, src: sb } = at[before]
+    // the side from that point to the next one of copy k is, in the source, the side after it (or, the other way round, before it)
+    const pos = k % 2 === 0 ? sb + 1 : sb
+    const added = backToSource(next.pts[ins], maps[k], flipped[k])
+    const src = [...source.slice(0, pos), added, ...source.slice(pos)]
     return { shape: withBinds(regenerate({ ...next, pts: src, sym: { ...sym, m: sym.m + 1 } }), next.pts) }
   }
   if (next.pts.length === old.pts.length - 1) {
-    let at = 0
-    while (at < next.pts.length && samePt(next.pts[at], old.pts[at])) at++
-    const { src: s } = place(at)
-    if (onAxis(s)) return { shape: old, refused: 'A point on an axis of a symmetric shape cannot be deleted: turn symmetry off first.' }
-    if (sym.m < 1) return { shape: old, refused: 'A symmetric shape needs its points.' }
+    let del = 0
+    while (del < next.pts.length && samePt(next.pts[del], old.pts[del])) del++
+    const { src: s } = at[del]
+    const isStart = s === 0 && s0, isEnd = s === L - 1 && e0
+    const spec: ModelSymmetry = isStart ? withEnds(sym, [false, e0]) : isEnd ? withEnds(sym, [s0, false]) : { ...sym, m: sym.m - 1 }
+    if (!isStart && !isEnd && sym.m < 1) return { shape: old, refused: 'A symmetric shape needs its points.' }
+    if (symCount(spec) < 3) return { shape: old, refused: 'A shape needs at least three points.' }
     const src = source.filter((_, i) => i !== s)
-    return { shape: withBinds(regenerate({ ...next, pts: src, sym: { ...sym, m: sym.m - 1 } }), next.pts) }
+    return { shape: withBinds(regenerate({ ...next, pts: src, sym: spec }), next.pts) }
   }
   return { shape: old, refused: 'That edit cannot be made to a symmetric shape: turn symmetry off first.' }
 }
@@ -314,6 +406,8 @@ export function symmetryOf(v: unknown, points: number): ModelSymmetry | null {
   const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : NaN)
   const n = Math.round(num(s.n)), m = Math.round(num(s.m)), a = num(s.a), cx = num(s.cx), cy = num(s.cy), side = Math.round(num(s.side))
   if (!(n >= 1 && n <= SYM_AXES_MAX) || !(m >= 0) || !Number.isFinite(a) || !Number.isFinite(cx) || !Number.isFinite(cy)) return null
-  if (points !== 2 * n * (m + 1)) return null
-  return { a: r2(((a % 180) + 180) % 180), n, side: Number.isFinite(side) ? ((side % (2 * n)) + 2 * n) % (2 * n) : 0, cx: r2(cx), cy: r2(cy), m }
+  const ends: [boolean, boolean] = Array.isArray(s.ends) && s.ends.length === 2 ? [s.ends[0] !== false, s.ends[1] !== false] : [true, true]
+  if (points !== symCount({ n, m, ends })) return null
+  const spec: ModelSymmetry = { a: r2(((a % 180) + 180) % 180), n, side: Number.isFinite(side) ? ((side % (2 * n)) + 2 * n) % (2 * n) : 0, cx: r2(cx), cy: r2(cy), m }
+  return ends[0] && ends[1] ? spec : { ...spec, ends }
 }

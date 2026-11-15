@@ -457,8 +457,10 @@ described, now stale, in `docs/data-model.md`).
   handles), so they share one curve on the writer's card too.
   Shape editor S6 adds, with a default: on a shape `sym` (`ModelSymmetry`: `a` the first axis's angle in the shape's frame,
   0..180; `n` axes, 1..6, evenly spaced; `side` the wedge the source came from; `cx`, `cy` the middle; `m` the points strictly
-  inside the source wedge; null: not symmetric). The points hold the whole outline, 2n(m + 1) of them with the source first,
-  so nothing else has to draw it; a spec that does not fit the points is let go on both sides (the points stay).
+  inside the source wedge; `ends` whether the source has its point on its first axis and on its last, absent: both;
+  null: not symmetric). The points hold the whole outline, 2n·m + n·(s + e) of them (s and e are 1 for each end that has its
+  point) with the source first, so nothing else has to draw it; a spec that does not fit the points is let go on both sides
+  (the points stay).
   Shape types T1 adds, with a default: on a shape `kind` (`base`, `stretch`, `pivot`, `shadow` or `light`; anything else is read as
   `base`). A shape acts as a stretch shape when every point is linked; a shadow and a light are drawn black and white at the
   shape's opacity, above every other shape and kept inside them. A symmetric shape's points may now be linked: the solver moves

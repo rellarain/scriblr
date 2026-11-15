@@ -104,6 +104,39 @@ describe('a symmetric shape', () => {
   })
 })
 
+describe('points on the axes are optional (the user, 2026-11-16)', () => {
+  const dotAt = (x: number, y: number) => dots().find(d => at(d)[0] === x && at(d)[1] === y)
+  it('removes a point on an axis with Delete, and its copy on the same axis goes too', async () => {
+    await quartered()
+    const bottom = dotAt(80, 140)!
+    pointer(bottom, 'pointerdown', pixelOf(80, 140))
+    pointer(canvas(), 'pointerup', pixelOf(80, 140))
+    canvas().focus()
+    fireEvent.keyDown(canvas(), { key: 'Delete' })
+    expect(dots()).toHaveLength(6)
+    expect(dotAt(80, 140)).toBeUndefined()
+    expect(dotAt(80, 100)).toBeUndefined()
+    expect(dotAt(60, 120)).toBeDefined()
+    expect(screen.queryByText(/axis of a symmetric shape cannot/)).toBeNull()
+  })
+
+  it('removes one with Ctrl + click, puts it back with a double-click on the side that crosses the axis, and Undo takes that back', async () => {
+    const user = await quartered()
+    const side = pixelOf(60, 120)
+    fireEvent(dotAt(60, 120)!, new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, ctrlKey: true, clientX: side.x, clientY: side.y }))
+    pointer(canvas(), 'pointerup', side)
+    expect(dots()).toHaveLength(6)
+    expect(dotAt(60, 120)).toBeUndefined()
+    expect(dotAt(100, 120)).toBeUndefined()
+    fireEvent.doubleClick(canvas(), { clientX: side.x, clientY: side.y })
+    expect(dots()).toHaveLength(8)
+    expect(dotAt(60, 120)).toBeDefined()
+    expect(dotAt(100, 120)).toBeDefined()
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(dots()).toHaveLength(6)
+  })
+})
+
 describe('symmetric shapes connected (shape types T1)', () => {
   it('connects a point of one symmetric shape to a point of another, and its copies follow', async () => {
     const made = (id: string, x: number, y: number) => { const r = enableSymmetry(sharp(id, [[x, y], [x + 40, y], [x + 40, y + 40], [x, y + 40]]), { a: 0, n: 2 }, 1, 60); if (!r.ok) throw new Error(r.reason); return r.shape }

@@ -8,7 +8,7 @@ import { apply, boxOf, build, flatten, inPolygon, inverse, nearestEdge, type Box
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
 import { copyShareAt, copySharesOf, drawnOf, dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, toSourceSpot, weldTree, type DropTarget, sharesCurve } from './engine/connect'
-import { rayAngles, wedgeAt } from './engine/symmetry'
+import { crossesAxis, rayAngles, wedgeAt } from './engine/symmetry'
 import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, rotOf, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
@@ -138,6 +138,8 @@ export interface ConnectTool {
   onLoosen: (shapeId: string, i: number, x: number, y: number) => void
   // a double-click on a shared segment adds a point to it and to every segment that shares it
   onAddShared: (shapeId: string, e: number, x: number, y: number) => void
+  // a double-click (or a drag) on a side of a symmetric shape that crosses an axis with no point on it puts the point back on the axis
+  onRestoreLinePoint?: (shapeId: string, e: number) => void
 }
 // How much of each edge of the canvas a toolbar covers, in pixels: the view is fitted and centred in what is left.
 export interface Insets { left: number; right: number; bottom: number; top?: number }
@@ -1094,6 +1096,8 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (!d.other && !editable) return
+    // a drag from a side that crosses an axis with no point on it puts the point back on the axis (then drag that point)
+    if (p.connect?.onRestoreLinePoint && crossesAxis(s, d.e)) { p.connect.onRestoreLinePoint(s.id, d.e); return }
     const [lx, ly] = apply(inverse(r.matrix), d.at[0], d.at[1])
     const added = addPoint(s, d.e, { mirror, axis })
     if (added.index < 0) { p.onNote?.('A shape may have at most 60 points.'); return }
@@ -1131,6 +1135,8 @@ export function DesignerCanvas(p: CanvasProps) {
     if (p.connect && copy?.weld) { const [x, y] = toSourceSpot(drawnOf(content, solved, s.id), h.e, copy.source, copy.reversed, h.x, h.y); p.connect.onAddShared(s.id, copy.source, x, y); return }
     // a shared segment gets its point on the segment that is drawn and on every segment that shares it (shape editor S5)
     if (p.connect && (sharedSegment(content, s.id, h.e) || sharersOf(content, s.id, h.e).length)) { p.connect.onAddShared(s.id, h.e, h.x, h.y); return }
+    // a side of a symmetric shape that crosses an axis with no point on it gets its point back, on the axis
+    if (p.connect?.onRestoreLinePoint && crossesAxis(s, h.e)) { p.connect.onRestoreLinePoint(s.id, h.e); return }
     if (p.connect) return
     const [x, y] = apply(inverse(r.matrix), h.x, h.y)
     const added = addPoint(s, h.e, { mirror, axis })
