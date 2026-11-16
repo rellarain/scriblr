@@ -154,6 +154,7 @@ const queueViewOf = (v: QueueView | null | undefined): QueueView | null => {
   return {
     ...v,
     me: { ...v.me, thisWeek: week(v.me.thisWeek), nextWeek: week(v.me.nextWeek) },
+    weeks: list(v.weeks).map(w => ({ id: w.id, thisWeek: week(w.thisWeek), nextWeek: week(w.nextWeek) })),
     levels: v.levels ?? { medium: 3, high: 6, urgent: 10 },
     queues: v.queues.map(q => ({ ...q, staff: list(q.staff), chats: list(q.chats), waiting: list(q.waiting) })),
     next: v.next ?? null,

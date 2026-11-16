@@ -9,8 +9,8 @@ Code: `admin/office/OfficeTiles.tsx` (one component per tile), `admin/office/Tab
 | Tile | Icon | Picker | Tabs |
 |---|---|---|---|
 | Site | `GlobeIcon` | none | Site analytics · Departments (add, rename, set the director, delete an empty one) |
-| Department | `BuildingIcon` | department | Details (name, director, counts) · Roster · Schedule · Analytics · Teams (add, rename, set the manager, delete an empty one) |
-| Team | `PeopleIcon` | team | Assignment (the roles of its admins) · Allotment (its people's helper hours) · Schedule · Performance · Members (add, take off, the manager) · Applications |
+| Department | `BuildingIcon` | department | Details (name, director, counts) · Roster · Schedule (everyone's helper time) · Analytics · Teams (add, rename, set the manager, delete an empty one) |
+| Team | `PeopleIcon` | team | Assignment (the roles of its admins) · Allotment (its people's helper hours) · Schedule (everyone's helper time) · Performance · Members (add, take off, the manager) · Applications |
 | Channel | `FilterIcon` | console | Queue analytics · Resource analytics · Helper-checked feedback (Channel Management for that console) |
 | Desk | `DeskIcon` | none | Voting · Toning (each message's tone) · Explication (what each message is about and what should happen) |
 | Admin/Helper | `ClipboardIcon` | staff member | Training · Performance · Activity · Flags · Promote · Demote · Term · Allot hours |
@@ -20,6 +20,7 @@ Code: `admin/office/OfficeTiles.tsx` (one component per tile), `admin/office/Tab
 - **Demote** lists what can lower them: a promotion taken back, admin to helper, and the teams they manage and departments they direct. Someone made a helper leads nothing, as someone who left does (the server clears it too).
 - **Term** marks someone as left (never deleted) or rehires them. The owner cannot be termed or made a helper: those buttons are off, with the reason as their title.
 - **Hire** makes the user picked a helper or an admin, in a team. A user already on the staff shows as such.
+- **Schedule** (Department and Team): everyone's helper time, read only, as each set it (helpers on Helper > Settings, admins on Admin > Dashboard > Schedule): a row per person with helper hours, a column per day ("9:00–13:00"), their hours, and **This week** / **Next week** chips (`aria-pressed`). The table scrolls sideways when narrow. See [Feedback](../Feedback/README.md), Helper > Settings.
 - Parts with no data in the app yet (the analytics, performance, activity, flags, engagement, a user's training and applications) say in one line what they will hold. Users will apply in Training once they pass its required exams.
 
 ## Tabs and picker

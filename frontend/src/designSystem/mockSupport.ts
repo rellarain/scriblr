@@ -237,6 +237,7 @@ export function createMockSupport(opts: {
     return {
       me: { id: pp.id, name: pp.name, kind: pp.kind, allotment: pp.allotment, onShift: shifts.get(me) ?? false, thisWeek: week(me, weekOf(now)), nextWeek: week(me, weekOf(plusDays(now, 7))), managesAny: manages(pp, null) },
       today: weekday(now), levels: { ...levels }, queues, next: nextFor(me),
+      weeks: pp.kind === 'admin' ? all.filter(x => x.active && x.allotment).map(x => ({ id: x.id, thisWeek: week(x.id, weekOf(now)), nextWeek: week(x.id, weekOf(plusDays(now, 7))) })) : [],
     }
   }
   const ordered = (r: LevelRanges) => [r.medium, r.high, r.urgent].every(n => Number.isInteger(n) && n >= 1 && n <= 999) && r.medium < r.high && r.high < r.urgent

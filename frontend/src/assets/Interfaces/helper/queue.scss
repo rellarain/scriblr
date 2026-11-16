@@ -63,3 +63,7 @@
 // The Helper's schedule (Settings).
 .qWeek { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--ov-sink-1); }
 .qDay { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; min-height: 28px; > .qDayName { width: 124px; } }
+
+// Everyone's helper time, read only (support/WeekTable.tsx): scrolls sideways when narrow.
+.qWeekTableWrap { overflow-x: auto; }
+.qWeekTable td { white-space: nowrap; font-variant-numeric: tabular-nums; }

@@ -105,10 +105,14 @@ export interface QueueRow {
   waiting: QueueWaiting[]
 }
 
+export interface PersonWeeks { id: string; thisWeek: ScheduleWeek; nextWeek: ScheduleWeek }
+
 export interface QueueView {
   me: { id: string; name: string; kind: 'helper' | 'admin'; allotment: number | null; onShift: boolean; thisWeek: ScheduleWeek; nextWeek: ScheduleWeek; managesAny: boolean }
   // Today, Monday 0.
   today: number
+  // Everyone's helper time this week and next (each active person with helper hours; admins only: the Office's Schedule tabs).
+  weeks: PersonWeeks[]
   levels: LevelRanges
   queues: QueueRow[]
   next: string | null

@@ -100,6 +100,8 @@ The sidebar's queue meter counts the chats the staff member is in and those wait
 
 ## Helper > Settings: the schedule
 
+Everyone with helper hours sets their own: helpers on Helper > Settings, admins on Admin > Dashboard > Schedule (the same editor, `support/ShiftEditor.tsx`). The Office's Department and Team tiles show everyone's on their **Schedule** tab (`support/WeekTable.tsx`, read only): a row per person with helper hours, a column per day ("9:00–13:00"), the hours, and a This week / Next week choice. The queue view gives admins everyone's weeks (`weeks`).
+
 - **This week**: the blocks, fixed.
 - **Next week**: a row per day with a switch, the start (a stepper by the hour) and the hours (a stepper, 1 to 12, ending by midnight), the total against the allotment, and **Save next week** (`SaveIcon`). A week with no schedule of its own repeats the latest one.
 - Without helper hours it says so.

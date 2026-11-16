@@ -1,6 +1,7 @@
 import { ChannelTile, DepartmentTile, DeskTile, SiteTile, StaffTile, TeamTile, UserTile } from './admin/office/OfficeTiles'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from './admin/plan/PlanPages'
 import { SlaPage } from './admin/office/StaffPages'
+import ShiftEditor from '../../support/ShiftEditor'
 import HelpTile from '../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../channels/helpTargets'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
@@ -88,8 +89,8 @@ const DESIGNER_HELP = [
 const OFFICE_HELP = [
   'The Office has seven tiles. Each lists its parts as tabs in its title bar, and a tile about one of several things (a department, a team, a console, a staff member, a user) has a picker at the top. The open tab and the choice are remembered on this computer. Parts with nothing to show yet say what they will hold.',
   'Site: the departments (add, rename, delete an empty one, and set the director).',
-  'Department: its details (name, director and counts), its roster, its schedule, and its teams (add, rename, delete an empty one, and set the manager).',
-  'Team: Assignment sets the roles of its admins on each console; Allotment their helper hours; Members adds people to the team, takes them off it and sets the manager.',
+  'Department: its details (name, director and counts), its roster, its schedule (everyone\'s helper time this week or next, as each set it), and its teams (add, rename, delete an empty one, and set the manager).',
+  'Team: Assignment sets the roles of its admins on each console; Allotment their helper hours; Schedule their helper time this week or next; Members adds people to the team, takes them off it and sets the manager.',
   'Channel: Helper-checked feedback is Channel Management for the console picked: correct the subject, verb and tone of each message in voting, ask the writer a question or leave staff a comment.',
   'Desk: Voting gives a yes, no or pass with a note on each statement in voting (advice for the planner); Toning sets the tone of each message; Explication what it is about and what should happen.',
   'Admin/Helper: Training records the training a person finished on an interface or a console; Promote and Demote raise or lower their support tier on a console, make a helper an admin or an admin a helper (who then leads nothing), and make them the manager of their team or the director of their department; Term marks someone as left (never deleted) or rehires them; Allot hours gives them 5, 10, 20 or 30 helper hours a week.',
@@ -103,9 +104,9 @@ const SECTIONS: AuiSectionDef[] = [
       { key: 'notifications', label: 'Notifications', Icon: EnvelopeIcon,
         body: 'View admin notifications here.' },
       { key: 'dashboardSchedule', label: 'Schedule', Icon: CalendarIcon,
-        body: 'View and manage the admin work schedule here.' },
+        body: '' },
       { key: 'dashboardHelp', label: 'Help', Icon: HelpIcon,
-        body: 'Resources and assistance using the Dashboard console here.' },
+        body: 'Resources and assistance using the Dashboard console here.\n\nSchedule: your helper time. This week is fixed; set next week here, a block a day at most, within the hours the Office allots you. Everyone\'s shows on the Schedule tab of their department and team in the Office.' },
     ],
   },
   {
@@ -219,6 +220,7 @@ function AUI() {
       // an Office tile's tabs go in its title bar
       titleExtras: OFFICE_TILES[page.key] ? <span ref={slots.ref(`office.${page.key}`)} className="gtRailSlot" /> : undefined,
       children: OFFICE_TILES[page.key] ? officeTile(page.key, slots.host(`office.${page.key}`))
+        : page.key === 'dashboardSchedule' ? <ShiftEditor label="Schedule" />
         : page.key === 'projectNodePlan' ? <NodePlanPage />
         : page.key === 'projectMyWork' ? <MyWorkPage />
         : page.key === 'projectTimeline' ? <TimelinePage />

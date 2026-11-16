@@ -11,6 +11,7 @@ import { staffApi } from '../../../../staff/staffApi'
 import type { Person, StaffView } from '../../../../staff/staffTypes'
 import { changeRoster, loadRoster, useRoster } from '../../../../staff/rosterStore'
 import { useStaffChats, userId } from '../../../../support/supportStores'
+import WeekTable from '../../../../support/WeekTable'
 import { CURRENT_USER } from '../../../../userSeed'
 import RoleAssignment from '../RoleAssignment'
 import { ChannelManagementPage, ExplicationPage, TonePage, VotingPage } from './StatementPages'
@@ -71,7 +72,9 @@ export function DepartmentTile({ host }: Host) {
           )
         })),
         tab('roster', 'Roster', PeopleIcon, id => roster('Department roster', v => <RosterTables view={v} departmentId={id} />)),
-        tab('schedule', 'Schedule', CalendarIcon, () => <Soon>The department&apos;s shifts this week and next.</Soon>),
+        tab('schedule', 'Schedule', CalendarIcon, id => roster('Department schedule', v => (
+          <WeekTable label={`Shifts of ${v.departments.find(d => d.id === id)?.name ?? 'the department'}`} people={v.people.filter(p => p.departmentId === id && p.active)} />
+        ))),
         tab('analytics', 'Analytics', BarChartIcon, () => <Soon>Department analytics: its plan work, its queues and its feedback.</Soon>),
         tab('teams', 'Teams', TeamIcon, id => roster('Teams', v => <TeamList view={v} departmentId={id} />)),
       ]}
@@ -140,7 +143,9 @@ export function TeamTile({ host }: Host) {
           return admins.length ? <RoleAssignment only={admins} /> : <p className="fbMuted">No admins on the team.</p>
         })),
         tab('allotment', 'Allotment', ClockIcon, id => roster('Team allotment', v => <AllotmentTable view={v} people={membersOf(v, id).filter(p => p.active)} />)),
-        tab('schedule', 'Schedule', CalendarIcon, () => <Soon>The team&apos;s shifts this week and next.</Soon>),
+        tab('schedule', 'Schedule', CalendarIcon, id => roster('Team schedule', v => (
+          <WeekTable label={`Shifts of ${v.teams.find(t => t.id === id)?.name ?? 'the team'}`} people={membersOf(v, id).filter(p => p.active)} />
+        ))),
         tab('performance', 'Performance', LineChartIcon, () => <Soon>Team performance: its plan work done within the SLA, chats taken and feedback checked.</Soon>),
         tab('members', 'Members', PeopleIcon, id => roster('Team members', v => <TeamMembers view={v} teamId={id} />)),
         tab('applications', 'Applications', EnvelopeIcon, () => <Soon>Applications from users who passed the required exams in Training.</Soon>),

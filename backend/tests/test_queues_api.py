@@ -134,3 +134,18 @@ def test_admins_see_each_queues_staff_and_chats_but_not_their_messages(client: T
     assert [w["id"] for w in draft["waiting"]] == ids[1:]
     # A helper's view has the switchboard only.
     assert row(queues(client, ARI))["staff"] == [] and row(queues(client, ARI))["chats"] == []
+
+
+def test_admins_see_everyones_weeks_and_set_their_own(client: TestClient, wednesday: datetime) -> None:
+    """The view gives admins every active person with helper hours, this week and next (the Office's Schedule tabs); helpers get
+    none. An admin with helper hours (the owner too) sets next week, and it shows in everyone's weeks."""
+    assert queues(client, ARI)["weeks"] == []
+    weeks = {w["id"]: w for w in queues(client, LEE)["weeks"]}
+    assert "adm-dana" not in weeks  # no helper hours
+    assert {"hlp-ari", "hlp-noor", "adm-sam", "adm-lee", "owner"} <= set(weeks)
+    assert weeks["hlp-ari"]["thisWeek"]["hours"] == 20
+    assert weeks["hlp-ari"]["nextWeek"]["own"] is False  # the week before it repeats
+    v = client.put("/api/support/schedule", headers={"X-Admin-Id": "owner"}, json={"blocks": [{"day": 4, "start": 9, "hours": 8}]}).json()
+    assert v["me"]["nextWeek"]["hours"] == 8
+    owner = next(w for w in v["weeks"] if w["id"] == "owner")
+    assert (owner["nextWeek"]["own"], owner["nextWeek"]["blocks"]) == (True, [{"day": 4, "start": 9, "hours": 8}])

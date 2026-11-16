@@ -314,7 +314,7 @@ def _week(q: QueueSettings, pid: str, week: str) -> dict:
 
 def view(file: SupportFile, q: QueueSettings, sf: staff.StaffFile, me: str, consoles: list[str], now: datetime) -> dict:
     """The Queue console: my helper time and switchboard; for admins, each queue's staff, chats (never their messages)
-    and waiting users; the levels."""
+    and waiting users, and everyone's helper time this week and next (the Office's Schedule tabs); the levels."""
     p = staff.person(sf, me)
     names = {x.id: x.name for x in sf.people}
     pending = _pending(file)
@@ -365,6 +365,11 @@ def view(file: SupportFile, q: QueueSettings, sf: staff.StaffFile, me: str, cons
             "managesAny": _manages(p, None),
         },
         "today": now.weekday(),
+        # every active person with helper hours, their week and the next (admins only)
+        "weeks": [
+            {"id": x.id, "thisWeek": _week(q, x.id, week_of(now)), "nextWeek": _week(q, x.id, week_of(now + timedelta(days=7)))}
+            for x in sf.people if admin and x.active and x.allotment
+        ],
         "levels": q.levels.model_dump(),
         "queues": queues,
         "next": next_for(file, q, sf, me, consoles, now),
