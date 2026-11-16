@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CopyIcon } from '../../assets/icons'
-import { linksOf } from '../../lib/markup/checks'
+import { needsLinks } from '../../lib/markup/checks'
 import { linkTitle } from '../../lib/markup/links'
 import { parseCached } from '../../lib/markup/parse'
 import { plainTextOf } from '../../lib/markup/plainText'
@@ -8,7 +8,7 @@ import { useLinkContext } from './linkContext'
 
 // Copy as plain text, for readers: the words with no markers, links as their titles, leaving out answers, hints and explanations.
 export function CopyPlainText({ text, label = 'Copy as plain text' }: { text: string; label?: string }) {
-  const links = useLinkContext(text, linksOf(parseCached(text).blocks).length > 0)
+  const links = useLinkContext(text, needsLinks(parseCached(text).blocks))
   const [said, setSaid] = useState('')
   useEffect(() => {
     if (!said) return

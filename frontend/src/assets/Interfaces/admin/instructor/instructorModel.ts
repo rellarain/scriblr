@@ -1,5 +1,6 @@
 import type { TrainingContent, TrainingContentDraft, TrainingCourse, TrainingCurriculum, TrainingLesson, TrainingModule } from '../../../../api/types'
 import { indexOf, type TrainingItemKind } from '../../training/trainingContent'
+import { assignQuestionIds } from '../../../../lib/markup/questionIds'
 import { moveBefore, nudge } from '../plot/presetModel'
 
 // The Instructor console's model, pure: the Training courses as the builder edits them (the draft the server saves whole), the operations on it, and
@@ -146,6 +147,24 @@ export function add(draft: Draft, kind: Kind, parentId: string | null, random: M
 }
 
 // ---- changing ----
+
+// The draft with every question of every quiz, test and exam given its permanent id (`????#q7f3a`; lib/markup/questionIds.ts); the same draft
+// when every question has one.
+export function withQuestionIds(draft: Draft, random?: MakeRandom): Draft {
+  let changed = false
+  const ided = <T extends { text: string }>(list: T[]): T[] => list.map(a => {
+    const text = assignQuestionIds(a.text ?? '', random)
+    if (text === (a.text ?? '')) return a
+    changed = true
+    return { ...a, text }
+  })
+  const courses = draft.courses.map(c => ({
+    ...c,
+    exams: ided(c.exams),
+    modules: c.modules.map(m => ({ ...m, tests: ided(m.tests), lessons: m.lessons.map(l => ({ ...l, quizzes: ided(l.quizzes) })) })),
+  }))
+  return changed ? { ...draft, courses } : draft
+}
 
 export interface Fields { title: string; description: string; hue: number | null; body: string; passMark: number; text: string }
 

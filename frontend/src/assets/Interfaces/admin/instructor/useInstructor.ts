@@ -29,7 +29,13 @@ export function useInstructor(random: MakeRandom = Math.random) {
     save: async value => {
       const problems = model.faults(value)
       if (problems.length > 0) throw new Error(`Cannot save yet: ${problems[0].message}${problems.length > 1 ? ` (and ${problems.length - 1} more)` : ''}`)
-      adoptTraining(await saveTrainingContent(value))
+      // a quiz's, test's or exam's questions get their permanent ids as it is saved, and the editors show them
+      const ided = model.withQuestionIds(value)
+      if (ided !== value && ref.current === value) {
+        ref.current = ided
+        setDraft(ided)
+      }
+      adoptTraining(await saveTrainingContent(ided))
     },
   })
 

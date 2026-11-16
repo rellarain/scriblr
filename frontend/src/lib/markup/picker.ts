@@ -1,11 +1,14 @@
 import type { ResourcesFile, TrainingContent } from '../../api/types'
+import { inlineText } from './inline'
 import type { Heading } from './links'
+import { parseCached } from './parse'
 
 // The editor's link picker: while a link is being typed (a `@` where a link may start, then names, `@`s and `#`, up to the caret), it lists
 // what the link could point at by title (the articles of the channel list, the Training courses, modules and lessons, the text's own
 // headings) and puts the chosen one's id path in place of what was typed.
 
-export interface LinkQuery { start: number; query: string }
+// `mode`: a link (`@…`), or the question a `?????` line pulls in.
+export interface LinkQuery { start: number; query: string; mode?: 'link' | 'pullin' }
 
 // The link being typed at the caret, if any.
 export function linkQueryAt(text: string, caret: number): LinkQuery | null {
@@ -19,7 +22,43 @@ export function linkQueryAt(text: string, caret: number): LinkQuery | null {
   return { start, query: m[0].slice(1) }
 }
 
-export interface PickerOption { id: string; label: string; insert: string; kind: 'article' | 'training' | 'heading' }
+export interface PickerOption { id: string; label: string; insert: string; kind: 'article' | 'training' | 'heading' | 'question' }
+
+// The question being chosen on a `?????` line: what follows the marker, up to the caret.
+export function pullInQueryAt(text: string, caret: number): LinkQuery | null {
+  const lineStart = text.lastIndexOf('\n', caret - 1) + 1
+  const m = /^([ \t]*\?\?\?\?\?)(\S*)$/.exec(text.slice(lineStart, caret))
+  return m ? { start: lineStart + m[1].length, query: m[2], mode: 'pullin' } : null
+}
+
+const words = (query: string) => query.toLowerCase().replace(/[@#_-]+/g, ' ').split(/\s+/).filter(Boolean)
+
+// Every question with an id in a quiz, test or exam: the Resources assessments, then Training's exams, tests and quizzes.
+export function questionOptions(query: string, resources: ResourcesFile | null, training: TrainingContent | null, limit = 8): PickerOption[] {
+  const all: PickerOption[] = []
+  const add = (path: string, owner: string, text: string) => {
+    for (const b of parseCached(text).blocks) {
+      if (b.kind === 'question' && b.id) all.push({ id: `${path}#${b.id}`, label: `${owner} › ${inlineText(b.prompt)}`, insert: `${path}#${b.id}`, kind: 'question' })
+    }
+  }
+  if (resources) {
+    for (const n of resources.nodes) {
+      const text = resources.assessments[n.id]?.text
+      if (text) add(`@${n.id.split('/').join('@')}`, n.name || 'Untitled', text)
+    }
+  }
+  if (training) {
+    for (const c of training.courses) {
+      if (c.exams[0]) add(`@training@${c.id}`, `Exam of ${c.title}`, c.exams[0].text)
+      for (const m of c.modules) {
+        if (m.tests[0]) add(`@training@${c.id}@${m.id}`, `Test of ${m.title}`, m.tests[0].text)
+        for (const l of m.lessons) if (l.quizzes[0]) add(`@training@${c.id}@${m.id}@${l.id}`, `Quiz of ${l.title}`, l.quizzes[0].text)
+      }
+    }
+  }
+  const want = words(query)
+  return all.filter(o => want.every(w => `${o.label} ${o.insert}`.toLowerCase().includes(w))).slice(0, limit)
+}
 
 export function linkOptions(query: string, resources: ResourcesFile | null, training: TrainingContent | null, headings: Heading[], limit = 8): PickerOption[] {
   const all: PickerOption[] = []
@@ -44,11 +83,11 @@ export function linkOptions(query: string, resources: ResourcesFile | null, trai
       }
     }
   }
-  const words = query.toLowerCase().replace(/[@#_-]+/g, ' ').split(/\s+/).filter(Boolean)
+  const want = words(query)
   const matches = (o: PickerOption) => {
-    if (words.length === 0) return true
+    if (want.length === 0) return true
     const hay = `${o.label} ${o.insert}`.toLowerCase()
-    return words.every(w => hay.includes(w))
+    return want.every(w => hay.includes(w))
   }
   return all.filter(matches).slice(0, limit)
 }

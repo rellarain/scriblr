@@ -38,6 +38,12 @@ Read the @writer@draft guide, the lesson @training@writer-c1@writer-c1-m1@writer
 ? One word
 ! moment
 
+???? Which of these hold a draft?
+??! A moment
+??! A chapter
+??? A plotline
+?!! Plotlines are planned, not drafted.
+
 Text after the questions ends them.
 ??! stray option, to show a check
 ####### seven, to show a check`

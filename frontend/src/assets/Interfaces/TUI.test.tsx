@@ -226,6 +226,26 @@ describe('Training (TUI): what the courses hold', () => {
     expect(within(screen.getByRole('list', { name: 'Quizzes of Lesson 1' })).getByText(detail('Placeholder quiz. · Pass mark 70% · Not tried yet'))).toBeInTheDocument()
   })
 
+  it('takes a lesson\'s quiz on one page, keeps the result, and passing it completes the lesson', async () => {
+    const user = userEvent.setup()
+    trainingBackend()
+    render(<TUI />)
+    await desk()
+    await openFromCatalog(user, 'Writer Course 1')
+    await user.click(screen.getByRole('button', { name: 'Open Module 1' }))
+    await user.click(screen.getByRole('button', { name: 'Open Lesson 1' }))
+    await user.click(tab('Lesson 1 (max)', 'Quizzes'))
+    await user.click(screen.getByRole('button', { name: 'Take Quiz 1' }))
+    const quiz = within(screen.getByRole('region', { name: 'Quiz 1' }))
+    await user.click(quiz.getByRole('radio', { name: 'A quarrel that ends a friendship' }))
+    await user.click(quiz.getByRole('button', { name: 'Submit' }))
+    expect(await quiz.findByText('Score 100% · passed (pass mark 70%)')).toBeInTheDocument()
+    expect(quiz.getByText('Something is different afterwards.')).toBeInTheDocument()
+    await user.click(quiz.getByRole('button', { name: 'Back' }))
+    expect(await within(screen.getByRole('list', { name: 'Quizzes of Lesson 1' })).findByText(detail('Placeholder quiz. · Pass mark 70% · Best 100%, passed'))).toBeInTheDocument()
+    for (const done of screen.getAllByRole('button', { name: 'Mark Lesson 1 not complete' })) expect(done).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('shows a curriculum with no courses, and courses that are in no curriculum', async () => {
     const user = userEvent.setup()
     const content = seedContent()

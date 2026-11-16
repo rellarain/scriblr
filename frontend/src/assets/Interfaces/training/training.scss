@@ -21,6 +21,16 @@
     .mkOption--wrong, .mkOption--dim { color: inherit; }
     .mkQuestionBar .mkIconBtn { background: var(--level-wash-lo); color: inherit; &:hover { background: var(--level-wash); } }
   }
+  // Taking a quiz, test or exam: Back and its title, then the quiz taker (components/markup/QuizTaker.tsx) in the level's ink and washes.
+  .trQuiz { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+  .trQuizHead { display: flex; align-items: center; gap: var(--space-2); }
+  .trQuizTitle { margin: 0; font-size: var(--text-ui); font-weight: 700; }
+  .trRowText--grow { flex: 1 1 auto; padding: var(--space-3) var(--space-4); }
+  .trQuiz {
+    .mkQuestion, .mkPullin { background: var(--level-wash-lo); }
+    .mkOption--wrong, .mkOption--dim { color: inherit; }
+    .mkIconBtn { background: var(--level-wash-lo); color: inherit; &:hover { background: var(--level-wash); } &:disabled { cursor: default; } }
+  }
   .trMaterialBar .mkIconBtn { background: var(--level-wash-lo); color: inherit; &:hover { background: var(--level-wash); } &:focus-visible { outline-color: var(--wr-accent-light); } }
   // A curriculum in the Catalog: its name, what it is, and its courses.
   .trGroup { display: flex; flex-direction: column; gap: var(--space-3); }

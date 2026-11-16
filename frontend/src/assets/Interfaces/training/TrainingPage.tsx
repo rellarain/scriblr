@@ -1,9 +1,11 @@
-import type { ComponentType, ReactNode } from 'react'
+import { useState, type ComponentType, type ReactNode } from 'react'
 import type { TrainingAssessment, TrainingProgress } from '../../../api/types'
 import CopyPlainText from '../../../components/markup/CopyPlainText'
 import Markup, { MarkupInline } from '../../../components/markup/Markup'
 import MarkupPlace from '../../../components/markup/MarkupPlace'
-import { CheckboxIcon, type IconProps } from '../../icons'
+import QuizTaker from '../../../components/markup/QuizTaker'
+import { recordAttempt } from './trainingStore'
+import { CheckboxIcon, ChevronLeftIcon, PlayIcon, type IconProps } from '../../icons'
 import { assessmentResult, resultText } from './trainingContent'
 import { TRAINING_PAGES, type TrainingPageKey } from './trainingPages'
 
@@ -97,18 +99,33 @@ export function TrainingAbout({ text }: { text: string }) {
   return <MarkupPlace><Markup text={text} baseLevel={3} className="trAbout" /></MarkupPlace>
 }
 
-// The quizzes, tests or exams of something: each with its pass mark and how the learner did. (There is no taking one yet: a result is kept
-// when there is one, through the API.)
+// The quizzes, tests or exams of something: each with its pass mark and how the learner did, and a button that takes it (the quiz taker, in
+// place of the list, with Back). Submitting keeps the result; passing marks the lesson, module or course complete.
 export function TrainingAssessments({ label, items, progress, none }: { label: string; items: TrainingAssessment[]; progress: TrainingProgress; none: string }) {
+  const [taking, setTaking] = useState<string | null>(null)
+  const open = items.find(i => i.id === taking)
   if (items.length === 0) return <TrainingEmpty>{none}</TrainingEmpty>
+  if (open) {
+    return (
+      <section className="trQuiz" aria-label={open.title}>
+        <div className="trQuizHead">
+          <button type="button" className="trRowAction" aria-label="Back" title="Back" onClick={() => setTaking(null)}><ChevronLeftIcon size={18} /></button>
+          <h4 className="trQuizTitle">{open.title}</h4>
+        </div>
+        <TrainingAbout text={open.description} />
+        <QuizTaker key={open.id} text={open.text} passMark={open.passMark} onSubmit={score => recordAttempt(open.id, score)} />
+      </section>
+    )
+  }
   return (
     <ul className="trList" aria-label={label}>
       {items.map(item => (
-        <li key={item.id} className="trRow trRow--static">
-          <span className="trRowText trRowText--static">
+        <li key={item.id} className="trRow">
+          <span className="trRowText trRowText--static trRowText--grow">
             <span className="trRowTitle">{item.title}</span>
             <RowDetail about={item.description} detail={[`Pass mark ${item.passMark}%`, resultText(assessmentResult(progress, item.id))].filter(Boolean).join(' · ')} />
           </span>
+          <button type="button" className="trRowAction" aria-label={`Take ${item.title}`} title={`Take ${item.title}`} onClick={() => setTaking(item.id)}><PlayIcon size={18} /></button>
         </li>
       ))}
     </ul>

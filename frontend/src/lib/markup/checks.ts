@@ -1,11 +1,12 @@
 import { linksIn, type Inline, type LinkToken } from './inline'
 import { resolveLink, type LinkContext } from './links'
 import { parseMarkup, type Block, type Parsed } from './parse'
+import { resolvePullIn } from './pullIns'
 
 // What the editor's checks panel lists, each with the line it is on (clicking one goes there): a marker that is not one, a hint, option,
 // explanation or answer outside a question, an explanation with no option above it, a question with no right option or accepted answer,
-// a question id used twice, and (when a link context is given and what it points at has loaded) a link or heading link that goes nowhere.
-// (Pulled-in questions are checked from a later slice.)
+// a question id used twice, and (when a link context is given and what it points at has loaded) a link, heading link or pulled-in question
+// that goes nowhere.
 
 export interface MarkupCheck { line: number; message: string }
 
@@ -31,12 +32,22 @@ export function linksOf(blocks: Block[]): Array<{ link: LinkToken; line: number 
   return out
 }
 
+// Whether the text needs the channel list and Training to be drawn (it has links or pulled-in questions).
+export function needsLinks(blocks: Block[]): boolean {
+  return blocks.some(b => b.kind === 'pullin') || linksOf(blocks).length > 0
+}
+
 export function checksOf(text: string, parsed: Parsed = parseMarkup(text), links?: LinkContext): MarkupCheck[] {
   const out: MarkupCheck[] = []
   if (links) {
     for (const { link, line } of linksOf(parsed.blocks)) {
       const r = resolveLink(link, links)
       if (r.status === 'missing') out.push({ line, message: `${link.raw} goes nowhere: ${r.why}` })
+    }
+    for (const b of parsed.blocks) {
+      if (b.kind !== 'pullin') continue
+      const r = resolvePullIn(b.ref, links)
+      if (r.status === 'missing') out.push({ line: b.line, message: `?????${b.ref} pulls in nothing: ${r.why}` })
     }
   }
   for (const s of parsed.strays) {

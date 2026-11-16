@@ -13,7 +13,7 @@ Code: `admin/instructor/` (`InstructorConsole.tsx`, `InstructorTree.tsx`, `Instr
   - *curriculum*: **colour** (the hue slider; a button takes the colour away), and **its courses** in order (reorder, take out, an Add course select);
   - *course*: **colour** (a course follows its curriculum's unless it is given one: the *inherit* button), and **In curricula** check boxes;
   - *lesson*: the **material**, in the markup editor (Write, Read-only, Side by side, its checks and cheat sheet);
-  - *quiz, test, exam*: the **pass mark** (a stepper, `.instStep`: 1 a click, 10 with Shift, 0-100) and the **Questions**, written in the markup editor. A lesson holds **one quiz**, a module **one test**, a course **one exam**: the add button is turned off with the reason (*A lesson has one quiz: write more questions in it.*);
+  - *quiz, test, exam*: the **pass mark** (a stepper, `.instStep`: 1 a click, 10 with Shift, 0-100) and the **Questions**, written in the markup editor (on a `?????` line its picker lists the questions of every quiz, test and exam to pull in). Each question gets its **permanent id** when the course is saved (`????#q7f3a`), and the field shows it; a pasted copy of an id gets a fresh one. A lesson holds **one quiz**, a module **one test**, a course **one exam**: the add button is turned off with the reason (*A lesson has one quiz: write more questions in it.*);
   - *project*: its **exercises**, only those of its own course, in order (an Add exercise select lists the rest).
 - **Move to** (module, lesson, exercise, quiz, test, project, exam): a select of the places it can go ("Course › Module"). It says what else changes: a project stops naming an exercise that left its course.
 

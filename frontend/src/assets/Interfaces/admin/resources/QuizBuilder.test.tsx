@@ -51,8 +51,11 @@ describe('QuizBuilder', () => {
     const field = await screen.findByRole('textbox', { name: 'Quiz questions' })
     fireEvent.change(field, { target: { value: '???? Pick one\n?! Right\n?? Wrong' } })
     expect(setAssessment).not.toHaveBeenCalled()
-    await waitFor(() => expect(setAssessment).toHaveBeenCalledWith(plotlines.id, '???? Pick one\n?! Right\n?? Wrong'))
+    // saved with each question's permanent id; leaving the field shows the same ids there
+    await waitFor(() => expect(setAssessment).toHaveBeenCalledWith(plotlines.id, expect.stringMatching(/^\?\?\?\?#q[0-9a-f]{4} Pick one\n\?! Right\n\?\? Wrong$/)))
     expect(setAssessment).toHaveBeenCalledTimes(1)
+    fireEvent.blur(field)
+    expect(field).toHaveValue(setAssessment.mock.calls[0][1])
   })
 
   it('shows what is written, and checks a question with no right option', async () => {

@@ -3,7 +3,7 @@ import { seedContent } from '../../../../designSystem/mockTraining'
 import {
   LIMITS, add, canAdd, draftOf, exercisesOfCourse, faults, find, inheritedHue, isBlank, kindOf, moveItem, moveTo, newId, nudgeItem, nudgeRef, parentChoices, patch, remove, reorderRefs,
   setMembership, setProjectExercises, takenIds, type Draft,
-} from './instructorModel'
+ withQuestionIds } from './instructorModel'
 
 const draft = (): Draft => draftOf(seedContent())
 // The seed with no quizzes, tests or exams (each place holds one at most).
@@ -89,6 +89,15 @@ describe('adding', () => {
     expect(r.id).toBeNull()
     expect(r.draft).toBe(d)
     expect(canAdd(d, 'lesson', null)).toMatch(/nothing to add/)
+  })
+
+  it('gives the questions of every quiz, test and exam their ids, and leaves a draft whose questions have them as it is', () => {
+    const d = patch(draft(), 'writer-c1-x1', { text: '???? One\n?! a' })
+    const ided = withQuestionIds(d)
+    expect(course(ided, 'writer-c1').exams[0].text).toMatch(/^\?\?\?\?#q[0-9a-f]{4} One/)
+    expect(withQuestionIds(ided)).toBe(ided)
+    const plain = bare()
+    expect(withQuestionIds(plain)).toBe(plain)
   })
 
   it('holds one quiz to a lesson, one test to a module and one exam to a course, and says why', () => {

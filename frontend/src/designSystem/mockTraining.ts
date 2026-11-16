@@ -23,7 +23,7 @@ export function seedContent(): TrainingContent {
         lessons: [{
           id: l, title: 'Lesson 1', description: 'Placeholder lesson.', body: `#### Lesson 1\n\nPlaceholder material for the ${role.toLowerCase()} course.`,
           exercises: [{ id: `${l}-e1`, title: 'Exercise 1', description: 'Placeholder exercise.' }],
-          quizzes: [{ id: `${l}-q1`, title: 'Quiz 1', description: 'Placeholder quiz.', passMark: 70, text: '' }],
+          quizzes: [{ id: `${l}-q1`, title: 'Quiz 1', description: 'Placeholder quiz.', passMark: 70, text: `????#qs01 Which of these is a scene?\n?! A quarrel that ends a friendship\n!! Something is different afterwards.\n?? A list of the castle's rooms\n!! Nothing changes.` }],
         }],
         tests: [{ id: `${m}-t1`, title: 'Test 1', description: 'Placeholder test.', passMark: 70, text: '' }],
       }],

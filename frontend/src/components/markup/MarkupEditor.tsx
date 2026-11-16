@@ -3,9 +3,9 @@ import type { TrainingContentDraft } from '../../api/types'
 import { EyeIcon, FlagIcon, HelpIcon, LayoutMidiIcon, PencilIcon } from '../../assets/icons'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
 import { CHEAT_SHEET } from '../../lib/markup/cheatSheet'
-import { checksOf, linksOf, type MarkupCheck } from '../../lib/markup/checks'
+import { checksOf, needsLinks, type MarkupCheck } from '../../lib/markup/checks'
 import { parseCached } from '../../lib/markup/parse'
-import { insertLink, linkOptions, linkQueryAt, type LinkQuery, type PickerOption } from '../../lib/markup/picker'
+import { insertLink, linkOptions, linkQueryAt, pullInQueryAt, questionOptions, type LinkQuery, type PickerOption } from '../../lib/markup/picker'
 import { useLinkContext } from './linkContext'
 import { Markup } from './Markup'
 import './markup.scss'
@@ -13,7 +13,8 @@ import './markup.scss'
 // The markup editor (Resources articles and quizzes, Training material, descriptions and assessments): a text field with three views,
 // Write, Read-only (the formatted text) and Side by side, a checks panel that lists what is wrong by line (a click goes to the line) and a
 // cheat sheet of the markers. No insert toolbar: the text is typed. Typing `@` where a link may start opens the link picker: what the link could
-// point at, by title (arrows choose, Enter or Tab puts its id path in, Escape closes). The view is remembered on this computer for every editor.
+// point at, by title (arrows choose, Enter or Tab puts its id path in, Escape closes); on a `?????` line it lists the questions of the quizzes,
+// tests and exams to pull in. The view is remembered on this computer for every editor.
 
 export type MarkupView = 'write' | 'read' | 'side'
 
@@ -89,9 +90,9 @@ export function CheatSheet({ id }: { id: string }) {
 }
 
 // The link picker under the field: the options for the link being typed (`role="listbox"`, the field points at the one chosen).
-function LinkPicker({ id, options, active, onPick }: { id: string; options: PickerOption[]; active: number; onPick: (o: PickerOption) => void }) {
+function LinkPicker({ id, options, active, onPick, label }: { id: string; options: PickerOption[]; active: number; onPick: (o: PickerOption) => void; label: string }) {
   return (
-    <ul className="mkPicker" id={id} role="listbox" aria-label="Link to">
+    <ul className="mkPicker" id={id} role="listbox" aria-label={label}>
       {options.length === 0 && <li className="mkPickerNone" role="option" aria-selected={false} aria-disabled="true">Nothing by that name.</li>}
       {options.map((o, k) => (
         <li
@@ -115,13 +116,13 @@ export function MarkupEditor({ value, onChange, label, baseLevel = 2, rows = 8, 
   const [query, setQuery] = useState<LinkQuery | null>(null)
   const [active, setActive] = useState(0)
   const parsed = parseCached(shown)
-  const links = useLinkContext(shown, query !== null || linksOf(parsed.blocks).length > 0, training)
+  const links = useLinkContext(shown, query !== null || needsLinks(parsed.blocks), training)
   const checks = useMemo(() => checksOf(shown, parsed, links), [shown, parsed, links])
-  const options = useMemo(() => (query ? linkOptions(query.query, links.resources, links.training, links.headings) : []), [query, links])
+  const options = useMemo(() => (!query ? [] : query.mode === 'pullin' ? questionOptions(query.query, links.resources, links.training) : linkOptions(query.query, links.resources, links.training, links.headings)), [query, links])
   // the link being typed at the caret, read again after every key and click in the field
   const track = (el: HTMLTextAreaElement) => {
-    const q = el.selectionStart === el.selectionEnd ? linkQueryAt(el.value, el.selectionStart) : null
-    setQuery(prev => (prev?.start === q?.start && prev?.query === q?.query ? prev : q))
+    const q = el.selectionStart === el.selectionEnd ? (pullInQueryAt(el.value, el.selectionStart) ?? linkQueryAt(el.value, el.selectionStart)) : null
+    setQuery(prev => (prev?.start === q?.start && prev?.query === q?.query && prev?.mode === q?.mode ? prev : q))
     if (!q || q.start !== query?.start) setActive(0)
   }
   const pick = (option: PickerOption) => {
@@ -176,7 +177,7 @@ export function MarkupEditor({ value, onChange, label, baseLevel = 2, rows = 8, 
               onClick={e => track(e.currentTarget)}
               onBlur={() => { setQuery(null); onBlur?.() }}
             />
-            {query && <LinkPicker id={pickerId} options={options} active={Math.min(active, Math.max(0, options.length - 1))} onPick={pick} />}
+            {query && <LinkPicker id={pickerId} label={query.mode === 'pullin' ? 'Question to pull in' : 'Link to'} options={options} active={Math.min(active, Math.max(0, options.length - 1))} onPick={pick} />}
           </div>
         )}
         {view !== 'write' && (

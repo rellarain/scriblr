@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import type { TrainingContentDraft } from '../../api/types'
-import { linksOf } from '../../lib/markup/checks'
+import { needsLinks } from '../../lib/markup/checks'
 import { classifyLine } from '../../lib/markup/lines'
 import { linksIn, parseInline } from '../../lib/markup/inline'
-import { parseCached, type Block, type ListItem } from '../../lib/markup/parse'
-import { LinkCtx, useLinkContext } from './linkContext'
+import { parseCached, type Block, type ListItem, type QuestionBlock } from '../../lib/markup/parse'
+import { resolvePullIn } from '../../lib/markup/pullIns'
+import { LinkCtx, useLinkContext, useLinks } from './linkContext'
 import { PracticeQuestion } from './QuestionView'
 import { QuestionIcon } from '../../assets/icons'
 import { renderInline, renderLines } from './renderInline'
@@ -12,7 +13,28 @@ import './markup.scss'
 
 // The read-only view of Scriblr's markup (lib/markup). Headings are real headings whose levels follow the container's own: `######` is
 // one below `baseLevel` (the heading of what holds the text), each smaller marker one further down, never past h6. Lists are lists, a
-// number read with its item; quotes are quotes. A knowledge check is a practice question (QuestionView.tsx).
+// number read with its item; quotes are quotes. A knowledge check is a practice question (QuestionView.tsx), and so is a question pulled in
+// from a quiz, test or exam (`?????`), unless what holds the text draws its questions itself (the quiz taker: `QuestionSlot`).
+
+// How the questions of a text are drawn: by `key` (`q<line>` for its own, `p<line>` for one pulled in). None: as practice questions.
+export type QuestionSlot = (q: QuestionBlock, key: string) => ReactNode
+export const QuestionSlotCtx = createContext<QuestionSlot | null>(null)
+
+function Question({ q, slotKey }: { q: QuestionBlock; slotKey: string }) {
+  const slot = useContext(QuestionSlotCtx)
+  return <>{slot ? slot(q, slotKey) : <PracticeQuestion q={q} />}</>
+}
+
+function PullIn({ at, line }: { at: string; line: number }) {
+  const links = useLinks()
+  const r = links ? resolvePullIn(at, links) : { status: 'pending' as const }
+  if (r.status === 'ok') return <Question q={r.question} slotKey={`p${line}`} />
+  return (
+    <p className={`mkPullin${r.status === 'missing' ? ' mkPullin--missing' : ''}`} title={r.status === 'missing' ? r.why : undefined}>
+      <QuestionIcon size={14} /> {at}{r.status === 'missing' && <span className="mkMissing">not found</span>}
+    </p>
+  )
+}
 
 type Heading = 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
@@ -62,8 +84,8 @@ function BlockView({ block, baseLevel }: { block: Block; baseLevel: number }) {
     }
     case 'list': return <List items={block.items} />
     case 'quote': return <blockquote className="mkQuote"><p>{renderLines(block.lines)}</p></blockquote>
-    case 'question': return <PracticeQuestion q={block} />
-    case 'pullin': return <p className="mkPullin"><QuestionIcon size={14} /> {block.ref}</p>
+    case 'question': return <Question q={block} slotKey={`q${block.line}`} />
+    case 'pullin': return <PullIn at={block.ref} line={block.line} />
   }
 }
 
@@ -80,7 +102,7 @@ export interface MarkupProps {
 
 export function Markup({ text, baseLevel = 2, className, empty = null, training }: MarkupProps) {
   const { blocks } = parseCached(text)
-  const links = useLinkContext(text, linksOf(blocks).length > 0, training)
+  const links = useLinkContext(text, needsLinks(blocks), training)
   if (blocks.length === 0) return <>{empty}</>
   return (
     <LinkCtx.Provider value={links}>

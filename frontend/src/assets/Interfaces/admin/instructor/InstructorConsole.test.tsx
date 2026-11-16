@@ -292,7 +292,9 @@ describe('the Instructor console: the fields of each kind', () => {
     expect(mark.getByRole('button', { name: 'Raise Pass mark' })).toBeDisabled()
     fireEvent.change(editor('Exam').getByRole('textbox', { name: 'Questions' }), { target: { value: '???? Which act?\n?! The second\n?? The first' } })
     fireEvent.click(save())
-    await waitFor(() => expect(backend.state.content.courses.find(c => c.id === 'writer-c1')!.exams[0]).toMatchObject({ passMark: 100, text: '???? Which act?\n?! The second\n?? The first' }))
+    // saved with its question's permanent id, which the field then shows
+    await waitFor(() => expect(backend.state.content.courses.find(c => c.id === 'writer-c1')!.exams[0]).toMatchObject({ passMark: 100, text: expect.stringMatching(/^\?\?\?\?#q[0-9a-f]{4} Which act\?\n\?! The second\n\?\? The first$/) }))
+    expect(editor('Exam').getByRole('textbox', { name: 'Questions' })).toHaveValue(backend.state.content.courses.find(c => c.id === 'writer-c1')!.exams[0].text)
   })
 
   it('writes a lesson\'s material in the markup and reads it formatted', async () => {
