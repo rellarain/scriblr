@@ -279,6 +279,14 @@
 .cmJoint-dot { fill: var(--accent); stroke: var(--alert); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 // an anchor (shape types T4): a small diamond in the ink, edged in the raised surface so it reads on any shape
 .cmAnchorMark { fill: var(--ink); stroke: var(--surface-raised); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+// a shape's centre (C1): a ring and a cross in the zone's ink over a wider ring of the raised surface, so it reads on any fill; filled with the accent when it is the selected
+// part, and with the alert colour while a dragged point would link to it (the ink ring round it, as for a point being connected)
+.cmCentre { pointer-events: none; }
+.cmCentreUnder { fill: none; stroke: var(--surface-raised); stroke-width: 4; vector-effect: non-scaling-stroke; }
+.cmCentreRing { fill: none; stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.cmCentreCross { stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.cmCentre--sel .cmCentreRing { fill: var(--accent); stroke-width: 2.5; }
+.cmCentre--on .cmCentreRing { fill: var(--alert); stroke-width: 2; }
 // a posable point (T5): a ring in the accent, grabbed in Pose mode; a slider's stops: small squares in the ink on the outline it runs along
 .cmPoseMark { fill: var(--surface-raised); fill-opacity: 0.6; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmPoseMark--live { pointer-events: auto; cursor: grab; }

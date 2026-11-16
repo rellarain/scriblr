@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { AlignSection, ArrangeSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CloneActions, type ConnectionActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
+import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -87,6 +87,8 @@ export interface InspectorProps {
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
   joint?: JointActions
+  // the selected shape's centre (C1), while it is what is selected
+  centre?: CentreActions
   // the shape editor's mirrors (Z3) and clones (Z4)
   mirrors?: MirrorActions
   clones?: CloneActions
@@ -220,6 +222,7 @@ function ShapeTab(p: InspectorProps) {
           {p.symmetry && !shape.cloneOf && <SymmetrySection shape={shape} actions={p.symmetry} />}
           {p.connections && !shape.cloneOf && <ConnectionsSection content={content} shape={shape} selPoint={selPoint} actions={p.connections} />}
           {p.joint && !shape.cloneOf && <JointSection actions={p.joint} />}
+          {p.centre && !shape.cloneOf && <CentreSection content={content} actions={p.centre} />}
           {!shape.mirrorOf && !shape.cloneOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} simple />}
         </>
       )}

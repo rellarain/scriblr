@@ -70,6 +70,8 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   add('shared-line/deep', 'Designer canvas', 'Ink line under a shared segment, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
   // a pivot point (joints J2): the accent inside a ring of the alert colour, over a wider ring of the ink
   add('joint-ring/deep', 'Designer canvas', 'Ink ring round a pivot point, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
+  // a shape's centre (C1): a ring and a cross of the ink (over a ring of the raised surface), filled with the accent or the alert colour when chosen or about to be linked to
+  add('centre-ring/deep', 'Designer canvas', 'Ink ring and cross of a shape centre, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
 
   // ---- text on the accent, alert and admin-accent fills (and their hover / dim shades)
   const onAccent = fillInk(colors.accent, hues.theme)

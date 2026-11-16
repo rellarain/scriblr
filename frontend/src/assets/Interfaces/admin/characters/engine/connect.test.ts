@@ -35,7 +35,9 @@ describe('what a dragged point is over', () => {
     const c = three(), solved = solveAtRest(c)
     expect(dropTargetAt(c, solved, 'a', 141, 101, 3)).toMatchObject({ kind: 'point', shapeId: 'b', i: 1 })
     expect(dropTargetAt(c, solved, 'a', 120, 101, 3)).toMatchObject({ kind: 'edge', shapeId: 'b', e: 0 })
-    expect(dropTargetAt(c, solved, 'a', 120, 120, 3)).toBeNull()
+    // the middle of B is its centre (C1), offered as well; elsewhere inside it there is nothing
+    expect(dropTargetAt(c, solved, 'a', 120, 120, 3)).toMatchObject({ kind: 'center', shapeId: 'b' })
+    expect(dropTargetAt(c, solved, 'a', 130, 130, 3)).toBeNull()
     // A's own point at (60, 100) is not offered while A is dragged
     expect(dropTargetAt(c, solved, 'a', 60, 100, 3)).toBeNull()
   })

@@ -1317,7 +1317,7 @@ ModelFit = Literal["scale", "keep", "stretch"]
 ModelBoneEndKind = Literal["group", "point"]
 ModelScaleTarget = Literal["group", "shape", "model"]
 ModelScaleAxis = Literal["xy", "x", "y"]
-ModelBindKind = Literal["point", "edge"]
+ModelBindKind = Literal["point", "edge", "center"]
 ModelTintKind = Literal["shadow", "mid", "highlight"]
 ModelGradDir = Literal["down", "up", "left", "right", "radial"]
 ModelBlend = Literal["multiply", "screen", "overlay"]
@@ -1407,8 +1407,9 @@ class ModelSlide(BaseModel):
 
 class ModelBind(BaseModel):
     """A point link, kept on the point that follows. `kind` "point": the point sits on point `i` of shape `s` plus the offset `d` (a weld has none); kind
-    "edge": it sits at `t` (0..1) along the edge from point `e` of shape `s`, `o` units outward (a clothes point locked to the edge of a body part). A
-    link is solved when the model is drawn, so the point never has to be kept in step by hand."""
+    "edge": it sits at `t` (0..1) along the edge from point `e` of shape `s`, `o` units outward (a clothes point locked to the edge of a body part); kind
+    "center" (shape editor C1): it sits on the centre of shape `s` plus the offset `d`. A link is solved when the model is drawn, so the point never has
+    to be kept in step by hand."""
 
     kind: ModelBindKind = "point"
     s: str = Field(pattern=_MODEL_ID)
@@ -1458,7 +1459,7 @@ class ModelBind(BaseModel):
     @field_validator("kind", mode="before")
     @classmethod
     def _kind(cls, value: Any) -> Any:
-        return value if value in ("point", "edge") else "point"
+        return value if value in ("point", "edge", "center") else "point"
 
     @field_validator("i", "e", mode="before")
     @classmethod
@@ -1769,7 +1770,8 @@ class ModelShapePivot(BaseModel):
 
 class ModelMark(BaseModel):
     """A mark on a shape (shape types T4): an anchor pins the shape where it is (one lets it turn about the mark, two or more hold it still); a posable point (T5) is
-    dragged to pose the figure. It lies in the shape's own drawing space, on one of its points (`i`, which then cannot be dragged) or inside it (`i` None)."""
+    dragged to pose the figure. It lies in the shape's own drawing space, on one of its points (`i`, which then cannot be dragged) or inside it (`i` None). `c`
+    (shape editor C1): it sits on the shape's centre and follows it (x, y are where it was set; `i` is then None)."""
 
     id: str = Field(pattern=_MODEL_ID)
     kind: ModelMarkKind = "anchor"
@@ -1777,6 +1779,18 @@ class ModelMark(BaseModel):
     y: float = 0.0
     i: Optional[int] = None
     name: str = Field(default="", max_length=MODEL_BIND_NAME_MAX)
+    c: bool = False
+
+    @field_validator("c", mode="before")
+    @classmethod
+    def _centre(cls, value: Any) -> bool:
+        return value is True
+
+    @model_validator(mode="after")
+    def _centre_has_no_point(self) -> "ModelMark":
+        if self.c:
+            self.i = None
+        return self
 
     @field_validator("kind", mode="before")
     @classmethod

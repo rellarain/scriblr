@@ -127,7 +127,8 @@ describe('the cards', () => {
     expect(within(card).getByRole('button', { name: 'c shape' })).toHaveAttribute('aria-current', 'true')
     await user.click(within(card).getByRole('button', { name: 'Expand c shape' }))
     const points = within(card).getByRole('list', { name: 'Points of c shape' })
-    expect(within(points).getAllByRole('button')).toHaveLength(4)
+    // the centre (C1), then the four points
+    expect(within(points).getAllByRole('button').map(b => b.textContent)).toEqual(['Centre', 'Point 1', 'Point 2', 'Point 3', 'Point 4'])
     await user.click(within(points).getByRole('button', { name: 'Point 2' }))
     expect(within(points).getByRole('button', { name: 'Point 2' })).toHaveAttribute('aria-current', 'true')
   })

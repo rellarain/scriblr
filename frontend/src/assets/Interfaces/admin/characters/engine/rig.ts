@@ -12,6 +12,7 @@ import { carryPoints, cloneMat, middleOf, middleOfAll } from './cloneAt'
 import { curvePlace, sameSegment } from './connect'
 import { poseOf } from './pivots'
 import { slidPlace } from './sliders'
+import { centreOf, centreThrough } from './centre'
 import { isCast } from './kinds'
 import { angleOf, fromBehind, wrapAngle, type View } from './angles'
 import { LAYER_THICK, carryKey, facing, facingFade, handleDepths, inSeen, isKeySpot, keyAt, mixBuilt, pickKeys, shiftOf, shifted, spinOutline, spinPoint, spinSilhouette, spinTotal, spinVector, surfaceAt, turnedDepth, turnedX, turningOf, twinKeys, unbuild, usesKeys, viewZ, type Key, type KeyPick, type Moved, type Spin, type Surface } from './turn'
@@ -680,7 +681,12 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         const at = (i: number): PointSkin => target.skin!.pts[i % m] ?? { base: target.group, inf: [] }
         let x: number, y: number, held: PointSkin
         if (b.kind === 'point') { const q = rest[b.i % m]; x = q.x + b.d[0] * f; y = q.y + b.d[1] * f; held = at(b.i) }
-        else { const [se, st] = slidPlace(b, m); [x, y] = edgeAt(rest, windSign(rest), se, st, b.o * f); held = mixSkin(at(se), at(se + 1), st) }
+        else if (b.kind === 'center') {
+          // the centre of the outline before its skin moved it, carried by what its first point follows
+          const own = shapeMap.get(b.s), mid = own ? centreOf(own, rest.map(q => ({ x: q.x, y: q.y, m: 's' as const }))) : null
+          if (!mid) continue
+          x = mid[0] + b.d[0] * f; y = mid[1] + b.d[1] * f; held = at(0)
+        } else { const [se, st] = slidPlace(b, m); [x, y] = edgeAt(rest, windSign(rest), se, st, b.o * f); held = mixSkin(at(se), at(se + 1), st) }
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue
         p.x = x; p.y = y
         ;(carried ??= new Map()).set(k, held)
@@ -693,10 +699,16 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const n = a.length
       let wx: number, wy: number
       if (b.kind === 'point') { const q = a[b.i % n]; wx = q.x; wy = q.y }
-      else { const [se, st] = slidPlace(b, n); [wx, wy] = edgeAt(a, windSign(a), se, st, b.o * f) }
+      else if (b.kind === 'center') {
+        // shape editor C1: the centre of the outline the rig reads, carried by its group as `pre` is
+        const own = shapeMap.get(b.s), mid = own ? centreThrough(own, target.frame, target.rig.length ? target.rig : own.pts) : null
+        if (!mid) continue
+        ;[wx, wy] = mid
+      } else { const [se, st] = slidPlace(b, n); [wx, wy] = edgeAt(a, windSign(a), se, st, b.o * f) }
       inv = inv ?? inverse(Mg)
       const [lx, ly] = apply(inv, wx, wy)
-      const x = lx + (b.kind === 'point' ? b.d[0] * f : 0), y = ly + (b.kind === 'point' ? b.d[1] * f : 0)
+      const offset = b.kind === 'point' || b.kind === 'center'
+      const x = lx + (offset ? b.d[0] * f : 0), y = ly + (offset ? b.d[1] * f : 0)
       if (Number.isFinite(x) && Number.isFinite(y)) {
         p.x = x; p.y = y
         const place = curvePlace(b)

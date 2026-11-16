@@ -63,7 +63,7 @@ function bind(v: unknown): ModelBind | null {
   const s = idOf(v.s)
   if (!s) return null
   const at = (x: unknown) => Math.round(num(x, 0, 0, LIMITS.pointsMax - 1))
-  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName), ...(repairSlide(v.slide, v.kind === 'edge' ? 'edge' : 'point') ? { slide: repairSlide(v.slide, 'edge') } : {}), ...(repairJoint(v.pivot) ? { pivot: repairJoint(v.pivot) } : {}) }
+  return { kind: v.kind === 'edge' || v.kind === 'center' ? v.kind : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}), ...bindName('name', v.name), ...bindName('segName', v.segName), ...(repairSlide(v.slide, v.kind === 'edge' ? 'edge' : 'point') ? { slide: repairSlide(v.slide, 'edge') } : {}), ...(repairJoint(v.pivot) ? { pivot: repairJoint(v.pivot) } : {}) }
 }
 
 function point(v: unknown): ModelPoint {

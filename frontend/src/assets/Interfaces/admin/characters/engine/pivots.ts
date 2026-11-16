@@ -3,6 +3,7 @@ import { IDENTITY, apply, bezierAt, build, inverse, mul, nearestEdge, rotate, ty
 import { anchorsOf, placeMat } from './anchors'
 import { treeRank } from './order'
 import { orbitOf } from './symmetry'
+import { centreOf } from './centre'
 import type { Solved } from './rig'
 
 // Pivot points (joints J2). Any link between shapes of two different objects can be made a pivot point: the shapes on its two sides turn about the linked point. Objects are
@@ -160,6 +161,7 @@ function restPlace(byId: Map<string, ModelShape>, b: ModelBind): [number, number
     t = byId.get(bind.s)
   }
   if (!t || t.pts.length < 2) return null
+  if (bind.kind === 'center') { const mid = centreOf(t); return mid ? [mid[0] + bind.d[0], mid[1] + bind.d[1]] : null }
   if (bind.kind === 'point') { const q = t.pts[bind.i % t.pts.length]; return q ? [q.x, q.y] : null }
   const a = build(t.pts, t.closed), e = bezierAt(a, bind.e % a.length, bind.t)
   return [e.x, e.y]

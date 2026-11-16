@@ -85,11 +85,12 @@ import { cloneEdit, clonePlace, detachClone, makeClone, reconcileClones, setClon
 import { cloneTurn } from './engine/cloneAt'
 import type { CloneActions, MirrorActions } from './ShapePanels'
 import { addZone, ensureZones, moveGroupTo, moveObjectTo, moveShapeTo, moveZone, needsZones, newGroupIn, removeZone, renameZone, topZone, zoneById, zonesOf } from './engine/zones'
-import type { ArrangeActions, ConnectionActions, JointActions, SymmetryActions } from './ShapePanels'
+import type { ArrangeActions, CentreActions, ConnectionActions, JointActions, SymmetryActions } from './ShapePanels'
 import { jointAt, migrateJoints, needsJoints, poseOf, setJointSetting, toggleJoint } from './engine/pivots'
-import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, guardAnchors, marksOf, posableOn, toggleAnchor, togglePosable } from './engine/anchors'
+import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, centreAnchorOf, guardAnchors, marksOf, posableOn, toggleAnchor, toggleCentreAnchor, togglePosable } from './engine/anchors'
 import { isSlider, makeSlider, nearestPlace, placeAt, setStop, stopSlider } from './engine/sliders'
 import { drawnOf } from './engine/connect'
+import { drawnCentre } from './engine/centre'
 import { beginPose, beginReach, beginSlide, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag } from './engine/posing'
 import { disableSymmetry, enableSymmetry, followSymmetry, restoreLinePoint } from './engine/symmetry'
 import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
@@ -262,7 +263,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const closeShapeForm = useCallback(() => setShapeForm(null), [])
   // the point form (T2): the point it was opened for and where; and the last place the pointer was over the canvas (a paste goes there)
   // i is -1 for a form opened inside a shape (shape types T4), with `inside` the spot in the shape's own space
-  const [pointForm, setPointForm] = useState<{ id: string; i: number; left: number; top: number; inside?: [number, number] } | null>(null)
+  const [pointForm, setPointForm] = useState<{ id: string; i: number; left: number; top: number; inside?: [number, number]; centre?: boolean } | null>(null)
   // a drag in the shape editor's Pose mode (T4): what it does, the content when it began, and whether it has changed anything yet (its undo step is made then)
   const shapePoseRef = useRef<{ drag: ShapePoseDrag; start: ModelContent; changed: boolean } | null>(null)
   const closePointForm = useCallback(() => setPointForm(null), [])
@@ -692,6 +693,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // A point or a segment of the selected shape chosen (on the canvas, or by its chip).
   function selectPoint(i: number) { setSelPoint(i); setPart('point') }
   function selectSegment(e: number) { setSelPoint(e); setPart('segment') }
+  function selectCentre() { setPart('centre') }
   // A right-click that did not drag: on a point it changes the point's type, on a segment it makes the segment straight or curved (of the shape it is on, which is
   // selected with it), on a shape it selects the shape, on the grid it unselects everything.
   function onRightClick(t: RightTarget, at?: RightSpot) {
@@ -701,6 +703,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (t.kind === 'grid') { setSel(rightClickGrid()); setPart('shape'); return }
     const other = !(sel.kind === 'shape' && sel.id === t.id)
     if (other) choose(rightClickShape(t.id))
+    // a right-click on a shape's centre (C1) opens the point form with Anchor
+    if (t.kind === 'centre') {
+      selectCentre()
+      const s = shapeById(content, t.id)
+      if (shapesOnly && at && s && !s.mirrorOf && !s.cloneOf) { const r = stageRef.current?.getBoundingClientRect(); setPointForm({ id: s.id, i: -1, centre: true, left: at.clientX - (r?.left ?? 0), top: at.clientY - (r?.top ?? 0) }) }
+      return
+    }
     if (t.kind === 'shape') {
       // in the shape editor a right-click inside a shape (away from its points and segments) opens the point form there, to put an anchor inside it (T4)
       const s = shapeById(content, t.id), r = canvasSolved.shapes[t.id]
@@ -1413,6 +1422,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   actions.shapeTree = shapesOnly ? {
     onSelect: choose,
     onSelectPoint: (shapeId, i) => { choose({ kind: 'shape', id: shapeId }); selectPoint(i) },
+    onSelectCentre: (shapeId: string) => { choose({ kind: 'shape', id: shapeId }); selectCentre() },
     onAddZone: () => {
       const id = freshId(content, 'z', makeId), e = addZone(content, { id, name: `Zone ${zonesOf(content).length + 1}`, groups: [] })
       if (applyEdit(e)) choose({ kind: 'zone', id })
@@ -1860,6 +1870,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onDetach: (kind, id) => { applyEdit(detachClone(content, kind, id, canvasSolved)) },
     onPlace: (objectId, at) => { commit(setCloneAt(content, 'object', objectId, at), true) },
   } : undefined
+  // the selected shape's centre (C1): an anchor there, and the points linked to it (each a pivot or not)
+  const centreActions: CentreActions | undefined = shapesOnly && selShape && part === 'centre' && !selShape.mirrorOf ? {
+    anchored: !!centreAnchorOf(selShape),
+    onAnchor: () => { const r = toggleCentreAnchor(selShape); if (!r.ok) setNote(r.reason); else editShape(selShape.id, r.shape) },
+    linked: content.shapes.flatMap(o => o.pts.flatMap((pt, i) => (pt.bind?.kind === 'center' && pt.bind.s === selShape.id ? [{ shapeId: o.id, i, pivot: !!pt.bind.pivot }] : []))),
+    onPivot: (sid, i) => { const r = toggleJoint(content, sid, i); if (!r.ok) setNote(r.reason); else commit(r.content, true) },
+    onDisconnect: (sid, i) => { commit(disconnect(content, canvasSolved, sid, i), true) },
+  } : undefined
   const jointActions: JointActions | undefined = selShape && selJoint ? {
     joint: selJoint,
     onSetting: (key, v) => { commit(setJointSetting(content, selShape.id, selPoint, key, v), true) },
@@ -1925,7 +1943,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   // the anchors where they are drawn now
   const anchorMarks = shapesOnly ? content.shapes.flatMap(s => anchorsOf(s).map(m => {
-    const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
+    // an anchor on the centre (C1) is where the centre is drawn
+    const [x, y] = (m.c ? drawnCentre(s, canvasSolved.shapes[s.id]) : null) ?? apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
     return { id: `${s.id}:${m.id}`, x, y, name: m.name }
   })) : undefined
   // where the pivot points are now (they move with the side that holds them)
@@ -1969,7 +1988,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={shapesOnly ? shapePose : poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} linkShown={shapesOnly && selShape ? linkShown(content, selShape.id) : undefined} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
-            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
+            onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onSelectCentre={shapesOnly ? selectCentre : undefined} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
             onShape={live} onMoveBody={shapesOnly ? moveBody : undefined} onEditShape={editShape}
             onRightClick={onRightClick} worldRef={worldRef} pointerRef={pointerRef}
@@ -1987,6 +2006,20 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {!shapesOnly && <p className="cmStageNote" aria-live="polite">{stageNote}</p>}
           </div>
 
+          {pointForm && pointForm.centre && shapeById(content, pointForm.id) && (
+            <PointForm
+              at={{ left: pointForm.left, top: pointForm.top }}
+              anchored={!!centreAnchorOf(shapeById(content, pointForm.id)!)}
+              onAnchor={() => {
+                const s = shapeById(content, pointForm.id)
+                setPointForm(null)
+                if (!s) return
+                const r = toggleCentreAnchor(s)
+                if (!r.ok) setNote(r.reason); else editShape(s.id, r.shape)
+              }}
+              onClose={closePointForm}
+            />
+          )}
           {pointForm && pointForm.inside && shapeById(content, pointForm.id) && (
             <PointForm
               at={{ left: pointForm.left, top: pointForm.top }}
@@ -2007,7 +2040,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onClose={closePointForm}
             />
           )}
-          {pointForm && !pointForm.inside && shapeById(content, pointForm.id)?.pts[pointForm.i] && (
+          {pointForm && !pointForm.inside && !pointForm.centre && shapeById(content, pointForm.id)?.pts[pointForm.i] && (
             <PointForm
               at={{ left: pointForm.left, top: pointForm.top }} mode={shapeById(content, pointForm.id)!.pts[pointForm.i].m}
               onMode={m => { const s = shapeById(content, pointForm.id); if (s) editShape(s.id, setMode(s, pointForm.i, m, { axis: content.axis }), pointForm.i); setPointForm(null) }}
@@ -2052,7 +2085,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
           )}
           <ToolbarPanel side="left" title="Tree" label="Tree tools" state={left} min={PANEL_LIMITS.left.min} max={PANEL_LIMITS.left.max} onOpen={open => setPanel('left', { open })} onWidth={onPanelWidth('left')}>
-            <TreeBar content={content} sel={sel} selPoint={part === 'point' ? selPoint : null} state={test.state} hidden={hiddenSet} models={nav} actions={actions} />
+            <TreeBar content={content} sel={sel} selPoint={part === 'point' ? selPoint : part === 'centre' ? -1 : null} state={test.state} hidden={hiddenSet} models={nav} actions={actions} />
           </ToolbarPanel>
 
           <ToolbarPanel side="right" title="Editor" label="Editor tools" state={right} min={PANEL_LIMITS.right.min} max={PANEL_LIMITS.right.max} onOpen={open => setPanel('right', { open })} onWidth={onPanelWidth('right')}>
@@ -2164,7 +2197,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} symmetry={symmetry} joint={jointActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

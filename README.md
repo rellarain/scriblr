@@ -358,6 +358,8 @@ described, now stale, in `docs/data-model.md`).
   separate, so saving the courses never wipes it (it only drops what names something now gone): `enrolled` (course id -> date), `completed` (a course, module, lesson,
   exercise or project id -> date) and `attempts` (an assessment id -> its latest 20 results, `passed` = the score reaches the pass mark; a pass marks the lesson, module or
   course it checks complete). A corrupt file is quarantined (409) and a file from a newer version is refused (409).
+- **Shape centres** (Designer, shape editor C1) — a point link may be of kind `center` (`ModelBind.kind`: the point sits on the centre of shape `s` plus the offset `d`), and a mark may sit
+  on the centre (`ModelMark.c`, its `i` then None). The centre is not stored: it is the middle of the shape's box in its own frame, or a symmetric shape's `sym.cx`, `sym.cy`.
 - **Markup** — Resources (`resources.json`, schema v2: a guide, tutorial bodies, FAQ answers and an assessment's `text`) and Training (`training.json`, schema v2) are
   written in Scriblr's own markup, parsed by the frontend's `lib/markup` (headings `######` largest to `#` smallest, lists `>` to `>>>>`, `"` quotes, `*` styles, `\`
   escapes, the knowledge checks `?????` to `!`, and links by permanent ids: `@writer@draft@3f9c21ab` a channel node's article, `@training@course@module@lesson`

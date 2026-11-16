@@ -1,6 +1,7 @@
 import type { ModelMark, ModelPlace, ModelPoint, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, mul, rotate, translate, type Mat } from './geometry'
 import { transformShape } from './transform'
+import { centreOf } from './centre'
 
 // Marks and anchors (shape types T4). A mark lies in a shape's own drawing space, on one of its points (`i`) or inside it (`i` null). An anchor pins the shape where it is on
 // the grid: an anchored point cannot be dragged or removed, a shape with one anchor turns, flips and resizes about it (it cannot be moved), and a shape with two or more is
@@ -34,8 +35,9 @@ export function repairMarks(v: unknown, n: number): ModelMark[] {
     if (!raw || typeof raw !== 'object') continue
     const m = raw as Record<string, unknown>
     if (typeof m.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(m.id) || out.some(x => x.id === m.id)) continue
-    const i = typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < n ? m.i : null
-    out.push({ id: m.id, kind: m.kind === 'pose' ? 'pose' : 'anchor', x: r2(fin(m.x, 0)), y: r2(fin(m.y, 0)), i, name: typeof m.name === 'string' ? m.name.trim().slice(0, 40) : '' })
+    const c = m.c === true
+    const i = !c && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < n ? m.i : null
+    out.push({ id: m.id, kind: m.kind === 'pose' ? 'pose' : 'anchor', x: r2(fin(m.x, 0)), y: r2(fin(m.y, 0)), i, name: typeof m.name === 'string' ? m.name.trim().slice(0, 40) : '', ...(c ? { c: true } : {}) })
     if (out.length >= MARKS_MAX) break
   }
   return out
@@ -90,6 +92,19 @@ export function addFreePosable(s: ModelShape, x: number, y: number, id = freshMa
   return { ok: true, shape: { ...s, marks: [...marksOf(s), { id, kind: 'pose', x: r2(x), y: r2(y), i: null, name: '' }] } }
 }
 export const removeMark = (s: ModelShape, id: string): ModelShape => ({ ...s, marks: marksOf(s).filter(m => m.id !== id) })
+
+// Where a mark is in the shape's own space: a mark on the centre (C1) is wherever the centre is now, any other where it was put.
+export const markXY = (s: Pick<ModelShape, 'pts' | 'closed' | 'rot' | 'sym'>, m: ModelMark): [number, number] => (m.c ? centreOf(s) ?? [m.x, m.y] : [m.x, m.y])
+export const centreAnchorOf = (s: ModelShape): ModelMark | undefined => anchorsOf(s).find(m => m.c)
+// An anchor on the shape's centre (C1), or off again: the shape is pinned there and turns about it.
+export function toggleCentreAnchor(s: ModelShape): Made {
+  const on = centreAnchorOf(s)
+  if (on) return { ok: true, shape: removeMark(s, on.id) }
+  const mid = centreOf(s)
+  if (!mid) return { ok: false, reason: 'This shape has no points.' }
+  if (marksOf(s).length >= MARKS_MAX) return { ok: false, reason: `A shape may have at most ${MARKS_MAX} marks.` }
+  return { ok: true, shape: { ...s, marks: [...marksOf(s), { id: freshMarkId(s), kind: 'anchor', x: r2(mid[0]), y: r2(mid[1]), i: null, name: '', c: true }] } }
+}
 export const renameMark = (s: ModelShape, id: string, name: string): ModelShape => ({ ...s, marks: marksOf(s).map(m => (m.id === id ? { ...m, name: name.slice(0, 40) } : m)) })
 
 // ---- what an edit does to the anchors ----
@@ -124,7 +139,9 @@ export type Guard = { ok: true; shape: ModelShape } | { ok: false; reason: strin
 export function guardAnchors(old: ModelShape, next: ModelShape): Guard {
   const marks = marksOf(next)
   if (!marks.length) return { ok: true, shape: next }
-  const before = new Map(marksOf(old).map(m => [m.id, m]))
+  // a mark on the centre (C1) is read where the centre was
+  const atCentre = (sh: ModelShape, m: ModelMark): ModelMark => { if (!m.c) return m; const [x, y] = markXY(sh, m); return { ...m, x, y, i: null } }
+  const before = new Map(marksOf(old).map(m => [m.id, atCentre(old, m)]))
   const sameCount = old.pts.length === next.pts.length
   // a point that follows another shape stays with it whatever the shape does, so the free points tell whether the whole shape was changed
   const free = sameCount ? old.pts.flatMap((p, i) => (p.bind ? [] : [i])) : []
@@ -159,6 +176,7 @@ export function guardAnchors(old: ModelShape, next: ModelShape): Guard {
   const kept = marks.map(m => {
     const was = before.get(m.id)
     if (!was) return m
+    if (m.c) { const [x, y] = markXY(out, m); return { ...m, x: r2(x), y: r2(y), i: null } }
     if (m.kind === 'anchor') {
       const j = was.i === null ? -1 : out.pts.findIndex(q => near(q, was.x, was.y))
       return { ...m, x: was.x, y: was.y, i: j >= 0 ? j : null }

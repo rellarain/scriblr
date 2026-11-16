@@ -264,6 +264,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Ring round a linked point, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
 | Ink line under a shared segment, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
 | Ink ring round a pivot point, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
+| Ink ring and cross of a shape centre, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
 
 ## Schedule
 

@@ -3,7 +3,7 @@ import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, linkHolder, sharedSegment, sharersOf, weldedTo, type CopyShare } from './engine/connect'
 import { shapeById } from './modelContent'
-import { AlignAcrossIcon, AlignDownIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
+import { AlignAcrossIcon, AlignDownIcon, AnchorIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, OrbitIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { TURN_LIMIT } from './engine/pivots'
 import { removeMark, renameMark } from './engine/anchors'
 import { LIMITS } from './engine/limits'
@@ -260,7 +260,7 @@ export function ConnectionsSection({ content, shape, selPoint, actions }: { cont
     // on a symmetric shape the copies of a point share its link (joints J1): a copy shows the link of the copy that holds it
     const holder = linkHolder(shape, selPoint), b = holder === null ? null : shape.pts[holder]?.bind
     if (b && holder !== null) {
-      const text = b.kind === 'edge' ? `On a segment of ${nameOf(b.s)}` : isWeld(b) ? `Welded to point ${b.i + 1} of ${nameOf(b.s)}` : `Follows point ${b.i + 1} of ${nameOf(b.s)}`
+      const text = b.kind === 'edge' ? `On a segment of ${nameOf(b.s)}` : b.kind === 'center' ? `On the centre of ${nameOf(b.s)}` : isWeld(b) ? `Welded to point ${b.i + 1} of ${nameOf(b.s)}` : `Follows point ${b.i + 1} of ${nameOf(b.s)}`
       rows.push({ key: 'own', text: holder === selPoint ? text : `${text} (a copy of point ${holder + 1})`, shapeId: shape.id, i: holder, field: 'name', value: b.name ?? '', label: 'Name of the connection' })
     }
     for (const f of weldedTo(content, shape.id, selPoint)) {
@@ -289,6 +289,35 @@ export function ConnectionsSection({ content, shape, selPoint, actions }: { cont
             <input value={r.value} maxLength={NAME_LIMIT} aria-label={r.label} onChange={e => actions.onName(r.shapeId, r.i, r.field, e.target.value)} />
           </label>
           <button type="button" className="cmIconBtn" aria-label={r.field === 'segName' ? `Disconnect the segment shared with ${r.with ?? nameOf(r.shapeId)}` : r.key === 'own' ? 'Disconnect' : `Disconnect ${nameOf(r.shapeId)}`} title="Disconnect" onClick={() => actions.onDisconnect(r.shapeId, r.i, r.field === 'segName')}><CloseIcon size={14} /></button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---- the centre (C1) ----
+
+// What the Centre section needs from the page: whether the shape is anchored at its centre, and the points of other shapes linked to it, each a pivot point or not.
+export interface CentreActions {
+  anchored: boolean
+  onAnchor: () => void
+  linked: Array<{ shapeId: string; i: number; pivot: boolean }>
+  onPivot: (shapeId: string, i: number) => void
+  onDisconnect: (shapeId: string, i: number) => void
+}
+export function CentreSection({ content, actions }: { content: ModelContent; actions: CentreActions }) {
+  const nameOf = (id: string): string => shapeById(content, id)?.name || 'a shape'
+  return (
+    <div className="cmCentrePanel" role="group" aria-label="Centre">
+      <h3 className="cmInsSub">Centre</h3>
+      <div className="cmInline">
+        <button type="button" className={`cmIconBtn${actions.anchored ? ' cmIconBtn--on' : ''}`} aria-pressed={actions.anchored} aria-label="Anchor at the centre" title={actions.anchored ? 'Anchor: take the anchor off' : 'Anchor: pin the shape at its centre'} onClick={actions.onAnchor}><AnchorIcon size={14} /></button>
+      </div>
+      {actions.linked.map(l => (
+        <div key={`${l.shapeId}:${l.i}`} className="cmConnRow">
+          <span className="cmInsText">Point {l.i + 1} of {nameOf(l.shapeId)}</span>
+          <button type="button" className={`cmIconBtn${l.pivot ? ' cmIconBtn--on' : ''}`} aria-pressed={l.pivot} aria-label={`Pivot: point ${l.i + 1} of ${nameOf(l.shapeId)}`} title={l.pivot ? 'Pivot: make it a plain link' : 'Pivot: the shapes on its two sides bend here'} onClick={() => actions.onPivot(l.shapeId, l.i)}><OrbitIcon size={14} /></button>
+          <button type="button" className="cmIconBtn" aria-label={`Disconnect point ${l.i + 1} of ${nameOf(l.shapeId)}`} title="Disconnect" onClick={() => actions.onDisconnect(l.shapeId, l.i)}><CloseIcon size={14} /></button>
         </div>
       ))}
     </div>

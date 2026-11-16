@@ -1,5 +1,5 @@
 import type { ModelContent, ModelPlace } from '../../../../../api/types'
-import { anchorsOf, marksOf, placeMat, placeOf } from './anchors'
+import { anchorsOf, markXY, marksOf, placeMat, placeOf } from './anchors'
 import { IDENTITY, apply, inverse, mul, rotate, translate, type BuiltPoint, type Mat } from './geometry'
 import { nearestPlace, slideAt } from './sliders'
 import { addJointTurn, poseOf, type Pose } from './pivots'
@@ -76,7 +76,7 @@ function begin(c: ModelContent, body: string, grab: [number, number], at: [numbe
   if (body === root) {
     if (anchors > 1) return no('Two anchors hold this figure where it is.')
     const holder = (pose.bodies.get(root) ?? []).map(id => c.shapes.find(x => x.id === id)!).find(x => anchorsOf(x).length)!
-    const m = anchorsOf(holder)[0], A = apply(objectMat(pose, root), m.x, m.y)
+    const m = anchorsOf(holder)[0], [mx, my] = markXY(holder, m), A = apply(objectMat(pose, root), mx, my)
     return { ok: true, drag: { kind: 'turn', root, at: A, from: at, place0: placeMat(c.objects.find(o => o.id === root)?.place) }, content: c }
   }
   const chain = chainOf(pose, body)
@@ -95,7 +95,7 @@ export function beginPose(c: ModelContent, shapeId: string, at: [number, number]
 export function beginReach(c: ModelContent, shapeId: string, markId: string, at: [number, number]): PoseStart {
   const pose = poseOf(c), body = pose.bodyOf.get(shapeId), m = marksOf(c.shapes.find(s => s.id === shapeId)).find(k => k.id === markId)
   if (!body || !m) return no('A posable point poses the object it is on: put it on a shape of one.')
-  return begin(c, body, [m.x, m.y], at, 'this point')
+  return begin(c, body, markXY(c.shapes.find(s => s.id === shapeId)!, m), at, 'this point')
 }
 
 // A drag begun on a slider: it moves along `outline` (canvas space) between its stops.

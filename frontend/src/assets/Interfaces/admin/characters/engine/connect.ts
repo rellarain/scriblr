@@ -7,6 +7,7 @@ import { apply, bezierAt, build, inverse, nearestEdge, r2, transformList, type B
 import { LIMITS, linkCount } from './limits'
 import { reaches } from './pairEdit'
 import { followSymmetry, orbitOf } from './symmetry'
+import { drawnCentre } from './centre'
 import type { Solved } from './rig'
 import { done, fail, type Edit } from './rigEdit'
 
@@ -15,9 +16,10 @@ import { done, fail, type Edit } from './rigEdit'
 // a point link with no offset, a lock an edge link with none. Two neighbouring points welded to two neighbouring points of one other shape make a shared segment: the
 // solver draws the follower's segment as the other shape's (`rig.ts`), and the editor sends what is done to it there. Everything here is pure.
 
-// What a dragged point is over: a point of another shape, or a spot on one of its segments (canvas space).
+// What a dragged point is over: a point of another shape, its centre (C1), or a spot on one of its segments (canvas space).
 export type DropTarget =
   | { kind: 'point'; shapeId: string; i: number; x: number; y: number }
+  | { kind: 'center'; shapeId: string; x: number; y: number }
   | { kind: 'edge'; shapeId: string; e: number; t: number; x: number; y: number }
 
 const ZERO = 1e-6
@@ -29,10 +31,12 @@ export const drawnOf = (c: ModelContent, solved: Solved, shapeId: string): Built
   return r && s && r.local.length >= 3 ? build(r.local, s.closed, r.matrix) : []
 }
 
-// The point or segment of another shape under (x, y), within `reach` (canvas units): a point wins over a segment. The dragged shape and shapes not drawn are left out.
-// `ignore` holds the points (shape:index) that move with the dragged one: neither they nor the segments of their shapes are offered.
+// The point, centre or segment of another shape under (x, y), within `reach` (canvas units): the nearer of a point and a centre wins, and either wins over a segment. The
+// dragged shape and shapes not drawn are left out. `ignore` holds the points (shape:index) that move with the dragged one: neither they nor the centres and segments of
+// their shapes are offered.
 export function dropTargetAt(c: ModelContent, solved: Solved, dragged: string, x: number, y: number, reach: number, ignore: Set<string> = new Set()): DropTarget | null {
   let point: DropTarget | null = null, pd = reach
+  let centre: DropTarget | null = null, cd = reach
   let edge: DropTarget | null = null, ed = reach
   for (const s of c.shapes) {
     const r = solved.shapes[s.id]
@@ -45,9 +49,12 @@ export function dropTargetAt(c: ModelContent, solved: Solved, dragged: string, x
       if (d <= pd) { pd = d; point = { kind: 'point', shapeId: s.id, i, x: p.x, y: p.y } }
     })
     if (moving) continue
+    const mid = drawnCentre(s, r)
+    if (mid) { const d = Math.hypot(mid[0] - x, mid[1] - y); if (d <= cd) { cd = d; centre = { kind: 'center', shapeId: s.id, x: mid[0], y: mid[1] } } }
     const hit = nearestEdge(transformList(r.local, r.matrix), x, y)
     if (hit && hit.dist <= ed) { ed = hit.dist; edge = { kind: 'edge', shapeId: s.id, e: hit.e, t: hit.t, x: hit.x, y: hit.y } }
   }
+  if (centre && (!point || cd < pd)) return centre
   return point ?? edge
 }
 
@@ -104,6 +111,14 @@ const named = (old: ModelBind | null | undefined, bind: ModelBind): ModelBind =>
 export function connect(c: ModelContent, solved: Solved, shapeId: string, i: number, target: DropTarget): Edit {
   const s = shapeById(c, shapeId)
   if (!s?.pts[i]) return fail('There is no such point.')
+  if (target.kind === 'center') {
+    // on another shape's centre (C1): it sits there and follows it
+    const why = followRefusal(c, shapeId, i, target.shapeId)
+    if (why) return fail(why)
+    const bind: ModelBind = { kind: 'center', s: target.shapeId, i: 0, d: [0, 0], e: 0, t: 0, o: 0 }
+    const [x, y] = into(solved, shapeId, target.x, target.y)
+    return done(setPoint(c, shapeId, i, p => ({ ...p, x, y, bind: named(p.bind, bind) })))
+  }
   if (target.kind === 'edge') {
     const why = followRefusal(c, shapeId, i, target.shapeId)
     if (why) return fail(why)
@@ -421,7 +436,7 @@ export function rebindByPlace(before: ModelContent, solved: Solved, after: Model
     let changed = false
     const pts = s.pts.map((p, k) => {
       const b = p.bind
-      if (!b || b.s !== shapeId) return p
+      if (!b || b.s !== shapeId || b.kind === 'center') return p
       changed = true
       if (b.kind === 'point') {
         const from = old.pts[b.i], to = from ? now.pts.findIndex(q => same(q, from)) : -1

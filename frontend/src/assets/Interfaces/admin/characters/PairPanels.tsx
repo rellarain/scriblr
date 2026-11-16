@@ -70,6 +70,7 @@ const HOWS: Array<{ id: LinkHow; name: string; hint: string }> = [
 function describe(c: ModelContent, b: ModelBind): string {
   const target = shapeById(c, b.s)?.name.trim() || 'a shape'
   if (b.kind === 'edge') return `locked to the edge from point ${b.e + 1} of ${target}, ${b.o} out${b.tan ? ', leaves along the edge' : ''}`
+  if (b.kind === 'center') return `on the centre of ${target}`
   return b.d[0] === 0 && b.d[1] === 0 ? `welded to point ${b.i + 1} of ${target}` : `follows point ${b.i + 1} of ${target} (${b.d[0]}, ${b.d[1]} away)`
 }
 

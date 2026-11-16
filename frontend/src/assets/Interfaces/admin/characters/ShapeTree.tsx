@@ -23,6 +23,8 @@ import { CARD_NAMES, displayed, dropRule, isExpanded, pathTo, storedSpot, type D
 export interface ShapeTreeActions {
   onSelect: (sel: Selection) => void
   onSelectPoint: (shapeId: string, i: number) => void
+  // the shape's centre (C1), listed above its points
+  onSelectCentre?: (shapeId: string) => void
   onAddZone: () => void
   onAddGroupIn: (zoneId: string) => void
   onAddObject: (groupId: string) => void
@@ -217,7 +219,7 @@ export function ShapeTree({ content, sel, selPoint, hidden, entry, onOpenModels,
       kids: () => (
         <>
           {shapeMirrors(s, o).length > 0 && <ul className="dzCardList dzTreeList" aria-label={`Copies of ${name}`}>{shapeMirrors(s, o).map(m => shapeCard(m, o, objectOff))}</ul>}
-          <PointRows shape={s} name={name} selected={sel.kind === 'shape' && sel.id === s.id ? selPoint : null} onSelect={i => actions.onSelectPoint(s.id, i)} />
+          <PointRows shape={s} name={name} selected={sel.kind === 'shape' && sel.id === s.id ? selPoint : null} onSelect={i => actions.onSelectPoint(s.id, i)} onCentre={actions.onSelectCentre ? () => actions.onSelectCentre!(s.id) : undefined} />
         </>
       ),
     })
@@ -262,11 +264,21 @@ function ChevronButton({ name, expanded, onClick }: { name: string; expanded: bo
   )
 }
 
-// The points of an expanded shape: a row each, with the marks it carries (an anchor, a posable point, a slider); a click selects the point.
-function PointRows({ shape, name, selected, onSelect }: { shape: ModelShape; name: string; selected: number | null; onSelect: (i: number) => void }) {
+// The points of an expanded shape: a row each, with the marks it carries (an anchor, a posable point, a slider); a click selects the point. Above them its centre (C1;
+// `selected` -1 when the centre is what is selected), with an anchor mark when the shape is anchored there.
+function PointRows({ shape, name, selected, onSelect, onCentre }: { shape: ModelShape; name: string; selected: number | null; onSelect: (i: number) => void; onCentre?: () => void }) {
   const marks = marksOf(shape)
+  const centreAnchor = marks.some(m => m.kind === 'anchor' && m.c)
   return (
     <ol className="dzPoints" aria-label={`Points of ${name}`}>
+      {onCentre && !shape.mirrorOf && !shape.cloneOf && (
+        <li>
+          <button type="button" className={`dzPoint${selected === -1 ? ' dzPoint--sel' : ''}`} aria-current={selected === -1 ? 'true' : undefined} onClick={onCentre}>
+            <span className="dzPointName">Centre</span>
+            {centreAnchor && <span className="cmTwin" role="img" aria-label="The centre is an anchor" title="An anchor"><AnchorIcon size={11} /></span>}
+          </button>
+        </li>
+      )}
       {shape.pts.map((p, i) => {
         const anchor = marks.some(m => m.kind === 'anchor' && m.i === i), pose = marks.some(m => m.kind === 'pose' && m.i === i), slider = isSlider(p)
         return (

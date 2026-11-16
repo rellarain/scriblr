@@ -691,8 +691,8 @@ export interface CharacterCreate { name?: string; portrait?: CharacterPortrait; 
 export type ModelPointMode = 'c' | 's' | 'cs' | 'sc'
 export type ModelLayer = 'body' | 'clothing' | 'hair'
 export type ModelView = 'both' | 'front' | 'back'
-// A point link, kept on the point that follows: kind 'point' = on point i of shape s plus the offset d (a weld has none); kind 'edge' = t (0..1) along the edge from point e of shape s, o units outward (a clothes point locked to the edge of a body part). Solved when the model is drawn.
-export type ModelBindKind = 'point' | 'edge'
+// A point link, kept on the point that follows: kind 'point' = on point i of shape s plus the offset d (a weld has none); kind 'edge' = t (0..1) along the edge from point e of shape s, o units outward (a clothes point locked to the edge of a body part); kind 'center' (C1) = on the centre of shape s plus the offset d. Solved when the model is drawn.
+export type ModelBindKind = 'point' | 'edge' | 'center'
 // tan (phase 5b): an edge link may also leave along the direction of its edge; between two such points locked to different shapes the outline runs on smoothly from one edge to the other (a bridge).
 // Shape types T5: a slider, an edge link that moves along the other shape's outline between two stops (places e + t along it); `at` where it has been posed (null: as drawn)
 export interface ModelSlide { lo: number; hi: number; at: number | null }
@@ -721,9 +721,9 @@ export interface ModelMirrorLine { shape: string; k: number }
 // Clones (Z4): where a clone stands: its original's middle taken to (x, y) in its own space, turned by `turn` degrees about it, flipped across first when `flip`.
 export interface ModelCloneAt { x: number; y: number; turn: number; flip: boolean }
 // Shape types T4: a mark on a shape, in its own drawing space, on point i or inside it (i null): an anchor pins the shape (T5: a posable point); and where a figure's first
-// shape has been posed (turned about the origin, then moved; null as drawn)
+// shape has been posed (turned about the origin, then moved; null as drawn). c (C1): the mark sits on the shape's centre and follows it (x, y are where it was set; i is null).
 export type ModelMarkKind = 'anchor' | 'pose'
-export interface ModelMark { id: string; kind: ModelMarkKind; x: number; y: number; i: number | null; name: string }
+export interface ModelMark { id: string; kind: ModelMarkKind; x: number; y: number; i: number | null; name: string; c?: boolean }
 export interface ModelPlace { dx: number; dy: number; turn: number }
 // A shape that shows with a slider (phase 5b; a crease): fully hidden when the slider is at `hidden`, fully drawn at `shown`, in proportion between.
 export interface ModelFade { slider: string; hidden: number; shown: number }

@@ -8,6 +8,7 @@ import { apply, boxOf, build, flatten, inPolygon, inverse, nearestEdge, type Box
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
 import { copyShareAt, copySharesOf, drawnOf, dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, toSourceSpot, weldTree, type DropTarget, sharesCurve } from './engine/connect'
+import { drawnCentre } from './engine/centre'
 import { crossesAxis, rayAngles, wedgeAt } from './engine/symmetry'
 import { BOX_HANDLES, HANDLE_NAMES, frameCorners, frameOf, handleAt, resizeFrom, rotOf, turnFrom, turnHandleAt, type BoxHandle, type Frame } from './engine/transform'
 import { paintDefs, paintShapes } from './engine/paint'
@@ -208,6 +209,8 @@ export interface CanvasProps {
   onSelect: (sel: Selection) => void
   onSelectPoint: (i: number) => void
   onSelectSegment: (e: number) => void
+  // the shape editor (C1): every shape's centre shows on the selected and the hovered shape; a click selects it (with its shape), a drag from it moves the shape
+  onSelectCentre?: () => void
   // Ctrl and the wheel over the canvas zoom (the view keeps the point under the pointer where it is).
   onZoom?: (zoom: number) => void
   // A drag is about to change the content: remember it for undo once.
@@ -257,7 +260,7 @@ type Drag =
   // a point locked onto a segment of another shape, slid along it (shape editor S5)
   | { kind: 'slide'; shapeId: string; index: number; x0: number; y0: number; moved: boolean }
   | { kind: 'handle'; shapeId: string; index: number; which: 'hi' | 'ho' }
-  | { kind: 'move'; shapeId: string; last: [number, number]; start: [number, number]; from: ModelShape; box: Box | null; world0: [number, number]; box0: Box | null; x0: number; y0: number; moved: boolean }
+  | { kind: 'move'; shapeId: string; last: [number, number]; start: [number, number]; from: ModelShape; box: Box | null; world0: [number, number]; box0: Box | null; x0: number; y0: number; moved: boolean; centre?: boolean }
   | { kind: 'pivot' }
   | { kind: 'pose' }
   | { kind: 'posePress'; shapeId: string; x0: number; y0: number; world: [number, number] }
@@ -279,6 +282,7 @@ type Drag =
 // one; x, y: the spot on it nearest the pointer, where the hover handle sits).
 type Hover =
   | { kind: 'point'; shapeId: string; i: number }
+  | { kind: 'centre'; shapeId: string; x: number; y: number }
   | { kind: 'cross'; crossing: Crossing }
   | { kind: 'edge'; shapeId: string; e: number; x: number; y: number }
 
@@ -315,7 +319,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const dropRef = useRef<DropTarget | null>(null)
   const showDrop = (t: DropTarget | null) => {
     const a = dropRef.current
-    const same = a === t || (!!a && !!t && a.kind === t.kind && a.shapeId === t.shapeId && (a.kind === 'point' ? a.i === (t as typeof a).i : a.e === (t as typeof a).e && Math.abs(a.x - t.x) + Math.abs(a.y - t.y) < 1e-3))
+    const same = a === t || (!!a && !!t && a.kind === t.kind && a.shapeId === t.shapeId && (a.kind === 'point' ? a.i === (t as typeof a).i : a.kind === 'center' ? true : a.e === (t as typeof a).e && Math.abs(a.x - t.x) + Math.abs(a.y - t.y) < 1e-3))
     dropRef.current = t
     if (!same) setDrop(t)
   }
@@ -389,6 +393,8 @@ export function DesignerCanvas(p: CanvasProps) {
   const shownLinked = new Set(p.linkShown ?? p.linked ?? [])
   const lockOn = !!p.lock?.enabled && overlay && !p.weights && !p.skin
   const hoverOk = !legacyPose && !p.pick && !through && !p.frames && !p.taper
+  // the shape editor shows and offers the centres of shapes (C1)
+  const centresOn = !!p.onSelectCentre && !!p.connect && !p.weights && !p.skin
 
   function rect() {
     const r = svgRef.current?.getBoundingClientRect()
@@ -570,6 +576,11 @@ export function DesignerCanvas(p: CanvasProps) {
       built.forEach((b, i) => { const d = Math.hypot(b.x - wx, b.y - wy); if (d <= bd) { bd = d; best = i } })
       if (best >= 0) return { kind: 'point', shapeId: shape.id, i: best }
     }
+    // its centre (C1)
+    if (overlay && shape && centresOn && !p.rigid) {
+      const mid = drawnCentre(shape, solvedShape)
+      if (mid && Math.hypot(mid[0] - wx, mid[1] - wy) <= REACH_POINT * px) return { kind: 'centre', shapeId: shape.id, x: mid[0], y: mid[1] }
+    }
     if (overlay && shape && matrix && !p.skin && !p.rigid) {
       const [lx, ly] = apply(inverse(matrix), wx, wy)
       const hit = nearestEdge(shape.pts, lx, ly)
@@ -588,6 +599,10 @@ export function DesignerCanvas(p: CanvasProps) {
       let best = -1, bd = reach
       pts.forEach((b, k) => { const d = Math.hypot(b.x - wx, b.y - wy); if (d <= bd) { bd = d; best = k } })
       if (best >= 0) return { kind: 'point', shapeId: id, i: best }
+      if (centresOn) {
+        const mid = drawnCentre(s, r)
+        if (mid && Math.hypot(mid[0] - wx, mid[1] - wy) <= reach) return { kind: 'centre', shapeId: id, x: mid[0], y: mid[1] }
+      }
       const [lx, ly] = apply(inverse(r.matrix), wx, wy)
       const hit = nearestEdge(r.local, lx, ly)
       if (hit && grabsEdge(hit.dist * Math.sqrt(Math.abs(r.matrix[0] * r.matrix[3] - r.matrix[1] * r.matrix[2])), px, r.local, s.closed, lx, ly)) {
@@ -601,6 +616,7 @@ export function DesignerCanvas(p: CanvasProps) {
     if (a === b) return true
     if (!a || !b || a.kind !== b.kind) return false
     if (a.kind === 'point' && b.kind === 'point') return a.shapeId === b.shapeId && a.i === b.i
+    if (a.kind === 'centre' && b.kind === 'centre') return a.shapeId === b.shapeId && Math.hypot(a.x - b.x, a.y - b.y) < 0.01
     if (a.kind === 'cross' && b.kind === 'cross') return a.crossing.other === b.crossing.other && Math.hypot(a.crossing.x - b.crossing.x, a.crossing.y - b.crossing.y) < 0.01
     if (a.kind === 'edge' && b.kind === 'edge') return a.shapeId === b.shapeId && a.e === b.e && Math.hypot(a.x - b.x, a.y - b.y) < 0.5 * pixel()
     return false
@@ -620,6 +636,15 @@ export function DesignerCanvas(p: CanvasProps) {
     const h = hitTest(e)
     if (!h) return false
     if (h.kind === 'cross') { p.lock?.onAdvance(h.crossing); return true }
+    // a shape's centre (C1): a drag from it moves the shape; on another shape a click selects that shape (the middle of a shape is where it is clicked to select it), on
+    // the selected shape a click that does not move selects the centre (when the press ends)
+    if (h.kind === 'centre') {
+      const own = !!shape && h.shapeId === shape.id
+      if (!own) p.onSelect({ kind: 'shape', id: h.shapeId })
+      beginMove(e, h.shapeId, own)
+      if (own && dragRef.current?.kind === 'move') dragRef.current.centre = true
+      return true
+    }
     // the shape editor (Z1): a press on a segment waits: a click selects it, a drag adds a point there (or moves a shared segment)
     if (h.kind === 'edge' && p.connect && !p.weights && !p.skin) {
       const other = !shape || h.shapeId !== shape.id
@@ -654,6 +679,8 @@ export function DesignerCanvas(p: CanvasProps) {
   function rightTarget(e: { clientX: number; clientY: number }, fallback: RightTarget): RightTarget {
     const h = legacyPose || p.pick || through ? null : hitTest(e)
     if (h?.kind === 'point') return { kind: 'point', id: h.shapeId, i: h.i }
+    // the selected shape's centre (C1); another shape's is its inside, as a click on it selects the shape
+    if (h?.kind === 'centre') return h.shapeId === shape?.id ? { kind: 'centre', id: h.shapeId } : fallback
     if (h?.kind === 'edge') return { kind: 'segment', id: h.shapeId, e: h.e }
     return fallback
   }
@@ -693,6 +720,10 @@ export function DesignerCanvas(p: CanvasProps) {
     if (hoverDown(e, true)) return
     const already = sel.kind === 'shape' && sel.id === id
     if (!already || part !== 'shape') p.onSelect({ kind: 'shape', id })
+    beginMove(e, id, already)
+  }
+  // A drag that moves a shape (from its body, or from its centre).
+  function beginMove(e: ReactPointerEvent, id: string, already = sel.kind === 'shape' && sel.id === id) {
     const from = shapesById.get(id), r = solved.shapes[id]
     if (!from || from.mirrorOf || p.weights || p.skin || (already && !editable) || !r) return
     // the shape's own space (its group's matrix), so the drag can begin before the page has drawn it selected
@@ -996,7 +1027,7 @@ export function DesignerCanvas(p: CanvasProps) {
       // the shape under the dragged point shows its outline and points (Z1), and a point it comes close to takes the dragged point onto it
       const over = ready?.shapeId ?? shapeUnder(wx, wy, d.shapeId)
       setDragOver(o => (o === over ? o : over))
-      if (ready?.kind === 'point') { wx = ready.x; wy = ready.y }
+      if (ready?.kind === 'point' || ready?.kind === 'center') { wx = ready.x; wy = ready.y }
     }
     if ((d.kind === 'point' && !ready) || d.kind === 'handle') [wx, wy] = snapPoint(s, d.kind === 'point' ? d.index : -1, wx, wy)
     else if (d.kind === 'move' && !onGrid && d.box0) {
@@ -1026,6 +1057,7 @@ export function DesignerCanvas(p: CanvasProps) {
     targetsRef.current = null
     setGuides(null)
     if (d && d.kind === 'pose') p.pose?.onUp()
+    if (d && d.kind === 'move' && d.centre && !d.moved) p.onSelectCentre?.()
     if (d && d.kind === 'posePress') p.onSelect({ kind: 'shape', id: d.shapeId })
     setDragOver(null)
     if (d && d.kind === 'segPress') {
@@ -1176,7 +1208,7 @@ export function DesignerCanvas(p: CanvasProps) {
     } else if (d[e.key]) {
       e.preventDefault()
       const [dx, dy] = d[e.key], n = shape.pts.length
-      const next = part === 'shape' ? moveShape(shape, dx, dy)
+      const next = part === 'shape' || part === 'centre' ? moveShape(shape, dx, dy)
         : part === 'segment' ? nudgePoint(nudgePoint(shape, selPoint, dx, dy, { mirror, axis }), (selPoint + 1) % n, dx, dy, { mirror, axis })
         : nudgePoint(shape, selPoint, dx, dy, { mirror, axis })
       p.onEditShape(shape.id, next, undefined)
@@ -1215,7 +1247,7 @@ export function DesignerCanvas(p: CanvasProps) {
   // the point the selected segment ends at (none past the last point of an open shape)
   const segEnd = part === 'segment' && shape && (shape.closed || selPoint < built.length - 1) ? built[(selPoint + 1) % built.length] : undefined
   const nudgeHint = p.taper ? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : part === 'shape' ? 'Arrow keys move the shape' : part === 'segment' ? (p.onRemove ? 'Arrow keys move the segment; Delete removes it, joining its two points' : 'Arrow keys move the segment') : 'Arrow keys move the point; Delete removes it'
-  const hoverShapeId = dragOver ?? (hover ? (hover.kind === 'edge' || hover.kind === 'point' ? hover.shapeId : shape?.id ?? null) : null)
+  const hoverShapeId = dragOver ?? (hover ? (hover.kind === 'edge' || hover.kind === 'point' || hover.kind === 'centre' ? hover.shapeId : shape?.id ?? null) : null)
   const hoveredPoint = hover?.kind === 'point' && hover.shapeId === shape?.id ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
   const selectedPointsDrawn = shown.has('points') && overlay && !p.rigid
@@ -1493,6 +1525,30 @@ export function DesignerCanvas(p: CanvasProps) {
 
   // What shows only while the pointer is over an outline, a point or a crossing: the outline widens, its points appear small, the point under the pointer is larger, a large
   // handle sits on the outline where a click would add a point, and a crossing shows the stage of its lock. It is drawn over every layer and takes no clicks of its own.
+  // The centres (C1): of the selected shape (marked when it is the selected part), of the shape under the pointer, and of the shape a dragged point is over (in the alert
+  // colour while the point would link to it). They take no clicks of their own: the hover finds them.
+  function centreLayer(): ReactNode {
+    if (!centresOn) return null
+    const ids = [...new Set([overlay && shape ? shape.id : null, hoverShapeId].filter((x): x is string => !!x))]
+    return ids.map(id => {
+      const s = shapesById.get(id), r = solved.shapes[id]
+      if (!s || !r || !r.visible || r.off || s.mirrorOf || s.cloneOf) return null
+      const mid = drawnCentre(s, r)
+      if (!mid) return null
+      const [x, y] = mid, k = 4 * u
+      const lit = (drop?.kind === 'center' && drop.shapeId === id) || (hover?.kind === 'centre' && hover.shapeId === id && !dragOver)
+      const chosen = !!shape && id === shape.id && part === 'centre'
+      return (
+        <g key={`c${id}`} className={`cmCentre${lit ? ' cmCentre--on' : ''}${chosen ? ' cmCentre--sel' : ''}`} data-centre={id} aria-hidden="true">
+          <circle cx={x} cy={y} r={k + 1.5 * u} className="cmCentreUnder" />
+          <circle cx={x} cy={y} r={k} className="cmCentreRing" />
+          <line x1={x - k} y1={y} x2={x + k} y2={y} className="cmCentreCross" />
+          <line x1={x} y1={y - k} x2={x} y2={y + k} className="cmCentreCross" />
+          <title>{`Centre of ${s.name || 'the shape'}`}</title>
+        </g>
+      )
+    })
+  }
   function hoverLayer(): ReactNode {
     if (!hoverShapeId || (!hover && !dragOver)) return null
     const hs = solved.shapes[hoverShapeId], hShape = shapesById.get(hoverShapeId)
@@ -1595,6 +1651,7 @@ export function DesignerCanvas(p: CanvasProps) {
           <circle cx={g.x} cy={g.y} r={3.5 * u} className="cmGripDot" />
         </g>
       ))}
+      {centreLayer()}
       {hoverLayer()}
       {p.taper && (
         <g className="cmTaper" aria-hidden="true">

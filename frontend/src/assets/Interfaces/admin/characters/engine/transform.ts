@@ -102,6 +102,18 @@ export function resizeFrom(s0: ModelShape, f0: Frame, h: BoxHandle, px: number, 
   const [lx, ly] = apply(unframeMat(f0), px, py)
   // from the opposite side, or (Ctrl, joints J1) from the middle, both sides moving
   const mid = o.fromMiddle === true, k = mid ? 2 : 1
+  // from the centre (C1): a symmetric shape's centre can be off the middle of its frame; then each side scales by how far the pointer is from it
+  if (mid && s0.sym) {
+    const [cx, cy] = apply(unframeMat(f0), s0.sym.cx, s0.sym.cy)
+    const along = (l: number, side: number, half: number, c: number) => (side && Math.abs(side * half - c) > 1e-6 ? Math.max(MIN_SIDE / (2 * half || 1), (l - c) / (side * half - c)) : 1)
+    let sx = along(lx, u, f0.w / 2, cx), sy = along(ly, v, f0.h / 2, cy)
+    if (o.keep || mustKeepRatio(s0)) {
+      if (u && v) sx = sy = Math.max(sx, sy)
+      else if (u) sy = sx
+      else sx = sy
+    }
+    return transformShape(s0, frameScale(f0, sx, sy, cx, cy))
+  }
   const ax = mid ? 0 : -u * (f0.w / 2), ay = mid ? 0 : -v * (f0.h / 2)
   let w = u ? Math.max(MIN_SIDE, (lx - ax) * u * k) : f0.w
   let ht = v ? Math.max(MIN_SIDE, (ly - ay) * v * k) : f0.h
@@ -118,12 +130,16 @@ export function resizeFrom(s0: ModelShape, f0: Frame, h: BoxHandle, px: number, 
   return transformShape(s0, frameScale(f0, sx, sy, ax, ay))
 }
 
-// A turn about the middle of the frame by the angle the pointer has swept about it since the drag began; `snap` (Shift) puts the frame's angle on a step of 15 degrees.
+// What a shape turns and resizes about (shape editor C1): its centre, which is the middle of its frame, or, on a symmetric shape, the point its lines of symmetry cross.
+export const pivotOf = (s: ModelShape, f: Frame): [number, number] => (s.sym ? [s.sym.cx, s.sym.cy] : [f.cx, f.cy])
+
+// A turn about the shape's centre by the angle the pointer has swept about it since the drag began; `snap` (Shift) puts the frame's angle on a step of 15 degrees.
 export function turnFrom(s0: ModelShape, f0: Frame, start: [number, number], px: number, py: number, snap = false): ModelShape {
-  const a0 = Math.atan2(start[1] - f0.cy, start[0] - f0.cx), a1 = Math.atan2(py - f0.cy, px - f0.cx)
+  const [cx, cy] = pivotOf(s0, f0)
+  const a0 = Math.atan2(start[1] - cy, start[0] - cx), a1 = Math.atan2(py - cy, px - cx)
   let delta = ((a1 - a0) * 180) / Math.PI
   if (snap) delta = Math.round((f0.rot + delta) / 15) * 15 - f0.rot
-  return delta ? transformShape(s0, rotate(delta, f0.cx, f0.cy), delta) : s0
+  return delta ? transformShape(s0, rotate(delta, cx, cy), delta) : s0
 }
 
 // The steppers of the panel: the middle of the frame across or down, its width or height (about its middle; `keep` scales the other side as much), and its angle.
@@ -146,8 +162,8 @@ export function setSize(s: ModelShape, side: 'w' | 'h', value: number, keep = fa
 export function setTurn(s: ModelShape, deg: number): ModelShape {
   const f = frameOf(s)
   if (!f) return s
-  const delta = normTurn(deg - f.rot)
-  return delta ? transformShape(s, rotate(delta, f.cx, f.cy), delta) : s
+  const delta = normTurn(deg - f.rot), [cx, cy] = pivotOf(s, f)
+  return delta ? transformShape(s, rotate(delta, cx, cy), delta) : s
 }
 
 // A mirror image of the shape across (left for right) or down (top for bottom) about its frame's own middle. The points keep their order, so whatever refers to a point by

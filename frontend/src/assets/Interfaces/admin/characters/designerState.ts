@@ -7,8 +7,9 @@ import { objectById, groupById, objectOfShape, shapeById } from './modelContent'
 export type SelKind = 'none' | 'zone' | 'group' | 'object' | 'shape'
 export interface Selection { kind: SelKind; id: string }
 export const NONE: Selection = { kind: 'none', id: '' }
-// What of the selected shape is selected (S2 of the shape editor): the shape as a whole, one of its points, or one of its segments (segment e runs from point e to the next).
-export type PartKind = 'shape' | 'point' | 'segment'
+// What of the selected shape is selected (S2 of the shape editor): the shape as a whole, one of its points, one of its segments (segment e runs from point e to the next), or
+// its centre (C1).
+export type PartKind = 'shape' | 'point' | 'segment' | 'centre'
 
 export const same = (a: Selection, b: Selection): boolean => a.kind === b.kind && a.id === b.id
 
@@ -62,6 +63,6 @@ export function showFor(c: ModelContent, sel: Selection): string[] {
 
 // What the right button does when it is clicked (not dragged): on a point it changes the point's type and on a segment it makes the segment straight or curved (the page
 // does those); on the body of a shape it selects the shape; on the empty grid it unselects everything, to see the end result.
-export type RightTarget = { kind: 'grid' } | { kind: 'shape'; id: string } | { kind: 'point'; id: string; i: number } | { kind: 'segment'; id: string; e: number }
+export type RightTarget = { kind: 'grid' } | { kind: 'shape'; id: string } | { kind: 'point'; id: string; i: number } | { kind: 'segment'; id: string; e: number } | { kind: 'centre'; id: string }
 export const rightClickShape = (shapeId: string): Selection => ({ kind: 'shape', id: shapeId })
 export const rightClickGrid = (): Selection => NONE
