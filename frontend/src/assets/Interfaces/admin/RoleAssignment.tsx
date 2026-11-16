@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useChannels } from '../../../channels/channelStore'
 import { childrenOf, labelOf } from '../../../channels/channelTree'
 import { staffFeedbackApi } from '../../../feedback/feedbackApi'
-import { changeStaff, clearStaffError, useStaff } from '../../../feedback/staffStore'
+import { changeStaff, clearStaffError, useStaff, OWNER_ID } from '../../../feedback/staffStore'
 import type { Role } from '../../../feedback/feedbackTypes'
 import { staffApi } from '../../../staff/staffApi'
 import { changeRoster, useRoster } from '../../../staff/rosterStore'
@@ -62,13 +62,16 @@ export default function RoleAssignment() {
         <tbody>
           {bundle.admins.map(admin => {
             const held = admin.roles[console] ?? []
+            // the owner (universal access) holds every role everywhere: shown ticked, not changed here
+            const owner = admin.id === OWNER_ID
             return (
               <tr key={admin.id}>
-                <th scope="row">{admin.name}</th>
+                <th scope="row">{admin.name}{owner && <span className="feedbackCardMeta"> Every role</span>}</th>
                 {ROLES.map(r => (
                   <td key={r.key}>
                     <input
-                      type="checkbox" checked={held.includes(r.key)} aria-label={`${admin.name}: ${r.label} on ${pretty(console)}`}
+                      type="checkbox" checked={owner || held.includes(r.key)} disabled={owner} aria-label={`${admin.name}: ${r.label} on ${pretty(console)}`}
+                      title={owner ? 'The owner holds every role' : undefined}
                       onChange={() => toggle(admin.id, r.key, held)}
                     />
                   </td>

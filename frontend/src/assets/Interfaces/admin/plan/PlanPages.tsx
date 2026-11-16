@@ -4,7 +4,6 @@ import {
 } from '../../../icons'
 import { useChannels } from '../../../../channels/channelStore'
 import { childrenOf as channelChildren, labelOf } from '../../../../channels/channelTree'
-import ActingAs from '../../../../feedback/ActingAs'
 import { staffFeedbackApi } from '../../../../feedback/feedbackApi'
 import { scopeOf } from '../../../../feedback/feedbackLogic'
 import StatementCard from '../../../../feedback/StatementCard'
@@ -57,7 +56,7 @@ function Frame({ label, bar, children }: { label: string; bar?: ReactNode; child
   }
   return (
     <div className="plPage fbScope" aria-label={label}>
-      <div className="fbBar">{bar}<ActingAs /></div>
+      {bar && <div className="fbBar">{bar}</div>}
       {error && (
         <p className="fbError" role="alert">
           {error} <button type="button" className="fbIconBtn" aria-label="Dismiss" title="Dismiss" onClick={clearPlanError}>×</button>

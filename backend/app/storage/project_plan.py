@@ -263,7 +263,9 @@ def _can(fb: feedback.FeedbackFile, admin: feedback.Admin, item: PlanItem, sf: O
     sla = sla_of(item, sf, now or utcnow())
     came_up = bool(sla and sla["to"] == admin.id)
     mine = (item.assignee is not None and item.assignee.kind == "staff" and item.assignee.id == admin.id) or item.claimedBy == admin.id or came_up
-    claimable = (item.assignee is None or _assigned_to_me(sf, admin.id, item) or came_up) and item.claimedBy in ("", admin.id) and item.status != "done"
+    # the owner (universal access) may claim any open item nobody else has claimed
+    owner = admin.id == feedback.OWNER_ID
+    claimable = (owner or item.assignee is None or _assigned_to_me(sf, admin.id, item) or came_up) and item.claimedBy in ("", admin.id) and item.status != "done"
     return {"edit": planner, "status": planner or mine, "claim": claimable and item.claimedBy != admin.id}
 
 

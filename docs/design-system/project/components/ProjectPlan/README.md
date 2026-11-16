@@ -34,7 +34,7 @@ Each item has a title, a status (To do, Claimed, In progress, Done), a priority 
 - **Moving an item along** is for whoever it is assigned to, whoever claimed it, or a Planner.
 - **Claiming**: anyone may claim an item that is unassigned or assigned to them and not claimed by someone else.
 
-A control that cannot be used is disabled, and its title gives the reason. The server refuses it too. The page acts as the staff member in the feedback screens' **Acting as** chip, and loads again when that changes.
+A control that cannot be used is disabled, and its title gives the reason. The server refuses it too. The page acts as the owner (universal access: every role, and any open item can be claimed).
 
 ## What writers see
 

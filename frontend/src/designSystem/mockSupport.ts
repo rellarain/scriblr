@@ -199,7 +199,8 @@ export function createMockSupport(opts: {
     }
     return best?.id ?? null
   }
-  const manages = (pp: Omit<Person, 'tier'>, q: string | null) => pp.active && (q ? pp.supports.includes(q) : pp.supports.length > 0)
+  // the owner (universal access) manages every queue
+  const manages = (pp: Omit<Person, 'tier'>, q: string | null) => pp.active && (pp.id === 'owner' || (q ? pp.supports.includes(q) : pp.supports.length > 0))
   const week = (pid: string, start: string) => { const { blocks, own } = scheduleFor(pid, start); return { start, blocks: blocks.map(b => ({ ...b })), hours: blocks.reduce((n, b) => n + b.hours, 0), own } }
   function queueView(me: string): QueueView {
     const pp = person(me)

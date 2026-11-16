@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useChannels } from '../../../channels/channelStore'
 import { childrenOf, labelOf } from '../../../channels/channelTree'
-import ActingAs from '../../../feedback/ActingAs'
 import '../../../feedback/feedback.scss'
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, RestoreIcon } from '../../icons'
 import { clearQueueError, loadQueues, setQueueOverride, setQueueRanges, setQueueSwitch, useQueues } from '../../../support/supportStores'
@@ -138,7 +137,6 @@ function QueueSection() {
   return (
     <div className="queueSection fbScope">
       <div className="queueScroll">
-        <div className="fbBar"><ActingAs /></div>
         {error && <p className="fbError" role="alert">{error} <button type="button" className="fbIconBtn" aria-label="Dismiss" title="Dismiss" onClick={clearQueueError}><CloseIcon size={12} /></button></p>}
         <p className="qMe">
           <strong>{me.name}</strong>

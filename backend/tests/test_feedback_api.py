@@ -273,7 +273,7 @@ def _v2_file() -> dict:
 def test_a_version_2_file_moves_to_channel_ids_once_keeping_a_copy(client: TestClient, app_data_root: Path) -> None:
     (app_data_root / "feedback.json").write_text(json.dumps(_v2_file()), encoding="utf-8")
     b = bundle(client, {"X-Admin-Id": "adm-old"})
-    roles = b["admins"][0]["roles"]
+    roles = next(a for a in b["admins"] if a["id"] != "owner")["roles"]
     assert roles["helper/inbox"] == ["checker", "channelManager"]
     assert roles["writer/shelf"] == ["voter", "planner"]
     assert all(roles[c] == ["channelManager"] for c in ("reader/nook", "reader/library", "reader/book", "reader/pages"))
@@ -294,7 +294,7 @@ def test_a_version_2_file_moves_to_channel_ids_once_keeping_a_copy(client: TestC
 def test_a_version_1_file_moves_its_access_patterns_to_scopes(client: TestClient, app_data_root: Path) -> None:
     v1 = {**_v2_file(), "schemaVersion": 1, "admins": [{"id": "adm-old", "name": "Old", "processing": ["Helper/Inbox", "Writer/*"], "projectPlan": ["Writer/Draft"]}]}
     (app_data_root / "feedback.json").write_text(json.dumps(v1), encoding="utf-8")
-    roles = bundle(client, {"X-Admin-Id": "adm-old"})["admins"][0]["roles"]
+    roles = next(a for a in bundle(client, {"X-Admin-Id": "adm-old"})["admins"] if a["id"] == "adm-old")["roles"]
     assert roles["helper/inbox"] == ["checker"]
     assert roles["writer/draft"] == ["voter", "planner"] and roles["writer/dashboard"] == ["voter"]
     assert (app_data_root / "feedback.v1.json").exists()

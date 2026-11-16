@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import '../../../feedback/feedback.scss'
-import ActingAs from '../../../feedback/ActingAs'
 import { ChevronLeftIcon, ChevronRightIcon, SaveIcon } from '../../icons'
 import { saveSchedule, useQueues } from '../../../support/supportStores'
 import { DAY_LABEL, type ScheduleBlock, type ScheduleWeek } from '../../../support/supportTypes'
@@ -72,7 +71,6 @@ function SettingsSection() {
   return (
     <div className="queueSection fbScope">
       <div className="queueScroll">
-        <div className="fbBar"><ActingAs /></div>
         {error && <p className="fbError" role="alert">{error}</p>}
         {!view ? <p className="fbMuted">Loading…</p> : !view.me.allotment ? (
           <p className="fbMuted">No helper hours are allotted to you.</p>

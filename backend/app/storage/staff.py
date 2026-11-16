@@ -111,6 +111,8 @@ def _seed(root: Path) -> StaffFile:
     )
     place = {"adm-dana": ("dep-product", "team-writing"), "adm-lee": ("dep-product", "team-reading"), "adm-sam": ("dep-support", "team-help")}
     for a in fb.admins:
+        if a.id == feedback.OWNER_ID:
+            continue  # the owner is added by _ensure_owner, with their hours
         dep, team = place.get(a.id, (None, None))
         file.people.append(Person(id=a.id, name=a.name, departmentId=dep, teamId=team))
     lee = next((p for p in file.people if p.id == "adm-lee"), None)
@@ -160,10 +162,18 @@ def _save(root: Path, file: StaffFile) -> None:
     project_store._atomic_write_json(root, _path(root), file.model_dump(mode="json"))
 
 
+def _ensure_owner(file: StaffFile) -> None:
+    """The owner (universal access) is always on the roster, first: an admin with 30 helper hours, never termed. Kept in the file the next time it is
+    written."""
+    if not any(p.id == feedback.OWNER_ID for p in file.people):
+        file.people.insert(0, Person(id=feedback.OWNER_ID, name=feedback.OWNER_NAME, kind="admin", allotment=30))
+
+
 def _load(root: Path) -> StaffFile:
     path = _path(root)
     if not path.exists():
         file = _seed(root)
+        _ensure_owner(file)
         _save(root, file)
         return file
     try:
@@ -173,6 +183,7 @@ def _load(root: Path) -> StaffFile:
         raise project_store.ShardCorruptError(path, quarantined, str(e)) from e
     for p in PRIORITIES:
         file.sla.setdefault(p, DEFAULT_SLA[p])
+    _ensure_owner(file)
     return file
 
 
@@ -218,6 +229,8 @@ def tier_for(p: Person, console_id: str) -> Optional[int]:
     who left has none."""
     if not p.active:
         return None
+    if p.id == feedback.OWNER_ID:
+        return 4
     if p.kind == "admin" and p.allotment and promoted(p, console_id):
         return 4
     if console_id in p.supports:
@@ -233,6 +246,8 @@ def tier_of(p: Person) -> Optional[int]:
     """The highest tier a person has on any console (the roster's); none for someone who left."""
     if not p.active:
         return None
+    if p.id == feedback.OWNER_ID:
+        return 4
     tiers = [3 for _ in p.supports]
     for r in p.training:
         if not r.promotedBy:
@@ -327,6 +342,10 @@ def hire(file: StaffFile, root: Path, name: str, kind: str, department_id: Optio
 
 def edit_person(file: StaffFile, root: Path, pid: str, changes: dict) -> None:
     p = person(file, pid)
+    if p.id == feedback.OWNER_ID and changes.get("active") is False:
+        raise StaffError("The owner cannot be termed.")
+    if p.id == feedback.OWNER_ID and changes.get("kind", "admin") != "admin":
+        raise StaffError("The owner stays an admin.")
     if "name" in changes:
         p.name = _name(changes["name"], "A staff member")
         feedback_admin(root, p.id, p.name)
@@ -385,7 +404,7 @@ def promote(file: StaffFile, me: str, pid: str, node_id: str, on: bool) -> None:
     p = person(file, pid)
     directors = {d.directorId for d in file.departments if d.directorId}
     own = next((d.directorId for d in file.departments if d.id == p.departmentId), None) if p.departmentId else None
-    if (own and me != own) or (not own and me not in directors):
+    if me != feedback.OWNER_ID and ((own and me != own) or (not own and me not in directors)):
         raise StaffError("Only a director promotes" + (" (the director of their department)." if own else "."))
     r = next((x for x in p.training if x.nodeId == node_id), None)
     if r is None:

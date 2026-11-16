@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { __resetStaffForTests, getStaffState, setActingAdmin } from '../../../../feedback/staffStore'
+import { __resetStaffForTests, getStaffState } from '../../../../feedback/staffStore'
 import { getPlanState } from '../../../../plan/projectPlanStore'
 import { feedbackBackend } from '../../../../test/feedbackBackend'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from './PlanPages'
@@ -107,11 +107,11 @@ describe('Project Plan > My work, Board and Timeline', () => {
     expect(within(row).getByTitle(/New task: 2026-11-20 to 2026-11-20/)).toBeInTheDocument()
   })
 
-  it('loads the plan again when someone else is acting', async () => {
+  it('acts as the owner, who holds every role (universal access)', async () => {
     await seed()
     render(<MyWorkPage />)
     await screen.findByRole('region', { name: 'Mine' })
-    setActingAdmin('adm-lee')
-    await waitFor(() => expect(getPlanState().view?.me).toBe('adm-lee'))
+    await waitFor(() => expect(getPlanState().view?.me).toBe(getStaffState().adminId))
+    expect(screen.queryByRole('button', { name: /Acting as/ })).toBeNull()
   })
 })

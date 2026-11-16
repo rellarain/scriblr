@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it } from 'vitest'
 import { setChannels } from '../../../channels/channelStore'
 import { createMockChannels } from '../../../designSystem/mockChannels'
-import { __resetStaffForTests, loadStaff, setActingAdmin } from '../../../feedback/staffStore'
+import { __resetStaffForTests, loadStaff } from '../../../feedback/staffStore'
 import type { ResourceNode } from '../../../api/types'
 import { getStaffChats, loadStaffChats, startChat, takeChat } from '../../../support/supportStores'
 import { feedbackBackend } from '../../../test/feedbackBackend'
@@ -47,7 +47,7 @@ describe('Queue console', () => {
       await loadStaffChats()
       await takeChat(getStaffChats().view.waiting[0].id)
     })
-    await act(async () => { setActingAdmin('adm-dana'); await loadStaff() })
+    await act(async () => { __resetStaffForTests('adm-dana'); await loadStaff() })
     render(<QueueSection />)
     const queues = await screen.findByRole('region', { name: 'Queues' })
     const card = within(queues).getByText('Writer > Draft').closest('details') as HTMLElement

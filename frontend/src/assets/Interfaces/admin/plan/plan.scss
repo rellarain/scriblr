@@ -2,7 +2,6 @@
 // Theme tokens only; the feedback pieces bring their own look (feedback/feedback.scss).
 
 .plPage { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; width: 100%; overflow-y: auto; box-sizing: border-box; }
-.plPage .fbBar .signIn { margin-left: auto; }
 
 // Plan: the tree and the node.
 .plSplit { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); gap: 12px; min-height: 0; }

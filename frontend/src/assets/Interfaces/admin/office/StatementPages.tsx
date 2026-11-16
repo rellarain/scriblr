@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useChannels } from '../../../../channels/channelStore'
 import { childrenOf, labelOf } from '../../../../channels/channelTree'
-import ActingAs from '../../../../feedback/ActingAs'
 import ChannelPicker from '../../../../feedback/ChannelPicker'
 import { staffFeedbackApi } from '../../../../feedback/feedbackApi'
 import { inVoting, scopeOf, votesWaiting } from '../../../../feedback/feedbackLogic'
@@ -16,7 +15,7 @@ import '../../../../feedback/feedback.scss'
 // Admin > Office > Voting and Channel Management: the statements in voting (checked feedback, lumped by subject and verb), for
 // one console or all of them. Voting gives a yes, no or pass with a note (advice for the Project Plan's planner). Channel
 // Management corrects each message's subject, verb and tone (a message moved leaves its statement for another one), and asks the
-// writer a question or leaves staff a comment. Both act as the staff member chosen in the Acting as chip.
+// writer a question or leaves staff a comment. Both act as the owner, who holds every role (universal access).
 
 const messageActions: MessageActions = {
   ask: (id, text) => changeStaff(a => staffFeedbackApi.ask(a, id, text)),
@@ -47,7 +46,6 @@ function Frame({ label, children, count }: { label: string; count?: number; chil
           {scopes.map(n => <option key={n.id} value={n.id}>{n.kind === 'interface' ? `${n.name} (all)` : labelOf(index, n.id)}</option>)}
         </select>
         {count !== undefined && count > 0 && <span className="fbBadge" title="Waiting for your vote">{count} to vote on</span>}
-        <ActingAs />
       </div>
       {error && (
         <p className="fbError" role="alert">

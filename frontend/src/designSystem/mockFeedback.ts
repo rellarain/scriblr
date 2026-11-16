@@ -44,8 +44,11 @@ const grant = (...pairs: [string[], Role[]][]): Record<string, Role[]> => {
   return out
 }
 
+// The owner (universal access, backend feedback.OWNER_ID): first among the admins, every role everywhere, who a call acts as when it names nobody.
+const OWNER = 'owner'
 function seedAdmins(): FeedbackAdmin[] {
   return [
+    { id: OWNER, name: 'Owner', roles: {} },
     { id: 'adm-dana', name: 'Dana Ruiz', roles: grant([[INBOX], ['checker', 'channelManager']], [[...WRITER_CONSOLES, ...READER_CONSOLES, 'admin/office'], ['voter']], [WRITER_CONSOLES, ['channelManager', 'planner']]) },
     { id: 'adm-lee', name: 'Lee Park', roles: grant([[INBOX], ['checker']], [[...WRITER_CONSOLES, ...READER_CONSOLES], ['voter']], [READER_CONSOLES, ['channelManager']]) },
     { id: 'adm-sam', name: 'Sam Ortiz', roles: grant([[INBOX], ['checker']], [READER_CONSOLES, ['voter', 'planner']]) },
@@ -150,7 +153,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
     if (!a) throw new Refused(401, 'Choose who you are acting as.')
     return a
   }
-  const has = (a: FeedbackAdmin, role: Role, scope: string) => (a.roles[scope] ?? []).includes(role)
+  const has = (a: FeedbackAdmin, role: Role, scope: string) => a.id === OWNER || (a.roles[scope] ?? []).includes(role)
   const need = (a: FeedbackAdmin, role: Role, scope: string, what: string) => {
     if (!has(a, role, scope)) throw new Refused(403, `${what} needs the ${role === 'channelManager' ? 'Channel manager' : role[0].toUpperCase() + role.slice(1)} role on ${scope}.`)
   }
@@ -190,6 +193,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
   type Stored = Omit<Person, 'tier'>
   const promotedBy = (nodeId: string, by: string | null = 'adm-sam') => ({ nodeId, finishedAt: '2026-11-02T10:00:00.000Z', promotedBy: by, promotedAt: by ? '2026-11-03T10:00:00.000Z' : null })
   const people: Stored[] = [
+    { id: OWNER, name: 'Owner', kind: 'admin', active: true, departmentId: null, teamId: null, allotment: 30, supports: [], training: [] },
     { id: 'adm-dana', name: 'Dana Ruiz', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-writing', allotment: null, supports: ['writer/draft'], training: [] },
     { id: 'adm-lee', name: 'Lee Park', kind: 'admin', active: true, departmentId: 'dep-product', teamId: 'team-reading', allotment: 10, supports: ['reader/library', 'reader/nook'], training: [] },
     { id: 'adm-sam', name: 'Sam Ortiz', kind: 'admin', active: true, departmentId: 'dep-support', teamId: 'team-help', allotment: 10, supports: [], training: [promotedBy('writer/draft')] },
@@ -203,6 +207,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
   const promoted = (pp: Stored, node: string) => pp.training.some(r => r.nodeId === node && !!r.promotedBy)
   const tierFor = (pp: Stored, console: string): number | null => {
     if (!pp.active) return null
+    if (pp.id === OWNER) return 4
     if (pp.kind === 'admin' && pp.allotment && promoted(pp, console)) return 4
     if (pp.supports.includes(console)) return 3
     if (pp.kind === 'helper' && promoted(pp, console.split('/')[0])) return 2
@@ -211,6 +216,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
   }
   const tierOf = (pp: Stored): Person['tier'] => {
     if (!pp.active) return null
+    if (pp.id === OWNER) return 4
     const tiers = pp.supports.map(() => 3)
     for (const r of pp.training) {
       if (!r.promotedBy) continue
@@ -251,7 +257,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
         return staffView()
       }
       const own = departments.find(d => d.id === pp.departmentId)?.directorId ?? null
-      if ((own && meId !== own) || (!own && !departments.some(d => d.directorId === meId))) throw new Refused(400, own ? 'Only a director promotes (the director of their department).' : 'Only a director promotes.')
+      if (meId !== OWNER && ((own && meId !== own) || (!own && !departments.some(d => d.directorId === meId)))) throw new Refused(400, own ? 'Only a director promotes (the director of their department).' : 'Only a director promotes.')
       if (!has) throw new Refused(400, 'Their training there is not finished yet.')
       if (body.promoted === false) { has.promotedBy = null; has.promotedAt = null } else { has.promotedBy = meId; has.promotedAt = new Date().toISOString() }
       return staffView()
@@ -259,6 +265,8 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
     if (what === 'people' && method === 'PATCH') {
       const pp = people.find(x => x.id === id)
       if (!pp) throw new Refused(404, `No staff member ${id}`)
+      if (pp.id === OWNER && body.active === false) throw new Refused(400, 'The owner cannot be termed.')
+      if (pp.id === OWNER && 'kind' in body && body.kind !== 'admin') throw new Refused(400, 'The owner stays an admin.')
       if ('allotment' in body && body.allotment !== null && ![5, 10, 20, 30].includes(Number(body.allotment))) throw new Refused(400, 'Helper hours are 5, 10, 20 or 30 a week.')
       Object.assign(pp, body)
       if (body.active === false) {
@@ -304,7 +312,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
       items: [...items].sort((a, b) => a.nodeId.localeCompare(b.nodeId) || (a.parentId ?? '').localeCompare(b.parentId ?? '') || a.order - b.order).map(i => {
         const planner = has(me, 'planner', scopeOf(i.nodeId))
         const mineToo = i.assignee?.id === me.id || i.claimedBy === me.id
-        const claimable = (!i.assignee || i.assignee.id === me.id) && (!i.claimedBy || i.claimedBy === me.id) && i.status !== 'done'
+        const claimable = (me.id === OWNER || !i.assignee || i.assignee.id === me.id) && (!i.claimedBy || i.claimedBy === me.id) && i.status !== 'done'
         return { ...i, can: { edit: planner, status: planner || mineToo, claim: claimable && i.claimedBy !== me.id } }
       }),
     }
@@ -468,6 +476,7 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
     if (what === 'admins' && sub === 'roles') {
       const target = admins.find(a => a.id === id)
       if (!target) throw new Refused(404, `Admin ${id} not found`)
+      if (target.id === OWNER) throw new Refused(403, 'The owner holds every role.')
       const scope = String(body.scope ?? '')
       const roles = (body.roles as Role[]) ?? []
       if (target.id === me.id && scope === INBOX && has(me, 'channelManager', INBOX) && !roles.includes('channelManager')) {

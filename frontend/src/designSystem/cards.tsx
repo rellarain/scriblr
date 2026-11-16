@@ -26,7 +26,6 @@ import { ChannelManagementPage, VotingPage } from '../assets/Interfaces/admin/of
 import InboxSection from '../assets/Interfaces/helper/inbox/InboxSection'
 import ChatsSection from '../assets/Interfaces/helper/ChatsSection'
 import QueueSection from '../assets/Interfaces/helper/QueueSection'
-import { setActingAdmin } from '../feedback/staffStore'
 import SettingsSection from '../assets/Interfaces/helper/SettingsSection'
 import { useHelperChats } from '../assets/Interfaces/helper/useHelperChats'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from '../assets/Interfaces/admin/plan/PlanPages'
@@ -312,9 +311,8 @@ function HelperChatCard() {
   return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex', padding: 12 }}>{helper.selectedChatId ? <ChatsSection helper={helper} /> : null}</div></div>
 }
 
-// Helper > Settings acting as Ari, a helper with 20 hours a week (the Acting as chip changes who).
+// Helper > Settings as the owner (universal access), who has 30 helper hours a week.
 function ScheduleCard() {
-  useEffect(() => { setActingAdmin('hlp-ari') }, [])
   return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex' }}><SettingsSection /></div></div>
 }
 

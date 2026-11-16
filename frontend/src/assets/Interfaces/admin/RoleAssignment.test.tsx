@@ -71,4 +71,18 @@ describe('Admin > Office > Assignment', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Dana Ruiz: Channel manager on Helper > Inbox' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('You cannot remove your own Channel manager role')
   })
+  it('shows the owner (universal access) with every role, which is not changed here', async () => {
+    __resetStaffForTests()
+    feedbackBackend()
+    await loadStaff()
+    render(<RoleAssignment />)
+    for (const role of ['Checker', 'Voter', 'Channel manager', 'Planner']) {
+      const box = screen.getByRole('checkbox', { name: `Owner: ${role} on Helper > Inbox` })
+      expect(box).toBeChecked()
+      expect(box).toBeDisabled()
+    }
+    expect(screen.getByText('Every role')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Dana Ruiz: Planner on Helper > Inbox' })).not.toBeDisabled()
+  })
+
 })

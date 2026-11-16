@@ -1,7 +1,6 @@
 // Admin > Office's staff pages and Configuration > SLA (StaffPages.tsx). Theme tokens only; fields and buttons come from feedback.scss.
 
 .stPage { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; width: 100%; overflow-y: auto; box-sizing: border-box; }
-.stPage .fbBar .signIn { margin-left: auto; }
 .stGroup { display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
 .stTeams { list-style: none; margin: 0; padding: 0 0 0 14px; display: flex; flex-direction: column; gap: 4px; }
 .stTable {

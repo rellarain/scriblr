@@ -88,7 +88,6 @@ textarea.fbField { resize: vertical; min-height: 64px; line-height: 1.4; }
 .fbLabel { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .fbPage { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; width: 100%; overflow-y: auto; box-sizing: border-box; }
 .fbBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.fbBar .signIn { margin-left: auto; }
 
 // A writer's own feedback: the steps it has passed.
 .fbSteps { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; padding: 0; list-style: none; }

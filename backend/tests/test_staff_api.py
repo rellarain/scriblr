@@ -25,7 +25,7 @@ def test_the_sample_staff_come_from_the_feedback_admins_in_one_roster(client: Te
     assert [d["name"] for d in v["departments"]] == ["Product", "Support"]
     # By department, then tier (the highest anywhere; none last), active above inactive, then by name.
     assert [(p["name"], p["tier"]) for p in v["people"]] == [
-        ("Dana Ruiz", 3), ("Lee Park", 3), ("Noor Haddad", 1), ("Ari Chen", 2), ("Sam Ortiz", 4),
+        ("Dana Ruiz", 3), ("Lee Park", 3), ("Noor Haddad", 1), ("Ari Chen", 2), ("Sam Ortiz", 4), ("Owner", 4),
     ]
     assert v["sla"] == {"urgent": 4, "high": 24, "normal": 72, "low": 168}
     # The helpers can act in the feedback screens too.

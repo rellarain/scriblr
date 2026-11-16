@@ -127,7 +127,7 @@ def test_admins_see_each_queues_staff_and_chats_but_not_their_messages(client: T
     client.post(f"/api/support/chats/{ids[0]}/actions", headers=ARI, json={"action": "stage", "stage": "issue"})
     v = queues(client, DANA)
     draft = row(v)
-    assert {s["id"]: s["state"] for s in draft["staff"]} == {"hlp-ari": "active", "hlp-noor": "inactive", "adm-dana": "inactive", "adm-sam": "inactive"}
+    assert {s["id"]: s["state"] for s in draft["staff"]} == {"hlp-ari": "active", "hlp-noor": "inactive", "adm-dana": "inactive", "adm-sam": "inactive", "owner": "inactive"}
     chat = draft["chats"][0]
     assert (chat["staffName"], chat["userName"], chat["stage"], chat["actions"]) == ("Ari Chen", "User 0", "issue", ["taken", "stage"])
     assert "events" not in chat

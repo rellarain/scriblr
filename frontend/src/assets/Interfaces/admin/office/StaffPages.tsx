@@ -2,8 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, RestoreIcon, TrashIcon, CloseIcon } from '../../../icons'
 import { useChannels } from '../../../../channels/channelStore'
 import { childrenOf, labelOf } from '../../../../channels/channelTree'
-import { useStaff } from '../../../../feedback/staffStore'
-import ActingAs from '../../../../feedback/ActingAs'
+import { OWNER_ID, useStaff } from '../../../../feedback/staffStore'
 import '../../../../feedback/feedback.scss'
 import { staffApi } from '../../../../staff/staffApi'
 import type { Person, PersonKind, Priority, StaffView } from '../../../../staff/staffTypes'
@@ -13,7 +12,7 @@ import './staff.scss'
 // Admin > Office's staff pages (Department Roster, Department Details, Allotment, Hire/Term Admin, Monitor Training) and
 // Configuration > SLA, over one staff view (staff/rosterStore.ts). Support tiers are worked out per console: 1 a helper promoted on
 // it, 2 a helper promoted on its interface, 3 its channel support, 4 an admin with helper hours promoted on it (the roster shows the
-// highest anywhere). Changes act as the staff member in the Acting as chip.
+// highest anywhere). Changes act as the owner, who holds every role (universal access).
 
 const TIER_LABEL: Record<number, string> = { 1: 'Tier 1', 2: 'Tier 2', 3: 'Tier 3', 4: 'Tier 4' }
 const KIND_LABEL: Record<PersonKind, string> = { helper: 'Helper', admin: 'Admin' }
@@ -32,7 +31,6 @@ function Frame({ label, children }: { label: string; children: (view: StaffView)
   }
   return (
     <div className="stPage fbScope" aria-label={label}>
-      <div className="fbBar"><ActingAs /></div>
       {error && <p className="fbError" role="alert">{error} <button type="button" className="fbIconBtn" aria-label="Dismiss" title="Dismiss" onClick={clearRosterError}>×</button></p>}
       {children(view)}
     </div>
@@ -279,6 +277,8 @@ export function TrainingPage() {
       {view => {
         const directors = new Set(view.departments.map(d => d.directorId).filter(Boolean))
         const mayPromote = (p: Person) => {
+          // the owner (universal access) promotes anyone; anyone else only as their director
+          if (adminId === OWNER_ID) return true
           const own = view.departments.find(d => d.id === p.departmentId)?.directorId ?? null
           return own ? adminId === own : directors.has(adminId)
         }

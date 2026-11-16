@@ -51,6 +51,10 @@ SCHEMA_VERSION = 3
 NOTE_MAX = 500
 TEXT_MAX = 2000
 INBOX = "helper/inbox"
+# The owner (universal access, 2026-11-16): the one who runs this copy of Scriblr. They are always on the staff, hold every role on every
+# part of the app, and are who a staff call acts as when it names nobody (there is no login yet). Other staff keep their roles for later.
+OWNER_ID = "owner"
+OWNER_NAME = "Owner"
 ROLE_ORDER: list[str] = ["checker", "voter", "channelManager", "planner"]
 ROLE_WORDS = {"checker": "the Checker role", "voter": "the Voter role", "channelManager": "the Channel manager role", "planner": "the Planner role"}
 
@@ -244,6 +248,12 @@ def _seed_message(mid: str, text: str, author: str, day: str, sender: Tone, chan
 
 
 def _build_seed() -> FeedbackFile:
+    file = _build_seed_file()
+    _ensure_owner(file)
+    return file
+
+
+def _build_seed_file() -> FeedbackFile:
     messages = [
         _seed_message("fb-1", "The editor freezes for a second every time I paste a large block of text.", "j.rivera", "2026-08-10",
                       "unpleasant", "writer/draft/draft", "verb-fix", "unpleasant", "adm-dana"),
@@ -431,7 +441,14 @@ def _load(root: Path) -> FeedbackFile:
         raise project_store.ShardCorruptError(path, quarantined, str(e)) from e
     if version < SCHEMA_VERSION:
         _save(root, file)
+    _ensure_owner(file)
     return file
+
+
+def _ensure_owner(file: FeedbackFile) -> None:
+    """The owner is always among the admins (first), kept in the file the next time it is written."""
+    if not any(a.id == OWNER_ID for a in file.admins):
+        file.admins.insert(0, Admin(id=OWNER_ID, name=OWNER_NAME))
 
 
 def load(root: Path) -> FeedbackFile:
@@ -470,7 +487,8 @@ def admin_by_id(file: FeedbackFile, admin_id: str) -> Admin:
 
 
 def has_role(admin: Admin, role: str, scope: str) -> bool:
-    return role in admin.roles.get(scope, [])
+    """The owner holds every role everywhere; anyone else the roles assigned to them on that scope."""
+    return admin.id == OWNER_ID or role in admin.roles.get(scope, [])
 
 
 def require_role(admin: Admin, role: str, scope: str, what: str, label: str = "") -> None:
@@ -880,6 +898,8 @@ def set_roles(file: FeedbackFile, actor_id: str, admin_id: str, scope: str, role
     yet), but nobody can remove their own Channel manager role on Helper > Inbox, so someone always manages the verbs."""
     actor = admin_by_id(file, actor_id)
     target = admin_by_id(file, admin_id)
+    if target.id == OWNER_ID:
+        raise Forbidden("The owner holds every role.")
     if scope not in scopes:
         raise FeedbackError(f"Unknown console {scope!r}")
     unknown = [r for r in roles if r not in ROLE_ORDER]

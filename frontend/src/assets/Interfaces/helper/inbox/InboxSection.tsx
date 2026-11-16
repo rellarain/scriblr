@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { ComponentType } from 'react'
 import { CheckboxIcon, GearIcon, type IconProps } from '../../../icons'
-import ActingAs from '../../../../feedback/ActingAs'
 import { staffFeedbackApi } from '../../../../feedback/feedbackApi'
 import { toCheck } from '../../../../feedback/feedbackLogic'
 import { changeStaff, clearStaffError, loadStaff, useStaff } from '../../../../feedback/staffStore'
@@ -62,7 +61,6 @@ function InboxSection() {
             </button>
           ))}
         </nav>
-        <ActingAs />
       </div>
       {error && (
         <p className="inboxError" role="alert">

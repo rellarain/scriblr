@@ -26,12 +26,10 @@ def current_admin(
     x_admin_id: Optional[str] = Header(default=None),
     root: Path = Depends(get_app_data_storage_root),
 ) -> str:
+    # a staff call acts as the staff member it names, else as the owner (universal access: there is no login yet)
     if x_admin_id:
         return x_admin_id
-    admins = store.load(root).admins
-    if not admins:
-        raise HTTPException(status_code=403, detail="No admin to act as.")
-    return admins[0].id
+    return store.OWNER_ID
 
 
 def _known(root: Path) -> set[str]:

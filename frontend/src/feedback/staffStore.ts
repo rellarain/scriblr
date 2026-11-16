@@ -3,11 +3,12 @@ import { staffFeedbackApi } from './feedbackApi'
 import type { StaffBundle } from './feedbackTypes'
 
 // The staff side of the feedback pipeline, shared by the Inbox, the Office's Voting and Channel Management, the Project Plan,
-// Office > Assignment and the Inbox badge. The admin acting (no login yet: picked with the "Acting as" chip) is remembered in this
-// browser. Changes are sent one at a time, in order, so quick edits (typing a note) cannot overtake each other; each answer is
-// the whole bundle.
+// Office > Assignment and the Inbox badge. The staff member acting is always the owner (universal access, 2026-11-16: no login yet,
+// and the owner holds every role); tests may act as someone else. Changes are sent one at a time, in order, so quick edits (typing a
+// note) cannot overtake each other; each answer is the whole bundle.
 
-const ADMIN_KEY = 'scriblr.helper.adminId'
+// The owner's staff id (backend storage/feedback.py OWNER_ID).
+export const OWNER_ID = 'owner'
 // Fired after staff change the feedback, so the writer's side reads it again.
 export const FEEDBACK_CHANGED = 'scriblr:feedback'
 
@@ -26,11 +27,7 @@ const bundleOf = (b: StaffBundle): StaffBundle => ({
   roleHistory: list(b?.roleHistory), can: { check: !!b?.can?.check, manageVerbs: !!b?.can?.manageVerbs },
 })
 
-function storedAdmin(): string {
-  try { return localStorage.getItem(ADMIN_KEY) ?? '' } catch { return '' }
-}
-
-let state: StaffState = { adminId: storedAdmin(), bundle: null, status: 'idle', error: null }
+let state: StaffState = { adminId: OWNER_ID, bundle: null, status: 'idle', error: null }
 const listeners = new Set<() => void>()
 let queue: Promise<unknown> = Promise.resolve()
 
@@ -54,12 +51,6 @@ export async function loadStaff(): Promise<void> {
   } catch (err) {
     set({ status: 'error', error: err instanceof Error ? err.message : 'The feedback could not be loaded.' })
   }
-}
-
-export function setActingAdmin(adminId: string) {
-  try { localStorage.setItem(ADMIN_KEY, adminId) } catch { /* private window */ }
-  set({ adminId, error: null })
-  void loadStaff()
 }
 
 // Runs one change as the admin acting and replaces the bundle with the server's answer.
@@ -87,7 +78,7 @@ export function refreshStaff() {
   if (state.status !== 'idle') void loadStaff()
 }
 
-export function __resetStaffForTests(adminId = '') {
+export function __resetStaffForTests(adminId = OWNER_ID) {
   state = { adminId, bundle: null, status: 'idle', error: null }
   queue = Promise.resolve()
   listeners.forEach(l => l())

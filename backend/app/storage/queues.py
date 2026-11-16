@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-from . import staff
+from . import feedback, staff
 
 if TYPE_CHECKING:
     from .support import Chat, SupportFile
@@ -215,7 +215,8 @@ def set_switch(file: SupportFile, q: QueueSettings, sf: staff.StaffFile, me: str
 
 
 def _manages(p: staff.Person, queue: Optional[str]) -> bool:
-    return bool(p.active and (queue in p.supports if queue else p.supports))
+    # the owner (universal access) manages every queue
+    return bool(p.active and (p.id == feedback.OWNER_ID or (queue in p.supports if queue else p.supports)))
 
 
 def set_ranges(q: QueueSettings, sf: staff.StaffFile, me: str, queue: Optional[str], ranges: Optional[dict], consoles: list[str]) -> None:

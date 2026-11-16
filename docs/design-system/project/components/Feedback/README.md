@@ -104,7 +104,7 @@ The sidebar's queue meter counts the chats the staff member is in and those wait
 - **Next week**: a row per day with a switch, the start (a stepper by the hour) and the hours (a stepper, 1 to 12, ending by midnight), the total against the allotment, and **Save next week** (`SaveIcon`). A week with no schedule of its own repeats the latest one.
 - Without helper hours it says so.
 
-## Roles and Acting as
+## Roles and the owner
 
 Roles are held per console of the channel list (or per interface), and set in **Office > Assignment**:
 
@@ -113,7 +113,7 @@ Roles are held per console of the channel list (or per interface), and set in **
 - **Channel manager**: corrects a console's statements. On Helper > Inbox, it also keeps the verbs.
 - **Planner**: accepts or vetoes a console's statements.
 
-A control the person acting cannot use is disabled, and its title gives the reason. The server refuses it too, and the refusal shows in an alert. There is no login yet, so the **Acting as** chip (initials) picks the staff member, remembered in this browser.
+There is no login yet, so every Admin and Helper screen acts as the **owner** (universal access): a staff member always on the roster (*Owner*, an admin with 30 helper hours, renameable), who holds **every role on every part of the app** and tier 4 on every console, claims any open plan item and promotes anyone. Assignment shows the owner's row as *Every role*, ticked and not changeable, and the owner cannot be termed. The other staff keep their roles for when they sign in. A control a staff member cannot use is disabled, and its title gives the reason; the server refuses it too, and the refusal shows in an alert.
 
 ## The user's Notifications
 
