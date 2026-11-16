@@ -1,8 +1,11 @@
-import { parseMarkup, type Parsed } from './parse'
+import { linksIn, type Inline, type LinkToken } from './inline'
+import { resolveLink, type LinkContext } from './links'
+import { parseMarkup, type Block, type Parsed } from './parse'
 
 // What the editor's checks panel lists, each with the line it is on (clicking one goes there): a marker that is not one, a hint, option,
 // explanation or answer outside a question, an explanation with no option above it, a question with no right option or accepted answer,
-// and a question id used twice. (Links, anchors and pulled-in questions are checked from the next slice.)
+// a question id used twice, and (when a link context is given and what it points at has loaded) a link or heading link that goes nowhere.
+// (Pulled-in questions are checked from a later slice.)
 
 export interface MarkupCheck { line: number; message: string }
 
@@ -11,8 +14,31 @@ const PART: Record<string, string> = {
   '?!!': 'An explanation', '!!': 'An explanation', '?': 'A text field', '!': 'An answer',
 }
 
-export function checksOf(text: string, parsed: Parsed = parseMarkup(text)): MarkupCheck[] {
+// Every link in the blocks, with the line it is on.
+export function linksOf(blocks: Block[]): Array<{ link: LinkToken; line: number }> {
+  const out: Array<{ link: LinkToken; line: number }> = []
+  const add = (inline: Inline[], line: number) => { for (const link of linksIn(inline)) out.push({ link, line }) }
+  for (const b of blocks) {
+    if (b.kind === 'paragraph' || b.kind === 'quote') b.lines.forEach((l, k) => add(l, b.line + k))
+    else if (b.kind === 'heading') add(b.inline, b.line)
+    else if (b.kind === 'list') b.items.forEach(i => add(i.inline, i.line))
+    else if (b.kind === 'question') {
+      add(b.prompt, b.line)
+      b.hints.forEach(h => add(h, b.line))
+      b.options.forEach(o => { add(o.inline, o.line); o.explanation.forEach(e => add(e, o.line)) })
+    }
+  }
+  return out
+}
+
+export function checksOf(text: string, parsed: Parsed = parseMarkup(text), links?: LinkContext): MarkupCheck[] {
   const out: MarkupCheck[] = []
+  if (links) {
+    for (const { link, line } of linksOf(parsed.blocks)) {
+      const r = resolveLink(link, links)
+      if (r.status === 'missing') out.push({ line, message: `${link.raw} goes nowhere: ${r.why}` })
+    }
+  }
   for (const s of parsed.strays) {
     if (s.why === 'unknown') out.push({ line: s.line, message: s.marker[0] === '#' ? `${s.marker} is not a heading: they go from # to ######.` : `${s.marker} is not a list: they go from > to >>>>.` })
     else if (s.why === 'outside') out.push({ line: s.line, message: `${PART[s.marker] ?? 'This line'} outside a question.` })

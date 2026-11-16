@@ -360,7 +360,8 @@ described, now stale, in `docs/data-model.md`).
   course it checks complete). A corrupt file is quarantined (409) and a file from a newer version is refused (409).
 - **Markup** — Resources (`resources.json`, schema v2: a guide, tutorial bodies, FAQ answers and an assessment's `text`) and Training (`training.json`, schema v2) are
   written in Scriblr's own markup, parsed by the frontend's `lib/markup` (headings `######` largest to `#` smallest, lists `>` to `>>>>`, `"` quotes, `*` styles, `\`
-  escapes, and the knowledge checks `?????` to `!`). **A file from before it is converted once on read** (`storage/markup_migration.py`, before the file is validated,
+  escapes, the knowledge checks `?????` to `!`, and links by permanent ids: `@writer@draft@3f9c21ab` a channel node's article, `@training@course@module@lesson`
+  a Training item, `#Heading-words` a heading, `[text]` a label, opened in place with Back). **A file from before it is converted once on read** (`storage/markup_migration.py`, before the file is validated,
   only while its raw `schemaVersion` is below 2): Markdown (guides, tutorials, lesson material) by `markup_convert.markdown_to_markup` (heading sizes turned round,
   `-`/`*`/`+` items to `>`, numbered items to `>>`, indented ones to `>>>`/`>>>>`, `>` quotes to `"`, `_` to `*` at word edges, links to `text (url)`, accidental markers
   escaped), plain text (FAQ answers, descriptions) by `plain_to_markup` (escapes only), the old Resources form questions to `????#id` text with their ids kept, and where

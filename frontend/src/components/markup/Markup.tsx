@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react'
+import type { TrainingContentDraft } from '../../api/types'
+import { linksOf } from '../../lib/markup/checks'
 import { classifyLine } from '../../lib/markup/lines'
-import { parseInline } from '../../lib/markup/inline'
+import { linksIn, parseInline } from '../../lib/markup/inline'
 import { parseCached, type Block, type ListItem, type QuestionBlock } from '../../lib/markup/parse'
+import { LinkCtx, useLinkContext } from './linkContext'
 import { QuestionIcon } from '../../assets/icons'
 import { renderInline, renderLines } from './renderInline'
 import './markup.scss'
@@ -87,24 +90,31 @@ export interface MarkupProps {
   className?: string
   // What shows when the text is empty.
   empty?: ReactNode
+  // The Training courses being edited, for links to them (the Instructor's draft); else the saved ones.
+  training?: TrainingContentDraft
 }
 
-export function Markup({ text, baseLevel = 2, className, empty = null }: MarkupProps) {
+export function Markup({ text, baseLevel = 2, className, empty = null, training }: MarkupProps) {
   const { blocks } = parseCached(text)
+  const links = useLinkContext(text, linksOf(blocks).length > 0, training)
   if (blocks.length === 0) return <>{empty}</>
   return (
-    <div className={`mk${className ? ` ${className}` : ''}`}>
-      {blocks.map((b, k) => <BlockView key={`${b.kind}${b.line}:${k}`} block={b} baseLevel={baseLevel} />)}
-    </div>
+    <LinkCtx.Provider value={links}>
+      <div className={`mk${className ? ` ${className}` : ''}`}>
+        {blocks.map((b, k) => <BlockView key={`${b.kind}${b.line}:${k}`} block={b} baseLevel={baseLevel} />)}
+      </div>
+    </LinkCtx.Provider>
   )
 }
 
-// The first line's words only, styled, for a row's details (no headings, lists or questions).
+// The first line's words only, styled, for a row's details (no headings, lists or questions); a link is its title, as text (the row is a
+// button itself).
 export function MarkupInline({ text, className }: { text: string; className?: string }) {
   const first = text.split(/\r?\n/).map(classifyLine).find(l => l.kind !== 'blank')
+  const inline = first ? parseInline(first.kind === 'unknown' ? `${first.marker} ${first.text}` : first.text) : []
+  const links = useLinkContext(text, linksIn(inline).length > 0)
   if (!first) return null
-  const words = first.kind === 'unknown' ? `${first.marker} ${first.text}` : first.text
-  return <span className={`mkInline${className ? ` ${className}` : ''}`}>{renderInline(parseInline(words))}</span>
+  return <LinkCtx.Provider value={links}><span className={`mkInline${className ? ` ${className}` : ''}`}>{renderInline(inline, true)}</span></LinkCtx.Provider>
 }
 
 export default Markup

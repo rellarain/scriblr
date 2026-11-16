@@ -86,3 +86,36 @@
 // Copy as plain text, and what it said.
 .mkCopy { display: inline-flex; align-items: center; gap: var(--space-2); }
 .mkCopyNote { font-size: var(--text-small); &:empty { display: none; } }
+
+// Links: a button in a place (it opens there), text elsewhere; one that points at nothing keeps its text and gets a "not found" mark.
+.mkLink {
+  display: inline; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 0.16em; text-decoration-thickness: from-font;
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+}
+.mkLink--static { cursor: text; text-decoration-style: dotted; }
+.mkLink--pending { cursor: text; text-decoration: none; }
+.mkLink--missing { cursor: text; text-decoration: none; }
+.mkMissing { display: inline-block; margin-left: 0.35em; padding: 0 0.35em; font-size: 0.78em; font-weight: 700; font-style: normal; line-height: 1.5; background: var(--alert); color: var(--on-alert); }
+
+// A place where links open (MarkupPlace): what was there, hidden while a link's target is open over it with a Back button.
+.mkPlace { min-width: 0; }
+.mkPlaceView[hidden] { display: none !important; }
+.mkPlaceBar { display: flex; margin-bottom: var(--space-2); }
+.mkTrainingItem { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: inherit; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; } }
+[data-anchor]:focus { outline: none; }
+
+// The link picker, under the field while a link is being typed.
+.mkFieldWrap { position: relative; min-width: 0; }
+.mkPicker {
+  position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 2px; list-style: none; max-height: 260px; overflow-y: auto;
+  background: var(--surface-raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.mkPickerOption { display: flex; flex-direction: column; gap: 1px; padding: var(--space-1) var(--space-2); cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &[aria-selected='true'] { background: var(--accent); color: var(--on-accent); .mkPickerPath { color: inherit; } }
+}
+.mkPickerLabel { font-size: var(--text-small); font-weight: 600; overflow-wrap: anywhere; }
+.mkPickerPath { font-family: ui-monospace, monospace; font-size: 0.78em; color: var(--ink-muted); overflow-wrap: anywhere; }
+.mkPickerNone { padding: var(--space-1) var(--space-2); font-size: var(--text-small); color: var(--ink-muted); }
+.mkHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); h4 { margin: 0; } }

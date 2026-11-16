@@ -2,7 +2,7 @@
 
 Scriblr's own markup is how Resources articles (guides, tutorials, FAQ answers, the Exam/Test/Quiz questions) and Training (lesson material, every description, quiz/test/exam questions) are written, and every reader sees it formatted. It is not Markdown: `#` is the **smallest** heading and `>` makes **lists**.
 
-Code: the parser `lib/markup/` (pure, node-tested: `lines.ts`, `inline.ts`, `blocks.ts`, `parse.ts`, `anchors.ts`, `checks.ts`, `plainText.ts`, `cheatSheet.ts`, `escape.ts`), the components `components/markup/` (`Markup.tsx` with `MarkupInline`, `MarkupEditor.tsx` with the checks panel and the cheat sheet, `CopyPlainText.tsx`, `markup.scss`). The backend converts text written before the markup once (`storage/markup_convert.py`, `storage/markup_migration.py`); `lib/markup/markerParity.test.ts` keeps the two lists of markers equal.
+Code: the parser `lib/markup/` (pure, node-tested: `lines.ts`, `inline.ts`, `blocks.ts`, `parse.ts`, `anchors.ts`, `links.ts`, `picker.ts`, `checks.ts`, `plainText.ts`, `cheatSheet.ts`, `escape.ts`), the components `components/markup/` (`Markup.tsx` with `MarkupInline`, `MarkupEditor.tsx` with the link picker, the checks panel and the cheat sheet, `MarkupPlace.tsx` with the article and Training views, `linkContext.tsx`, `renderInline.tsx`, `CopyPlainText.tsx`, `markup.scss`), and the Resources file's store `channels/resourcesStore.ts` (the admin's Resources builder hands every edit into it). The backend converts text written before the markup once (`storage/markup_convert.py`, `storage/markup_migration.py`); `lib/markup/markerParity.test.ts` keeps the two lists of markers equal.
 
 ## The markers
 
@@ -26,6 +26,24 @@ Inside a line: `***bold italic***`, `**bold**`, `*italic*`. A run of stars opens
 
 Headings are real headings whose levels follow what holds the text (`baseLevel`, the level of its own title): `######` is one below it, each smaller marker one further down, never past `h6`. Each gets an anchor from its words (`data-anchor`, repeats `-2`, `-3`) for links to headings.
 
+## Links
+
+A link names what it points at by **permanent ids**, so a reader always sees its **current title** (`lib/markup/links.ts`):
+
+| Link | Points at |
+|---|---|
+| `@writer@draft@3f9c21ab` | a channel node's article (the names joined by `/` are its id: an interface, console, component or feature) |
+| `@training@<course>[@<module>[@<lesson>]]` | a Training course, module or lesson; ids are unique, so the deepest one is the item. After `training` a course's id wins over a channel node; `@training` alone, or with a name that is neither, is the Training interface's article |
+| `@#Heading-words` | a heading of the same text (its words joined by hyphens, any capitals) |
+| `@writer@draft#Heading-words` | a heading of another article (or of a lesson's material) |
+| `…[text]` | right after a link: this text instead of the title |
+
+`@` starts a link only at the start of a line or after a space or punctuation (so `name@mail.com` is not one); the link ends at the first character that is not a letter, digit, `_` or `-` (an `@` between names and a `#` before the heading continue it). A link is read as one token, so it may sit inside bold or italic.
+
+- **Reading**: a link reads as its label, else its title. In a **place** (`MarkupPlace`: a Help tile's guides, a lesson's material, an About paragraph) it is a button (`.mkLink`) that **opens its target in place**, over what was there, with a **Back** button (`ChevronLeftIcon`, *Back*): what was there stays mounted (hidden), the focus moves to Back and, on Back, returns to the link. A heading of the same text scrolls there; a heading of another article opens that article at the heading. An article opens as in a Help tile (its title, its guide, tutorials and FAQ, Copy); a course, module or lesson as its title, its description and its material. Outside a place a link is text (`.mkLink--static`, a dotted underline). Inside a row (`MarkupInline`) it is only its title, since the row is a button itself.
+- **Not found**: a link that points at nothing keeps its text and gets a **"not found"** mark (`.mkMissing`, the alert colour; the reason in its title). Until the channel list or Training has loaded, a link shows as typed with no mark, and the link checks wait.
+- **Copy as plain text** copies a link as its label or its title.
+
 ## Knowledge checks
 
 A question is a `????` line and the check lines after it (blank lines are allowed inside it; any other line ends it). Its kind is set by its first option.
@@ -48,7 +66,8 @@ They are practice: nothing is saved. Until the practice slice they show as their
 
 `MarkupEditor` is a text field with a bar: three **view** buttons (`role="group"`, *View of …*: **Write** `PencilIcon`, **Read-only** `EyeIcon`, **Side by side** `LayoutMidiIcon`, `aria-pressed`; the view is remembered on this computer for every editor, `scriblr.markup.view`), the **checks count** (`.mkCheckCount`, the alert colour, shown only when there are checks) and the **cheat sheet** button (`HelpIcon`, `aria-expanded`). Side by side puts the field and the formatted text in two columns, one above the other under 520px of the editor's own width. The formatted text is drawn from a deferred copy of the text, so typing stays quick. There is no insert toolbar: the text is typed.
 
-- **Checks** (`.mkChecks`, a list of buttons, each *Line n* and what is wrong): a marker that is not one (`#######`, `>>>>>`), a hint, option, explanation, text field or answer outside a question, an explanation with no option above it, a question with no right option or accepted answer, a question with no options, a question id used twice. A click selects that line in the field (switching to Write from Read-only). Links and pulled-in questions are checked from the links slice.
+- **Link picker** (`.mkPicker`, `role="listbox"` *Link to*, under the field): typing `@` where a link may start lists what the link could point at by title: the text's own headings (`# Heading`), every article of the channel list (*Writer › Draft › Autosave*) and the Training courses, modules and lessons (*Training › Course › Module › Lesson*), each with its id path, filtered by the words typed after `@`. Arrows choose, **Enter** or **Tab** puts the id path in place of what was typed, **Escape** closes. The field says so (`aria-autocomplete="list"`, `aria-expanded`, `aria-activedescendant`). In the Instructor the picker and the titles use the courses being edited.
+- **Checks** (`.mkChecks`, a list of buttons, each *Line n* and what is wrong): a marker that is not one (`#######`, `>>>>>`), a hint, option, explanation, text field or answer outside a question, an explanation with no option above it, a question with no right option or accepted answer, a question with no options, a question id used twice, and a **link or heading link that goes nowhere** (*@writer@gone goes nowhere: …*). A click selects that line in the field (switching to Write from Read-only). Pulled-in questions are checked from the quiz slice.
 - **Cheat sheet** (`.mkCheat`, a region): every marker with an example to copy and what it makes, in four groups.
 
 ## Reading

@@ -58,8 +58,8 @@ describe('inline', () => {
 describe('blocks', () => {
   it('makes paragraphs at blank lines, keeping single line breaks', () => {
     const [a, b] = only('one\ntwo\n\nthree', 'paragraph')
-    expect(a.lines.map(inlineText)).toEqual(['one', 'two'])
-    expect(b.lines.map(inlineText)).toEqual(['three'])
+    expect(a.lines.map(l => inlineText(l))).toEqual(['one', 'two'])
+    expect(b.lines.map(l => inlineText(l))).toEqual(['three'])
   })
 
   it('numbers lists as the user asked', () => {
@@ -73,7 +73,7 @@ describe('blocks', () => {
 
   it('makes one quote of quote lines together, and headings their own blocks with anchors', () => {
     const [q] = only('" one\n" two\ntext', 'quote')
-    expect(q.lines.map(inlineText)).toEqual(['one', 'two'])
+    expect(q.lines.map(l => inlineText(l))).toEqual(['one', 'two'])
     const hs = only('###### Start here\ntext\n# Start here', 'heading')
     expect(hs.map(h => [h.level, h.anchor])).toEqual([[6, 'start-here'], [1, 'start-here-2']])
     expect(blocks('###### Start here\ntext')[1].kind).toBe('paragraph')
@@ -84,8 +84,8 @@ describe('blocks', () => {
     expect(q.id).toBe('q1')
     expect(inlineText(q.prompt)).toBe('Which?')
     expect(q.type).toBe('choice')
-    expect(q.hints.map(inlineText)).toEqual(['think'])
-    expect(q.options.map(o => [inlineText(o.inline), o.correct, o.explanation.map(inlineText)])).toEqual([['yes', true, ['because']], ['no', false, []]])
+    expect(q.hints.map(l => inlineText(l))).toEqual(['think'])
+    expect(q.options.map(o => [inlineText(o.inline), o.correct, o.explanation.map(l => inlineText(l))])).toEqual([['yes', true, ['because']], ['no', false, []]])
     expect(blocks('????#q1 Which?\n?! yes\nafter').map(b => b.kind)).toEqual(['question', 'paragraph'])
   })
 
@@ -99,7 +99,7 @@ describe('blocks', () => {
 
   it('shows check lines outside a question as text, and pull-ins as their own blocks', () => {
     const [p] = only('?! stray', 'paragraph')
-    expect(p.lines.map(inlineText)).toEqual(['?! stray'])
+    expect(p.lines.map(l => inlineText(l))).toEqual(['?! stray'])
     expect(only('?????@writer@draft#q1', 'pullin')[0].ref).toBe('@writer@draft#q1')
   })
 

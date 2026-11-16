@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { setResourcesFile } from '../../../../channels/resourcesStore'
 import {
   addResourceNode, deleteResourceNode, getResources, putResourceAssessment, putResourceFaq, putResourceGuide,
   putResourceTutorials, renameResourceNode,
@@ -53,9 +54,11 @@ export function useResources() {
   const [error, setError] = useState<string | undefined>(undefined)
 
   const fileRef = useRef<ResourcesFile | null>(file)
+  // Every change also goes to the shared store, so the Help tiles and the markup's links see it at once.
   function applyFile(next: ResourcesFile) {
     fileRef.current = next
     setFileState(next)
+    setResourcesFile(next)
   }
 
   async function load() {

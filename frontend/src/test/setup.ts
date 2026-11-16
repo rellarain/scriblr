@@ -12,6 +12,7 @@ import { __resetShapeLibraryForTests } from '../assets/Interfaces/writer/maps/ma
 import { __resetWorldLinksForTests } from '../assets/Interfaces/writer/links/linkStore'
 import { __resetWorldNavForTests } from '../assets/Interfaces/writer/links/worldNav'
 import { __resetChannelsForTests } from '../channels/channelStore'
+import { __resetResourcesForTests } from '../channels/resourcesStore'
 import { __resetStaffForTests } from '../feedback/staffStore'
 import { __resetMineForTests } from '../feedback/mineStore'
 import { __resetPlanForTests } from '../plan/projectPlanStore'
@@ -28,6 +29,7 @@ afterEach(() => {
   __resetDragEndedForTests()
   __resetPlanStoreForTests()
   __resetTrainingForTests()
+  __resetResourcesForTests()
   __resetPlacesForTests()
   __resetBiomesForTests()
   __resetShapeLibraryForTests()

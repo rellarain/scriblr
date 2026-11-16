@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react'
 import type { TrainingAssessment, TrainingProgress } from '../../../api/types'
 import CopyPlainText from '../../../components/markup/CopyPlainText'
 import Markup, { MarkupInline } from '../../../components/markup/Markup'
+import MarkupPlace from '../../../components/markup/MarkupPlace'
 import { CheckboxIcon, type IconProps } from '../../icons'
 import { assessmentResult, resultText } from './trainingContent'
 import { TRAINING_PAGES, type TrainingPageKey } from './trainingPages'
@@ -90,10 +91,10 @@ export function RowDetail({ about, detail }: { about?: string; detail?: string }
   return <span className="trRowDetail">{hasAbout && <MarkupInline text={about} />}{hasAbout && detail ? ' · ' : ''}{detail}</span>
 }
 
-// What a course, module, lesson, exercise or project is: its description in the markup.
+// What a course, module, lesson, exercise or project is: its description in the markup (a link in it opens in its place, with Back).
 export function TrainingAbout({ text }: { text: string }) {
   if (text.trim() === '') return null
-  return <Markup text={text} baseLevel={3} className="trAbout" />
+  return <MarkupPlace><Markup text={text} baseLevel={3} className="trAbout" /></MarkupPlace>
 }
 
 // The quizzes, tests or exams of something: each with its pass mark and how the learner did. (There is no taking one yet: a result is kept
@@ -114,12 +115,12 @@ export function TrainingAssessments({ label, items, progress, none }: { label: s
   )
 }
 
-// A lesson's material, formatted from the markup, with Copy as plain text.
+// A lesson's material, formatted from the markup, with Copy as plain text. A link in it opens in the lesson's place, with Back.
 export function TrainingMaterial({ source, title }: { source: string; title: string }) {
   return (
-    <div className="trMaterial">
+    <MarkupPlace className="trMaterial">
       <div className="trMaterialBar"><CopyPlainText text={source} label={`Copy ${title} as plain text`} /></div>
       <Markup text={source} baseLevel={3} />
-    </div>
+    </MarkupPlace>
   )
 }

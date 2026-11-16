@@ -71,7 +71,7 @@ function Material({ lesson, ins }: { lesson: TrainingLesson; ins: Instructor }) 
   return (
     <div className="instField">
       <span className="instLabel">Material</span>
-      <MarkupEditor label="Material" baseLevel={3} rows={14} maxLength={FIELD_MAX.body} value={lesson.body} onChange={body => ins.edit(lesson.id, { body })} />
+      <MarkupEditor label="Material" baseLevel={3} rows={14} maxLength={FIELD_MAX.body} value={lesson.body} onChange={body => ins.edit(lesson.id, { body })} training={ins.draft ?? undefined} />
     </div>
   )
 }
@@ -218,7 +218,7 @@ export function InstructorEditor({ draft, ins, id, focusTitle, onAdded, onRemove
       </label>
       <div className="instField">
         <span className="instLabel">Description</span>
-        <MarkupEditor label="Description" baseLevel={3} rows={3} maxLength={FIELD_MAX.description} value={item.description} onChange={description => ins.edit(id, { description })} />
+        <MarkupEditor label="Description" baseLevel={3} rows={3} maxLength={FIELD_MAX.description} value={item.description} onChange={description => ins.edit(id, { description })} training={ins.draft ?? undefined} />
       </div>
 
       {kind === 'curriculum' && (
@@ -241,7 +241,7 @@ export function InstructorEditor({ draft, ins, id, focusTitle, onAdded, onRemove
             <span className="instLabel">Questions</span>
             <MarkupEditor
               label="Questions" baseLevel={3} rows={14} maxLength={FIELD_MAX.body} value={(typed.text as string | undefined) ?? ''} onChange={text => ins.edit(id, { text })}
-              placeholder={'???? A question\n?! The right choice\n?? A wrong choice'}
+              placeholder={'???? A question\n?! The right choice\n?? A wrong choice'} training={ins.draft ?? undefined}
             />
           </div>
         </>
