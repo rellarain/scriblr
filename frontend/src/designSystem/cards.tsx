@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
 import RUI from '../assets/Interfaces/RUI'
@@ -9,7 +9,9 @@ import { ReviewDialog } from '../assets/Interfaces/reader/ReviewDialog'
 import type { ReaderCtx } from '../assets/Interfaces/reader/readerContext'
 import { loadReader, useReader } from '../assets/Interfaces/reader/readerStore'
 import * as Icons from '../assets/icons'
-import { ReactionHeartIcon } from '../assets/icons'
+import { ReactionHeartIcon, type IconProps } from '../assets/icons'
+import TileArea from '../components/tiles/TileArea'
+import { useRailSlots } from '../components/tiles/consoleTiles'
 import { SaveCluster } from '../components/SaveCluster'
 import { ColorRange } from '../components/ColorRange'
 import { PAGES_COMPONENTS } from '../assets/Interfaces/writer/consoleDefs'
@@ -30,6 +32,7 @@ import SettingsSection from '../assets/Interfaces/helper/SettingsSection'
 import { useHelperChats } from '../assets/Interfaces/helper/useHelperChats'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from '../assets/Interfaces/admin/plan/PlanPages'
 import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage } from '../assets/Interfaces/admin/office/StaffPages'
+import { ChannelTile, DepartmentTile, DeskTile, SiteTile, StaffTile, TeamTile, UserTile } from '../assets/Interfaces/admin/office/OfficeTiles'
 import UserNotifications from '../assets/Interfaces/user/UserNotifications'
 import HelpTile from '../components/help/HelpTile'
 import { HELP_TARGETS } from '../channels/helpTargets'
@@ -354,6 +357,31 @@ function StaffCard({ view }: { view: string }) {
   )
 }
 
+// The Office's tiles, one at a time, each in a tile of its own with its tabs in the title bar, on the shared pretend store (mockFeedback.ts).
+const OFFICE_VIEWS = [
+  { id: 'site', label: 'Site' }, { id: 'department', label: 'Department' }, { id: 'team', label: 'Team' }, { id: 'channel', label: 'Channel' },
+  { id: 'desk', label: 'Desk' }, { id: 'staff', label: 'Admin/Helper' }, { id: 'user', label: 'User' },
+]
+const OFFICE_CARD: Record<string, [ComponentType<{ host: HTMLElement | null }>, ComponentType<IconProps>]> = {
+  site: [SiteTile, Icons.GlobeIcon], department: [DepartmentTile, Icons.BuildingIcon], team: [TeamTile, Icons.PeopleIcon], channel: [ChannelTile, Icons.FilterIcon],
+  desk: [DeskTile, Icons.DeskIcon], staff: [StaffTile, Icons.ClipboardIcon], user: [UserTile, Icons.UserIcon],
+}
+function OfficeCard({ view }: { view: string }) {
+  const slots = useRailSlots()
+  const [Tile, Icon] = OFFICE_CARD[view] ?? OFFICE_CARD.desk
+  const title = OFFICE_VIEWS.find(v => v.id === view)?.label ?? 'Desk'
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'hidden', boxSizing: 'border-box', padding: 14, display: 'flex', flexDirection: 'column' }}>
+        <TileArea
+          gridId={`ds.office.${view}`} label="Office tiles"
+          tiles={[{ id: view, title, Icon, titleExtras: <span ref={slots.ref(view)} className="gtRailSlot" />, children: <Tile host={slots.host(view)} />, className: 'gtTile--even' }]}
+        />
+      </div>
+    </div>
+  )
+}
+
 function MapBiomesCard() {
   return (
     <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
@@ -506,6 +534,7 @@ export const CARDS: CardDef[] = [
   card('items', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ItemsCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),
   card('channels', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ChannelsCard /> }),
+  card('office', { frame: 'plain', views: OFFICE_VIEWS, defaults: { view: 'desk', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <OfficeCard key={view} view={view} /> }),
   card('staff', { frame: 'plain', views: STAFF_VIEWS, defaults: { view: 'roster', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <StaffCard key={view} view={view} /> }),
   card('project-plan', { frame: 'plain', views: PLAN_VIEWS, defaults: { view: 'plan', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <ProjectPlanCard key={view} view={view} /> }),
   card('feedback', { frame: 'plain', views: FEEDBACK_VIEWS, defaults: { view: 'help', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <FeedbackCard key={view} view={view} /> }),

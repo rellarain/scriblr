@@ -30,7 +30,7 @@ Each item has a title, a status (To do, Claimed, In progress, Done), a priority 
 
 ## Who may do what
 
-- **Shaping a plan** (adding, editing, moving, deleting and assigning items, deciding statements) needs the Planner role on the node's console, set in Office > Assignment.
+- **Shaping a plan** (adding, editing, moving, deleting and assigning items, deciding statements) needs the Planner role on the node's console, set in Office > Team > Assignment.
 - **Moving an item along** is for whoever it is assigned to, whoever claimed it, or a Planner.
 - **Claiming**: anyone may claim an item that is unassigned or assigned to them and not claimed by someone else.
 

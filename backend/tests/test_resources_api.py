@@ -36,8 +36,9 @@ def test_get_seeds_the_tree_from_the_app_screens(client: TestClient) -> None:
     assert by_id["writer"]["name"] == "Writer"
     assert by_id["writer/draft"]["parentId"] == "writer"
     assert by_id["writer/draft/draft"]["kind"] == "component"
-    assert by_id["admin/office/voting"]["name"] == "Voting"
-    assert by_id["admin/office/hire-term-admin"]["name"] == "Hire/Term Admin"
+    office = sorted((n for n in body["nodes"] if n["parentId"] == "admin/office"), key=lambda n: n["order"])
+    assert [n["name"] for n in office] == ["Site", "Department", "Team", "Channel", "Desk", "Admin/Helper", "User"]
+    assert by_id["admin/office/admin-helper"]["kind"] == "component"
     interfaces = sorted((n for n in body["nodes"] if n["parentId"] is None), key=lambda n: n["order"])
     assert [n["name"] for n in interfaces] == ["Writer", "Reader", "Training", "User", "Helper", "Admin"]
     assert client.get("/api/resources").json() == body  # stable across reloads
@@ -78,11 +79,34 @@ def test_screens_of_a_newer_version_are_merged_in_once(client: TestClient, app_d
     assert by_id["writer/shelf/plot"]["name"] == "Plot"
     assert body["content"]["writer/shelf/plot"]["guide"] == "kept"
     assert by_id["writer/dashboard"]["order"] > by_id["writer/shelf"]["order"]  # after the siblings already there
-    assert "admin/office/voting" in by_id
-    assert body["screensVersion"] >= 1
+    assert "admin/office/desk" in by_id
+    assert body["screensVersion"] == 2
     # Deleting a screen branch is not undone by the next load.
     assert client.delete("/api/resources/nodes/training/lesson").status_code == 200
     assert not any(n["id"].startswith("training/lesson") for n in _tree(client)["nodes"])
+
+
+def test_the_office_tiles_arrive_beside_its_old_pages(client: TestClient, app_data_root: Path) -> None:
+    """A tree merged at screens version 1 keeps the Office's twelve old pages (what points at them still does) and gains
+    its seven tiles after them."""
+    import json
+
+    old = {
+        "schemaVersion": 2,
+        "screensVersion": 1,
+        "nodes": [
+            {"id": "admin", "kind": "interface", "parentId": None, "order": 0, "name": "Admin"},
+            {"id": "admin/office", "kind": "console", "parentId": "admin", "order": 0, "name": "Office"},
+            {"id": "admin/office/voting", "kind": "component", "parentId": "admin/office", "order": 0, "name": "Voting"},
+        ],
+        "content": {},
+        "assessments": {},
+    }
+    (app_data_root / "resources.json").write_text(json.dumps(old), encoding="utf-8")
+    body = _tree(client)
+    office = sorted((n for n in body["nodes"] if n["parentId"] == "admin/office"), key=lambda n: n["order"])
+    assert [n["name"] for n in office] == ["Voting", "Site", "Department", "Team", "Channel", "Desk", "Admin/Helper", "User"]
+    assert body["screensVersion"] == 2
 
 
 def test_a_node_something_points_at_cannot_be_deleted(client: TestClient) -> None:

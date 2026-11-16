@@ -263,7 +263,7 @@ def _build_seed_file() -> FeedbackFile:
                       "unpleasant", "reader/library/catalog", "verb-improve", "unpleasant", "adm-dana"),
         _seed_message("fb-4", "Just wanted to say the reading stack is great, keep it up!", "j.rivera", "2026-08-13",
                       "pleasant", "reader/nook/stack", "verb-keep", "pleasant", "adm-sam"),
-        _seed_message("fb-5", "Not sure what this button does??", "a.kim", "2026-08-14", "neutral", "admin/office/voting", "verb-simplify"),
+        _seed_message("fb-5", "Not sure what this button does??", "a.kim", "2026-08-14", "neutral", "admin/office/desk", "verb-simplify"),
         _seed_message("fb-6", "At night I cannot tell the shelf icons apart, they need more contrast.", "j.rivera", "2026-08-15",
                       "unpleasant", _SHELF, "verb-increase", "unpleasant", "adm-dana"),
         _seed_message("fb-7", "Dark mode is lovely but the icons are too dim, please make them brighter.", "m.okafor", "2026-08-16",

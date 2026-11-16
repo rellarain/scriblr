@@ -17,8 +17,8 @@ const SAMPLE: [string, string][] = [
   ['training', 'Training'], ['training/desk', 'Desk'], ['training/desk/courses', 'Courses'],
   ['user', 'User'], ['user/dashboard', 'Dashboard'], ['user/dashboard/notifications', 'Notifications'],
   ['helper', 'Helper'], ['helper/inbox', 'Inbox'], ['helper/inbox/check', 'Check'], ['helper/queue', 'Queue'], ['helper/chat', 'Chat'],
-  ['admin', 'Admin'], ['admin/project-plan', 'Project Plan'], ['admin/office', 'Office'], ['admin/office/voting', 'Voting'],
-  ['admin/office/channel-management', 'Channel Management'], ['admin/configuration', 'Configuration'], ['admin/configuration/channels', 'Channels'],
+  ['admin', 'Admin'], ['admin/project-plan', 'Project Plan'], ['admin/office', 'Office'], ['admin/office/desk', 'Desk'],
+  ['admin/office/channel', 'Channel'], ['admin/configuration', 'Configuration'], ['admin/configuration/channels', 'Channels'],
 ]
 
 function sampleNodes(): ResourceNode[] {

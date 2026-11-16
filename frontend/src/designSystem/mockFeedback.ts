@@ -72,7 +72,7 @@ function seedMessages(): Message[] {
     message('fb-2', 'I love the new dark mode, but the scratchpad icons are hard to see in it.', 'a.kim', '2026-08-11', 'unpleasant', SHELF, 'verb-increase', 'mixed', 'adm-lee'),
     message('fb-3', 'Search inside the library is basically useless, it never finds anything relevant.', ME, '2026-08-12', 'unpleasant', 'reader/library/catalog', 'verb-improve', 'unpleasant', 'adm-dana'),
     message('fb-4', 'Just wanted to say the reading stack is great, keep it up!', 'j.rivera', '2026-08-13', 'pleasant', 'reader/nook/stack', 'verb-keep', 'pleasant', 'adm-sam'),
-    message('fb-5', 'Not sure what this button does??', 'a.kim', '2026-08-14', 'neutral', 'admin/office/voting', 'verb-simplify'),
+    message('fb-5', 'Not sure what this button does??', 'a.kim', '2026-08-14', 'neutral', 'admin/office/desk', 'verb-simplify'),
     message('fb-6', 'At night I cannot tell the scratchpad icons apart, they need more contrast.', 'j.rivera', '2026-08-15', 'unpleasant', SHELF, 'verb-increase', 'unpleasant', 'adm-dana'),
     message('fb-7', 'Dark mode is lovely but the icons are too dim, please make them brighter.', 'm.okafor', '2026-08-16', 'mixed', SHELF, 'verb-increase'),
   ]
@@ -269,7 +269,8 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
       if (pp.id === OWNER && 'kind' in body && body.kind !== 'admin') throw new Refused(400, 'The owner stays an admin.')
       if ('allotment' in body && body.allotment !== null && ![5, 10, 20, 30].includes(Number(body.allotment))) throw new Refused(400, 'Helper hours are 5, 10, 20 or 30 a week.')
       Object.assign(pp, body)
-      if (body.active === false) {
+      // someone who left, or was made a helper, leads nothing
+      if (body.active === false || body.kind === 'helper') {
         for (const d of departments) if (d.directorId === pp.id) d.directorId = null
         for (const t of teams) if (t.managerId === pp.id) t.managerId = null
       }

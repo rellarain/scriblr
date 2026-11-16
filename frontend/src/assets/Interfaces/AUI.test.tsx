@@ -5,8 +5,14 @@ import { __resetSettingsForTests } from '../../settings/settingsStore'
 import AUI from './AUI'
 import { mockFetch } from '../../test/mockFetch'
 
-vi.mock('./admin/RoleAssignment', () => ({ default: () => <div>role assignment</div> }))
-vi.mock('./admin/office/StatementPages', () => ({ VotingPage: () => <div>voting page</div>, ChannelManagementPage: () => <div>channel management page</div> }))
+// The Office's tiles (covered by OfficeTiles.test.tsx): each shows its name, and puts its tabs in the slot it is given.
+vi.mock('./admin/office/OfficeTiles', async () => {
+  const { createPortal } = await import('react-dom')
+  const make = (name: string) => function Tile({ host }: { host: HTMLElement | null }) {
+    return <>{host && createPortal(<span>{name} tabs</span>, host)}<div>{name} tile</div></>
+  }
+  return { SiteTile: make('site'), DepartmentTile: make('department'), TeamTile: make('team'), ChannelTile: make('channel'), DeskTile: make('desk'), StaffTile: make('staff'), UserTile: make('user') }
+})
 vi.mock('./admin/plan/PlanPages', () => ({ NodePlanPage: () => <div>plan page</div>, MyWorkPage: () => <div>my work page</div>, TimelinePage: () => <div>timeline page</div>, BoardPage: () => <div>board page</div> }))
 // Resources' own internals (its tree, backend calls) are covered by
 // useResources.test.ts and its own component tests -- mocked here so this
@@ -33,28 +39,22 @@ describe('AUI (the Admin panel as tiles)', () => {
   it('shows the eight sections as consoles with their pages as tiles, and every section Help text in the Help console', async () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
-    expect(within(tile('office')).getByText('Assignment')).toBeTruthy()
+    expect(within(tile('office')).getByText('Desk')).toBeTruthy()
     // Help is a console of its own, not a tile of a section.
-    expect(within(tile('office')).queryByText(/using the Office console/)).toBeNull()
-    expect(await within(tile('help')).findByText(/using the Office console/)).toBeTruthy()
+    expect(within(tile('office')).queryByText(/The Office has seven tiles/)).toBeNull()
+    expect(await within(tile('help')).findByText(/The Office has seven tiles/)).toBeTruthy()
     expect(within(tile('help')).getByText(/using the Project Plan console/)).toBeTruthy()
   })
 
-  it('has the Manager and Director pages, Voting and Channel Management in the Office, a Project Plan in place of the Processor and a house for the Dashboard', () => {
+  it('has the seven Office tiles, a Project Plan in place of the Processor and a house for the Dashboard', () => {
     render(<AUI />)
     for (const gone of ['processor', 'manager', 'director']) expect(tile(gone)).toBeNull()
     const tabs = (id: string, name: string) =>
       within(within(tile(id).querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: `${name} tiles tabs` }))
         .getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(tabs('office', 'Office')).toEqual([
-      'Allotment', 'Assignment', 'Team Schedule', 'Department Details', 'Department Roster', 'Department Analytics', 'Department', 'Monitor Training', 'Department Schedules', 'Hire/Term Admin',
-      'Voting', 'Channel Management',
-    ])
-    expect(within(tile('office')).getByText('voting page')).toBeTruthy()
-    expect(within(tile('office')).getByText('channel management page')).toBeTruthy()
+    expect(tabs('office', 'Office')).toEqual(['Site', 'Department', 'Team', 'Channel', 'Desk', 'Admin/Helper', 'User'])
+    for (const name of ['site', 'department', 'team', 'channel', 'desk', 'staff', 'user']) expect(within(tile('office')).getByText(`${name} tile`)).toBeTruthy()
     // the Organizer keeps only Bookclub Management
-    expect(within(tile('organizer')).queryByText('voting page')).toBeNull()
-    expect(within(tile('organizer')).queryByText('channel management page')).toBeNull()
     expect(within(tile('organizer')).getByText('Manage bookclubs here.')).toBeTruthy()
     expect(within(tile('projectPlan')).getByRole('heading', { name: /Project Plan/ })).toBeTruthy()
     for (const page of ['plan page', 'my work page', 'timeline page', 'board page']) expect(within(tile('projectPlan')).getByText(page)).toBeTruthy()
@@ -80,9 +80,14 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(tile('designer').querySelector('.gtBody--framed')).toBeNull()
   })
 
-  it('shows the role assignment editor in the Office tile', () => {
+  it("puts each Office tile's tabs in its own title bar", () => {
     render(<AUI />)
-    expect(within(tile('office')).getByText('role assignment')).toBeTruthy()
+    const ids: Array<[string, string]> = [['officeSite', 'site'], ['officeDepartment', 'department'], ['officeTeam', 'team'], ['officeChannel', 'channel'], ['officeDesk', 'desk'], ['officeStaff', 'staff'], ['officeUser', 'user']]
+    for (const [id, name] of ids) {
+      const title = tile(id).querySelector('.gtTitle') as HTMLElement
+      expect(within(title).getByText(`${name} tabs`)).toBeTruthy()
+      expect(within(tile(id).querySelector('.gtBody') as HTMLElement).queryByText(`${name} tabs`)).toBeNull()
+    }
   })
 
   it('shows Configuration > Plot as the plot presets page, without a second heading above it', async () => {
@@ -132,8 +137,8 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(within(bar).getAllByRole('button')).toHaveLength(SECTIONS.length + 1)
     expect(within(bar).getAllByRole('button').at(-1)?.getAttribute('aria-label')).toBe('Help')
     const pages = within(tile('office').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Office tiles tabs' })
-    await user.click(within(pages).getByRole('button', { name: 'Assignment' }))
-    expect(tile('assignment')).toBeNull()
+    await user.click(within(pages).getByRole('button', { name: 'Desk' }))
+    expect(tile('officeDesk')).toBeNull()
     await user.click(within(bar).getByRole('button', { name: 'Office' }))
     expect(tile('office')).toBeNull()
   })

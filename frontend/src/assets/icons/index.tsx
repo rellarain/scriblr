@@ -55,6 +55,32 @@ export function GlobeIcon(props: IconProps) {
   </IconBase>
 }
 
+// A funnel (the Office's Channel tile: feedback and queues filtered to one console).
+export function FilterIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 5h16l-6 7.5v5.5l-4 2v-7.5z" />
+  </IconBase>
+}
+
+// A desk with a drawer (the Office's Desk tile: an admin's own validation of feedback).
+export function DeskIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M2 9h20" />
+    <path d="M4 9v11M20 9v11" />
+    <path d="M13 9v5h7" />
+    <path d="M15.5 11.5h2" />
+  </IconBase>
+}
+
+// A clipboard with lines (the Office's Admin/Helper tile: one staff member's record).
+export function ClipboardIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <rect x="9" y="2.5" width="6" height="3" rx="1" />
+    <path d="M8.5 11h7M8.5 15h5" />
+  </IconBase>
+}
+
 export function SwapIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M4 8h13M13 4l4 4-4 4" />

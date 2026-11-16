@@ -18,8 +18,9 @@ export function useRailSlots() {
 }
 export type RailSlots = ReturnType<typeof useRailSlots>
 
-// A tile of a console: its icon in the console's rail, its title, and what it shows.
-export interface ConsolePage { id: string; label: string; Icon: ComponentType<IconProps>; children: ReactNode; bodyClassName?: string }
+// A tile of a console: its icon in the console's rail, its title, and what it shows (and what else sits in its title bar: the Office tiles'
+// tabs, 2026-11-16).
+export interface ConsolePage { id: string; label: string; Icon: ComponentType<IconProps>; children: ReactNode; bodyClassName?: string; titleExtras?: ReactNode }
 
 // A console tile whose body is an area of its own tiles, with their rail in the console tile's title bar. With a `gutter` (the Admin consoles, the user,
 // 2026-11-15) the tiles sit that far apart and that far from the console's edge, the console's body takes the colour of its title bar (one frame round
@@ -39,7 +40,7 @@ export function consoleTile(slots: RailSlots, { panel, id, title, Icon, pages, l
     children: (
       <TileArea
         gridId={`${panel}.${id}`} label={label ?? `${title} tiles`} bar barHost={slots.host(id)} gutter={gutter}
-        tiles={pages.map(p => ({ id: p.id, title: p.label, Icon: p.Icon, children: p.children, bodyClassName: p.bodyClassName, className: gutter === undefined ? undefined : 'gtTile--even' }))}
+        tiles={pages.map(p => ({ id: p.id, title: p.label, Icon: p.Icon, children: p.children, bodyClassName: p.bodyClassName, titleExtras: p.titleExtras, className: gutter === undefined ? undefined : 'gtTile--even' }))}
       />
     ),
   }

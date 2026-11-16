@@ -340,6 +340,15 @@ def hire(file: StaffFile, root: Path, name: str, kind: str, department_id: Optio
     return p
 
 
+def _leads_nothing(file: StaffFile, pid: str) -> None:
+    for d in file.departments:
+        if d.directorId == pid:
+            d.directorId = None
+    for t in file.teams:
+        if t.managerId == pid:
+            t.managerId = None
+
+
 def edit_person(file: StaffFile, root: Path, pid: str, changes: dict) -> None:
     p = person(file, pid)
     if p.id == feedback.OWNER_ID and changes.get("active") is False:
@@ -351,6 +360,9 @@ def edit_person(file: StaffFile, root: Path, pid: str, changes: dict) -> None:
         feedback_admin(root, p.id, p.name)
     if "kind" in changes:
         p.kind = changes["kind"]
+        if p.kind == "helper":
+            # Someone made a helper leads nothing, as someone who left does.
+            _leads_nothing(file, p.id)
     dep = changes.get("departmentId", p.departmentId)
     tid = changes.get("teamId", p.teamId)
     if "departmentId" in changes and "teamId" not in changes and tid and team(file, tid).departmentId != dep:
@@ -361,12 +373,7 @@ def edit_person(file: StaffFile, root: Path, pid: str, changes: dict) -> None:
         p.active = bool(changes["active"])
         if not p.active:
             # Someone who left leads nothing.
-            for d in file.departments:
-                if d.directorId == p.id:
-                    d.directorId = None
-            for t in file.teams:
-                if t.managerId == p.id:
-                    t.managerId = None
+            _leads_nothing(file, p.id)
     if "allotment" in changes:
         a = changes["allotment"]
         if a is not None and a not in ALLOTMENTS:

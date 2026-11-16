@@ -6,7 +6,8 @@ import { HELP_TARGETS } from './helpTargets'
 // The app's screens as the backend names them (storage/channels.py `_SCREENS`), read from the Python source: the block is
 // a literal of tuples and lists of strings, so turning tuples into lists makes it JSON.
 function screenIds(): Set<string> {
-  const src = readFileSync(resolve(__dirname, '../../../backend/app/storage/channels.py'), 'utf8')
+  // (a Windows checkout has CRLF line ends)
+  const src = readFileSync(resolve(__dirname, '../../../backend/app/storage/channels.py'), 'utf8').replace(/\r\n/g, '\n')
   const start = src.indexOf('_SCREENS: list')
   const open = src.indexOf('= [', start) + 2
   const close = src.indexOf('\n]\n', open) + 2
@@ -31,7 +32,7 @@ function screenIds(): Set<string> {
 describe('the Help targets', () => {
   it('each name a screen of the backend channel list', () => {
     const ids = screenIds()
-    expect(ids.has('admin/office/hire-term-admin')).toBe(true)
+    expect(ids.has('admin/office/admin-helper')).toBe(true)
     for (const [name, target] of Object.entries(HELP_TARGETS)) {
       expect(ids.has(target.id), `${name}: ${target.id}`).toBe(true)
     }

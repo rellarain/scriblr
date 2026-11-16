@@ -19,7 +19,8 @@ NodeKind = Literal["interface", "console", "component", "feature"]
 
 CHILD_KIND: dict[str, Optional[str]] = {"interface": "console", "console": "component", "component": "feature", "feature": None}
 
-SCREENS_VERSION = 1
+# Version 2 (2026-11-16): the Office's seven tiles; its twelve pages before them stay in a tree until an admin deletes them.
+SCREENS_VERSION = 2
 
 # Interface -> its consoles -> the tiles (components) of each console, in screen order.
 _SCREENS: list[tuple[str, list[tuple[str, list[str]]]]] = [
@@ -55,10 +56,7 @@ _SCREENS: list[tuple[str, list[tuple[str, list[str]]]]] = [
         ("Dashboard", ["Notifications", "Schedule"]),
         ("Project Plan", ["Plans", "My work", "Timeline", "Board"]),
         ("Organizer", ["Bookclub Management"]),
-        ("Office", [
-            "Allotment", "Assignment", "Team Schedule", "Department Details", "Department Roster", "Department Analytics",
-            "Department", "Monitor Training", "Department Schedules", "Hire/Term Admin", "Voting", "Channel Management",
-        ]),
+        ("Office", ["Site", "Department", "Team", "Channel", "Desk", "Admin/Helper", "User"]),
         ("Configuration", ["Overview", "Plot", "Maps", "Channels"]),
         ("Designer", ["Shape editor"]),
         ("Resources", ["Article Builder", "Quiz Builder"]),

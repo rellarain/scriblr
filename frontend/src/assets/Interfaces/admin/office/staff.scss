@@ -15,3 +15,12 @@
 .stStepValue { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
 .stActions { white-space: nowrap; text-align: right; }
 .stHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+// The Office's tiles (OfficeTiles.tsx, TabbedTile.tsx): the picker at the top, then the open tab's part, which scrolls (a page inside it does not
+// scroll on its own).
+.ofTile { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; width: 100%; box-sizing: border-box; }
+.ofPicker { align-self: flex-start; max-width: 100%; }
+.ofPanel { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.ofPanel > .stPage, .ofPanel > .fbPage { height: auto; overflow: visible; }
+.ofSoon { margin: 0; }
+.ofTile > .tileTabBar { flex: 0 0 auto; }

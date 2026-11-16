@@ -45,7 +45,7 @@ A checked message leaves the list and joins its statement. **Shift+Enter** moves
 
 ## The Office: Voting and Channel Management
 
-Both pages list the statements still in voting, most messages first. A select narrows them to an interface or a console. Each **statement card** (`.fbStatement`, a region named by its statement) shows:
+Both list the statements still in voting, most messages first. Voting is a tab of the Office's **Desk** tile, beside **Toning** (each message's tone) and **Explication** (what each message is about and what should happen); a select there narrows them to an interface or a console. Channel Management is the **Helper-checked feedback** tab of the Office's **Channel** tile, for the console its picker chooses (see [Office](../Office/README.md)). Each **statement card** (`.fbStatement`, a region named by its statement) shows:
 
 - its verb and subject;
 - the number of messages;
@@ -106,7 +106,7 @@ The sidebar's queue meter counts the chats the staff member is in and those wait
 
 ## Roles and the owner
 
-Roles are held per console of the channel list (or per interface), and set in **Office > Assignment**:
+Roles are held per console of the channel list (or per interface), and set in **Office > Team > Assignment**:
 
 - **Checker**: checks in the Inbox (on Helper > Inbox).
 - **Voter**: votes on a console's statements.

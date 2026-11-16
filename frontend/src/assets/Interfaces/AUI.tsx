@@ -1,13 +1,12 @@
-import RoleAssignment from './admin/RoleAssignment'
-import { ChannelManagementPage, VotingPage } from './admin/office/StatementPages'
+import { ChannelTile, DepartmentTile, DeskTile, SiteTile, StaffTile, TeamTile, UserTile } from './admin/office/OfficeTiles'
 import { BoardPage, MyWorkPage, NodePlanPage, TimelinePage } from './admin/plan/PlanPages'
-import { AllotmentPage, DepartmentsPage, HirePage, RosterPage, SlaPage, TrainingPage } from './admin/office/StaffPages'
+import { SlaPage } from './admin/office/StaffPages'
 import HelpTile from '../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../channels/helpTargets'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
-  BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon, ListIcon, GridViewIcon, ClockIcon,
+  LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon, HomeIcon, GanttIcon, GlobeIcon, FilterIcon, DeskIcon, ClipboardIcon, UserIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, MapIcon, GraduationCapIcon, TreeIcon, ListIcon, GridViewIcon, ClockIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -29,7 +28,8 @@ const WriterLimitsConsole = lazy(() => import('./admin/characters/WriterLimitsCo
 import { DESIGNER_TOOLS, WRITER_DESIGNER } from './admin/characters/designerFeatures'
 
 // The consoles of scrilbrPlan.md's "Admin Page (AUI)" section, as the user has since reshaped them (2026-11-15: the Manager and Director consoles merged
-// into Office, and a Project Plan console in place of the Processor; the Processor's Voting and the Organizer's Channel Management are pages of the Office).
+// into Office, and a Project Plan console in place of the Processor; 2026-11-16: the Office's pages became seven tiles with tabs, Voting in its Desk and
+// Channel Management in its Channel).
 // Resources -- not in that doc -- is built separately
 // below, since it isn't this shape: one console, no per-page children, just
 // the article/quiz builder). This is a full structural skeleton -- every
@@ -43,10 +43,8 @@ type AuiSectionKey = 'dashboard' | 'projectPlan' | 'organizer' | 'office' | 'con
 type AuiSubSectionKey =
   | 'notifications' | 'dashboardSchedule' | 'dashboardHelp'
   | 'projectNodePlan' | 'projectMyWork' | 'projectTimeline' | 'projectBoard' | 'projectPlanHelp'
-  | 'voting' | 'channelManagement' | 'bookclubManagement' | 'organizerHelp'
-  | 'allotment' | 'assignment' | 'teamSchedule'
-  | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department'
-  | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
+  | 'bookclubManagement' | 'organizerHelp'
+  | 'officeSite' | 'officeDepartment' | 'officeTeam' | 'officeChannel' | 'officeDesk' | 'officeStaff' | 'officeUser' | 'officeHelp'
   | 'configOverview' | 'configPlot' | 'configMaps' | 'configChannels' | 'configSla' | 'configWriterDesigner' | 'configHelp'
   | 'designerWork' | 'designerHelp'
 
@@ -84,6 +82,18 @@ const DESIGNER_HELP = [
   'Symmetry: turn it on for a shape, choose the angle of the first axis (or a preset: vertical, horizontal or a diagonal) and how many axes (evenly spaced), then click the side to copy; Escape stops. The other sides follow it, and a point in any copy can be dragged. Turning it off keeps every point where it is. The points where the outline crosses an axis are optional: Delete or Ctrl + click removes one (its copies on the matching axes go too) and the outline joins its mirror image there; a double-click on the side that crosses the axis puts the point back, on the axis. A point of a symmetric shape can be connected to another shape (a symmetric one too): its copies follow it, and only one copy of each point can be connected.',
   'Lines of symmetry: a selected shape with one axis shows a round handle at each end of its line of symmetry, where the line meets the outline, and a diamond on the outline. Drag an end to lengthen or shorten the shape along its line; the other end stays where it is and the shape stays as wide. Symmetric shapes linked to it whose lines lie on the same line (a chest, a belly and a hip on one spine) share the ends: dragging one stretches them all from the far end, each keeping its share of the line, which is then drawn whole. Drag the diamond to widen or narrow the shape evenly on both sides of its line. The handles show while the Symmetry axes layer is shown; Snap to grid snaps the pointer, and each drag is one undo step.',
   'Viewing: right-drag the grid, or scroll (Shift and scroll for sideways), to move across it; Ctrl and scroll on the canvas (or scroll on the zoom slider) to zoom: up zooms in, down zooms out; and Fit to see everything. Click the grid to unselect everything. Snap and Snap to grid can be turned off in the panel.',
+].join('\n\n')
+
+// The Office's help: its tiles show no explanations of their own.
+const OFFICE_HELP = [
+  'The Office has seven tiles. Each lists its parts as tabs in its title bar, and a tile about one of several things (a department, a team, a console, a staff member, a user) has a picker at the top. The open tab and the choice are remembered on this computer. Parts with nothing to show yet say what they will hold.',
+  'Site: the departments (add, rename, delete an empty one, and set the director).',
+  'Department: its details (name, director and counts), its roster, its schedule, and its teams (add, rename, delete an empty one, and set the manager).',
+  'Team: Assignment sets the roles of its admins on each console; Allotment their helper hours; Members adds people to the team, takes them off it and sets the manager.',
+  'Channel: Helper-checked feedback is Channel Management for the console picked: correct the subject, verb and tone of each message in voting, ask the writer a question or leave staff a comment.',
+  'Desk: Voting gives a yes, no or pass with a note on each statement in voting (advice for the planner); Toning sets the tone of each message; Explication what it is about and what should happen.',
+  'Admin/Helper: Training records the training a person finished on an interface or a console; Promote and Demote raise or lower their support tier on a console, make a helper an admin or an admin a helper (who then leads nothing), and make them the manager of their team or the director of their department; Term marks someone as left (never deleted) or rehires them; Allot hours gives them 5, 10, 20 or 30 helper hours a week.',
+  'User: Hire makes the user picked a helper or an admin, in a team.',
 ].join('\n\n')
 
 const SECTIONS: AuiSectionDef[] = [
@@ -124,35 +134,17 @@ const SECTIONS: AuiSectionDef[] = [
   },
   {
     key: 'office', label: 'Office', Icon: BriefcaseIcon,
-    // The Manager's pages, then the Director's, then the Office's own (the doc gives these as bullets instead of named components),
-    // then the two feedback passes in their order: Voting (the Processor's page) and Channel Management (the Organizer's).
+    // Seven tiles, each with its parts as tabs in its title bar (the user, 2026-11-16; admin/office/OfficeTiles.tsx).
     subSections: [
-      { key: 'allotment', label: 'Allotment', Icon: PeopleIcon,
-        body: 'Manage team and user allotments here.' },
-      { key: 'assignment', label: 'Assignment', Icon: TeamIcon,
-        body: 'Manage team and user assignments here.' },
-      { key: 'teamSchedule', label: 'Team Schedule', Icon: CalendarIcon,
-        body: 'View and manage team schedules here.' },
-      { key: 'departmentDetails', label: 'Department Details', Icon: BuildingIcon,
-        body: 'View department details here.' },
-      { key: 'departmentRoster', label: 'Department Roster', Icon: PeopleIcon,
-        body: 'Manage roles — promote, demote, or skill admin users based on training, and assign full and part time schedules here.' },
-      { key: 'departmentAnalytics', label: 'Department Analytics', Icon: BarChartIcon,
-        body: 'View department analytics here.' },
-      { key: 'department', label: 'Department', Icon: BuildingIcon,
-        body: 'Manage the department here.' },
-      { key: 'monitorTraining', label: 'Monitor Training', Icon: BriefcaseIcon,
-        body: '' },
-      { key: 'departmentSchedules', label: 'Department Schedules', Icon: CalendarIcon,
-        body: 'View and manage department schedules here.' },
-      { key: 'hireTermAdmin', label: 'Hire/Term Admin', Icon: PeopleIcon,
-        body: 'Hire or terminate admin users here.' },
-      { key: 'voting', label: 'Voting', Icon: VotingIcon,
-        body: 'Vote yes, no or pass on the statements in voting (advice for the planner).' },
-      { key: 'channelManagement', label: 'Channel Management', Icon: SortingIcon,
-        body: 'Correct the subject, verb and tone of the messages in voting, and ask the writer or comment.' },
+      { key: 'officeSite', label: 'Site', Icon: GlobeIcon, body: '' },
+      { key: 'officeDepartment', label: 'Department', Icon: BuildingIcon, body: '' },
+      { key: 'officeTeam', label: 'Team', Icon: PeopleIcon, body: '' },
+      { key: 'officeChannel', label: 'Channel', Icon: FilterIcon, body: '' },
+      { key: 'officeDesk', label: 'Desk', Icon: DeskIcon, body: '' },
+      { key: 'officeStaff', label: 'Admin/Helper', Icon: ClipboardIcon, body: '' },
+      { key: 'officeUser', label: 'User', Icon: UserIcon, body: '' },
       { key: 'officeHelp', label: 'Help', Icon: HelpIcon,
-        body: 'Resources and assistance using the Office console here.' },
+        body: OFFICE_HELP },
     ],
   },
   {
@@ -202,6 +194,16 @@ function designerTile(slots: ReturnType<typeof useRailSlots>): AreaTile {
   }
 }
 
+// The Office's tiles, each drawn with the slot in its title bar where its tabs go.
+const OFFICE_TILES: Partial<Record<AuiSubSectionKey, ComponentType<{ host: HTMLElement | null }>>> = {
+  officeSite: SiteTile, officeDepartment: DepartmentTile, officeTeam: TeamTile, officeChannel: ChannelTile,
+  officeDesk: DeskTile, officeStaff: StaffTile, officeUser: UserTile,
+}
+function officeTile(key: AuiSubSectionKey, host: HTMLElement | null) {
+  const Tile = OFFICE_TILES[key]
+  return Tile ? <Tile host={host} /> : null
+}
+
 // The space between the tiles of an Admin console and round them, to the console's edge (the user, 2026-11-15).
 const AUI_GUTTER = 10
 
@@ -214,22 +216,17 @@ function AUI() {
     panel: 'aui', id: section.key, title: section.label, Icon: section.Icon, gutter: AUI_GUTTER,
     pages: section.subSections.filter(s => s.label !== 'Help').map(page => ({
       id: page.key, label: page.label, Icon: page.Icon,
-      children: page.key === 'assignment' ? <RoleAssignment />
-        : page.key === 'voting' ? <VotingPage />
+      // an Office tile's tabs go in its title bar
+      titleExtras: OFFICE_TILES[page.key] ? <span ref={slots.ref(`office.${page.key}`)} className="gtRailSlot" /> : undefined,
+      children: OFFICE_TILES[page.key] ? officeTile(page.key, slots.host(`office.${page.key}`))
         : page.key === 'projectNodePlan' ? <NodePlanPage />
         : page.key === 'projectMyWork' ? <MyWorkPage />
         : page.key === 'projectTimeline' ? <TimelinePage />
         : page.key === 'projectBoard' ? <BoardPage />
-        : page.key === 'channelManagement' ? <ChannelManagementPage />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
         : page.key === 'configMaps' ? <Suspense fallback={null}><MapsConfigConsole /></Suspense>
         : page.key === 'configChannels' ? <Suspense fallback={null}><ChannelsConsole /></Suspense>
         : page.key === 'configSla' ? <SlaPage />
-        : page.key === 'departmentRoster' ? <RosterPage />
-        : page.key === 'departmentDetails' ? <DepartmentsPage />
-        : page.key === 'allotment' ? <AllotmentPage />
-        : page.key === 'hireTermAdmin' ? <HirePage />
-        : page.key === 'monitorTraining' ? <TrainingPage />
         : page.key === 'configWriterDesigner' ? <Suspense fallback={null}><WriterLimitsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),

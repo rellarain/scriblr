@@ -21,7 +21,8 @@ const ROLES: Array<{ key: Role; label: string; hint: string }> = [
   { key: 'planner', label: 'Planner', hint: "Accepts or vetoes the console's statements" },
 ]
 
-export default function RoleAssignment() {
+// `only`: the staff to list (a team's people, in the Office's Team tile); none: everyone.
+export default function RoleAssignment({ only }: { only?: string[] } = {}) {
   const { bundle, adminId, status, error } = useStaff()
   const { index } = useChannels()
   const [console, setConsole] = useState('helper/inbox')
@@ -60,7 +61,7 @@ export default function RoleAssignment() {
           </tr>
         </thead>
         <tbody>
-          {bundle.admins.map(admin => {
+          {bundle.admins.filter(a => !only || only.includes(a.id)).map(admin => {
             const held = admin.roles[console] ?? []
             // the owner (universal access) holds every role everywhere: shown ticked, not changed here
             const owner = admin.id === OWNER_ID

@@ -14,11 +14,11 @@ import './staff.scss'
 // it, 2 a helper promoted on its interface, 3 its channel support, 4 an admin with helper hours promoted on it (the roster shows the
 // highest anywhere). Changes act as the owner, who holds every role (universal access).
 
-const TIER_LABEL: Record<number, string> = { 1: 'Tier 1', 2: 'Tier 2', 3: 'Tier 3', 4: 'Tier 4' }
-const KIND_LABEL: Record<PersonKind, string> = { helper: 'Helper', admin: 'Admin' }
+export const TIER_LABEL: Record<number, string> = { 1: 'Tier 1', 2: 'Tier 2', 3: 'Tier 3', 4: 'Tier 4' }
+export const KIND_LABEL: Record<PersonKind, string> = { helper: 'Helper', admin: 'Admin' }
 const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' }
 
-function Frame({ label, children }: { label: string; children: (view: StaffView) => ReactNode }) {
+export function Frame({ label, children }: { label: string; children: (view: StaffView) => ReactNode }) {
   const { view, status, error } = useRoster()
   if (!view) {
     return (
@@ -37,15 +37,15 @@ function Frame({ label, children }: { label: string; children: (view: StaffView)
   )
 }
 
-const nameOf = (view: StaffView, id: string | null) => (id ? view.people.find(p => p.id === id)?.name ?? id : '')
-const placeOf = (view: StaffView, p: Person) => {
+export const nameOf = (view: StaffView, id: string | null) => (id ? view.people.find(p => p.id === id)?.name ?? id : '')
+export const placeOf = (view: StaffView, p: Person) => {
   const team = view.teams.find(t => t.id === p.teamId)
   const dep = view.departments.find(d => d.id === (team?.departmentId ?? p.departmentId))
   return [dep?.name, team?.name].filter(Boolean).join(' · ')
 }
 
 // A text field saved when left (or on Enter); Escape puts it back.
-function NameField({ value, label, onSave }: { value: string; label: string; onSave: (name: string) => void }) {
+export function NameField({ value, label, onSave }: { value: string; label: string; onSave: (name: string) => void }) {
   const [text, setText] = useState(value)
   const save = () => { if (text.trim() && text !== value) onSave(text); else setText(value) }
   return (
@@ -60,45 +60,45 @@ function NameField({ value, label, onSave }: { value: string; label: string; onS
 // --- Department Roster -----------------------------------------------------------------------------------------------------
 
 export function RosterPage() {
+  return <Frame label="Department Roster">{view => <RosterTables view={view} />}</Frame>
+}
+
+// The roster as tables, one per department (with `departmentId`, that department's only; '' for the people in none).
+export function RosterTables({ view, departmentId }: { view: StaffView; departmentId?: string }) {
+  const all = [...view.departments.map(d => ({ id: d.id, name: d.name })), { id: '', name: 'No department' }]
+  const groups = departmentId === undefined ? all : all.filter(g => g.id === departmentId)
   return (
-    <Frame label="Department Roster">
-      {view => {
-        const groups = [...view.departments.map(d => ({ id: d.id, name: d.name })), { id: '', name: 'No department' }]
+    <div className="fbList">
+      {groups.map(g => {
+        const people = view.people.filter(p => (p.departmentId ?? '') === g.id)
+        if (people.length === 0) return departmentId === undefined ? null : <p key="none" className="fbMuted">Nobody yet.</p>
         return (
-          <div className="fbList">
-            {groups.map(g => {
-              const people = view.people.filter(p => (p.departmentId ?? '') === g.id)
-              if (people.length === 0) return null
-              return (
-                <section key={g.id || 'none'} className="stGroup" aria-label={g.name}>
-                  <h3 className="fbLabel">{g.name}</h3>
-                  <table className="stTable">
-                    <thead><tr><th scope="col">Name</th><th scope="col">Tier</th><th scope="col">Team</th><th scope="col">Helper hours</th><th scope="col">Supports</th></tr></thead>
-                    <tbody>
-                      {people.map(p => (
-                        <tr key={p.id} className={p.active ? undefined : 'stInactive'}>
-                          <th scope="row">{p.name}{!p.active && <span className="fbMuted"> (left)</span>}</th>
-                          <td>{p.tier ? TIER_LABEL[p.tier] : KIND_LABEL[p.kind]}</td>
-                          <td>{view.teams.find(t => t.id === p.teamId)?.name ?? ''}</td>
-                          <td>{p.allotment ? `${p.allotment} h` : ''}</td>
-                          <td>{p.supports.length || ''}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-              )
-            })}
-          </div>
+          <section key={g.id || 'none'} className="stGroup" aria-label={g.name}>
+            <h3 className="fbLabel">{g.name}</h3>
+            <table className="stTable">
+              <thead><tr><th scope="col">Name</th><th scope="col">Tier</th><th scope="col">Team</th><th scope="col">Helper hours</th><th scope="col">Supports</th></tr></thead>
+              <tbody>
+                {people.map(p => (
+                  <tr key={p.id} className={p.active ? undefined : 'stInactive'}>
+                    <th scope="row">{p.name}{!p.active && <span className="fbMuted"> (left)</span>}</th>
+                    <td>{p.tier ? TIER_LABEL[p.tier] : KIND_LABEL[p.kind]}</td>
+                    <td>{view.teams.find(t => t.id === p.teamId)?.name ?? ''}</td>
+                    <td>{p.allotment ? `${p.allotment} h` : ''}</td>
+                    <td>{p.supports.length || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
         )
-      }}
-    </Frame>
+      })}
+    </div>
   )
 }
 
 // --- Department Details ----------------------------------------------------------------------------------------------------
 
-function LeaderSelect({ view, value, label, onChange }: { view: StaffView; value: string | null; label: string; onChange: (id: string | null) => void }) {
+export function LeaderSelect({ view, value, label, onChange }: { view: StaffView; value: string | null; label: string; onChange: (id: string | null) => void }) {
   return (
     <select className="fbSelect" value={value ?? ''} aria-label={label} onChange={e => onChange(e.target.value || null)}>
       <option value="">Nobody</option>
@@ -108,57 +108,87 @@ function LeaderSelect({ view, value, label, onChange }: { view: StaffView; value
 }
 
 export function DepartmentsPage() {
-  const [newDep, setNewDep] = useState('')
-  const [newTeam, setNewTeam] = useState<Record<string, string>>({})
   return (
     <Frame label="Department Details">
       {view => (
         <div className="fbList">
           {view.departments.map(d => (
             <section key={d.id} className="stGroup" aria-label={d.name}>
-              <div className="fbRow">
-                <NameField value={d.name} label={`Name of ${d.name}`} onSave={name => void changeRoster(a => staffApi.editDepartment(a, d.id, { name }))} />
-                <span className="fbLabel">Director</span>
-                <LeaderSelect view={view} value={d.directorId} label={`Director of ${d.name}`} onChange={id => void changeRoster(a => staffApi.editDepartment(a, d.id, { directorId: id }))} />
-                <button type="button" className="fbIconBtn" aria-label={`Delete ${d.name}`} title="Delete the department (once it is empty)" onClick={() => void changeRoster(a => staffApi.removeDepartment(a, d.id))}><TrashIcon size={14} /></button>
-              </div>
-              <ul className="stTeams">
-                {view.teams.filter(t => t.departmentId === d.id).map(t => (
-                  <li key={t.id} className="fbRow" aria-label={t.name}>
-                    <NameField value={t.name} label={`Name of ${t.name}`} onSave={name => void changeRoster(a => staffApi.editTeam(a, t.id, { name }))} />
-                    <span className="fbLabel">Manager</span>
-                    <LeaderSelect view={view} value={t.managerId} label={`Manager of ${t.name}`} onChange={id => void changeRoster(a => staffApi.editTeam(a, t.id, { managerId: id }))} />
-                    <span className="fbMuted">{view.people.filter(p => p.teamId === t.id && p.active).length} people</span>
-                    <button type="button" className="fbIconBtn" aria-label={`Delete ${t.name}`} title="Delete the team (once it is empty)" onClick={() => void changeRoster(a => staffApi.removeTeam(a, t.id))}><TrashIcon size={14} /></button>
-                  </li>
-                ))}
-              </ul>
-              <form className="fbRow" onSubmit={e => { e.preventDefault(); const n = newTeam[d.id]?.trim(); if (n) void changeRoster(a => staffApi.addTeam(a, n, d.id)).then(ok => { if (ok) setNewTeam(x => ({ ...x, [d.id]: '' })) }) }}>
-                <input className="fbField" value={newTeam[d.id] ?? ''} maxLength={80} aria-label={`New team in ${d.name}`} placeholder="New team…" onChange={e => setNewTeam(x => ({ ...x, [d.id]: e.target.value }))} />
-                <button type="submit" className="fbIconBtn" aria-label={`Add a team to ${d.name}`} title="Add a team" disabled={!newTeam[d.id]?.trim()}><PlusIcon size={14} /></button>
-              </form>
+              <DepartmentRow view={view} departmentId={d.id} />
+              <TeamList view={view} departmentId={d.id} />
             </section>
           ))}
-          <form className="fbRow" onSubmit={e => { e.preventDefault(); if (newDep.trim()) void changeRoster(a => staffApi.addDepartment(a, newDep)).then(ok => { if (ok) setNewDep('') }) }}>
-            <input className="fbField" value={newDep} maxLength={80} aria-label="New department" placeholder="New department…" onChange={e => setNewDep(e.target.value)} />
-            <button type="submit" className="fbIconBtn" aria-label="Add a department" title="Add a department" disabled={!newDep.trim()}><PlusIcon size={14} /></button>
-          </form>
+          <AddDepartment />
         </div>
       )}
     </Frame>
   )
 }
 
+// One department: its name, director and delete (once it is empty).
+export function DepartmentRow({ view, departmentId }: { view: StaffView; departmentId: string }) {
+  const d = view.departments.find(x => x.id === departmentId)
+  if (!d) return null
+  return (
+    <div className="fbRow">
+      <NameField value={d.name} label={`Name of ${d.name}`} onSave={name => void changeRoster(a => staffApi.editDepartment(a, d.id, { name }))} />
+      <span className="fbLabel">Director</span>
+      <LeaderSelect view={view} value={d.directorId} label={`Director of ${d.name}`} onChange={id => void changeRoster(a => staffApi.editDepartment(a, d.id, { directorId: id }))} />
+      <button type="button" className="fbIconBtn" aria-label={`Delete ${d.name}`} title="Delete the department (once it is empty)" onClick={() => void changeRoster(a => staffApi.removeDepartment(a, d.id))}><TrashIcon size={14} /></button>
+    </div>
+  )
+}
+
+// A department's teams: each with its name, manager, how many people and delete (once it is empty), then a new one.
+export function TeamList({ view, departmentId }: { view: StaffView; departmentId: string }) {
+  const [newTeam, setNewTeam] = useState('')
+  const d = view.departments.find(x => x.id === departmentId)
+  if (!d) return null
+  return (
+    <>
+      <ul className="stTeams">
+        {view.teams.filter(t => t.departmentId === d.id).map(t => (
+          <li key={t.id} className="fbRow" aria-label={t.name}>
+            <NameField value={t.name} label={`Name of ${t.name}`} onSave={name => void changeRoster(a => staffApi.editTeam(a, t.id, { name }))} />
+            <span className="fbLabel">Manager</span>
+            <LeaderSelect view={view} value={t.managerId} label={`Manager of ${t.name}`} onChange={id => void changeRoster(a => staffApi.editTeam(a, t.id, { managerId: id }))} />
+            <span className="fbMuted">{view.people.filter(p => p.teamId === t.id && p.active).length} people</span>
+            <button type="button" className="fbIconBtn" aria-label={`Delete ${t.name}`} title="Delete the team (once it is empty)" onClick={() => void changeRoster(a => staffApi.removeTeam(a, t.id))}><TrashIcon size={14} /></button>
+          </li>
+        ))}
+      </ul>
+      <form className="fbRow" onSubmit={e => { e.preventDefault(); const n = newTeam.trim(); if (n) void changeRoster(a => staffApi.addTeam(a, n, d.id)).then(ok => { if (ok) setNewTeam('') }) }}>
+        <input className="fbField" value={newTeam} maxLength={80} aria-label={`New team in ${d.name}`} placeholder="New team…" onChange={e => setNewTeam(e.target.value)} />
+        <button type="submit" className="fbIconBtn" aria-label={`Add a team to ${d.name}`} title="Add a team" disabled={!newTeam.trim()}><PlusIcon size={14} /></button>
+      </form>
+    </>
+  )
+}
+
+export function AddDepartment() {
+  const [newDep, setNewDep] = useState('')
+  return (
+    <form className="fbRow" onSubmit={e => { e.preventDefault(); if (newDep.trim()) void changeRoster(a => staffApi.addDepartment(a, newDep)).then(ok => { if (ok) setNewDep('') }) }}>
+      <input className="fbField" value={newDep} maxLength={80} aria-label="New department" placeholder="New department…" onChange={e => setNewDep(e.target.value)} />
+      <button type="submit" className="fbIconBtn" aria-label="Add a department" title="Add a department" disabled={!newDep.trim()}><PlusIcon size={14} /></button>
+    </form>
+  )
+}
+
 // --- Allotment -------------------------------------------------------------------------------------------------------------
 
 export function AllotmentPage() {
+  return <Frame label="Allotment">{view => <AllotmentTable view={view} people={view.people.filter(p => p.active)} />}</Frame>
+}
+
+// The helper hours of these people (5, 10, 20 or 30 a week, or none).
+export function AllotmentTable({ view, people }: { view: StaffView; people: Person[] }) {
+  if (people.length === 0) return <p className="fbMuted">Nobody yet.</p>
   return (
-    <Frame label="Allotment">
-      {view => (
         <table className="stTable">
           <thead><tr><th scope="col">Name</th><th scope="col">Place</th><th scope="col">Helper hours a week</th></tr></thead>
           <tbody>
-            {view.people.filter(p => p.active).map(p => (
+            {people.map(p => (
               <tr key={p.id}>
                 <th scope="row">{p.name} <span className="fbMuted">{p.tier ? TIER_LABEL[p.tier] : KIND_LABEL[p.kind]}</span></th>
                 <td>{placeOf(view, p)}</td>
@@ -175,35 +205,17 @@ export function AllotmentPage() {
             ))}
           </tbody>
         </table>
-      )}
-    </Frame>
   )
 }
 
 // --- Hire/Term Admin -------------------------------------------------------------------------------------------------------
 
 export function HirePage() {
-  const [name, setName] = useState('')
-  const [kind, setKind] = useState<PersonKind>('admin')
-  const [team, setTeam] = useState('')
   return (
     <Frame label="Hire/Term Admin">
       {view => (
         <div className="fbList">
-          <form className="fbRow" aria-label="Hire" onSubmit={e => { e.preventDefault(); if (name.trim()) void changeRoster(a => staffApi.hire(a, { name, kind, teamId: team || null })).then(ok => { if (ok) setName('') }) }}>
-            <input className="fbField" value={name} maxLength={80} aria-label="Name" placeholder="Name…" onChange={e => setName(e.target.value)} />
-            <select className="fbSelect" value={kind} aria-label="Helper or admin" onChange={e => setKind(e.target.value as PersonKind)}>
-              <option value="admin">Admin</option>
-              <option value="helper">Helper</option>
-            </select>
-            <select className="fbSelect" value={team} aria-label="Team" onChange={e => setTeam(e.target.value)}>
-              <option value="">No team</option>
-              {view.departments.map(d => (
-                <optgroup key={d.id} label={d.name}>{view.teams.filter(t => t.departmentId === d.id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
-              ))}
-            </select>
-            <button type="submit" className="fbIconBtn fbIconBtn--primary" aria-label="Hire" title="Hire" disabled={!name.trim()}><PlusIcon size={14} /></button>
-          </form>
+          <HireForm view={view} />
           <table className="stTable">
             <tbody>
               {view.people.map(p => (
@@ -223,6 +235,30 @@ export function HirePage() {
         </div>
       )}
     </Frame>
+  )
+}
+
+// Hire someone: a name (given when hiring one of the app's users), helper or admin, and a team.
+export function HireForm({ view, givenName }: { view: StaffView; givenName?: string }) {
+  const [typed, setTyped] = useState('')
+  const [kind, setKind] = useState<PersonKind>(givenName === undefined ? 'admin' : 'helper')
+  const [team, setTeam] = useState('')
+  const name = givenName ?? typed
+  return (
+    <form className="fbRow" aria-label="Hire" onSubmit={e => { e.preventDefault(); if (name.trim()) void changeRoster(a => staffApi.hire(a, { name, kind, teamId: team || null })).then(ok => { if (ok) setTyped('') }) }}>
+      {givenName === undefined && <input className="fbField" value={typed} maxLength={80} aria-label="Name" placeholder="Name…" onChange={e => setTyped(e.target.value)} />}
+      <select className="fbSelect" value={kind} aria-label="Helper or admin" onChange={e => setKind(e.target.value as PersonKind)}>
+        <option value="helper">Helper</option>
+        <option value="admin">Admin</option>
+      </select>
+      <select className="fbSelect" value={team} aria-label="Team" onChange={e => setTeam(e.target.value)}>
+        <option value="">No team</option>
+        {view.departments.map(d => (
+          <optgroup key={d.id} label={d.name}>{view.teams.filter(t => t.departmentId === d.id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
+        ))}
+      </select>
+      <button type="submit" className="fbIconBtn fbIconBtn--primary" aria-label={givenName ? `Hire ${givenName}` : 'Hire'} title="Hire" disabled={!name.trim()}><PlusIcon size={14} /></button>
+    </form>
   )
 }
 
@@ -267,7 +303,7 @@ const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(unde
 
 // Training finished on interfaces and consoles, recorded per person, and the director's promotion that gives the tier (until Training
 // keeps records per staff member, finishing is recorded here by hand).
-export function TrainingPage() {
+export function TrainingPage({ personId }: { personId?: string } = {}) {
   const { index } = useChannels()
   const { adminId } = useStaff()
   const [picks, setPicks] = useState<Record<string, string>>({})
@@ -284,7 +320,7 @@ export function TrainingPage() {
         }
         return (
           <div className="fbList">
-            {view.people.filter(p => p.active).map(p => {
+            {view.people.filter(p => (personId ? p.id === personId : p.active)).map(p => {
               const may = mayPromote(p)
               const pick = picks[p.id] ?? ''
               return (

@@ -156,3 +156,19 @@ def test_assigning_to_someone_who_left_is_refused(client: TestClient) -> None:
 def test_a_corrupt_staff_file_is_quarantined(client: TestClient, app_data_root: Path) -> None:
     (app_data_root / "staff.json").write_text("{nope", encoding="utf-8")
     assert client.get("/api/staff").status_code == 409
+
+
+def test_someone_made_a_helper_leads_nothing(client: TestClient) -> None:
+    """Demoting an admin to helper takes away the team they manage and the department they direct, as leaving does."""
+    view = client.post("/api/staff/departments", json={"name": "Support"}).json()
+    dep = next(d for d in view["departments"] if d["name"] == "Support")
+    view = client.post("/api/staff/teams", json={"name": "Night", "departmentId": dep["id"]}).json()
+    team = next(t for t in view["teams"] if t["name"] == "Night")
+    view = client.post("/api/staff/people", json={"name": "Robin", "kind": "admin", "teamId": team["id"]}).json()
+    robin = next(p for p in view["people"] if p["name"] == "Robin")
+    client.patch(f"/api/staff/teams/{team['id']}", json={"managerId": robin["id"]})
+    client.patch(f"/api/staff/departments/{dep['id']}", json={"directorId": robin["id"]})
+    view = client.patch(f"/api/staff/people/{robin['id']}", json={"kind": "helper"}).json()
+    assert next(t for t in view["teams"] if t["id"] == team["id"])["managerId"] is None
+    assert next(d for d in view["departments"] if d["id"] == dep["id"])["directorId"] is None
+    assert next(p for p in view["people"] if p["id"] == robin["id"])["kind"] == "helper"

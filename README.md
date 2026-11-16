@@ -1036,13 +1036,17 @@ mounted it; it remains in git history.
   line down its middle, two separate outlined halves, two separate filled halves. A chapter with no outline is one free draft.
 - **`AUI.tsx`** (`admin/` subfolder) — the Admin panel: one console per section
   (Dashboard, Project Plan, Organizer, Office, Configuration, Designer, Resources,
-  Instructor, Help), each holding its pages as tiles. Real pages: Office >
-  Assignment (feedback roles and console support), Department Roster, Department
-  Details, Allotment and Hire/Term Admin (`admin/office/StaffPages.tsx` over `staff.json`),
-  Configuration > SLA, the **Project Plan** (`admin/plan/`: Plan, My
-  work, Timeline and Board over `project-plan.json`), **Voting** and **Channel Management**
-  (`admin/office/StatementPages.tsx`: the statements in voting, with votes and
-  corrections), Configuration > Plot, Maps and **Channels** (the channel list,
+  Instructor, Help), each holding its pages as tiles. The **Office** is seven tiles
+  (`admin/office/OfficeTiles.tsx`), each with its parts as tabs in its title bar and a
+  picker where it is about one of several things: Site (departments), Department
+  (details, roster, teams), Team (Assignment of feedback roles and console support,
+  Allotment, Members), Channel (a console's helper-checked feedback: Channel Management),
+  Desk (Voting, Toning, Explication of the statements in voting), Admin/Helper (training,
+  promote, demote, term, helper hours) and User (hire); the parts come from
+  `admin/office/StaffPages.tsx` (over `staff.json`) and `StatementPages.tsx`, and parts
+  with no data yet say what they will hold. Also real: Configuration > SLA, the
+  **Project Plan** (`admin/plan/`: Plan, My work, Timeline and Board over
+  `project-plan.json`), Configuration > Plot, Maps and **Channels** (the channel list,
   `admin/channels/`), the Designer, Resources and Instructor; the rest is placeholder text.
 - **`HUI.tsx`** (`helper/` subfolder) — a helper side panel: chats (the support
   chats of `/api/support`: a Help tile's Chat tab starts one, the Conversation tile
@@ -1059,7 +1063,7 @@ mounted it; it remains in git history.
   corrected in Admin > Office, then accepted or vetoed by the planner. Staff ask the
   writer questions (answered in the Help tile or under User > Dashboard >
   Notifications) and leave each other comments. Access is four roles per console
-  (Checker, Voter, Channel manager, Planner) set in Admin > Office > Assignment; staff
+  (Checker, Voter, Channel manager, Planner) set in Admin > Office > Team > Assignment; staff
   never see the writer's name. See `backend/app/storage/feedback.py` for the rules and
   `feedback/` for the shared pieces.
 - **`RUI.tsx`** / **`UUI.tsx`** — Reader and Home/Dashboard-shaped views
