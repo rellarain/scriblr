@@ -31,17 +31,33 @@
 
 .mkQuote { margin: 0 0 var(--space-3); padding: var(--space-1) 0 var(--space-1) var(--space-4); border-left: 3px solid currentColor; font-style: italic; p { margin: 0; } }
 
-// A knowledge check, shown as its question and options (it becomes practice in a later slice).
+// A knowledge check (QuestionView.tsx): the question, its options (radio buttons, check boxes) or a text field, the hints shown so far, then
+// Hint, Check and Show the answer. Revealed: the right options in the accent with a tick, a wrong choice struck with a cross, the others in the
+// muted ink; every explanation under its option. These are the accent / on-accent and muted-ink pairs the contrast audit already holds.
 .mkQuestion { margin: 0 0 var(--space-3); padding: var(--space-3) var(--space-4); background: var(--ov-sink-1); }
 .mkPrompt { margin: 0 0 var(--space-2); font-weight: 600; }
-.mkOptions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
-.mkOption { display: flex; align-items: baseline; gap: 0.5em; }
-.mkMark { flex: 0 0 auto; width: 0.8em; height: 0.8em; border: 1.5px solid currentColor; transform: translateY(0.08em); }
-.mkMark--choice { border-radius: 50%; }
+.mkOptions { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.mkOption { display: flex; flex-direction: column; gap: 2px; padding: 2px var(--space-2); }
+.mkOptionLabel { display: flex; align-items: baseline; gap: 0.5em; cursor: pointer; input { margin: 0; flex: 0 0 auto; transform: translateY(0.12em); accent-color: var(--accent); } }
+.mkOptionText { flex: 1 1 auto; min-width: 0; }
+.mkOptionMark { flex: 0 0 auto; display: inline-flex; align-self: center; }
+.mkOption--right { background: var(--accent); color: var(--on-accent); }
+.mkOption--wrong .mkOptionText { text-decoration: line-through; }
+.mkOption--wrong, .mkOption--dim { color: var(--ink-muted); }
+.mkQuestion--revealed .mkOptionLabel { cursor: default; }
+.mkExplanation { margin: 0 0 0 1.6em; font-size: 0.94em; }
+.mkHints { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.mkHint { padding-left: var(--space-3); border-left: 2px solid currentColor; font-style: italic; }
+.mkAccepted { margin: var(--space-2) 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.mkAcceptedLabel { font-weight: 600; }
+.mkAcceptedAnswer { padding: 0 var(--space-2); background: var(--accent); color: var(--on-accent); }
+.mkQuestionBar { display: flex; align-items: center; gap: 2px; margin-top: var(--space-3); }
+.mkResult { margin-left: var(--space-2); font-weight: 600; &:empty { display: none; } }
 .mkAnswerField {
   width: 100%; max-width: 320px; box-sizing: border-box; padding: var(--space-1) var(--space-2); border: 0; box-shadow: inset 0 0 0 1px var(--hairline);
   background: var(--surface-base); color: var(--ink); font: inherit;
   &::placeholder { color: var(--ink-faint); }
+  &:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
 }
 .mkPullin { display: flex; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); background: var(--ov-sink-1); font-style: italic; }
 

@@ -17,6 +17,9 @@
   .trMaterialBar { display: flex; justify-content: flex-end; }
   .trMaterial, .trAbout, .trGroupDefinition {
     .mkQuestion, .mkPullin { background: var(--level-wash-lo); }
+    // a revealed question's other options keep the level's ink (struck when chosen): the muted ink is the theme's, not the level's
+    .mkOption--wrong, .mkOption--dim { color: inherit; }
+    .mkQuestionBar .mkIconBtn { background: var(--level-wash-lo); color: inherit; &:hover { background: var(--level-wash); } }
   }
   .trMaterialBar .mkIconBtn { background: var(--level-wash-lo); color: inherit; &:hover { background: var(--level-wash); } &:focus-visible { outline-color: var(--wr-accent-light); } }
   // A curriculum in the Catalog: its name, what it is, and its courses.

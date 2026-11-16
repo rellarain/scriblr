@@ -3,15 +3,16 @@ import type { TrainingContentDraft } from '../../api/types'
 import { linksOf } from '../../lib/markup/checks'
 import { classifyLine } from '../../lib/markup/lines'
 import { linksIn, parseInline } from '../../lib/markup/inline'
-import { parseCached, type Block, type ListItem, type QuestionBlock } from '../../lib/markup/parse'
+import { parseCached, type Block, type ListItem } from '../../lib/markup/parse'
 import { LinkCtx, useLinkContext } from './linkContext'
+import { PracticeQuestion } from './QuestionView'
 import { QuestionIcon } from '../../assets/icons'
 import { renderInline, renderLines } from './renderInline'
 import './markup.scss'
 
 // The read-only view of Scriblr's markup (lib/markup). Headings are real headings whose levels follow the container's own: `######` is
 // one below `baseLevel` (the heading of what holds the text), each smaller marker one further down, never past h6. Lists are lists, a
-// number read with its item; quotes are quotes. Knowledge checks show their question and options (they become practice in a later slice).
+// number read with its item; quotes are quotes. A knowledge check is a practice question (QuestionView.tsx).
 
 type Heading = 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
@@ -52,23 +53,6 @@ function List({ items }: { items: ListItem[] }) {
   )
 }
 
-function StaticQuestion({ q }: { q: QuestionBlock }) {
-  return (
-    <div className="mkQuestion" role="group" aria-label="Practice question">
-      <p className="mkPrompt">{renderInline(q.prompt)}</p>
-      {q.type === 'text'
-        ? <input className="mkAnswerField" type="text" disabled placeholder={q.placeholder} aria-label="Your answer" />
-        : q.options.length > 0 && (
-          <ul className="mkOptions" role="list">
-            {q.options.map(o => (
-              <li key={o.line} className="mkOption"><span className={`mkMark mkMark--${q.type}`} aria-hidden="true" />{renderInline(o.inline)}</li>
-            ))}
-          </ul>
-        )}
-    </div>
-  )
-}
-
 function BlockView({ block, baseLevel }: { block: Block; baseLevel: number }) {
   switch (block.kind) {
     case 'paragraph': return <p className="mkP">{renderLines(block.lines)}</p>
@@ -78,7 +62,7 @@ function BlockView({ block, baseLevel }: { block: Block; baseLevel: number }) {
     }
     case 'list': return <List items={block.items} />
     case 'quote': return <blockquote className="mkQuote"><p>{renderLines(block.lines)}</p></blockquote>
-    case 'question': return <StaticQuestion q={block} />
+    case 'question': return <PracticeQuestion q={block} />
     case 'pullin': return <p className="mkPullin"><QuestionIcon size={14} /> {block.ref}</p>
   }
 }

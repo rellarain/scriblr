@@ -60,7 +60,14 @@ A question is a `????` line and the check lines after it (blank lines are allowe
 | `!` | an accepted answer of the text field, one per line |
 | `?????` | pulls in a question written in a quiz, test or exam (`?????@writer@draft#q7f3a`) |
 
-They are practice: nothing is saved. Until the practice slice they show as their question and options (`.mkQuestion`, the marks `.mkMark--checkbox` and `.mkMark--choice` drawn in the ink), never their answers, hints or explanations; a pulled-in question shows its reference (`.mkPullin`).
+They are **practice: nothing is saved** (`components/markup/QuestionView.tsx`: `QuestionView`, the question and its controls, and `PracticeQuestion`). A question (`.mkQuestion`, `role="group"` *Practice question*) shows its prompt and **radio buttons** (multiple choice, a `radiogroup`), **check boxes**, or a **text field** with its placeholder, then a bar of icon buttons: **Hint** (`SparkleIcon`; one hint a press, listed under the options, turned off when none are left), **Check** (`CheckIcon`; turned off until something is chosen or typed) and **Show the answer** (`EyeIcon`; at any time).
+
+- **Revealed** (by Check or Show the answer; it **stays answered**, no Try again): the right options are **highlighted** (`.mkOption--right`, the accent with the on-accent ink and a tick), a wrong choice is **struck** with a cross (`.mkOption--wrong`), the other options are **dimmed** (`.mkOption--dim`, the muted ink, still 4.5:1), **every explanation** shows under its option (`.mkExplanation`), and a text field shows its **accepted answers** (`.mkAccepted`, each in the accent). These are the accent / on-accent and muted-ink pairs the contrast audit already holds; in Training the dimmed options keep the level's ink.
+- **Check** also says how it went (`.mkResult`, a status): *Right.*, *Not quite.*, or for check boxes the share earned (*2 of 3.*). Show the answer says nothing.
+- **Text answers** (`lib/markup/answers.ts`) match an accepted answer ignoring capitals, extra spaces, punctuation and accents, and allow small typos: none in an answer under 5 characters, 1 for 5 to 9, 2 for 10 or more; two letters swapped count as one.
+- **Scores** (`lib/markup/score.ts`, used by the quizzes): multiple choice and text are right or wrong; check boxes earn a share, the right boxes ticked less the wrong ones over how many are right, never below 0.
+
+A pulled-in question shows its reference (`.mkPullin`) until the quiz slice.
 
 ## The editor
 
