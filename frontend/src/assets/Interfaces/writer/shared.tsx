@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { PlusIcon, TrashIcon } from '../../icons'
+import { TrashIcon } from '../../icons'
 export { useStoredState } from './storage'
 
 export function ConsoleTitleRow({ console: consoleName, component, right }: {
@@ -65,7 +65,13 @@ export function DeleteControl({ message, onConfirm, tone = 'light', blockedReaso
   )
 }
 
-// A textarea that grows with its content.
+const fitHeight = (el: HTMLTextAreaElement | null) => {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+// A textarea that grows with its content, and again when its width changes (a tile resized).
 export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField, 'aria-label': ariaLabel }: {
   value: string
   onChange: (next: string) => void
@@ -78,51 +84,21 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   'aria-label'?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => fitHeight(ref.current), [value])
   useEffect(() => {
     const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [value])
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let width = el.clientWidth
+    const watch = new ResizeObserver(() => { if (el.clientWidth !== width) { width = el.clientWidth; fitHeight(el) } })
+    watch.observe(el)
+    return () => watch.disconnect()
+  }, [])
   return (
     <textarea
       ref={ref} rows={rows} className={className} placeholder={placeholder} value={value} aria-label={ariaLabel}
       data-kf={keyField === 'draft' ? 'draft' : keyField ? '' : undefined}
       onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}
     />
-  )
-}
-
-// Keyword / template-field chips with an add box (Enter or the + button).
-export function ChipEditor({ items, placeholder, onAdd, onRemove }: {
-  items: { key: string; label: string }[]
-  placeholder: string
-  onAdd: (value: string) => void
-  onRemove: (key: string) => void
-}) {
-  const [draft, setDraft] = useState('')
-  function submit() {
-    if (!draft.trim()) return
-    onAdd(draft)
-    setDraft('')
-  }
-  return (
-    <div className="wrChipRow">
-      {items.map(item => (
-        <span key={item.key} className="wrChip">
-          {item.label}
-          <button type="button" aria-label={`Remove ${item.label}`} onClick={() => onRemove(item.key)}>×</button>
-        </span>
-      ))}
-      <span className="wrChipAdd">
-        <input
-          value={draft} placeholder={placeholder} data-kf=""
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
-        />
-        <button type="button" aria-label={`Add ${placeholder}`} disabled={!draft.trim()} onClick={submit}><PlusIcon size={12} /></button>
-      </span>
-    </div>
   )
 }
 

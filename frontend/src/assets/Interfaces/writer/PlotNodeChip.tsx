@@ -2,13 +2,14 @@ import type { ReactNode } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { ParentKeywords } from './PlotParents'
+import { PlotLinkChips } from './PlotChipField'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
 
-// A plot node as a row under another: a button that opens it (its title), then all its keywords and its whole description, in the colour the node
-// has in the plot (a subcategory's or a cluster's own fill, a plotline on its category's, with the stripes of its place in the tree at the left).
-// The child rows of a category, subcategory or cluster editor are these (PlotView.tsx), and so are the links of a node (LinkedSection.tsx), which also
-// say what kind of node it is and where it sits, and carry a button of their own (`actions`, beside the title).
+// A plot node as a row under another: a button that opens it (its title), then all its keywords and links and its whole description, in the colour the
+// node has in the plot (a subcategory's or a cluster's own fill, a plotline on its category's, with the stripes of its place in the tree at the left).
+// The child rows of a category, subcategory or cluster editor are these (PlotView.tsx); `kind`, `place`, `actions` and `below` say what kind of node it
+// is and where it sits, and give it a button of its own (beside the title) and something under it.
 export function PlotNodeChip({ w, node, meta, kind, place, actions, below }: {
   w: WriterWorkspace
   node: PlotNode
@@ -37,6 +38,7 @@ export function PlotNodeChip({ w, node, meta, kind, place, actions, below }: {
       </div>
       {trail !== '' && <span className="wrChildRowPlace">{trail}</span>}
       <ParentKeywords parent={node} label={label} />
+      <PlotLinkChips node={node} byId={w.plotNodeById} projectHue={w.projectHue} label={label} onOpen={w.focusPlotNode} />
       {body !== '' && <p className="wrParentBody">{body}</p>}
       {below}
     </div>

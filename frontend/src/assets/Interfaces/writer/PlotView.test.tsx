@@ -706,7 +706,7 @@ describe('the parent chips', () => {
     expect(document.querySelector('.wrParents input, .wrParents textarea')).toBeNull() // expanded is still only reading
     fireEvent.click(chips().getByRole('button', { name: 'Edit Romance' }))
     expect(chips().getByRole('slider', { name: 'Category colour' })).toBeInTheDocument()
-    expect(chips().getByPlaceholderText('Add keyword…')).toBeInTheDocument()
+    expect(chips().getByPlaceholderText('Add keyword or @link…')).toBeInTheDocument()
     fireEvent.change(chips().getByLabelText('Category title'), { target: { value: 'Love stories' } })
     fireEvent.change(chips().getByLabelText('Category description'), { target: { value: 'Always two people.' } })
     expect(tile('Contents').getByRole('button', { name: 'Love stories' })).toBeInTheDocument() // the contents follow
@@ -826,7 +826,7 @@ describe('the level fold circles', () => {
     expect(head.lastElementChild!.firstElementChild).toHaveClass('wrNavDots')
     expect(within(head).getByRole('button', { name: /^\s*Category$/ })).toBeInTheDocument()
     expect([...container.querySelectorAll('.wrPlotNavHead .wrNavDots .wrNavDot')].map(d => d.getAttribute('aria-label'))).toEqual(['Collapse all categories', 'Collapse all subcategories', 'Collapse all clusters'])
-    expect([...head.lastElementChild!.children].map(c => c.className)).toEqual(['wrNavDots', 'wrNavDot wrNavDot--desc', 'wrNavDot wrNavDot--keys'])
+    expect([...head.lastElementChild!.children].map(c => c.className)).toEqual(['wrNavDots', 'wrNavDot wrNavDot--desc', 'wrNavDot wrNavDot--keys', 'wrNavDot wrNavDot--links'])
     expect(container.querySelector('.wrPlotNav')!.lastElementChild).toHaveClass('wrPlotNavRows')
   })
 
@@ -1227,66 +1227,79 @@ describe('the Plot console\'s tiles', () => {
   })
 })
 
-// A node's links, kept on both ends (plotLinks.ts), and what the editors show of them.
+// A node's links, kept on both ends (plotLinks.ts): typed into the Keywords field after @ (PlotChipField.tsx), shown as chips there, on the parent
+// chips when they are expanded and on the child rows.
 describe('linked plot nodes', () => {
-  const linked = () => within(screen.getByRole('list', { name: /^Linked to / }))
+  const links = (label: string) => within(screen.getByRole('list', { name: `Links of ${label}` }))
+  const box = () => screen.getByRole('combobox', { name: /^Add a keyword or a link to / })
   const withLink = (a: string, b: string) => (nodes: PlotNode[]) =>
     nodes.map(n => (n.id === a ? { ...n, links: [b] } : n.id === b ? { ...n, links: [a] } : n))
 
-  it('has a Linked section in a plotline details, empty to begin with, whose picker leaves out its own parents', () => {
+  // (characters, places, items and scenes keep their own picker below: links/WorldLinks.test.tsx)
+  it('has no link picker of its own: the Keywords box links after @', () => {
     render(<Editor start={clustered()} />)
-    expect(screen.getByText('Linked')).toBeInTheDocument()
-    expect(screen.getByText('Nothing linked yet.')).toBeInTheDocument()
-    const picker = screen.getByRole('combobox', { name: 'Add link' })
-    expect(picker).toBeDisabled()
-    expect(picker.querySelectorAll('optgroup')).toHaveLength(0)
+    expect(screen.queryByRole('combobox', { name: 'Add link' })).toBeNull()
+    expect(screen.queryByText('Linked')).toBeNull()
+    expect(box()).toHaveAttribute('placeholder', 'Add keyword or @link…')
   })
 
-  it('links the plotline to a cluster of another category and lists it, in that node colour, with its keywords and description', () => {
+  it('links the plotline to a cluster of another category from @, as a chip in that node colour, and the cluster shows it too', () => {
     const start = startingPlot().concat(
       plotNode('cat2', 'category', null, { title: 'Heist', hue: 20 }),
-      plotNode('crew', 'cluster', 'cat2', { title: 'Crew', hue: 40, body: 'The team.', keywords: ['a', 'b', 'c', 'd', 'e'] }),
+      plotNode('crew', 'cluster', 'cat2', { title: 'Crew', hue: 40, body: 'The team.' }),
     )
     render(<Editor start={start} />)
-    const picker = screen.getByRole('combobox', { name: 'Add link' })
-    expect([...picker.querySelectorAll('optgroup')].map(g => g.getAttribute('label'))).toEqual(['Categories', 'Clusters'])
-    fireEvent.change(picker, { target: { value: 'crew' } })
-    const chip = within(screen.getByRole('list', { name: 'Linked to Meet cute' })).getByRole('button', { name: 'Open Crew' }).closest('.wrChildRow') as HTMLElement
-    expect(chip).toHaveClass('wrChildRow--cluster')
+    fireEvent.change(box(), { target: { value: '@cr' } })
+    const picker = within(screen.getByRole('listbox', { name: 'Link Meet cute to' }))
+    expect(picker.getAllByRole('option').map(o => o.textContent)).toEqual(['CrewclusterHeist'])
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    const chip = screen.getByRole('button', { name: 'Open Crew' }).closest('.wrLinkChip') as HTMLElement
+    expect(chip).toHaveClass('wrLinkChip--cluster')
     expect(chip.style.getPropertyValue('--wr-cluster-fill')).not.toBe('')
-    expect(within(chip).getByText('cluster')).toBeInTheDocument()
-    expect(within(chip).getByText('Heist')).toBeInTheDocument()
-    expect(within(chip).getByText('The team.')).toBeInTheDocument()
-    expect(within(within(chip).getByRole('list', { name: 'Keywords of Crew' })).getAllByRole('listitem')).toHaveLength(5)
-    expect(screen.queryByText('Nothing linked yet.')).toBeNull()
-  })
-
-  it('shows the link from the other end, and a click on it opens that node', () => {
-    render(<Editor start={withLink('line', 'sub')(startingPlot())} focused="sub" />)
-    fireEvent.click(linked().getByRole('button', { name: 'Open Meet cute' }))
-    expect(screen.getByPlaceholderText('Plotline title')).toHaveValue('Meet cute')
-    expect(linked().getByRole('button', { name: 'Open Slow burn' })).toBeInTheDocument()
+    expect(box()).toHaveValue('')
+    expect(screen.queryByRole('listbox')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Crew' }))
+    expect(screen.getByRole('button', { name: 'Open Meet cute' }).closest('.wrLinkChip')).not.toBeNull()
   })
 
   it('asks before removing a link, and removes it from both ends', () => {
     const start = withLink('line', 'cold')(startingPlot().concat(plotNode('cold', 'plotline', 'cat', { title: 'Cold open' })))
     render(<Editor start={start} />)
     fireEvent.click(screen.getByRole('button', { name: 'Remove the link to Cold open' }))
+    expect(screen.getByRole('group', { name: 'Remove the link to Cold open?' })).toHaveTextContent("It also leaves Cold open's links.")
     fireEvent.click(within(screen.getByRole('group', { name: 'Remove the link to Cold open?' })).getByRole('button', { name: 'Cancel' }))
-    expect(linked().getByRole('button', { name: 'Open Cold open' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Cold open' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove the link to Cold open' }))
     fireEvent.click(within(screen.getByRole('group', { name: 'Remove the link to Cold open?' })).getByRole('button', { name: 'Confirm' }))
-    expect(screen.queryByRole('list', { name: /^Linked to / })).toBeNull()
-    expect(screen.getByText('Nothing linked yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open Cold open' })).toBeNull()
   })
 
-  it('has the section in a category, a subcategory and a cluster editor too', () => {
+  it('has the field in a category, a subcategory and a cluster editor too, and its description grows with its text', () => {
     for (const id of ['cat', 'sub', 'clu']) {
       const { unmount } = render(<Editor start={clustered()} focused={id} />)
-      expect(screen.getByText('Linked')).toBeInTheDocument()
-      expect(screen.getByRole('combobox', { name: 'Add link' })).toBeInTheDocument()
+      expect(box()).toBeInTheDocument()
+      expect(document.querySelector('.wrCardPanelHead ~ div textarea')).toHaveClass('wrField--grow')
       unmount()
     }
+  })
+
+  it('shows a parent chip\'s links only when it is expanded, and its editor links from @ too', () => {
+    const start = withLink('cat', 'cold')(clustered().concat(plotNode('cold', 'plotline', 'cat', { title: 'Cold open' })))
+    render(<Editor start={start} />)
+    const parents = within(screen.getByRole('group', { name: 'Parents' }))
+    expect(parents.queryByRole('list', { name: 'Links of Romance' })).toBeNull() // minimized: keywords only
+    fireEvent.click(parents.getByRole('button', { name: 'Expand Romance' }))
+    expect(links('Romance').getByRole('button', { name: 'Open Cold open' })).toBeInTheDocument()
+    fireEvent.click(parents.getByRole('button', { name: 'Edit Romance' }))
+    const field = within(parents.getByRole('combobox', { name: 'Add a keyword or a link to Romance' }).closest('.wrChipField') as HTMLElement)
+    expect(field.getByRole('button', { name: 'Remove the link to Cold open' })).toBeInTheDocument()
+  })
+
+  it('shows the links of a child row', () => {
+    const start = withLink('line', 'cold')(startingPlot().concat(plotNode('cold', 'plotline', 'cat', { title: 'Cold open' })))
+    render(<Editor start={start} focused="sub" />)
+    const row = screen.getByRole('button', { name: 'Open Meet cute' }).closest('.wrChildRow') as HTMLElement
+    expect(within(within(row).getByRole('list', { name: 'Links of Meet cute' })).getByRole('button', { name: 'Open Cold open' })).toBeInTheDocument()
   })
 })
 

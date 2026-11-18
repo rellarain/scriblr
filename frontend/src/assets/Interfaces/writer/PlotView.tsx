@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { GridViewIcon, OutlineIcon, PencilIcon, PlusIcon, QueueIcon, TreeIcon } from '../../icons'
-import { ChipEditor, DeleteControl } from './shared'
+import { AutoTextarea, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
@@ -15,7 +15,9 @@ import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
 import { PlotParents, type ParentState, type ParentStates } from './PlotParents'
 import { PlotNodeChip } from './PlotNodeChip'
-import { LinkedSection } from './LinkedSection'
+import { PlotChipField } from './PlotChipField'
+import { WorldLinks } from './links/WorldLinks'
+import { nearestOfKind } from './outlineTree'
 import { linksOf } from './plotLinks'
 import PlotpointsTab from './levels/PlotpointsTab'
 import { SplitArea, type SplitTile } from './SplitArea'
@@ -70,19 +72,27 @@ function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   return <HueSlider label={label} {...w.plotHueSliderOf(node)} />
 }
 
-function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+// A node's links to characters, places, items and scenes (its links to other plot nodes are in its Keywords field: PlotChipField.tsx).
+export function PlotWorldLinks({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   return (
-    <div>
-      <div className="wrLabel">Keywords</div>
-      <ChipEditor
-        items={node.keywords.map(k => ({ key: k, label: k }))} placeholder="Add keyword…"
-        onAdd={k => w.addPlotKeyword(node.id, k)} onRemove={k => w.removePlotKeyword(node.id, k)}
-      />
-    </div>
+    <WorldLinks
+      projectId={w.activeProjectId} self={`plot:${node.id}`} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} outline={w.outlineNodes}
+      onOpenScene={id => { const ch = nearestOfKind(w.outlineNodes, id, 'chapter'); if (ch) w.openChapter(ch.id) }} heading="Characters, places, items and scenes"
+    />
   )
 }
 
-// What a parent chip opens onto in an editor (PlotParents.tsx): the parent's own title, description, colour and keywords, changed in place.
+// A plot editor's description: as tall as its text.
+function DescriptionField({ w, node, label }: { w: WriterWorkspace; node: PlotNode; label?: string }) {
+  return (
+    <AutoTextarea
+      className="wrField wrField--grow" keyField={label === undefined} rows={2} placeholder="Description" value={node.body} aria-label={label}
+      onChange={value => w.updatePlotNodeField(node.id, 'body', value)}
+    />
+  )
+}
+
+// What a parent chip opens onto in an editor (PlotParents.tsx): the parent's own title, description, colour, keywords and links, changed in place.
 function ParentFields({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const kind = `${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)}`
   return (
@@ -91,12 +101,9 @@ function ParentFields({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
         className="wrField" aria-label={`${kind} title`} placeholder={`${kind} title`} value={node.title}
         onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)}
       />
-      <textarea
-        className="wrField" aria-label={`${kind} description`} rows={2} placeholder="Description" value={node.body}
-        onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
-      />
+      <DescriptionField w={w} node={node} label={`${kind} description`} />
       <HueField w={w} node={node} />
-      <KeywordsField w={w} node={node} />
+      <PlotChipField w={w} node={node} />
     </div>
   )
 }
@@ -125,14 +132,11 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       </div>
       <div>
         <div className="wrLabel">Description</div>
-        <textarea
-          className="wrField" data-kf="" rows={2} placeholder="Description" value={node.body}
-          onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
-        />
+        <DescriptionField w={w} node={node} />
       </div>
       <HueField w={w} node={node} />
-      <KeywordsField w={w} node={node} />
-      <LinkedSection w={w} node={node} />
+      <PlotChipField w={w} node={node} />
+      <PlotWorldLinks w={w} node={node} />
       <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId, dragSetId, setDragSetId }} />
       {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
       {node.kind === 'subcategory' && <ChildRows w={w} node={node} kind="cluster" addLabel="Cluster" />}
@@ -182,13 +186,10 @@ function PlotlineEditor({ w, node, ui, dragId, setDragId }: { w: WriterWorkspace
         </div>
         <div>
           <div className="wrLabel">Description</div>
-          <textarea
-            className="wrField" data-kf="" rows={2} placeholder="Description" value={node.body}
-            onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
-          />
+          <DescriptionField w={w} node={node} />
         </div>
-        <KeywordsField w={w} node={node} />
-        <LinkedSection w={w} node={node} />
+        <PlotChipField w={w} node={node} />
+        <PlotWorldLinks w={w} node={node} />
       </div>
 
       <div className="wrFieldsPanel">

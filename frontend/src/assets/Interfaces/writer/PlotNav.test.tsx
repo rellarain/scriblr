@@ -96,7 +96,7 @@ describe('the full descriptions toggle', () => {
     const { container } = render(<Nav start={start()} />)
     const tools = container.querySelector('.wrPlotNavHead')!.lastElementChild as HTMLElement
     expect(tools).toHaveClass('wrNavTools')
-    expect([...tools.children].map(c => c.className)).toEqual(['wrNavDots', 'wrNavDot wrNavDot--desc', 'wrNavDot wrNavDot--keys']) // the fifth is the keywords
+    expect([...tools.children].map(c => c.className)).toEqual(['wrNavDots', 'wrNavDot wrNavDot--desc', 'wrNavDot wrNavDot--keys', 'wrNavDot wrNavDot--links']) // the fifth is the keywords, the sixth the links
     expect(within(screen.getByRole('group', { name: 'Fold a whole level' })).queryByRole('button', { name: /descriptions/ })).toBeNull()
     expect(toggle()).toHaveAttribute('aria-pressed', 'false')
     expect(toggle()).toHaveAttribute('aria-label', 'Show full descriptions')
@@ -303,5 +303,46 @@ describe('the keywords toggle', () => {
     expect(keys()).toHaveAttribute('aria-pressed', 'true')
     expect(chips(row(container, 'category'))).toEqual(['cast', 'people'])
     expect(desc()).toHaveAttribute('aria-pressed', 'false')
+  })
+})
+
+describe('the links toggle', () => {
+  const start = (linked = true) => [
+    plotNode('cat', 'category', null, { title: 'Characters', keywords: ['cast'] }),
+    plotNode('line', 'plotline', 'cat', { title: 'Ada', links: linked ? ['heist'] : [] }),
+    plotNode('cat2', 'category', null, { title: 'Crimes', order: 1 }),
+    plotNode('heist', 'plotline', 'cat2', { title: 'The heist', links: linked ? ['line'] : [] }),
+  ] as PlotNode[]
+  const links = () => screen.getByRole('button', { name: /links$/ })
+  const row = (container: HTMLElement, title: string) => [...container.querySelectorAll<HTMLElement>('.wrNavRow')].find(r => r.querySelector('.wrNavLabel')?.textContent === title) as HTMLElement
+
+  it('is the sixth circle, after the keywords one, off and dimmed while no node has a link', () => {
+    const { unmount } = render(<Nav start={start(false)} />)
+    expect(links()).toBeDisabled()
+    unmount()
+    render(<Nav start={start()} />)
+    expect(links()).toBeEnabled()
+    expect(links()).toHaveAttribute('aria-pressed', 'false')
+    expect(links()).toHaveAttribute('aria-label', 'Show links')
+    expect(links().previousElementSibling).toBe(screen.getByRole('button', { name: /keywords$/ }))
+  })
+
+  it('shows each node\'s links as chips in the linked node\'s colour, on both ends, and is kept across restarts', async () => {
+    const { container } = render(<Nav start={start()} />)
+    expect(container.querySelector('.wrLinkChip')).toBeNull()
+    await userEvent.click(links())
+    expect(links()).toHaveClass('wrNavDot--links', 'wrNavDot--on')
+    const ada = within(within(row(container, 'Ada')).getByRole('list', { name: 'Links of Ada' }))
+    expect(ada.getByRole('button', { name: 'Open The heist' })).toBeInTheDocument()
+    expect(ada.getByRole('button', { name: 'Open The heist' }).closest('.wrLinkChip')).toHaveClass('wrLinkChip--plotline')
+    expect(within(row(container, 'The heist')).getByRole('button', { name: 'Open Ada' })).toBeInTheDocument()
+    expect(getKv('scriblr.writer.plotNavLinks')).toBe(true)
+  })
+
+  it('opens the linked node from its chip', async () => {
+    const { container } = render(<Nav start={start()} />)
+    await userEvent.click(links())
+    await userEvent.click(within(row(container, 'Ada')).getByRole('button', { name: 'Open The heist' }))
+    expect(screen.getByLabelText('focused')).toHaveTextContent('heist')
   })
 })

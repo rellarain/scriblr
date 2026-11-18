@@ -220,9 +220,12 @@ described, now stale, in `docs/data-model.md`).
   in one set at most). **Links:** a category, subcategory, cluster or plotline can be linked to
   any other of those (never a plotpoint): `links` holds the ids of the others (at most 100),
   kept on **both** ends (`writer/plotLinks.ts`: `syncLinks` runs in `commitPlot`, so a deleted
-  node leaves no link behind, and in `migratePlot` on open). The Linked section of each editor
-  (`LinkedSection.tsx`) lists them as rows (`PlotNodeChip.tsx`) that open the node, and adds one
-  from a picker grouped by kind; taking one away asks first. A node lists its loose fields first, then its sets, then (a
+  node leaves no link behind, and in `migratePlot` on open). Each editor's Keywords field
+  (`PlotChipField.tsx`) shows them as chips after the keywords, each in the linked node's
+  colour and opening it, and adds one when what is typed starts with @ (the matches listed
+  with their kind and place); taking one away asks first. A keyword's text is edited in place
+  there. The contents (a sixth circle), the expanded parent chips and the child rows show the
+  links too. A node lists its loose fields first, then its sets, then (a
   plotline) its `Scrap` field. A set passes down to the plotlines like its fields (read-only
   there, folded or open as the writer left it, remembered per set); a plotline makes its own
   sets for its own fields; deleting a set keeps its fields, loose. A value defined on a category,

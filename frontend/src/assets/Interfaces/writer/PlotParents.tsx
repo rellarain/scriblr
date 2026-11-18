@@ -3,10 +3,12 @@ import type { PlotNode } from '../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, PencilIcon } from '../../icons'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
+import { PlotLinkChips } from './PlotChipField'
 
 // The parents of a plot node as chips, top-down (category, subcategory, cluster), each in its own plot colour. A chip has three states:
 //   minimized: the title and the keywords (small chips); a click on it expands it
-//   expanded:  the title (a link to that parent's own editor), the keywords and the whole description; a pencil opens the editor, the chevron minimizes it
+//   expanded:  the title (a link to that parent's own editor), the keywords, its links (each opens that node) and the whole description; a pencil opens
+//              the editor, the chevron minimizes it
 //   editor:    the parent's own fields to change in place (given `renderEditor`, the editors of the Plot console), reached only from expanded
 // The stripes at a chip's left are its tree's: category, subcategory, cluster.
 // Without `renderEditor` (Compare's group headers) there is no editor state, and a chip with no description is only a link to the parent.
@@ -82,6 +84,7 @@ export function PlotParents({ node, byId, projectHue, states, onState, onOpen, r
             {editing && renderEditor ? renderEditor(parent) : (
               <>
                 <ParentKeywords parent={parent} label={label} />
+                <PlotLinkChips node={parent} byId={byId} projectHue={projectHue} label={label} onOpen={onOpen} />
                 {body !== '' && <p className="wrParentBody">{body}</p>}
               </>
             )}

@@ -912,14 +912,31 @@ export function useWriterWorkspace() {
     commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hue } : n)), nodeId, projectRangeRef.current, projectHueRef.current), false)
   }
 
+  // A keyword is kept once, trimmed; it never starts with @ (in the keyword box, @ starts a link: PlotChipField.tsx).
   function addPlotKeyword(nodeId: string, keyword: string) {
     const trimmed = keyword.trim()
-    if (!trimmed) return
+    if (!trimmed || trimmed.startsWith('@')) return
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId && !n.keywords.includes(trimmed) ? { ...n, keywords: [...n.keywords, trimmed] } : n)), true)
   }
 
   function removePlotKeyword(nodeId: string, keyword: string) {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, keywords: n.keywords.filter(k => k !== keyword) } : n)), true)
+  }
+
+  // A keyword edited in place: it keeps its place; edited into one the node already has, the two become one. A blank or @ edit changes nothing.
+  function renamePlotKeyword(nodeId: string, from: string, to: string) {
+    const trimmed = to.trim()
+    if (!trimmed || trimmed === from || trimmed.startsWith('@')) return
+    commitPlot(plotNodesRef.current.map(n => {
+      if (n.id !== nodeId || !n.keywords.includes(from)) return n
+      return { ...n, keywords: n.keywords.includes(trimmed) ? n.keywords.filter(k => k !== from) : n.keywords.map(k => (k === from ? trimmed : k)) }
+    }), true)
+  }
+
+  // A keyword edited into a link (@ while editing it): the keyword goes and the link is made on both ends, as one step.
+  function keywordToLink(nodeId: string, keyword: string, otherId: string) {
+    const without = plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, keywords: n.keywords.filter(k => k !== keyword) } : n))
+    commitPlot(linkNodes(without, nodeId, otherId), true)
   }
 
   // Link two plot nodes, or take the link away: both ends change (plotLinks.ts).
@@ -1154,7 +1171,7 @@ export function useWriterWorkspace() {
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
     plotSelection, setPlotSelection, togglePlotSelection,
     focusPlotNode, addPlotNode, addPlotPreset, updatePlotNodeField, setPlotHue, deletePlotNode,
-    addPlotKeyword, removePlotKeyword, addPlotLink, removePlotLink,
+    addPlotKeyword, removePlotKeyword, renamePlotKeyword, keywordToLink, addPlotLink, removePlotLink,
     addPlotField, renamePlotField, movePlotField, removePlotField,
     setPlotFieldKind, addPlotOption, renamePlotOption, movePlotOption, removePlotOption, togglePlotOption, choosePlotOption, setPlotTextAnswer, removePlotAnswer,
     addPlotFieldset, renamePlotFieldset, movePlotFieldset, removePlotFieldset, setPlotFieldSet,

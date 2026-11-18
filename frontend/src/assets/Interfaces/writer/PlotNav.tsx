@@ -5,6 +5,8 @@ import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { LevelDots } from './LevelDots'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotlinesUnder, selectionState, sortByTitle } from './plotTree'
+import { linksOf } from './plotLinks'
+import { PlotLinkChips } from './PlotChipField'
 import { PresetPicker } from './PresetPicker'
 import { useStoredState } from './storage'
 
@@ -15,7 +17,8 @@ import { useStoredState } from './storage'
 // circles they drop to a second line. Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to
 // right): lit while any node of that level is open, a click closes them all, and a click on an unlit one opens them all. A fourth circle, lit in the
 // alert hue, shows the full description of every category, subcategory, cluster and plotline under its name, and a fifth, lit in the accent's lighter
-// shade, shows its keywords as read-only chips under that (each hidden otherwise; each kept across restarts). It is the Plot console's Contents tile, which sets its width.
+// shade, shows its keywords as read-only chips under that, and a sixth, lit in the accent, its links to other plot nodes as chips under those, each in
+// that node's colour, a click opening it (each hidden otherwise; each kept across restarts). It is the Plot console's Contents tile, which sets its width.
 
 const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
 
@@ -33,11 +36,14 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [fullDesc, setFullDesc] = useStoredState<boolean>('scriblr.writer.plotNavDescriptions', false)
   const [showKeys, setShowKeys] = useStoredState<boolean>('scriblr.writer.plotNavKeywords', false)
+  const [showLinks, setShowLinks] = useStoredState<boolean>('scriblr.writer.plotNavLinks', false)
   const children = w.plotChildrenByParentId
   // Every row of the list (a plotpoint is not one) can have a description to show; with none, the toggle has nothing to switch.
   const described = w.plotNodes.some(n => n.kind !== 'plotpoint' && n.body.trim() !== '')
   // The same for the keywords.
   const keyed = w.plotNodes.some(n => n.kind !== 'plotpoint' && n.keywords.length > 0)
+  // And for the links.
+  const linked = w.plotNodes.some(n => linksOf(n).length > 0)
   const selected = useMemo(() => new Set(w.plotSelection), [w.plotSelection])
   const ticked = w.plotSelection.filter(id => w.plotNodeById.get(id)?.kind === 'plotline').length
 
@@ -71,7 +77,8 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
         const state = selectionState(node, children, selected)
         const withDesc = fullDesc && node.body.trim() !== ''
         const keywords = showKeys ? node.keywords : []
-        const stacked = withDesc || keywords.length > 0
+        const links = showLinks && linksOf(node).some(id => w.plotNodeById.has(id))
+        const stacked = withDesc || keywords.length > 0 || links
         return [
           <div
             key={node.id}
@@ -100,6 +107,7 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
                     {keywords.map(k => <span key={k} className="wrNavChip" role="listitem">{k}</span>)}
                   </span>
                 )}
+                {links && <PlotLinkChips node={node} byId={w.plotNodeById} projectHue={w.projectHue} label={nodeLabel(node)} onOpen={id => { w.focusPlotNode(id); onOpenNode?.() }} />}
               </span>
             ) : (
               <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
@@ -129,6 +137,7 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
           })}
           desc={{ on: fullDesc, disabled: !described, noun: 'full descriptions', onClick: () => setFullDesc(!fullDesc) }}
           keys={{ on: showKeys, disabled: !keyed, onClick: () => setShowKeys(!showKeys) }}
+          links={{ on: showLinks, disabled: !linked, onClick: () => setShowLinks(!showLinks) }}
         />
       </div>
       {ticked > 0 && (

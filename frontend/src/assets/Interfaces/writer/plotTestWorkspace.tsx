@@ -113,7 +113,16 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     },
     updatePlotNodeField: (id: string, field: 'title' | 'body', value: string) => commit(ref.current.map(n => (n.id === id ? { ...n, [field]: value } : n))),
     deletePlotNode: (id: string) => { commit(ref.current.filter(n => n.id !== id)); setSelection(prev => prev.filter(s => s !== id)) },
-    setPlotHue: vi.fn(), setPlotHueRange: vi.fn(), setPlotInherit: vi.fn(), addPlotKeyword: vi.fn(), removePlotKeyword: vi.fn(),
+    setPlotHue: vi.fn(), setPlotHueRange: vi.fn(), setPlotInherit: vi.fn(),
+    // the keywords as the workspace keeps them (trimmed, once, never starting with @; an edit into one already there merges)
+    addPlotKeyword: (id: string, k: string) => { const t = k.trim(); if (t && !t.startsWith('@')) commit(ref.current.map(n => (n.id === id && !n.keywords.includes(t) ? { ...n, keywords: [...n.keywords, t] } : n))) },
+    removePlotKeyword: (id: string, k: string) => commit(ref.current.map(n => (n.id === id ? { ...n, keywords: n.keywords.filter(x => x !== k) } : n))),
+    renamePlotKeyword: (id: string, from: string, to: string) => {
+      const t = to.trim()
+      if (!t || t === from || t.startsWith('@')) return
+      commit(ref.current.map(n => (n.id !== id ? n : { ...n, keywords: n.keywords.includes(t) ? n.keywords.filter(x => x !== from) : n.keywords.map(x => (x === from ? t : x)) })))
+    },
+    keywordToLink: (id: string, k: string, other: string) => commit(linkNodes(ref.current.map(n => (n.id === id ? { ...n, keywords: n.keywords.filter(x => x !== k) } : n)), id, other)),
     addPlotLink: (id: string, other: string) => commit(linkNodes(ref.current, id, other)),
     removePlotLink: (id: string, other: string) => commit(unlinkNodes(ref.current, id, other)),
     plotHueSliderOf: (node: PlotNode) => ({ hue: node.hue ?? 120, centre: 120, range: 60, maxRange: 360, inherit: node.hue == null, onChange: vi.fn(), onRange: vi.fn(), onInherit: vi.fn() }),

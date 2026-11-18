@@ -2,7 +2,8 @@
 // fold, left to right, and after them one that shows each card's description. A level's circle is lit while any card of the level is open (a
 // click closes them all) and an outline when they are all closed (a click opens them all); it is dimmed when no card of the level has anything
 // under it. The description circle stands apart from them, filled in the alert hue while the descriptions are shown, and is dimmed when none has one.
-// Given `keys`, a circle after it shows each card's keywords the same way (filled in the accent's lighter shade while they are shown).
+// Given `keys`, a circle after it shows each card's keywords the same way (filled in the accent's lighter shade while they are shown), and given
+// `links`, one after that shows each card's links (filled in the accent while they are shown).
 
 export interface LevelDot {
   key: string
@@ -14,15 +15,17 @@ export interface LevelDot {
   onClick: () => void
 }
 
-export function LevelDots({ groupLabel, levels, desc, keys }: {
+export function LevelDots({ groupLabel, levels, desc, keys, links }: {
   groupLabel: string
   levels: LevelDot[]
   // `noun` is what the circle shows or hides ("full descriptions", "synopses").
   desc: { on: boolean; disabled: boolean; noun: string; onClick: () => void }
   keys?: { on: boolean; disabled: boolean; onClick: () => void }
+  links?: { on: boolean; disabled: boolean; onClick: () => void }
 }) {
   const descLabel = desc.on ? `Hide ${desc.noun}` : `Show ${desc.noun}`
   const keysLabel = keys?.on ? 'Hide keywords' : 'Show keywords'
+  const linksLabel = links?.on ? 'Hide links' : 'Show links'
   return (
     <div className="wrNavTools">
       <div className="wrNavDots" role="group" aria-label={groupLabel}>
@@ -44,6 +47,12 @@ export function LevelDots({ groupLabel, levels, desc, keys }: {
         <button
           type="button" className={keys.on ? 'wrNavDot wrNavDot--keys wrNavDot--on' : 'wrNavDot wrNavDot--keys'} disabled={keys.disabled}
           aria-label={keysLabel} aria-pressed={keys.on} title={keysLabel} onClick={keys.onClick}
+        />
+      )}
+      {links && (
+        <button
+          type="button" className={links.on ? 'wrNavDot wrNavDot--links wrNavDot--on' : 'wrNavDot wrNavDot--links'} disabled={links.disabled}
+          aria-label={linksLabel} aria-pressed={links.on} title={linksLabel} onClick={links.onClick}
         />
       )}
     </div>

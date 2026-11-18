@@ -86,6 +86,20 @@ describe('useWriterWorkspace: adding and changing plot nodes', () => {
     expect(get('line')?.keywords).toEqual(['storm'])
     act(() => { result.current.removePlotKeyword('line', 'storm') })
     expect(get('line')?.keywords).toEqual([])
+    act(() => { result.current.addPlotKeyword('line', '@storm') }) // @ starts a link in the keyword box: never a keyword
+    expect(get('line')?.keywords).toEqual([])
+  })
+
+  it('renames a keyword in its place, merges it into one already there, and ignores a blank or @ edit', async () => {
+    const { result, get } = await opened()
+    for (const k of ['rain', 'train', 'coat']) act(() => { result.current.addPlotKeyword('line', k) })
+    act(() => { result.current.renamePlotKeyword('line', 'train', '  storm ') })
+    expect(get('line')?.keywords).toEqual(['rain', 'storm', 'coat'])
+    act(() => { result.current.renamePlotKeyword('line', 'storm', '   ') })
+    act(() => { result.current.renamePlotKeyword('line', 'storm', '@heist') })
+    expect(get('line')?.keywords).toEqual(['rain', 'storm', 'coat'])
+    act(() => { result.current.renamePlotKeyword('line', 'coat', 'rain') })
+    expect(get('line')?.keywords).toEqual(['rain', 'storm'])
   })
 
   it('sets a category\'s colour, and does not colour a plotline', async () => {
@@ -711,6 +725,18 @@ describe('useWriterWorkspace: links between plot nodes', () => {
     act(() => { result.current.removePlotLink('line2', 'line') })
     expect(links(get, 'line')).toEqual([])
     expect(links(get, 'line2')).toEqual([])
+  })
+
+  it('turns a keyword into a link on both ends as one step, which one Undo takes back', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.addPlotKeyword('line', 'rival') })
+    act(() => { result.current.keywordToLink('line', 'rival', 'line2') })
+    expect(get('line')?.keywords).toEqual([])
+    expect(links(get, 'line')).toEqual(['line2'])
+    expect(links(get, 'line2')).toEqual(['line'])
+    act(() => { result.current.history.undo('plot') })
+    expect(get('line')?.keywords).toEqual(['rival'])
+    expect(links(get, 'line')).toEqual([])
   })
 
   it('links a plotline to a category, and never a plotpoint', async () => {

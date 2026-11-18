@@ -30,6 +30,7 @@
   }
   // Lit, it is the alert colour with a ring in the ink around it, so it stands out from any ground (the alert hue alone is only about 2:1 on a level's dark fill).
   .wrNavDot--desc.wrNavDot--on { border-color: var(--wr-alert); background: var(--wr-alert); box-shadow: 0 0 0 1.5px currentColor; }
+  .wrNavDot--links.wrNavDot--on { border-color: var(--wr-accent); background: var(--wr-accent); box-shadow: 0 0 0 1.5px currentColor; }
   .wrNavDot--keys.wrNavDot--on { border-color: var(--wr-accent-light); background: var(--wr-accent-light); box-shadow: 0 0 0 1.5px currentColor; }
   .wrPlotNavAdd { align-self: flex-start; flex: 0 0 auto; }
   // "+ Category" and "+ Preset" side by side; the preset list opens downward from the head over the rows.
@@ -176,8 +177,28 @@
   .wrChildRowTool { display: inline-flex; align-items: center; padding: var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
   .wrChildRow .wrParentChips { padding-top: var(--space-1); }
   .wrChildRow .wrConfirm { margin: 0 var(--space-4) var(--space-3) var(--space-4); }
-  .wrLinked { display: flex; flex-direction: column; gap: var(--space-3); }
-  .wrLinkedList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+  // A link to another plot node as a chip (PlotChipField.tsx): in the colour that node has in the plot, with the ink audited for it (the tile ink on a
+  // category's colour, white on a subcategory's or cluster's fill; a plotline wears its category's), a ring of that ink, a link mark, and its title,
+  // which opens it. Small in the plot tree, an expanded parent chip and a child row.
+  .wrLinkChip {
+    --wr-parent-bg: var(--wr-cat, var(--ov-sink-2)); --wr-parent-ink: var(--ink);
+    display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; min-width: 0; box-sizing: border-box; padding: 3px var(--space-4);
+    background: var(--wr-parent-bg); color: var(--wr-parent-ink); font-size: var(--text-small); font-weight: 700; border-radius: var(--radius-none);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wr-parent-ink) 45%, transparent);
+    &--subcategory { --wr-parent-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-parent-ink: var(--on-accent); }
+    &--cluster { --wr-parent-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-parent-ink: var(--on-accent); }
+    svg { flex: 0 0 auto; }
+    button { color: inherit; font: inherit; padding: 0; text-align: left; }
+    button:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 1px; }
+    &--small { padding: 1px var(--space-3); }
+  }
+  .wrLinkChipOpen { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline; text-underline-offset: 2px; }
+  .wrLinkChip .wrLinkChipRemove { opacity: 0.8; font-size: var(--text-field); line-height: 1; &:hover { opacity: 1; } }
+  .wrLinkChips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .wrLinkChips > [role='listitem'] { display: inline-flex; min-width: 0; max-width: 100%; }
+  .wrParentChips + .wrLinkChips, .wrParentHead + .wrLinkChips { padding: 0 var(--space-4) var(--space-3) var(--space-4); }
+  .wrChildRow .wrLinkChips { padding: var(--space-1) var(--space-4) var(--space-3); }
+  .wrNavText .wrLinkChips { margin: var(--space-2) var(--space-1) var(--space-1); }
   .wrProjectOutline { display: flex; flex-direction: column; gap: var(--space-4); max-width: 720px; }
   .wrProjHead { display: flex; align-items: center; justify-content: space-between; .wrLabel { margin-bottom: 0; } }
   .wrProjHeadActions { display: flex; gap: var(--space-3); }
