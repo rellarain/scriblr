@@ -1262,7 +1262,6 @@ describe('linked plot nodes', () => {
   const withLink = (a: string, b: string) => (nodes: PlotNode[]) =>
     nodes.map(n => (n.id === a ? { ...n, links: [b] } : n.id === b ? { ...n, links: [a] } : n))
 
-  // (characters, places, items and scenes keep their own picker below: links/WorldLinks.test.tsx)
   it('has no link picker of its own: the Keywords box links after @', () => {
     render(<Editor start={clustered()} />)
     expect(screen.queryByRole('combobox', { name: 'Add link' })).toBeNull()

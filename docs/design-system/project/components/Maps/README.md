@@ -101,7 +101,7 @@ A plot node, a character and a place can be linked to each other (not to their o
 
 - **Chips** (`.wlList`): each link is a row with the kind ("Plot", "Character", "Place") and the other end's name (a plot node by its place in the plot, a place by the maps it is inside); the row opens the other end, the x beside it takes the link away from both ends.
 - **Picker** (`.wlSelect`, "Link to…"): grouped by kind (Plot nodes, Characters, Places), without what is linked already and without the thing's own kind.
-- **Where**: in the Characters console under Story ("Linked to"), in the Maps console under the chosen named place, and under the plot node's Linked list ("Characters, places, items and scenes"). A link to something that is deleted (a character, a place that lost its name) is simply not shown.
+- **Where**: in the Characters console under Story ("Linked to"), in the Maps console under the chosen named place. A plot editor has no picker of its own (the user, 2026-11-18): a link made from a character, a place or an item shows on that page, and a plot node's links to other plot nodes are in its Keywords field. A link to something that is deleted (a character, a place that lost its name) is simply not shown.
 - **Opening**: a plot node opens in the Plot; a character or a place opens in its own console when that console is on screen (else when its tab is next opened): the Maps console opens the map and chooses the place.
 
 ## For readers

@@ -8,7 +8,6 @@ import { charactersBackend } from '../../../../test/charactersBackend'
 import { makeWorkspace } from '../../../../test/makeWorkspace'
 import { mapsBackend } from '../../../../test/mapsBackend'
 import CharactersConsole from '../characters/CharactersConsole'
-import { PlotWorldLinks } from '../PlotView'
 import MapsConsole from '../maps/MapsConsole'
 import { idOf, kindOf, linkedTo, refOf } from './linkStore'
 import { requestOpen } from './worldNav'
@@ -137,21 +136,5 @@ describe('the links of a place', () => {
     expect(await screen.findByRole('textbox', { name: 'Name of the place' })).toHaveValue('Port Veyra')
     const group = within(await screen.findByRole('group', { name: 'Linked to' }))
     expect(group.getByRole('combobox', { name: 'Link to' })).toBeInTheDocument()
-  })
-})
-
-describe('the links of a plot node', () => {
-  it('lists characters and places under the plot links, and links a character from the plot', async () => {
-    const backend = charactersBackend([ada()])
-    const api = withLinks(backend.fetch, [{ a: `place:${PLACE.key}`, b: 'plot:line1' }])
-    const focusPlotNode = vi.fn()
-    const w = makeWorkspace({ activeProjectId: 'p1', plotNodes: PLOT, plotNodeById: new Map(PLOT.map(n => [n.id, n])), focusPlotNode, projectHue: 200 })
-    const user = userEvent.setup()
-    render(<PlotWorldLinks w={w} node={PLOT[1]} />)
-    const group = within(await screen.findByRole('group', { name: 'Characters, places, items and scenes' }))
-    expect(await group.findByRole('button', { name: 'Open Known World > Port Veyra' })).toBeInTheDocument()
-    await user.selectOptions(group.getByRole('combobox', { name: 'Link to' }), 'char:chr_a')
-    await waitFor(() => expect(api.links).toContainEqual({ a: 'char:chr_a', b: 'plot:line1' }))
-    expect(within(group.getByRole('combobox', { name: 'Link to' })).queryByRole('option', { name: 'Ada' })).not.toBeInTheDocument()
   })
 })

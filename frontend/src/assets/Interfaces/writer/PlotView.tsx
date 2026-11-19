@@ -16,8 +16,6 @@ import { PlotCompare } from './PlotCompare'
 import { PlotParents, type ParentState, type ParentStates } from './PlotParents'
 import { PlotNodeChip } from './PlotNodeChip'
 import { PlotChipField } from './PlotChipField'
-import { WorldLinks } from './links/WorldLinks'
-import { nearestOfKind } from './outlineTree'
 import { linksOf } from './plotLinks'
 import PlotpointsTab from './levels/PlotpointsTab'
 import { SplitArea, type SplitTile } from './SplitArea'
@@ -70,16 +68,6 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const label = node.kind === 'cluster' ? 'Cluster colour' : node.kind === 'subcategory' ? 'Subcategory colour' : 'Category colour'
   return <HueSlider label={label} {...w.plotHueSliderOf(node)} />
-}
-
-// A node's links to characters, places, items and scenes (its links to other plot nodes are in its Keywords field: PlotChipField.tsx).
-export function PlotWorldLinks({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
-  return (
-    <WorldLinks
-      projectId={w.activeProjectId} self={`plot:${node.id}`} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} outline={w.outlineNodes}
-      onOpenScene={id => { const ch = nearestOfKind(w.outlineNodes, id, 'chapter'); if (ch) w.openChapter(ch.id) }} heading="Characters, places, items and scenes"
-    />
-  )
 }
 
 // A plot editor's description: as tall as its text.
@@ -136,7 +124,6 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       </div>
       <HueField w={w} node={node} />
       <PlotChipField w={w} node={node} />
-      <PlotWorldLinks w={w} node={node} />
       <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId, dragSetId, setDragSetId }} />
       {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
       {node.kind === 'subcategory' && <ChildRows w={w} node={node} kind="cluster" addLabel="Cluster" />}
@@ -189,7 +176,6 @@ function PlotlineEditor({ w, node, ui, dragId, setDragId }: { w: WriterWorkspace
           <DescriptionField w={w} node={node} />
         </div>
         <PlotChipField w={w} node={node} />
-        <PlotWorldLinks w={w} node={node} />
       </div>
 
       <div className="wrFieldsPanel">
