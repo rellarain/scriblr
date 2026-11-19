@@ -100,8 +100,20 @@
   .wrAnswerFromBody { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
   .wrAnswerWho { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; }
 
-  // A value: a plain box with rounded corners; the field name small, bold and all caps in its top left
-  // corner, the title and description in the middle, one icon on the right. Unassigned it wears its
+  // The two lines heading a value's card and a plotpoint's tile (PlotValueHead.tsx; the user, 2026-11-18): the place (category › subcategory › cluster)
+  // in small capitals at the smallest size and the subtle ink, at the top right; then the holder (the plotline, or the node that defines the value) in
+  // the card's own ink and the fieldset and field in the subtle ink, small capitals a step larger. The title is larger again, in the card's ink; the
+  // description is at the place's size but in the card's ink, so it reads easily. The subtle ink is the card's at 80% (PLOT_SUBTLE_ALPHA in
+  // theme/zoneLooks.ts, audited as "plot-value-subtle").
+  .wrValuePlace {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
+    font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: color-mix(in srgb, currentColor 80%, transparent);
+  }
+  .wrValueHead { font-size: var(--text-ui); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.35; overflow-wrap: anywhere; }
+  .wrValueSep, .wrValueField { color: color-mix(in srgb, currentColor 80%, transparent); }
+
+  // A value: a plain box with rounded corners; its two heading lines (above), the title and description in the middle, one icon on the right.
+  // Unassigned it wears its
   // category colour with its subcategory as the left edge; assigned to a chapter, its book's primary
   // colour with the secondary as the edge, shaded by its awareness once it is on a moment.
   .wrPlotValue {
@@ -112,20 +124,21 @@
     &--dragging { opacity: 0.7; }
     &--highlight { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
   }
-  .wrPlotValueField { position: absolute; top: 5px; left: 14px; right: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; pointer-events: none; }
+  .wrPlotValuePlace { position: absolute; top: 5px; left: 14px; right: 8px; pointer-events: none; }
+  .wrPlotValue--noPlace { padding-top: var(--space-base); }
   .wrPlotValueGrip { flex: 0 0 auto; }
   // An answer is one line: no room above it for a field name (a value card has the room), and it must come after `.wrPlotValue` to win its padding.
   // (An option row, which is an answer too, has its own padding.)
   .wrPlotValue--answer:not(.wrOptionRow) { padding: var(--space-3) var(--space-base) var(--space-3) calc(var(--wr-edge-w, 4px) + 10px); }
   .wrPlotValueBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
   .wrPlotValueTitle { font-size: var(--text-field); font-weight: 700; overflow-wrap: anywhere; }
-  .wrPlotValueText { font-size: var(--text-ui); overflow-wrap: anywhere; }
+  .wrPlotValueText { font-size: var(--text-small); overflow-wrap: anywhere; white-space: pre-line; }
   .wrPlotValueIcon { flex: 0 0 auto; display: inline-flex; align-items: center; }
   .wrPlotValueLock { display: inline-flex; cursor: help; }
   .wrPlotValueX { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: var(--radius-button); color: inherit; &:hover { background: var(--ov-lift-2); } }
   .wrPointTitle, .wrPointBody { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: inherit; padding: 0; &::placeholder { color: color-mix(in srgb, currentColor 70%, transparent); } }
   .wrPointTitle { font-size: var(--text-field); font-weight: 700; }
-  .wrPointBody { font-size: var(--text-ui); }
+  .wrPointBody { font-size: var(--text-small); resize: none; overflow: hidden; font-family: inherit; line-height: 1.35; display: block; }
   .wrEye { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: var(--radius-button); color: inherit; &:hover:not(&--static) { background: var(--ov-lift-2); } &--static { cursor: help; } }
   .wrEyeLegend {
     list-style: none; margin: var(--space-2) 0 0; padding: var(--space-base) 0 0; border-top: 1px solid var(--wr-page-line); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) 8px; font-size: var(--text-small); color: var(--wr-page-muted);

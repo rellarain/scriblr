@@ -3,7 +3,7 @@ import type { OutlineNode, PlotNode } from '../../../api/types'
 import {
   BODY_MAX, DEFAULT_FIELD_NAME, FIELDSET_NAME_MAX, MAX_FIELDSETS, SCRAP_FIELD_NAME, TITLE_MAX, addField, addFieldset, addValue,
   canMoveValue, deleteField, deleteFieldset, deleteValue, fieldGroups, fieldLayout, fieldsInOrder, migratePlot, moveField, moveFieldset, moveValue,
-  orderValues, renameField, renameFieldset, scopeLayouts, scrapFieldId, setFieldSet, syncReferences, textOf, updateValue, valuesIn,
+  orderValues, renameField, renameFieldset, scopeLayouts, scrapFieldId, setFieldSet, syncReferences, textOf, updateValue, valueHeader, valuesIn,
 } from './plotFields'
 import { placeValue } from './plotPlacement'
 
@@ -107,6 +107,20 @@ describe('references', () => {
     for (const line of ['lineA', 'lineB', 'lineC']) expect(valuesIn(nodes, line, 'fTheme')).toHaveLength(2)
   })
 
+  it('takes a description of its own, read after the original\'s, and keeps both when it becomes the plotline\'s own value', () => {
+    let nodes = world().map(n => (n.id === 'val' ? { ...n, body: 'Earned slowly' } : n))
+    const ref = valuesIn(nodes, 'lineA', 'fTheme')[0]
+    nodes = updateValue(nodes, ref.id, { title: 'Changed', body: 'Here, through the storm' })
+    const index = () => new Map(nodes.map(n => [n.id, n]))
+    expect(find(nodes, ref.id).title).toBe('') // its title stays its original's
+    expect(textOf(find(nodes, ref.id), index())).toEqual({ title: 'Trust', body: 'Earned slowly\nHere, through the storm' })
+    expect(textOf(valuesIn(nodes, 'lineB', 'fTheme')[0], index()).body).toBe('Earned slowly') // the other plotline's is its own
+    expect(find(nodes, ref.id).body.length).toBeLessThanOrEqual(BODY_MAX)
+    nodes = placeValue(nodes, ref.id, 'ch1', outlineById)
+    nodes = deleteValue(nodes, 'val', outlineById, makeId)
+    expect([find(nodes, ref.id).refId, find(nodes, ref.id).body]).toEqual([null, 'Earned slowly\nHere, through the storm'])
+  })
+
   it('is read-only on the plotline: text edits are ignored, and it cannot be deleted there', () => {
     const nodes = world()
     const ref = valuesIn(nodes, 'lineA', 'fTheme')[0]
@@ -120,6 +134,28 @@ describe('references', () => {
     nodes = updateValue(added.nodes, added.id!, { title: 'Mine' })
     expect(valuesIn(nodes, 'lineA', 'fTheme').map(v => v.refId)).toEqual(['val', null])
     expect(valuesIn(nodes, 'lineB', 'fTheme')).toHaveLength(1)
+  })
+})
+
+describe('valueHeader', () => {
+  it('names the place above the holder top-down, then the holder, the fieldset and the field', () => {
+    const nodes = [
+      node('cat', 'category', null, { title: 'Romance', customFieldDefs: [{ id: 'fTheme', name: 'Theme', setId: 'sBig' }], customFieldSets: [{ id: 'sBig', name: 'Big picture' }] }),
+      node('sub', 'subcategory', 'cat', { title: 'Slow burn' }),
+      node('crew', 'cluster', 'sub', { title: 'Household' }),
+      node('line', 'plotline', 'crew', { title: 'Meet cute', customFieldDefs: [{ id: 'fOwn', name: 'Setback' }] }),
+      node('own', 'plotpoint', 'line', { fieldId: 'fOwn' }),
+      node('ref', 'plotpoint', 'line', { fieldId: 'fTheme', refId: 'val' }),
+      node('val', 'plotpoint', 'cat', { fieldId: 'fTheme' }),
+      node('subVal', 'plotpoint', 'sub', { fieldId: 'fTheme' }),
+    ]
+    const index = new Map(nodes.map(n => [n.id, n]))
+    const read = (id: string) => { const h = valueHeader(find(nodes, id), index); return [h.place.map(n => n.title), h.holder?.title, h.fieldset, h.field] }
+    expect(read('own')).toEqual([['Romance', 'Slow burn', 'Household'], 'Meet cute', null, 'Setback'])
+    expect(read('ref')).toEqual([['Romance', 'Slow burn', 'Household'], 'Meet cute', 'Big picture', 'Theme']) // an inherited field keeps its set
+    expect(read('val')).toEqual([[], 'Romance', 'Big picture', 'Theme']) // a category's own value: no place above it
+    expect(read('subVal')).toEqual([['Romance'], 'Slow burn', 'Big picture', 'Theme'])
+    expect(valueHeader(node('lost', 'plotpoint', 'gone'), index)).toEqual({ place: [], holder: undefined, fieldset: null, field: '' })
   })
 })
 

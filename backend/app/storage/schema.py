@@ -452,8 +452,9 @@ class PlotNode(BaseModel):
     fieldId: Optional[str] = None
     # Set only on a plotpoint that is a plotline's reference to a value defined
     # on its category or subcategory: the id of that original value. Its title
-    # and body are then read from the original. Each plotline assigns its own
-    # reference to its own chapters.
+    # is then read from the original; its body is the plotline's own description
+    # of it, read after the original's. Each plotline assigns its own reference
+    # to its own chapters.
     refId: Optional[str] = None
     # Set only on a plotpoint placed on a moment, before placements had an awareness each; read into the placement like assignedMomentId.
     awareness: Optional[PlotAwareness] = None

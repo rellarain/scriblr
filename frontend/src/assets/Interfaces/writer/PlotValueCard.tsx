@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import type { DragEvent } from 'react'
 import type { PlotNode } from '../../../api/types'
 import { GripIcon, LockIcon } from '../../icons'
-import { BODY_MAX, TITLE_MAX, textOf } from './plotFields'
+import { BODY_MAX, TITLE_MAX, valueHeader } from './plotFields'
 import { valueLook } from './plotCardColors'
 import { placedCount } from './plotPlacement'
 import { nodeLabel } from './plotTree'
-import { DeleteControl } from './shared'
+import { AutoTextarea, DeleteControl } from './shared'
+import { PlotValueHead, PlotValuePlace, placeText } from './PlotValueHead'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
-// One value of a field, as a plotpoint card: a plain box with rounded corners, the
-// field's name small and bold in the top left, the title and (once there is a
-// title and Tab is pressed) the description, a counter (x3) once it is placed, and one icon on the right:
+// One value of a field, as a plotpoint card: a plain box with rounded corners, headed by two lines (PlotValueHead.tsx: the category, subcategory and
+// cluster at the top right, then the plotline, fieldset and field), then the title and the description, which is always there and grows with its
+// text (a reference shows its original's description and takes one of the plotline's own under it), a counter (x3) once it is placed, and one icon
+// on the right:
 //   own value, not placed      delete
 //   reference                  a lock (it is deleted where it was defined)
 //   own value, placed          a lock (take its placements away first: on the plot's chapter panel, or in the outline)
@@ -27,24 +29,23 @@ export function PlotValueCard({ w, point, fieldName, drag, dragging, autoFocus }
   const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
   const placed = placedCount(point, outlineById)
   const isRef = Boolean(point.refId)
-  const text = textOf(point, w.plotNodeById)
   const original = point.refId ? w.plotNodeById.get(point.refId) : undefined
   const definedOn = original?.parentId ? w.plotNodeById.get(original.parentId) : undefined
-
-  // The description shows once there is text in it, or after Tab from a titled value.
-  const [revealed, setRevealed] = useState(false)
-  const bodyRef = useRef<HTMLInputElement>(null)
-  const showBody = text.body !== '' || revealed
-  useEffect(() => { if (revealed) bodyRef.current?.focus() }, [revealed])
-
+  const head = valueHeader(point, w.plotNodeById)
   const highlighted = w.highlightedPointId === point.id
 
   // A new value left without a title is discarded when focus leaves the card.
   function onBlur(e: React.FocusEvent<HTMLDivElement>) {
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
-    setRevealed(false)
     if (!isRef && placed === 0 && point.title.trim() === '' && point.body.trim() === '') w.removePlotValue(point.id)
   }
+  const description = (
+    <AutoTextarea
+      className="wrPointBody" keyField rows={1} value={point.body} placeholder="Description" maxLength={BODY_MAX}
+      aria-label={`${fieldName} value description`}
+      onChange={next => w.updatePlotValue(point.id, { body: next })}
+    />
+  )
 
   const icon = (() => {
     if (isRef) {
@@ -64,10 +65,10 @@ export function PlotValueCard({ w, point, fieldName, drag, dragging, autoFocus }
 
   return (
     <div
-      className={`wrPlotValue${placed === 0 ? '' : ' wrPlotValue--assigned'}${dragging ? ' wrPlotValue--dragging' : ''}${highlighted ? ' wrPlotValue--highlight' : ''}`}
+      className={`wrPlotValue${placed === 0 ? '' : ' wrPlotValue--assigned'}${dragging ? ' wrPlotValue--dragging' : ''}${highlighted ? ' wrPlotValue--highlight' : ''}${placeText(head) === '' ? ' wrPlotValue--noPlace' : ''}`}
       data-knode={point.id} data-point={point.id} style={valueLook(point, w.plotNodeById, w.projectHue)} onBlur={onBlur}
     >
-      <span className="wrPlotValueField">{fieldName}</span>
+      <PlotValuePlace head={head} className="wrPlotValuePlace" />
       {drag && (
         <span
           className="wrGrip wrPlotValueGrip" draggable {...drag} aria-label="Drag plotpoint"
@@ -77,10 +78,12 @@ export function PlotValueCard({ w, point, fieldName, drag, dragging, autoFocus }
         </span>
       )}
       <div className="wrPlotValueBody">
+        <PlotValueHead head={head} fallbackField={fieldName} />
         {isRef ? (
           <>
-            <div className="wrPlotValueTitle">{text.title || 'Untitled'}</div>
-            {text.body !== '' && <div className="wrPlotValueText">{text.body}</div>}
+            <div className="wrPlotValueTitle">{original?.title || 'Untitled'}</div>
+            {(original?.body ?? '').trim() !== '' && <div className="wrPlotValueText">{original?.body}</div>}
+            {description}
           </>
         ) : (
           <>
@@ -92,20 +95,8 @@ export function PlotValueCard({ w, point, fieldName, drag, dragging, autoFocus }
                 if (e.target.value.trim() === '' && point.body.trim() !== '') return
                 w.updatePlotValue(point.id, { title: e.target.value })
               }}
-              onKeyDown={e => {
-                if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && point.title.trim() !== '' && !showBody) {
-                  e.preventDefault()
-                  setRevealed(true)
-                }
-              }}
             />
-            {showBody && (
-              <input
-                ref={bodyRef} className="wrPointBody" data-kf="" value={point.body} placeholder="Description" maxLength={BODY_MAX}
-                aria-label={`${fieldName} value description`}
-                onChange={e => w.updatePlotValue(point.id, { body: e.target.value })}
-              />
-            )}
+            {description}
           </>
         )}
       </div>

@@ -72,8 +72,9 @@ const fitHeight = (el: HTMLTextAreaElement | null) => {
 }
 
 // A textarea that grows with its content, and again when its width changes (a tile resized).
-export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField, 'aria-label': ariaLabel }: {
+export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField, maxLength, 'aria-label': ariaLabel }: {
   value: string
+  maxLength?: number
   onChange: (next: string) => void
   placeholder?: string
   className?: string
@@ -95,7 +96,7 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   }, [])
   return (
     <textarea
-      ref={ref} rows={rows} className={className} placeholder={placeholder} value={value} aria-label={ariaLabel}
+      ref={ref} rows={rows} className={className} placeholder={placeholder} value={value} aria-label={ariaLabel} maxLength={maxLength}
       data-kf={keyField === 'draft' ? 'draft' : keyField ? '' : undefined}
       onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}
     />

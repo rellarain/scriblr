@@ -154,9 +154,30 @@ export function valuesIn(nodes: PlotNode[], holderId: string, fieldId: string): 
 }
 
 // A value's title and description: a reference reads the original's.
+// A reference reads its original's title and description, then the plotline's own description of it on a line of its own (the user, 2026-11-18:
+// a plotline can describe a value it inherits).
 export function textOf(point: PlotNode, index: Map<string, PlotNode>): { title: string; body: string } {
   const original = point.refId ? index.get(point.refId) : undefined
-  return original ? { title: original.title, body: original.body } : { title: point.title, body: point.body }
+  return original ? { title: original.title, body: joinBodies(original.body, point.body) } : { title: point.title, body: point.body }
+}
+const joinBodies = (...bodies: string[]) => bodies.filter(b => b.trim() !== '').join('\n')
+
+// The two lines that head a value's card and a plotpoint's tile (the user, 2026-11-18). The first is where its holder sits: the category,
+// subcategory and cluster above it, top-down (the holder's own level is left out: it is on the second line). The second is the holder (the
+// plotline, or the category, subcategory or cluster whose editor defines the value), then the fieldset and the field the value is in.
+export interface ValueHeader { place: PlotNode[]; holder: PlotNode | undefined; fieldset: string | null; field: string }
+export function valueHeader(point: PlotNode, index: Map<string, PlotNode>): ValueHeader {
+  const holder = point.parentId ? index.get(point.parentId) : undefined
+  if (!holder) return { place: [], holder: undefined, fieldset: null, field: '' }
+  const chain = chainOf(holder, index)
+  const place = chain.slice(1).filter(n => n.kind === 'category' || n.kind === 'subcategory' || n.kind === 'cluster').reverse()
+  for (const owner of point.fieldId ? chain : []) {
+    const def = owner.customFieldDefs.find(d => d.id === point.fieldId)
+    if (!def) continue
+    const set = def.setId ? (owner.customFieldSets ?? []).find(s => s.id === def.setId) : undefined
+    return { place, holder, fieldset: set ? set.name : null, field: def.name }
+  }
+  return { place, holder, fieldset: null, field: '' }
 }
 
 // Values not placed yet first, then the placed ones by book, then chapter (each at its earliest placement).
@@ -315,10 +336,11 @@ export function addValue(nodes: PlotNode[], holderId: string, fieldId: string, m
   return { nodes: insertAfter(nodes, point, afterId, n => (afterId ? inField(n) : n.parentId === holderId)), id }
 }
 
-// Edit an own value's text (a reference is read-only), within the limits.
+// Edit an own value's text within the limits. A reference keeps its original's title; its description is the plotline's own, read after the original's.
 export function updateValue(nodes: PlotNode[], id: string, patch: { title?: string; body?: string }): PlotNode[] {
   return nodes.map(n => {
-    if (n.id !== id || n.kind !== 'plotpoint' || n.refId) return n
+    if (n.id !== id || n.kind !== 'plotpoint') return n
+    if (n.refId) return patch.body !== undefined ? { ...n, body: clampBody(patch.body) } : n
     return {
       ...n,
       ...(patch.title !== undefined ? { title: clampTitle(patch.title) } : {}),
@@ -373,7 +395,7 @@ function detach(nodes: PlotNode[], refId: string, original: PlotNode | undefined
   if (!ref || !ref.parentId) return nodes
   const field = plotlineFieldNamed(nodes, ref.parentId, fieldName, makeId)
   return field.nodes.map(n => (n.id === refId
-    ? { ...n, refId: null, fieldId: field.id, title: clampTitle(original?.title ?? n.title ?? '') || 'Untitled', body: clampBody(original?.body ?? n.body) }
+    ? { ...n, refId: null, fieldId: field.id, title: clampTitle(original?.title ?? n.title ?? '') || 'Untitled', body: clampBody(joinBodies(original?.body ?? '', n.body)) }
     : n))
 }
 
@@ -528,15 +550,4 @@ export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], make
   })
 
   return syncLinks(syncReferences(next, outlineById, makeId))
-}
-
-// The name of the field a plotpoint belongs to (looked up on its plotline and the nodes above it).
-export function fieldNameOf(point: PlotNode, index: Map<string, PlotNode>): string {
-  const start = point.parentId ? index.get(point.parentId) : undefined
-  if (!start || !point.fieldId) return ''
-  for (const owner of chainOf(start, index)) {
-    const def = owner.customFieldDefs.find(d => d.id === point.fieldId)
-    if (def) return def.name
-  }
-  return ''
 }

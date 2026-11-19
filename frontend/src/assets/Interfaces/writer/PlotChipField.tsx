@@ -1,8 +1,8 @@
-import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useId, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { LinkIcon, PlusIcon } from '../../icons'
-import { plotColors, plotColorVars } from './plotColors'
+import { PlusIcon } from '../../icons'
+import { linkHueCss } from './plotColors'
 import { linkChoices, linksOf, type LinkKind } from './plotLinks'
 import { nodeLabel, plotTrail } from './plotTree'
 
@@ -10,8 +10,9 @@ import { nodeLabel, plotTrail } from './plotTree'
 // its keywords and then its links (to other categories, subcategories, clusters and plotlines), ending in one box. What is typed there is a keyword,
 // unless it starts with @: then it searches for a node to link, the matches listed under the row with their kind and place (Enter links the first,
 // arrows choose). A keyword's text is edited by clicking it (Enter or leaving keeps it, Escape puts it back; edited into one the node already has,
-// the two become one; @ there turns it into a link). A link chip wears the linked node's colour, opens it, and asks before it is taken away (from both
-// ends). The box grows with what is typed and takes a line of its own when it no longer fits beside the chips.
+// the two become one; @ there turns it into a link). A link chip is a keyword chip in the linked node's hue (the user, 2026-11-18: the same padding,
+// corners and brightness as the keywords beside it); it opens that node, and asks before it is taken away (from both ends). The box grows with what is
+// typed and takes a line of its own when it no longer fits beside the chips.
 
 const MAX_SUGGESTIONS = 12
 
@@ -36,12 +37,17 @@ function GrowBox({ value, placeholder, children }: { value: string; placeholder:
   return <span className="wrChipBox" data-value={value || placeholder}>{children}</span>
 }
 
-// A link of a node as a chip, in the linked node's colour (its title opens it; its full place is the title's tooltip).
-export function PlotLinkChip({ byId, projectHue, other, small, onOpen, children }: {
+// Where a link chip sits, and so which keyword chip it looks like: the field's (`.wrChip`), a parent chip's or a child row's (`.wrParentChip`), the
+// contents' (`.wrNavChip`).
+export type LinkChipLook = 'field' | 'parent' | 'nav'
+const LOOK_CLASS: Record<LinkChipLook, string> = { field: 'wrChip', parent: 'wrParentChip', nav: 'wrNavChip' }
+
+// A link of a node as a chip: the keyword chip of the place it sits in, in the linked node's hue (its title opens it; its full place is the tooltip).
+export function PlotLinkChip({ byId, projectHue, other, look, onOpen, children }: {
   byId: Map<string, PlotNode>
   projectHue?: number
   other: PlotNode
-  small?: boolean
+  look: LinkChipLook
   onOpen: (id: string) => void
   // What follows the title (the field's remove button).
   children?: ReactNode
@@ -49,27 +55,27 @@ export function PlotLinkChip({ byId, projectHue, other, small, onOpen, children 
   const label = nodeLabel(other)
   const path = [...plotTrail(other, byId), other].map(nodeLabel).join(' › ')
   return (
-    <span className={`wrLinkChip wrLinkChip--${other.kind}${small ? ' wrLinkChip--small' : ''}`} style={plotColorVars(plotColors(other, byId, projectHue))} data-link={other.id}>
-      <LinkIcon size={small ? 10 : 12} />
+    <span className={`${LOOK_CLASS[look]} wrLinkChip wrLinkChip--${other.kind}`} style={{ '--wr-link-hue': linkHueCss(other, byId, projectHue) } as CSSProperties} data-link={other.id}>
       <button type="button" className="wrLinkChipOpen" aria-label={`Open ${label}`} title={path} onClick={() => onOpen(other.id)}>{label}</button>
       {children}
     </span>
   )
 }
 
-// The links of a node as small read-only chips (the plot tree, an expanded parent chip, a child row).
-export function PlotLinkChips({ node, byId, projectHue, label, onOpen }: {
+// The links of a node as read-only chips (the plot tree, an expanded parent chip, a child row), each looking like the keywords beside it.
+export function PlotLinkChips({ node, byId, projectHue, label, look, onOpen }: {
   node: PlotNode
   byId: Map<string, PlotNode>
   projectHue?: number
   label: string
+  look: Exclude<LinkChipLook, 'field'>
   onOpen: (id: string) => void
 }) {
   const linked = linksOf(node).flatMap(id => byId.get(id) ?? [])
   if (linked.length === 0) return null
   return (
-    <span className="wrLinkChips" role="list" aria-label={`Links of ${label}`}>
-      {linked.map(other => <span key={other.id} role="listitem"><PlotLinkChip byId={byId} projectHue={projectHue} other={other} small onOpen={onOpen} /></span>)}
+    <span className={look === 'nav' ? 'wrNavChips wrLinkChips' : 'wrParentChips wrLinkChips'} role="list" aria-label={`Links of ${label}`}>
+      {linked.map(other => <span key={other.id} role="listitem" className="wrLinkChipItem"><PlotLinkChip byId={byId} projectHue={projectHue} other={other} look={look} onOpen={onOpen} /></span>)}
     </span>
   )
 }
@@ -153,8 +159,8 @@ export function PlotChipField({ w, node, label = 'Keywords' }: { w: WriterWorksp
           </span>
         )))}
         {linked.map(o => (
-          <PlotLinkChip key={o.id} byId={w.plotNodeById} projectHue={w.projectHue} other={o} onOpen={w.focusPlotNode}>
-            <button type="button" className="wrLinkChipRemove" aria-label={`Remove the link to ${nodeLabel(o)}`} title={`Remove the link to ${nodeLabel(o)}`} onClick={() => setConfirming(o.id)}>×</button>
+          <PlotLinkChip key={o.id} byId={w.plotNodeById} projectHue={w.projectHue} other={o} look="field" onOpen={w.focusPlotNode}>
+            <button type="button" aria-label={`Remove the link to ${nodeLabel(o)}`} title={`Remove the link to ${nodeLabel(o)}`} onClick={() => setConfirming(o.id)}>×</button>
           </PlotLinkChip>
         ))}
         <span className="wrChipAdd">

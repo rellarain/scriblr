@@ -334,7 +334,7 @@ describe('the links toggle', () => {
     expect(links()).toHaveClass('wrNavDot--links', 'wrNavDot--on')
     const ada = within(within(row(container, 'Ada')).getByRole('list', { name: 'Links of Ada' }))
     expect(ada.getByRole('button', { name: 'Open The heist' })).toBeInTheDocument()
-    expect(ada.getByRole('button', { name: 'Open The heist' }).closest('.wrLinkChip')).toHaveClass('wrLinkChip--plotline')
+    expect(ada.getByRole('button', { name: 'Open The heist' }).closest('.wrLinkChip')).toHaveClass('wrLinkChip--plotline', 'wrNavChip')
     expect(within(row(container, 'The heist')).getByRole('button', { name: 'Open Ada' })).toBeInTheDocument()
     expect(getKv('scriblr.writer.plotNavLinks')).toBe(true)
   })

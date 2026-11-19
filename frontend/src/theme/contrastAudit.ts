@@ -6,7 +6,7 @@ import {
   BLACK, TEXT_TARGET, WHITE, mixRgb, oklchHueOf, oklchToRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
-  ANSWER_KIND_ALPHA, BLOCK_MIX, CAL_STEPS, DISLIKE_BAR_SATURATIONS, FACET_COLOR, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
+  ANSWER_KIND_ALPHA, BLOCK_MIX, CAL_STEPS, DISLIKE_BAR_SATURATIONS, FACET_COLOR, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, PLOT_SUBTLE_ALPHA, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
   fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
@@ -161,6 +161,7 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   // and the fills also at the app theme's own hue. Each at its saturation tier: a category the quietest, a subcategory the middle one, a cluster the loudest.
   let worstCategory = Infinity
   let worstAnswerKind = Infinity
+  let worstValueSubtle = Infinity
   let worstCategoryFill = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_QUIET)))
   let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_MIDDLE)))
   let worstCluster = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_LOUD)))
@@ -181,6 +182,32 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
     parentChip(ink, rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))),
     ...[SAT_MIDDLE, SAT_LOUD].map(tier => parentChip(WHITE, rgbOf(fillHsl(h, colors.accent, tier)))),
   )
+  // A link chip is the keyword chip of its place recoloured: the W3C "color" blend of the linked node's hue at the category's quiet saturation (whatever its
+  // kind) over the chip keeps the chip's luminosity and takes that hue. Worst over every linked hue.
+  const linkChip = (fg: RGB, chip: RGB) => Math.min(...Array.from({ length: 24 }, (_, k) => k * 15).map(lh => ratioOfRgb(fg, colorBlend(rgbOf(hsl(lh, colors.theme.s * SAT_QUIET, colors.theme.l)), chip))))
+  const linkOnLine = (h: number) => {
+    const bg = rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))
+    const chip = over(BLACK, SINK_ALPHAS[1] * shadeK(look.mode), bg)
+    return linkChip(over(ink, NAV_CHIP_INK_ALPHA, chip), chip)
+  }
+  const linkOnParent = (h: number) => {
+    const quiet = rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))
+    return Math.min(linkChip(ink, over(ink, 0.10, quiet)), ...[SAT_MIDDLE, SAT_LOUD].map(tier => { const f = rgbOf(fillHsl(h, colors.accent, tier)); return linkChip(WHITE, over(WHITE, 0.10, f)) }))
+  }
+  // In an editor's Keywords field (`.wrChip`, the deeper sink): the ink on a category's or plotline's card, white on a subcategory's or cluster's fill.
+  const linkOnField = (h: number) => {
+    const sink = SINK_ALPHAS[2] * shadeK(look.mode)
+    const quiet = rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))
+    return Math.min(linkChip(ink, over(BLACK, sink, quiet)), ...[SAT_MIDDLE, SAT_LOUD].map(tier => linkChip(WHITE, over(BLACK, sink, rgbOf(fillHsl(h, colors.accent, tier))))))
+  }
+  let worstLinkLine = Infinity
+  let worstLinkParent = Infinity
+  let worstLinkField = Infinity
+  for (let h = 0; h < 360; h += 30) {
+    worstLinkLine = Math.min(worstLinkLine, linkOnLine(h))
+    worstLinkParent = Math.min(worstLinkParent, linkOnParent(h))
+    worstLinkField = Math.min(worstLinkField, linkOnField(h))
+  }
   let worstParentChip = parentChipAt(hues.theme)
   let worstChipLine = chipOnLine(hues.theme)
   let worstChipFill = chipOnFills(hues.theme)
@@ -193,12 +220,16 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
     const group = over(BLACK, SINK_ALPHAS[1] * shadeK(look.mode), rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l)))
     const card = over(ink, LIFT_ALPHA_LIGHTEST, group)
     worstAnswerKind = Math.min(worstAnswerKind, ratioOfRgb(over(ink, ANSWER_KIND_ALPHA, card), card))
+    // A value's card and a plotpoint's tile lie on the category's colour (a Compare tile under the pointer keeps it and gains a ring).
+    const quiet = rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))
+    worstValueSubtle = Math.min(worstValueSubtle, ratioOfRgb(over(ink, PLOT_SUBTLE_ALPHA, quiet), quiet))
     worstCategoryFill = Math.min(worstCategoryFill, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_QUIET))))
     worstSubcategory = Math.min(worstSubcategory, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_MIDDLE))))
     worstCluster = Math.min(worstCluster, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_LOUD))))
   }
   out.push({ id: 'plot-category', group: 'Plot colours', label: 'Ink on a plot category, the worst hue', kind: 'text', ratio: worstCategory })
   out.push({ id: 'plot-category-fill', group: 'Plot colours', label: 'White on a plot category row in the contents, the worst hue', kind: 'text', ratio: worstCategoryFill })
+  out.push({ id: 'plot-value-subtle', group: 'Plot colours', label: 'The place, fieldset and field heading a value card or a plotpoint tile, the worst hue', kind: 'text', ratio: worstValueSubtle })
   out.push({ id: 'plot-answer-kind', group: 'Plot colours', label: 'The faint kind label on the card of an inherited answer, the worst hue', kind: 'text', ratio: worstAnswerKind })
   out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
   // A cluster's surface is the same fill at the loudest tier, over the same hues (within 30 degrees of its subcategory's).
@@ -206,6 +237,9 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   out.push({ id: 'plot-nav-chip-line', group: 'Plot colours', label: 'A keyword chip on a plotline row of the contents (also hovered), the worst hue', kind: 'text', ratio: worstChipLine })
   out.push({ id: 'plot-parent-chip', group: 'Plot colours', label: 'A keyword chip on a folded parent chip of the Plot editor, the worst hue', kind: 'text', ratio: worstParentChip })
   out.push({ id: 'plot-nav-chip-fill', group: 'Plot colours', label: 'A keyword chip on a category, subcategory or cluster row, the worst hue', kind: 'text', ratio: worstChipFill })
+  out.push({ id: 'plot-link-chip-line', group: 'Plot colours', label: 'A link chip on a plotline row of the contents, the worst row and linked hue', kind: 'text', ratio: worstLinkLine })
+  out.push({ id: 'plot-link-chip-field', group: 'Plot colours', label: 'A link chip in the Keywords field of a plot editor, the worst card and linked hue', kind: 'text', ratio: worstLinkField })
+  out.push({ id: 'plot-link-chip-parent', group: 'Plot colours', label: 'A link chip on a parent chip or a child row of the Plot editor, the worst card and linked hue', kind: 'text', ratio: worstLinkParent })
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
   const segment = hsl(colors.accent.h, colors.accent.s, 50)
@@ -335,3 +369,18 @@ export function audit(): AuditRow[] {
 }
 
 export { TEXT_TARGET, fillCap }
+
+// The W3C compositing "color" blend (Compositing and Blending Level 1, non-separable modes): the source's hue and saturation with the backdrop's
+// luminosity. Channels 0..1, as everywhere in the audit.
+export function colorBlend(src: RGB, backdrop: RGB): RGB {
+  const lum = ([r, g, b]: number[]) => 0.3 * r + 0.59 * g + 0.11 * b
+  const clip = (c: number[]) => {
+    const l = lum(c), lo = Math.min(...c), hi = Math.max(...c)
+    let out = c
+    if (lo < 0) out = out.map(v => l + ((v - l) * l) / (l - lo))
+    if (hi > 1) out = out.map(v => l + ((v - l) * (1 - l)) / (hi - l))
+    return out
+  }
+  const d = lum(backdrop) - lum(src)
+  return clip(src.map(v => v + d)).map(v => Math.min(1, Math.max(0, v))) as RGB
+}

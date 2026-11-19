@@ -216,12 +216,16 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 |---|---|---|---|---|---|
 | Ink on a plot category, the worst hue | 4.5:1 | 12.6 (12.0) | 13.9 (13.8) | 7.3 (6.1) | 9.3 (9.3) |
 | White on a plot category row in the contents, the worst hue | 4.5:1 | 7.5 (7.2) | 7.9 (7.1) | 6.8 (6.8) | 6.8 (6.8) |
+| The place, fieldset and field heading a value card or a plotpoint tile, the worst hue | 4.5:1 | 8.4 (8.1) | 9.1 (8.9) | 5.4 (4.6) | 6.7 (6.7) |
 | The faint kind label on the card of an inherited answer, the worst hue | 4.5:1 | 6.5 (6.2) | 7.0 (6.9) | 5.3 (4.7) | 6.3 (6.3) |
 | White on a plot subcategory, the worst hue | 4.5:1 | 7.4 (7.1) | 7.3 (6.9) | 6.8 (6.8) | 6.8 (6.8) |
 | White on a plot cluster, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.8 (6.8) |
 | A keyword chip on a plotline row of the contents (also hovered), the worst hue | 4.5:1 | 6.0 (5.7) | 6.3 (6.2) | 5.6 (5.0) | 6.7 (6.7) |
 | A keyword chip on a folded parent chip of the Plot editor, the worst hue | 4.5:1 | 5.6 (5.5) | 5.3 (5.3) | 5.3 (4.8) | 5.3 (5.3) |
 | A keyword chip on a category, subcategory or cluster row, the worst hue | 4.5:1 | 5.2 (5.1) | 4.8 (4.8) | 5.2 (5.2) | 5.3 (5.3) |
+| A link chip on a plotline row of the contents, the worst row and linked hue | 4.5:1 | 5.9 (5.7) | 6.3 (6.2) | 5.4 (4.7) | 6.6 (6.6) |
+| A link chip in the Keywords field of a plot editor, the worst card and linked hue | 4.5:1 | 8.6 (8.5) | 8.6 (8.1) | 9.2 (8.5) | 9.4 (9.4) |
+| A link chip on a parent chip or a child row of the Plot editor, the worst card and linked hue | 4.5:1 | 5.5 (5.5) | 5.5 (5.2) | 5.1 (4.6) | 5.1 (5.1) |
 
 ## Inbox tones
 

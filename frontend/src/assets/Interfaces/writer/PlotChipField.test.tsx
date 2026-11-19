@@ -124,6 +124,7 @@ describe('the keywords and links field', () => {
     const start = plot().map(n => (n.id === 'line' ? { ...n, links: ['hunt'] } : n.id === 'hunt' ? { ...n, links: ['line'] } : n))
     render(<Field start={start} />)
     expect(screen.getByRole('button', { name: 'Open Manhunt' })).toHaveAttribute('title', 'Crime › Manhunt')
+    expect(screen.getByRole('button', { name: 'Open Manhunt' }).closest('.wrLinkChip')).toHaveClass('wrChip') // the keywords' chip, in the node's hue
     fireEvent.click(screen.getByRole('button', { name: 'Remove the link to Manhunt' }))
     fireEvent.click(within(screen.getByRole('group', { name: 'Remove the link to Manhunt?' })).getByRole('button', { name: 'Confirm' }))
     expect(of('line').links).toEqual([])

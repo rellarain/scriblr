@@ -107,7 +107,7 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
                     {keywords.map(k => <span key={k} className="wrNavChip" role="listitem">{k}</span>)}
                   </span>
                 )}
-                {links && <PlotLinkChips node={node} byId={w.plotNodeById} projectHue={w.projectHue} label={nodeLabel(node)} onOpen={id => { w.focusPlotNode(id); onOpenNode?.() }} />}
+                {links && <PlotLinkChips node={node} byId={w.plotNodeById} projectHue={w.projectHue} label={nodeLabel(node)} look="nav" onOpen={id => { w.focusPlotNode(id); onOpenNode?.() }} />}
               </span>
             ) : (
               <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>

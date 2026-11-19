@@ -84,7 +84,7 @@ export function PlotParents({ node, byId, projectHue, states, onState, onOpen, r
             {editing && renderEditor ? renderEditor(parent) : (
               <>
                 <ParentKeywords parent={parent} label={label} />
-                <PlotLinkChips node={parent} byId={byId} projectHue={projectHue} label={label} onOpen={onOpen} />
+                <PlotLinkChips node={parent} byId={byId} projectHue={projectHue} label={label} look="parent" onOpen={onOpen} />
                 {body !== '' && <p className="wrParentBody">{body}</p>}
               </>
             )}

@@ -71,6 +71,21 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>, projectH
   }
 }
 
+// The hue a node shows as the origin of a link (PlotChipField.tsx): its own for a category, subcategory or cluster, its category's for a plotline or plotpoint,
+// inherited as plotColors inherits it. A link chip wears it at the category's quiet saturation whatever the node's kind, so only the hue tells links apart.
+export function linkHueOf(node: PlotNode, byId: Map<string, PlotNode>, projectHue?: number): number | string {
+  const chain: PlotNode[] = []
+  for (let current: PlotNode | undefined = node, guard = 0; current && guard < 8; guard += 1) {
+    chain.push(current)
+    current = current.parentId ? byId.get(current.parentId) : undefined
+  }
+  const own = (kind: PlotNode['kind']) => chain.find(n => n.kind === kind)
+  const order: PlotNode['kind'][] = node.kind === 'cluster' ? ['cluster', 'subcategory', 'category'] : node.kind === 'subcategory' ? ['subcategory', 'category'] : ['category']
+  for (const kind of order) { const hue = own(kind)?.hue; if (hue !== null && hue !== undefined) return hue }
+  return projectHue ?? APP_HUE
+}
+export const linkHueCss = (node: PlotNode, byId: Map<string, PlotNode>, projectHue?: number): string => themeColorCss(linkHueOf(node, byId, projectHue), SAT_QUIET)
+
 // The style that hands a node's colours to its CSS: `var(--wr-cat)`, `var(--wr-cat-fill)`, `var(--wr-sub)`, `var(--wr-sub-fill)`, `var(--wr-cluster)`,
 // `var(--wr-cluster-fill)`, and the edge: `var(--wr-edge)`, `var(--wr-edge-size)`, `var(--wr-edge-pos)` and `var(--wr-edge-w)` (each set only when the
 // node has that colour, so `var(--wr-edge, none)` works).

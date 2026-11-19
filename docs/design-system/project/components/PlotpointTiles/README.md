@@ -8,9 +8,9 @@ Code: `writer/PlotpointTile.tsx`, `levels/PlotpointsTab.tsx` (`PlotTray`), `plot
 
 `.wrPointTile`: a coloured ground (the category's, with its left edge as stacked 4px stripes, left to right: the category's accent colour, the subcategory's, the cluster's, one for each it sits in), an ink fitted to read on it, then:
 
-- a **trail** (category > subcategory > cluster, whichever it sits under) and the **plotline and field** ("Plotline sit amet · DEFAULT");
-- the **title** in bold and the **description**;
-- tools at the top right: a **counter**, the **awareness eye** of this placement (on a moment only) and an **x** that takes this placement away;
+- the **two heading lines of its value card** (`PlotValueHead.tsx`, see [LevelPanels](../LevelPanels/README.md)): **category › subcategory › cluster** along the top right (`.wrValuePlace`, small bold capitals at 11px in the subtle ink, ending in … when it does not fit), then the **plotline · fieldset · field** (`.wrValueHead`, 12px, the plotline in the tile's ink, the fieldset and field subtle), on both variants;
+- the **title** in bold (13px) and the **description** (`.wrPointTileBody`, 11px, the tile's ink, line breaks kept; a reference's is its original's, then the plotline's own);
+- tools at the top right, after the place: a **counter**, the **awareness eye** of this placement (on a moment only) and an **x** that takes this placement away. A tile that opens something (Compare) gains a **ring** under the pointer, so the colour under its text stays the audited one;
 - variants: `margin` (the plotpoint itself, in the tray and the compare list: it drags onto a chapter, act, scene or moment to place it there once more) and `placed` (one placement, boxed inside a card: it drags to another card, which moves it, or back to the tray, which takes it away).
 
 ## Counters

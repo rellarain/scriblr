@@ -99,6 +99,9 @@ export const ANSWER_KIND_ALPHA = 0.8
 // A keyword chip in a row of the Plot contents sits on the sink overlay (--ov-sink-1) and its text is the row's ink at 72%, fainter than the name and the description (72% is near the
 // least that reads: 65% does not reach 4.5:1). `.wrNavChip` in _plot.scss says 72%.
 export const NAV_CHIP_INK_ALPHA = 0.72
+// The subtle ink of a value's card and a plotpoint's tile (the place line, the fieldset and the field: PlotValueHead.tsx): the card's ink at 80% on its
+// category colour. `.wrValuePlace` and `.wrValueField` in _plot-fields.scss say 80%.
+export const PLOT_SUBTLE_ALPHA = 0.8
 
 // The Schedule console's facet colours: a hue the user picks, at one saturation and lightness, light enough to read on the dark level fill the console sits on
 // (a line, a dot or a bar, 3:1 on the tile). A shift's block is the facet colour mixed into the card behind it at these shares (`.wrSchedBlock` in _schedule.scss

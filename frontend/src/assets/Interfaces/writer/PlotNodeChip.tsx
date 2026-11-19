@@ -38,7 +38,7 @@ export function PlotNodeChip({ w, node, meta, kind, place, actions, below }: {
       </div>
       {trail !== '' && <span className="wrChildRowPlace">{trail}</span>}
       <ParentKeywords parent={node} label={label} />
-      <PlotLinkChips node={node} byId={w.plotNodeById} projectHue={w.projectHue} label={label} onOpen={w.focusPlotNode} />
+      <PlotLinkChips node={node} byId={w.plotNodeById} projectHue={w.projectHue} label={label} look="parent" onOpen={w.focusPlotNode} />
       {body !== '' && <p className="wrParentBody">{body}</p>}
       {below}
     </div>

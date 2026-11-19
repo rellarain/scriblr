@@ -232,7 +232,8 @@ described, now stale, in `docs/data-model.md`).
   subcategory or cluster (in its own fields or in ones it **inherits**: a subcategory has its
   category's fields, a cluster its subcategory's and its category's, shown read-only in its editor
   under its own, `FieldBlocks.tsx`'s `InheritedGroups`) is shown on every plotline under it as a **reference** (a
-  plotpoint with `refId`, whose text is the original's), which that plotline
+  plotpoint with `refId`, whose title and description are the original's, plus a
+  description of the plotline's own in the reference's `body`), which that plotline
   assigns to its own chapters; deleting a category/subcategory/cluster value or field
   turns its assigned references into the plotline's own values in a plotline
   field of the same name, and deleting a plotline field sends its assigned values to

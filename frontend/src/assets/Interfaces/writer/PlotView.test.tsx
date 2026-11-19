@@ -1,5 +1,6 @@
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SAT_QUIET, themeColorCss } from '../../../theme/bookColors'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import type { OutlineNode, PlotNode } from '../../../api/types'
 import { DraftPlotNotes } from './DraftPlotNotes'
@@ -63,15 +64,41 @@ describe('the plotline editor: fields and values', () => {
     expect(titles()).toEqual(['Missed train', 'Loses the key'])
   })
 
-  it('shows the description input only after Tab in a titled value, and limits it to 255', () => {
+  it('always shows a description under the title, which grows with its text and takes up to 255 characters', () => {
+    const onNodes = vi.fn()
+    render(<Editor onNodes={onNodes} />)
+    toggle(/^Expand Setback/)
+    const body = screen.getByLabelText('Setback value description') as HTMLTextAreaElement
+    expect(body.tagName).toBe('TEXTAREA')
+    expect(body).toHaveAttribute('placeholder', 'Description')
+    expect(body.maxLength).toBe(255)
+    expect(body).toHaveClass('wrPointBody')
+    fireEvent.change(body, { target: { value: 'On a rainy platform' } })
+    expect(onNodes.mock.lastCall?.[0].find((n: PlotNode) => n.id === 'own').body).toBe('On a rainy platform')
+  })
+
+  it('lets a plotline describe an inherited value under its original\'s description', () => {
+    const onNodes = vi.fn()
+    const start = startingPlot().map(n => (n.id === 'val' ? { ...n, body: 'Earned slowly' } : n))
+    render(<Editor start={start} onNodes={onNodes} />)
+    toggle(/^Expand Theme/)
+    const card = screen.getByText('Trust').closest('.wrPlotValue') as HTMLElement
+    expect(card).toHaveTextContent('Earned slowly')
+    const own = within(card).getByLabelText('Theme value description')
+    fireEvent.change(own, { target: { value: 'Here, through the storm' } })
+    const ref = onNodes.mock.lastCall?.[0].find((n: PlotNode) => n.refId && n.parentId === 'line')
+    expect(ref.body).toBe('Here, through the storm')
+    expect(ref.title).toBe('')
+  })
+
+  it('heads a value card with category › subcategory at the top right, then the plotline and the field', () => {
     render(<Editor />)
     toggle(/^Expand Setback/)
-    expect(screen.queryByLabelText('Setback value description')).toBeNull()
-    const title = screen.getByLabelText('Setback value title')
-    expect(fireEvent.keyDown(title, { key: 'Tab' })).toBe(false) // the browser's Tab is cancelled
-    const body = screen.getByLabelText('Setback value description') as HTMLInputElement
-    expect(body.maxLength).toBe(255)
-    expect(body).toHaveFocus()
+    const card = screen.getByLabelText('Setback value title').closest('.wrPlotValue') as HTMLElement
+    expect(card.querySelector('.wrPlotValuePlace')).toHaveTextContent('Romance › Slow burn')
+    expect(card.querySelector('.wrValueHead')?.textContent).toBe('Meet cute · Setback')
+    expect(card.querySelector('.wrValueHolder')).toHaveTextContent('Meet cute')
+    expect(card.querySelector('.wrValueField')).toHaveTextContent('Setback')
   })
 
   it('discards a new value left blank when focus leaves it', () => {
@@ -323,10 +350,10 @@ describe('the chapter page tiles', () => {
     expect(screen.getByLabelText('Placed once').textContent).toBe('×1')
   })
 
-  it('a placed tile leaves out the trail, has the eye of its own placement next to the x, and says which of several places it is', () => {
+  it('a placed tile is headed like its value card, has the eye of its own placement next to the x, and says which of several places it is', () => {
     const { container } = render(<Tile variant="placed" onMoment position={{ n: 2, of: 3 }} />)
-    expect(container).not.toHaveTextContent('Romance › Slow burn')
-    expect(container).toHaveTextContent('Meet cute · Setback')
+    expect(container.querySelector('.wrValuePlace')).toHaveTextContent('Romance › Slow burn')
+    expect(container.querySelector('.wrValueHead')?.textContent).toBe('Meet cute · Setback')
     expect(container.querySelector('.wrEye')).not.toBeNull()
     expect(screen.getByText('2 of 3')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unassign Missed train' })).toHaveAttribute('title', 'Take this placement away')
@@ -1254,8 +1281,9 @@ describe('linked plot nodes', () => {
     expect(picker.getAllByRole('option').map(o => o.textContent)).toEqual(['CrewclusterHeist'])
     fireEvent.keyDown(box(), { key: 'Enter' })
     const chip = screen.getByRole('button', { name: 'Open Crew' }).closest('.wrLinkChip') as HTMLElement
-    expect(chip).toHaveClass('wrLinkChip--cluster')
-    expect(chip.style.getPropertyValue('--wr-cluster-fill')).not.toBe('')
+    expect(chip).toHaveClass('wrLinkChip--cluster', 'wrChip') // a keyword chip in the cluster's hue
+    expect(chip.querySelector('svg')).toBeNull()
+    expect(chip.style.getPropertyValue('--wr-link-hue')).toBe(themeColorCss(40, SAT_QUIET)) // the cluster's own hue, at the quiet saturation
     expect(box()).toHaveValue('')
     expect(screen.queryByRole('listbox')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Open Crew' }))

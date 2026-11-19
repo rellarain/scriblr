@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlotNode } from '../../../api/types'
 import { fillColorCss } from '../../../theme/bookColors'
-import { plotColors, plotColorVars } from './plotColors'
+import { linkHueOf, plotColors, plotColorVars } from './plotColors'
 
 const node = (id: string, kind: PlotNode['kind'], parentId: string | null, hue?: number | null): PlotNode => ({
   id, kind, parentId, order: 0, title: id, body: '', assignedMomentId: null, assignedParagraphIndex: null,
@@ -24,6 +24,25 @@ const edge = (...colours: string[]) => ({
   edgeWidth: `${colours.length * 4}px`,
 })
 const noEdge = { edge: null, edgeSize: null, edgePos: null, edgeWidth: null }
+
+describe('linkHueOf', () => {
+  it('is a node own hue, else inherited as its colours are; a plotline shows the hue of its category', () => {
+    const cat = node('cat', 'category', null, 200)
+    const sub = node('sub', 'subcategory', 'cat', 120)
+    const plain = node('plain', 'subcategory', 'cat')
+    const crew = node('crew', 'cluster', 'sub')
+    const line = node('line', 'plotline', 'crew')
+    const lone = node('lone', 'category', null)
+    const byId = tree(cat, sub, plain, crew, line, lone)
+    expect(linkHueOf(cat, byId)).toBe(200)
+    expect(linkHueOf(sub, byId)).toBe(120)
+    expect(linkHueOf(plain, byId)).toBe(200)
+    expect(linkHueOf(crew, byId)).toBe(120)
+    expect(linkHueOf(line, byId)).toBe(200) // its category's, not its cluster's
+    expect(linkHueOf(lone, byId, 30)).toBe(30)
+    expect(linkHueOf(lone, byId)).toBe('var(--color-theme-h)')
+  })
+})
 
 describe('plotColors', () => {
   const category = node('c', 'category', null, 200)
