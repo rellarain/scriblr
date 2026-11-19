@@ -148,3 +148,18 @@ describe('the synopses circle', () => {
     expect(synopsisCircle()).toBeDisabled() // only an act has one
   })
 })
+
+describe('the colours of the cards', () => {
+  it("dress a series in its own colour, and its book, arcs and chapters in the book's (its own, else the series')", () => {
+    const outline = OUTLINE.map(n => (n.id === 'series' ? { ...n, themeHue: 120 } : n.id === 'book' ? { ...n, themeHue: null } : n))
+    const { container } = render(<Panel outline={outline} />)
+    const hueOf = (selector: string) => (container.querySelector(selector) as HTMLElement).style.getPropertyValue('--wr-plot-card').match(/^hsl\((\d+)/)?.[1]
+    expect(hueOf('.wrPlotCard--series')).toBe('120')
+    expect(hueOf('.wrPlotCard--book')).toBe('120')
+    expect(hueOf('.wrPlotCard--arc')).toBe('120')
+    expect(hueOf('.wrPlotChapter')).toBe('120')
+    const own = render(<Panel outline={OUTLINE.map(n => (n.id === 'series' ? { ...n, themeHue: 120 } : n))} />).container
+    expect((own.querySelector('.wrPlotCard--book') as HTMLElement).style.getPropertyValue('--wr-plot-card')).toMatch(/^hsl\(200,/) // the book's own
+    expect((own.querySelector('.wrPlotCard--series') as HTMLElement).style.getPropertyValue('--wr-plot-card')).toMatch(/^hsl\(120,/)
+  })
+})

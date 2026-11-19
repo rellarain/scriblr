@@ -13,12 +13,13 @@ import type { Role, ZoneKey, ZonePalette } from './types'
 // their hue once on load.)
 
 export const DEFAULT_BOOK_HUE = 28
-// How far a level's colour may sit from its parent's hue, in degrees either side (360 = any hue). The same for every project: a book
-// within 90 of the project, an arc 60 of its book, a chapter 30 of its arc; a plot category 90 of the project, a subcategory 60 of its
-// category, a cluster 30 of its subcategory. The project and the account's theme hues have no parent, so they are the whole wheel.
-export const HUE_RANGES = { project: 360, book: 90, arc: 60, chapter: 30, category: 90, subcategory: 60, cluster: 30, account: 360 } as const
+// How far a level's colour may sit from its parent's hue, in degrees either side (360 = any hue). The same for every project: a series
+// within 90 of the project, a book 90 of its series (of the project, outside any series), an arc 60 of its book, a chapter 30 of its arc;
+// a plot category 90 of the project, a subcategory 60 of its category, a cluster 30 of its subcategory. The project and the account's
+// theme hues have no parent, so they are the whole wheel.
+export const HUE_RANGES = { project: 360, series: 90, book: 90, arc: 60, chapter: 30, category: 90, subcategory: 60, cluster: 30, account: 360 } as const
 export type HueLevel = keyof typeof HUE_RANGES
-// The range of an outline or plot node's kind (a kind with no range of its own, like a series, is the whole wheel).
+// The range of an outline or plot node's kind (a kind with no range of its own, like an act, is the whole wheel).
 export const rangeOf = (kind: string): number => (HUE_RANGES as Record<string, number>)[kind] ?? 360
 
 // The ranges a colour's reach can be set to (a node's own `hueRange`, mirrors backend/app/storage/schema.py HUE_RANGE_OPTIONS). HUE_RANGES above are the

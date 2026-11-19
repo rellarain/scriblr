@@ -202,13 +202,13 @@ describe('the hue slider\'s lightness', () => {
 })
 
 describe('the hue ranges', () => {
-  it('are fixed per level: project 360, book 90, arc 60, chapter 30, category 90, subcategory 60, cluster 30, account 360', () => {
-    expect(HUE_RANGES).toEqual({ project: 360, book: 90, arc: 60, chapter: 30, category: 90, subcategory: 60, cluster: 30, account: 360 })
+  it('are fixed per level: project 360, series 90, book 90, arc 60, chapter 30, category 90, subcategory 60, cluster 30, account 360', () => {
+    expect(HUE_RANGES).toEqual({ project: 360, series: 90, book: 90, arc: 60, chapter: 30, category: 90, subcategory: 60, cluster: 30, account: 360 })
   })
 
-  it('are looked up by a node kind, and a kind with none of its own (a series) is the whole wheel', () => {
-    expect(['book', 'arc', 'chapter', 'category', 'subcategory', 'cluster'].map(rangeOf)).toEqual([90, 60, 30, 90, 60, 30])
-    expect(rangeOf('series')).toBe(360)
+  it('are looked up by a node kind, and a kind with none of its own (an act) is the whole wheel', () => {
+    expect(['series', 'book', 'arc', 'chapter', 'category', 'subcategory', 'cluster'].map(rangeOf)).toEqual([90, 90, 60, 30, 90, 60, 30])
+    expect(rangeOf('act')).toBe(360)
   })
 })
 

@@ -208,6 +208,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Collapsed header text on its hover | 4.5:1 | 5.4 (5.2) | 5.1 (5.0) | 5.1 (5.0) | 5.4 (5.1) |
 | Text on a cover wash | 4.5:1 | 10.8 (10.4) | 10.2 (10.0) | 10.2 (10.0) | 10.8 (10.1) |
 | Arc tab label (92%) on the cover colour | 4.5:1 | 6.6 (6.3) | 6.1 (5.9) | 6.1 (5.9) | 6.6 (6.0) |
+| Shelf series title on its series' darkened colour | 4.5:1 | 9.7 (9.3) | 9.1 (8.9) | 9.1 (8.9) | 9.7 (9.0) |
 | Card stripe (the accent colour, lifted) on the level page | 3:1 | 4.6 (4.0) | 4.6 (3.8) | 4.8 (3.7) | 4.8 (3.8) |
 
 ## Plot colours
@@ -269,6 +270,14 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Ink line under a shared segment, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
 | Ink ring round a pivot point, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
 | Ink ring and cross of a shape centre, on the canvas | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
+
+## Project outline
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Ink on a series card's tint, the worst series hue | 4.5:1 | 12.6 (12.0) | 13.9 (13.8) | 7.3 (6.1) | 9.3 (9.3) |
+| The ink at 90% (number, counts) on a series card's tint, the worst series hue | 4.5:1 | 10.8 (10.3) | 11.8 (11.7) | 6.3 (5.3) | 8.0 (8.0) |
+| Ink in a field or button (a recess) on a series card's tint, the worst series hue | 4.5:1 | 9.3 (8.9) | 10.3 (10.2) | 10.2 (8.9) | 12.3 (12.3) |
 
 ## Schedule
 

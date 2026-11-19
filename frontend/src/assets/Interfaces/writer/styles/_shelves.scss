@@ -18,6 +18,9 @@
   .wrShelfLoose { display: flex; align-items: flex-end; gap: var(--space-2); flex: 0 0 auto; }
   .wrShelfSeries { display: flex; flex-direction: row; gap: var(--space-3); flex: 0 0 auto; padding: var(--space-3) 8px 0 var(--space-2); background: var(--ov-sink-2); }
   .wrShelfSeriesLabel { flex: 0 0 auto; writing-mode: vertical-rl; align-self: stretch; max-height: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); }
+  // A series with a colour (Shelf.tsx): its section is that colour's level fill (in the series' quiet tier) darkened as a level's second shade
+  // (--wr-fill-2), so the level's ink reads on it for every hue (levelContrast.ts: level/shelf-series).
+  .wrShelfSeries--hued { background: color-mix(in srgb, var(--wr-series) 80%, black); .wrShelfSeriesLabel { color: var(--on-accent); } }
   .wrShelfSeriesBooks { display: flex; flex: 1 1 auto; align-items: flex-end; gap: var(--space-2); min-width: 16px; }
   .wrShelfEmpty { font-size: var(--text-small); opacity: 0.9; align-self: center; }
   // A book on the shelf. Its spine turns (a 3D flip) into its front cover while it is the selected book.

@@ -1,138 +1,265 @@
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { BookFaceIcon, GripIcon, PlusIcon } from '../../icons'
+import { BookFaceIcon, ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon } from '../../icons'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
 import { AutoTextarea, DeleteControl } from './shared'
 import { useNodeDnd } from './useNodeDnd'
 import { useNodeKeys } from '../../../lib/nodeKeys'
 import { useWordCounts } from './useWordCounts'
 import { formatWords } from './wordCount'
-import { DEFAULT_BOOK_HUE, SAT_MIDDLE, bookThemeHue, stripeColorCss } from '../../../theme/bookColors'
+import { outlineSat, stripeColorCss } from '../../../theme/bookColors'
+import { useStoredState } from './storage'
+import HueSlider from './HueSlider'
+import GoalField from './outline/GoalField'
+import { stat, structureOfBook, type BookStructure } from './outline/outlineModel'
 
-// The project outline: its series and books as nested cards in a single column.
-// A series groups books (the shelf shows each series as a labelled, darkened
-// section); books outside any series sit at the top level. Cards are reordered
-// and moved in and out of series by dragging their grip (drops land in the gaps
-// between cards). A book's trash icon deletes it and everything inside; a
-// series' trash icon deletes only the series, its books stay.
-const isItem = (n: OutlineNode) => n.kind === 'series' || n.kind === 'book'
+// The project outline (the Project level's Outline tab at Max): its series, books, arcs and chapters as nested cards in one column. A series
+// holds books, a book its arcs and the chapters outside any arc, an arc its chapters; books outside any series sit at the top. Every card
+// edits its title, its summary and its colour (a series is tinted in its own; each card has a stripe of its colour at its left edge); a book
+// also its goals, and a chapter has the Write pencil that opens it in the Draft. Books and arcs fold up (remembered per card: a book starts
+// folded, an arc open). Cards are reordered and moved by dragging their grip (drops land in the gaps between cards: a book into or out of a
+// series, an arc into another book, a chapter into another arc or book). Acts, scenes and moments stay on the book's own Outline.
+// A series' trash deletes only the series (its books stay); every other card's trash deletes it and everything inside it.
+type Kind = OutlineNode['kind']
+// What a list of cards holds under each parent: the top level (null) its series and loose books.
+const LISTED: Record<string, Kind[]> = { root: ['series', 'book'], series: ['book'], book: ['arc', 'chapter'], arc: ['chapter'] }
+const listedUnder = (parent: OutlineNode | undefined): Kind[] => LISTED[parent ? parent.kind : 'root'] ?? []
+// Where an arc or chapter stands: its book's numbering and the book's name ("Book 2").
+interface Place { structure: BookStructure | undefined; book: string }
+
+// Folded cards are remembered per node; a book with no entry starts folded, an arc open.
+function useProjectOutlineOpen() {
+  const [openMap, setOpenMap] = useStoredState<Record<string, boolean>>('scriblr.writer.projectOutlineOpen', {})
+  return {
+    isOpen: (node: OutlineNode): boolean => openMap[node.id] ?? node.kind !== 'book',
+    setOpen: (id: string, open: boolean) => setOpenMap(prev => ({ ...prev, [id]: open })),
+  }
+}
 
 function ProjectOutline({ w }: { w: WriterWorkspace }) {
-  const dnd = useNodeDnd(w)
-  const counts = useWordCounts(w.activeProjectId)
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const nodeById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
-  const rootItems = (index.get(null) ?? []).filter(isItem)
+  const dnd = useNodeDnd(w, {
+    accepts: (dragged, parentId) => listedUnder(parentId ? nodeById.get(parentId) : undefined).includes(dragged.kind),
+  })
+  const counts = useWordCounts(w.activeProjectId)
+  const fold = useProjectOutlineOpen()
+  const kidsOf = (parent: OutlineNode | undefined) => (index.get(parent ? parent.id : null) ?? []).filter(n => listedUnder(parent).includes(n.kind))
+  const rootItems = kidsOf(undefined)
 
-  // Numbered across the project, in outline order.
+  // Series and books are numbered across the project; arcs and chapters across their book.
   const bookNumber = useMemo(() => new Map(w.books.map((b, i) => [b.id, i + 1])), [w.books])
   const seriesNumber = new Map(rootItems.filter(n => n.kind === 'series').map((s, i) => [s.id, i + 1]))
+  const structures = useMemo(() => new Map(w.books.map(b => [b.id, structureOfBook(index, b.id)])), [w.books, index])
+  const bookOf = (node: OutlineNode): OutlineNode | undefined => {
+    let n: OutlineNode | undefined = node
+    for (let guard = 0; n && n.kind !== 'book' && guard < 8; guard += 1) n = n.parentId ? nodeById.get(n.parentId) : undefined
+    return n?.kind === 'book' ? n : undefined
+  }
 
-  const newBook = (parentId: string | null, afterId?: string) =>
-    w.addOutlineNode(parentId, 'book', { themeHue: DEFAULT_BOOK_HUE }, afterId)
+  // A new node goes where it belongs; one added inside a folded book or arc unfolds it, so the new card is on view.
+  const add = (parentId: string | null, kind: Kind, afterId?: string) => {
+    if (parentId) fold.setOpen(parentId, true)
+    return w.addOutlineNode(parentId, kind, {}, afterId)
+  }
 
-  // Keyboard shortcuts (lib/nodeKeys.ts): series and loose books form the top-level
-  // list; a book inside a series has that series as its parent.
+  // Keyboard shortcuts (lib/nodeKeys.ts): series and loose books form the top-level list, then each card's own list under it.
+  const parentOf = (id: string) => { const p = nodeById.get(id)?.parentId; return p ? nodeById.get(p) : undefined }
+  // Ctrl+Enter: a new sibling of the parent (a book in a series -> a series after it; an arc or a loose chapter -> a book after its book; a
+  // chapter in an arc -> an arc after it).
+  const parentSibling = (id: string): { parent: OutlineNode; kind: Kind } | null => {
+    const parent = parentOf(id)
+    return parent && parent.kind !== 'chapter' ? { parent, kind: parent.kind } : null
+  }
   const keys = useNodeKeys({
-    parentOf: id => nodeById.get(id)?.parentId ?? null,
-    siblingsOf: id => (index.get(nodeById.get(id)?.parentId ?? null) ?? []).filter(isItem).map(n => n.id),
+    parentOf: id => parentOf(id)?.id ?? null,
+    siblingsOf: id => kidsOf(parentOf(id)).map(n => n.id),
     isEmpty: id => {
       const n = nodeById.get(id)
-      if (!n) return true
-      return n.title.trim() === '' && n.synopsis.trim() === '' && (index.get(id) ?? []).length === 0
+      return !n || (n.title.trim() === '' && n.synopsis.trim() === '' && (index.get(id) ?? []).length === 0)
     },
     createSibling: id => {
       const n = nodeById.get(id)
-      if (!n) return null
-      return n.kind === 'book' ? newBook(n.parentId, id) : w.addOutlineNode(n.parentId, 'series', {}, id)
+      return n ? add(n.parentId, n.kind, id) : null
     },
-    // book (inside a series) -> a new series after that series.
     createParentSibling: id => {
-      const parent = nodeById.get(nodeById.get(id)?.parentId ?? '')
-      return parent?.kind === 'series' ? w.addOutlineNode(parent.parentId, 'series', {}, parent.id) : null
+      const up = parentSibling(id)
+      return up ? add(up.parent.parentId, up.kind, up.parent.id) : null
     },
-    canCreateParentSibling: id => nodeById.get(nodeById.get(id)?.parentId ?? '')?.kind === 'series',
-    // series -> a new book inside it (Shift+Enter); a book has no child card here.
-    createChild: id => (nodeById.get(id)?.kind === 'series' ? newBook(id) : null),
-    canCreateChild: id => nodeById.get(id)?.kind === 'series',
+    canCreateParentSibling: id => parentSibling(id) !== null,
+    // A series takes a new book (Shift+Enter), a book a new chapter, an arc a new chapter; a chapter has no child card here.
+    createChild: id => {
+      const n = nodeById.get(id)
+      if (!n || n.kind === 'chapter') return null
+      return add(id, n.kind === 'series' ? 'book' : 'chapter')
+    },
+    canCreateChild: id => { const kind = nodeById.get(id)?.kind; return kind === 'series' || kind === 'book' || kind === 'arc' },
     remove: id => (nodeById.get(id)?.kind === 'series' ? w.deleteSeries(id) : w.deleteOutlineNode(id)),
   })
 
+  // The card's colour: a stripe at its left edge (in its tier), and a series' tint behind it all.
+  const colours = (node: OutlineNode) => ({
+    '--wr-node-color': stripeColorCss(w.levelHueOf(node), outlineSat(node.kind)),
+    ...(node.kind === 'series' ? { '--wr-node-tint': w.levelTintOf(node) } : {}),
+  } as CSSProperties)
   const grip = (id: string) => (
     <span className="wrGrip" aria-label="Drag to reorder" title="Drag to reorder" {...dnd.gripProps(id)}>
       <GripIcon size={14} />
     </span>
   )
+  const foldButton = (node: OutlineNode, name: string, open: boolean) => (
+    <button
+      type="button" className="wrIconBtn" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
+      title={`${open ? 'Collapse' : 'Expand'} the ${node.kind}`} onClick={() => fold.setOpen(node.id, !open)}
+    >
+      {open ? <ChevronDownIcon size={15} /> : <ChevronRightIcon size={15} />}
+    </button>
+  )
+  const addButton = (parentId: string, kind: Kind, label: string) => (
+    <button type="button" className="wrSmallBtn" onClick={() => add(parentId, kind)}><PlusIcon size={13} /> {label}</button>
+  )
+  const hue = (node: OutlineNode, name: string) => <HueSlider label={`${name} colour`} className="wrNodeHue wrProjHue" {...w.hueSliderOf(node)} />
+  const summary = (node: OutlineNode, name: string, placeholder: string) => (
+    <AutoTextarea
+      className="wrProjSummary" placeholder={placeholder} aria-label={`${name} summary`} rows={1} value={node.synopsis} keyField
+      onChange={text => w.updateOutlineNode(node.id, { synopsis: text })}
+    />
+  )
+  const stats = (items: string[]) => <div className="wrProjStats">{items.map(item => <span key={item}>{item}</span>)}</div>
 
-  // Plain render functions (not components) so the inputs keep focus.
-  const bookCard = (book: OutlineNode) => {
-    const n = bookNumber.get(book.id) ?? 0
-    const chapters = chaptersOfBook(w.outlineNodes, book.id).length
+  // One card's frame: its top (the number over the title, between the grip and its tools) and what follows. `name` is what the card shows
+  // ("Chapter 1"), `label` what its controls are called (an arc's and a chapter's name their book: "Book 2, Chapter 1", as every book has a
+  // Chapter 1). Plain render functions, not components, so the inputs keep focus.
+  function frame(node: OutlineNode, name: string, label: string, placeholder: string, tools: ReactNode, body: ReactNode) {
     return (
-      <div
-        key={book.id} data-node={book.id} data-knode={book.id}
-        className={dnd.cardClass('wrProjBook wrOutlineCard', book.id)}
-        style={{ ['--wr-node-color' as string]: stripeColorCss(w.levelHueOf(book), SAT_MIDDLE) }}
-      >
+      <div key={node.id} data-node={node.id} data-knode={node.id} className={dnd.cardClass(`wrProjCard wrProj${node.kind[0].toUpperCase()}${node.kind.slice(1)} wrOutlineCard`, node.id)} style={colours(node)}>
         <div className="wrProjTop">
-          {grip(book.id)}
+          {grip(node.id)}
           <div className="wrProjTitle">
-            <span className="wrProjNumber">Book {n}</span>
+            <span className="wrProjNumber">{name}</span>
             <input
-              className="wrProjInput" value={book.title} placeholder="Book title" data-kf="" aria-label={`Book ${n} title`}
-              onChange={e => w.updateOutlineNode(book.id, { title: e.target.value })}
+              className={node.kind === 'series' ? 'wrProjInput wrProjInput--series' : 'wrProjInput'} value={node.title} placeholder={placeholder} data-kf=""
+              aria-label={`${label} title`} onChange={e => w.updateOutlineNode(node.id, { title: e.target.value })}
             />
           </div>
-          <span className="wrProjActions">
-            <button type="button" className="wrIconBtn" title="Open book" aria-label={`Open book ${n}`} onClick={() => w.openBook(book.id)}>
-              <BookFaceIcon size={15} />
-            </button>
-            <DeleteControl
-              tone="dark" message={`Delete Book ${n}${chapters ? ' and everything in it' : ''}?`}
-              onConfirm={() => w.deleteOutlineNode(book.id)}
-            />
-          </span>
+          <span className="wrProjActions">{tools}</span>
         </div>
-        <div className="wrProjStats">
-          <span>{chapters} {chapters === 1 ? 'chapter' : 'chapters'}</span>
-          <span>{formatWords(counts.books[book.id] ?? 0)}</span>
-        </div>
+        {body}
       </div>
     )
   }
 
-  const seriesCard = (series: OutlineNode) => {
-    const n = seriesNumber.get(series.id) ?? 0
-    const books = (index.get(series.id) ?? []).filter(b => b.kind === 'book')
-    return (
-      <div key={series.id} data-node={series.id} data-knode={series.id} className={dnd.cardClass('wrProjSeries wrOutlineCard', series.id)}>
-        <div className="wrProjTop">
-          {grip(series.id)}
-          <div className="wrProjTitle">
-            <span className="wrProjNumber">Series {n}</span>
-            <input
-              className="wrProjInput wrProjInput--series" value={series.title} placeholder="Series title" data-kf="" aria-label={`Series ${n} title`}
-              onChange={e => w.updateOutlineNode(series.id, { title: e.target.value })}
-            />
-          </div>
-          <span className="wrProjActions">
-            <DeleteControl
-              tone="dark" message={`Delete Series ${n}?${books.length ? ' Its books stay.' : ''}`}
-              onConfirm={() => w.deleteSeries(series.id)}
-            />
-          </span>
+  function chapterCard(chapter: OutlineNode, { structure, book }: Place) {
+    const n = structure?.numbers.chapter.get(chapter.id) ?? 0
+    const name = `Chapter ${n}`
+    const label = `${book}, ${name}`
+    const totals = structure?.totalsOfChapter.get(chapter.id) ?? { act: 0, scene: 0, moment: 0 }
+    const inside = (index.get(chapter.id) ?? []).length
+    return frame(chapter, name, label, 'Chapter title', (
+      <>
+        <button type="button" className="wrIconBtn" title="Write" aria-label={`Write ${book.toLowerCase()}, chapter ${n}`} onClick={() => w.openChapter(chapter.id)}>
+          <PencilIcon size={15} />
+        </button>
+        <DeleteControl tone="dark" message={`Delete ${name}${inside ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(chapter.id)} />
+      </>
+    ), (
+      <>
+        {summary(chapter, label, 'Chapter summary')}
+        <div className="wrProjFoot wrProjFoot--tools">
+          {hue(chapter, label)}
+          {stats([stat(totals.act, 'act'), stat(totals.scene, 'scene'), stat(totals.moment, 'moment'), formatWords(counts.nodes[chapter.id] ?? 0)])}
         </div>
-        <AutoTextarea
-          className="wrProjSummary" placeholder="Series summary" rows={2} value={series.synopsis} keyField
-          onChange={text => w.updateOutlineNode(series.id, { synopsis: text })}
+      </>
+    ))
+  }
+
+  function arcCard(arc: OutlineNode, place: Place) {
+    const n = place.structure?.numbers.arc.get(arc.id) ?? 0
+    const name = `Arc ${n}`
+    const label = `${place.book}, ${name}`
+    const chapters = kidsOf(arc)
+    const open = fold.isOpen(arc)
+    return frame(arc, name, label, 'Arc title', (
+      <>
+        {foldButton(arc, `${place.book.toLowerCase()}, arc ${n}`, open)}
+        <DeleteControl
+          tone="dark" message={`Delete ${name}${chapters.length ? ` and its ${stat(chapters.length, 'chapter')}` : ''}?`}
+          onConfirm={() => w.deleteOutlineNode(arc.id)}
         />
+      </>
+    ), (
+      <>
+        {stats([stat(chapters.length, 'chapter'), formatWords(counts.nodes[arc.id] ?? 0)])}
+        {open && (
+          <>
+            {summary(arc, label, 'Arc summary')}
+            {hue(arc, label)}
+            {dnd.children(arc.id, chapters, c => chapterCard(c, place))}
+            <div className="wrProjFoot">{addButton(arc.id, 'chapter', 'Chapter')}</div>
+          </>
+        )}
+      </>
+    ))
+  }
+
+  function bookCard(book: OutlineNode) {
+    const n = bookNumber.get(book.id) ?? 0
+    const name = `Book ${n}`
+    const place: Place = { structure: structures.get(book.id), book: name }
+    const chapters = chaptersOfBook(w.outlineNodes, book.id).length
+    const words = counts.books[book.id] ?? 0
+    const open = fold.isOpen(book)
+    return frame(book, name, name, 'Book title', (
+      <>
+        <button type="button" className="wrIconBtn" title="Open book" aria-label={`Open book ${n}`} onClick={() => w.openBook(book.id)}>
+          <BookFaceIcon size={15} />
+        </button>
+        {foldButton(book, `book ${n}`, open)}
+        <DeleteControl tone="dark" message={`Delete ${name}${chapters ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(book.id)} />
+      </>
+    ), (
+      <>
+        {stats([stat(chapters, 'chapter'), formatWords(words)])}
+        {open && (
+          <>
+            {summary(book, name, 'Book summary')}
+            {hue(book, name)}
+            <div className="wrProjGoals">
+              <GoalField label="Chapter target" current={chapters} goal={book.chapterCountTarget} onChange={v => w.updateOutlineNode(book.id, { chapterCountTarget: v })} />
+              <GoalField label="Word goal" current={words} goal={book.wordCountGoal} onChange={v => w.updateOutlineNode(book.id, { wordCountGoal: v })} />
+            </div>
+            {dnd.children(book.id, kidsOf(book), k => (k.kind === 'arc' ? arcCard(k, place) : chapterCard(k, place)))}
+            <div className="wrProjFoot">{addButton(book.id, 'arc', 'Arc')}{addButton(book.id, 'chapter', 'Chapter')}</div>
+          </>
+        )}
+      </>
+    ))
+  }
+
+  function seriesCard(series: OutlineNode) {
+    const n = seriesNumber.get(series.id) ?? 0
+    const name = `Series ${n}`
+    const books = kidsOf(series)
+    return frame(series, name, name, 'Series title', (
+      <DeleteControl tone="dark" message={`Delete ${name}?${books.length ? ' Its books stay.' : ''}`} onConfirm={() => w.deleteSeries(series.id)} />
+    ), (
+      <>
+        {summary(series, name, 'Series summary')}
+        {hue(series, name)}
         {dnd.children(series.id, books, bookCard)}
-        <div className="wrProjFoot">
-          <button type="button" className="wrSmallBtn" onClick={() => newBook(series.id)}><PlusIcon size={13} /> Book</button>
-        </div>
-      </div>
-    )
+        <div className="wrProjFoot">{addButton(series.id, 'book', 'Book')}</div>
+      </>
+    ))
+  }
+
+  // A chapter or arc of a book is rendered inside its book's card; a card found on its own (never, in a well-formed tree) is numbered by its book.
+  const render = (node: OutlineNode): ReactNode => {
+    if (node.kind === 'series') return seriesCard(node)
+    if (node.kind === 'book') return bookCard(node)
+    const book = bookOf(node)
+    const place: Place = { structure: book && structures.get(book.id), book: book ? `Book ${bookNumber.get(book.id) ?? 0}` : 'Book' }
+    return node.kind === 'arc' ? arcCard(node, place) : chapterCard(node, place)
   }
 
   return (
@@ -140,13 +267,13 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
       <div className="wrProjHead">
         <span className="wrLabel">Outline</span>
         <span className="wrProjHeadActions">
-          <button type="button" className="wrSmallBtn" onClick={() => w.addOutlineNode(null, 'series')}><PlusIcon size={13} /> Series</button>
-          <button type="button" className="wrSmallBtn" onClick={() => newBook(null)}><PlusIcon size={13} /> Book</button>
+          <button type="button" className="wrSmallBtn" onClick={() => add(null, 'series')}><PlusIcon size={13} /> Series</button>
+          <button type="button" className="wrSmallBtn" onClick={() => add(null, 'book')}><PlusIcon size={13} /> Book</button>
         </span>
       </div>
       {rootItems.length === 0 && <p className="wrMuted">No books yet. Add a book or a series to begin.</p>}
       <div className="wrProjStack" onKeyDown={keys.onKeyDown}>
-        {dnd.children(null, rootItems, item => (item.kind === 'series' ? seriesCard(item) : bookCard(item)))}
+        {dnd.children(null, rootItems, render)}
       </div>
     </div>
   )

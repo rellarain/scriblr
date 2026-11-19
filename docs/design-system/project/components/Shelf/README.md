@@ -8,7 +8,7 @@ Code: `writer/Shelf.tsx` (`Shelf`, `Spine`), `outlineTree.ts` (`shelfGroups`), b
 
 - **Books** `.wrShelfBooks`: a row (at least 150px tall) that scrolls sideways with the wheel, no scrollbar, across the **full width of the shelf** (the shelf has no padding of its own; the 8px inset is inside the scrolling row). Spines stand on the board, 4px apart (8px between a section and what is next to it).
 - **Board** `.wrShelfBoard`: a 26px strip under the row that runs the **full width of the shelf** (to the tile's edges and bottom), darker than the shelf and than a series section (two recesses deep: `ov-sink-3` over `ov-sink-2`), carrying the **project's title** (11px bold uppercase, 1.5px spacing; a link when it opens the project), the book count and a slot for a control. There is no header row above the shelf.
-- **Series** `.wrShelfSeries`: a darker section (`ov-sink-2`, a step lighter than the board; 8px padding) as tall as the row, with the **series title** up its left edge (9px uppercase, turned so it starts at the top of the section and reads downward, in the full level ink; it never widens the section); books outside a series stand loose between the sections.
+- **Series** `.wrShelfSeries`: a section (8px padding) as tall as the row, with the **series title** up its left edge (9px uppercase, turned so it starts at the top of the section and reads downward, in the full level ink; it never widens the section); books outside a series stand loose between the sections. The section is a **darkened shade of the series' colour** (`.wrShelfSeries--hued`: its own hue, else the project's, as a level fill in the series' quiet tier mixed 80% with black, like a level's second shade; the title is the level ink, audited as `level/shelf-series`), and a book in it with no colour of its own shows the series' colour. Where no colour is known (the reader's shelves) it is a plain darker band (`ov-sink-2`, a step lighter than the board).
 - **Spine** `.wrSpine`: 5 to 64px wide (5px at a goal of 15,000 words or with none, then 1px more for every further 3,000 words, so 26px at 80,000) and 110 to 140px tall. The colour is the book's fill (`--wr-spine`, the same as its level). **No title text**: the **book's number** is at the top (the title is its tooltip and accessible name).
 - **Bars** `.wrSpineBar`, top to bottom: **planning**, **plotting** and **outlining** (horizontal, 5px tall); the **words** bar (vertical, up the middle, 64% of the spine's width); **plotpoints placed**, **revision** and **published** (horizontal). A bar is a dark track of the spine's colour (55% toward black) with a lighter fill (55% toward white) for the progress, and turns the **accent** colour once complete (or past the word goal). A bar **appears only where there is a goal or a measure** (a total above zero); each has a tooltip ("Outlining: 3 of 5 chapters outlined").
 - **Cover** (active): 96px wide, the spine turned 180 degrees (0.45s): a serif 11px uppercase title, a 4px inner edge, a 3px right corner.
@@ -28,11 +28,11 @@ Code: `writer/Shelf.tsx` (`Shelf`, `Spine`), `outlineTree.ts` (`shelfGroups`), b
 
 ## Tokens
 
-`level-fill-<hue>` (the spine and cover), `level-ink`, `ov-sink-2` (a series section; the board is `ov-sink-3` over it), `accent` (a complete bar), `ink-muted` (labels), `ov-sink-3` (the board, over `ov-sink-2`).
+`level-fill-<hue>` (the spine and cover, and a series section mixed 80% with black), `level-ink`, `ov-sink-2` (a series section with no colour; the board is `ov-sink-3` over it), `accent` (a complete bar), `ink-muted` (labels), `ov-sink-3` (the board, over `ov-sink-2`).
 
 ## You provide
 
-`label`, `meta`, `groups` (from `shelfGroups(nodes)`), `progress` (per book id, from the book-progress endpoint), `activeBookId`, `onOpenBook`, optional `onOpen` (makes the name a link) and `right`.
+`label`, `meta`, `groups` (from `shelfGroups(nodes)`), `progress` (per book id, from the book-progress endpoint), `activeBookId`, `onOpenBook`, optional `onOpen` (makes the name a link), `right` and `projectHue` (what a series or a loose book with no colour of its own shows).
 
 ## Don't
 

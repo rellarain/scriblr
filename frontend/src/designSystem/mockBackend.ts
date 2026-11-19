@@ -65,7 +65,7 @@ function node(id: string, kind: OutlineNode['kind'], parentId: string | null, or
 
 function outlineNodes(): OutlineNode[] {
   const out: OutlineNode[] = [
-    node('s1', 'series', null, 0, { title: 'Lorem ipsum series' }),
+    node('s1', 'series', null, 0, { title: 'Lorem ipsum series', themeHue: 110 }),
     node('b1', 'book', 's1', 0, { title: 'Lorem ipsum dolor', synopsis: lorem(0), themeHue: 28, chapterCountTarget: 12, wordCountGoal: 60000 }),
     node('b2', 'book', 's1', 1, { title: 'Sit amet consectetur', themeHue: 200, wordCountGoal: 80000 }),
     node('a1', 'arc', 'b1', 0, { title: 'Lorem ipsum arc', themeHue: 10 }),

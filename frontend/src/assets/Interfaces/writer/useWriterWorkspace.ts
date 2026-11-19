@@ -29,9 +29,9 @@ import { getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, listOutline
 import { newestFirst, nextSetting, nextSnapshot, sameValue, type LogEntry } from '../../../lib/logUndo'
 import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { effectiveRange, fillColorCss, hueOfCode, outlineSat, ownBookHue } from '../../../theme/bookColors'
+import { effectiveRange, fillColorCss, hueOfCode, outlineSat } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, hueSiblings, levelHue, levelRange, levelTint, rangeCapOf, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, hueSiblings, levelHue, levelRange, levelTint, ownHue, rangeCapOf, reconcileHues } from './levelHues'
 import type { HueSliderValue } from './HueSlider'
 import { plotHueSiblings, plotParentOf, plotRange, plotRangeCap, reconcilePlotHues, shownPlotHue } from './plotHues'
 
@@ -39,6 +39,8 @@ type AsyncStatus = 'idle' | 'loading' | 'error'
 
 // The longest name a project can have (the backend refuses a longer one; the name fields stop at it).
 export const PROJECT_NAME_MAX = 100
+// The outline kinds that carry a colour of their own (levelHues.ts): acts, scenes and moments show their chapter's.
+const HUED_KINDS = new Set<OutlineNodeKind>(['series', 'book', 'arc', 'chapter'])
 
 // Which of the five Writer consoles is showing.
 export type WuiConsole = 'shelves' | 'shelf' | 'book' | 'page' | 'pages'
@@ -148,13 +150,13 @@ export function useWriterWorkspace() {
   const levelTintOf = (node: OutlineNode): string => levelTint(node, hueNodes, projectHue)
   // The same colour as a panel's flat fill (the accent's saturation and lightness).
   const levelFillOf = (node: OutlineNode): string => fillColorCss(levelHue(node, hueNodes, projectHue), outlineSat(node.kind))
-  // The hue a node's own hue must stay near (the one its parent shows); null for a series, which has no colour.
+  // The hue a node's own hue must stay near (the one its parent shows).
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
   // How far a node's colour may sit from its parent's hue, in degrees either side (its own choice, else its kind's default, held to its parent's).
   const levelRangeOf = (node: OutlineNode): number => levelRange(node, hueNodes, projectRange)
-  // What a colour selector (HueSlider.tsx) needs for a book, arc or chapter, for a plot category, subcategory or cluster, and for the project.
+  // What a colour selector (HueSlider.tsx) needs for a series, book, arc or chapter, for a plot category, subcategory or cluster, and for the project.
   function hueSliderOf(node: OutlineNode): HueSliderValue {
-    const own = node.kind === 'book' ? ownBookHue(node) : node.themeHue ?? null
+    const own = ownHue(node)
     return {
       hue: levelHue(node, hueNodes, projectHue), centre: hueCentre(node, hueNodes, projectHue), range: levelRange(node, hueNodes, projectRange),
       maxRange: rangeCapOf(node, hueNodes, projectRange), inherit: own === null,
@@ -315,9 +317,7 @@ export function useWriterWorkspace() {
   // Apply an edit to the outline: `immediate` saves now (structural edits),
   // otherwise after a pause. Computed from the ref so edits in the same tick
   // compose, and kept out of state updaters (which run twice in StrictMode).
-  function commitOutline(changed: OutlineNode[], immediate: boolean) {
-    // A series has no colour of its own now: one stored in an older project is cleared the next time the outline is saved.
-    const next = dropSeriesHues(changed)
+  function commitOutline(next: OutlineNode[], immediate: boolean) {
     outlineNodesRef.current = next
     setOutlineNodes(next)
     if (!applyingHistory.current) outlineHistory.record(next, { text: !immediate })
@@ -650,13 +650,13 @@ export function useWriterWorkspace() {
       createdAt: new Date().toISOString(),
       ...patch,
     }
-    // A new book starts at the hue it is measured from (the project's); a new arc or chapter takes a hue in its range, spread away from
-    // its siblings'. A series has no colour.
-    if ((kind === 'book' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
+    // A new book starts at the hue it is measured from (its series', else the project's); a new series, arc or chapter takes a hue in its
+    // range, spread away from its siblings'.
+    if (HUED_KINDS.has(kind) && node.themeHue == null) {
       const map = new Map(prev.map(n => [n.id, n]))
       const centre = hueCentre(node, map, projectHueRef.current)
-      if (centre !== null && kind === 'book') node.themeHue = centre
-      else if (centre !== null) {
+      if (kind === 'book') node.themeHue = centre
+      else {
         const siblingHues = prev
           .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null)
           .map(n => hueOfCode(n.themeHue as number))
@@ -671,33 +671,33 @@ export function useWriterWorkspace() {
     commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
   }
 
-  // Sets a book's, arc's or chapter's own colour (a colour code): its hue is held within its range of its parent's (the node's own choice, 30 to 360, else
-  // its kind's default: a book 90, an arc 60, a chapter 30; never wider than its parent's), and the own hues under it are pulled back inside
-  // their ranges (nothing elsewhere moves).
+  // Sets a series', book's, arc's or chapter's own colour (a colour code): its hue is held within its range of its parent's (the node's own choice, 30
+  // to 360, else its kind's default: a series 90, a book 90, an arc 60, a chapter 30; never wider than its parent's), and the own hues under it are
+  // pulled back inside their ranges (nothing elsewhere moves).
   function setNodeHue(nodeId: string, code: number) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
-    if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    if (!target || !HUED_KINDS.has(target.kind)) return
     const map = new Map(prev.map(n => [n.id, n]))
     const value = fitToParent(Math.round(code), hueCentre(target, map, projectHueRef.current), levelRange(target, map, projectRangeRef.current))
     const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
     commitOutline(reconcileHues(next, projectHueRef.current, nodeId, projectRangeRef.current), false)
   }
 
-  // Sets how far a book's, arc's or chapter's colour may sit from its parent's hue (30, 60, 90, 120, 180 or 360 degrees either side; held to its
-  // parent's range), for it and all its siblings (the nodes of its kind under the same parent). Each one's own hue is pulled into the new window,
+  // Sets how far a series', book's, arc's or chapter's colour may sit from its parent's hue (30, 60, 90, 120, 180 or 360 degrees either side; held to
+  // its parent's range), for it and all its siblings (the nodes of its kind under the same parent). Each one's own hue is pulled into the new window,
   // and what is under it follows. At 360 there is no parent to follow: a node that was inheriting keeps the hue it was showing as its own.
   function setNodeHueRange(nodeId: string, range: number) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
-    if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    if (!target || !HUED_KINDS.has(target.kind)) return
     const map = new Map(prev.map(n => [n.id, n]))
     // (The siblings share a parent, so one cap holds for all.)
     const value = Math.min(range, rangeCapOf(target, map, projectRangeRef.current))
     const siblings = new Set(hueSiblings(target, map).map(n => n.id))
     const next = prev.map(n => {
       if (!siblings.has(n.id)) return n
-      const own = n.kind === 'book' ? ownBookHue(n) : n.themeHue ?? null
+      const own = ownHue(n)
       const hue = own != null ? fitToParent(Math.round(own), hueCentre(n, map, projectHueRef.current), value) : value >= 360 ? Math.round(levelHue(n, map, projectHueRef.current)) : null
       return { ...n, hueRange: value, themeHue: hue }
     })
@@ -709,7 +709,7 @@ export function useWriterWorkspace() {
   function setNodeInherit(nodeId: string, on: boolean) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
-    if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    if (!target || !HUED_KINDS.has(target.kind)) return
     const map = new Map(prev.map(n => [n.id, n]))
     // At 360 there is no parent hue to follow.
     if (on && levelRange(target, map, projectRangeRef.current) >= 360) return

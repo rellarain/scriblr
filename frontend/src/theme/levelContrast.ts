@@ -29,6 +29,8 @@ export function levelPairs(fill: HSL): LevelPair[] {
   out.push({ id: 'level/header-hover', label: 'Collapsed header text on its hover', ratio: text(WHITE, mixRgb(f, 88, WHITE)) })
   out.push({ id: 'level/cover-field', label: 'Text on a cover wash', ratio: text(WHITE, over(BLACK, 0.28, f)) })
   out.push({ id: 'level/arc-tab', label: 'Arc tab label (92%) on the cover colour', ratio: text(over(WHITE, 0.92, f), f) })
+  // A series' section on a shelf (Shelf.tsx, .wrShelfSeries--hued): its title in the level's ink on the series' fill darkened as fill-2.
+  out.push({ id: 'level/shelf-series', label: "Shelf series title on its series' darkened colour", ratio: text(WHITE, mixRgb(f, 80, BLACK)) })
   return out
 }
 

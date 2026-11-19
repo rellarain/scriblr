@@ -2,7 +2,8 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import type { BookProgress, Measure, OutlineNode } from '../../../api/types'
 import type { ShelfGroup } from './outlineTree'
 import { nodeLabel } from './plotTree'
-import { SAT_MIDDLE, bookThemeHue, fillColorCss } from '../../../theme/bookColors'
+import { SAT_MIDDLE, bookThemeHue, fillColorCss, outlineSat } from '../../../theme/bookColors'
+import { ownHue } from './levelHues'
 
 // A spine's size follows its book: the width from 5px (a goal of 15,000 words or none) to 64px (192,000 words or more), 1px wider for every further 3,000 words, the height from 110px to
 // 140px, so the bars on it have room. The selected book turns from its spine to its front cover, COVER_WIDTH wide.
@@ -94,11 +95,12 @@ export function Spine({ book, number, progress, active, onOpen, projectHue }: { 
   )
 }
 
-// A project's spines, grouped: each series is a darker section with its title down its left edge from the top, beside the books in it; books outside any
-// series stand on the plain shelf. The shelf's board carries the project's title (a link when it opens the project), the book count and
+// A project's spines, grouped: each series is a section with its title down its left edge from the top, beside the books in it; books outside any
+// series stand on the plain shelf. A series' section is a darkened shade of its colour (its own, else the project's), and a book in it with no
+// colour of its own shows the series'; where no colour is known (the reader's shelves) the section is a plain darker band. The shelf's board carries the project's title (a link when it opens the project), the book count and
 // the `right` slot.
 export function Shelf({ label, meta, groups, progress, activeBookId, selected, onOpenBook, onOpen, right, projectHue }: {
-  // What a book with no colour of its own shows.
+  // What a series or a loose book with no colour of its own shows.
   projectHue?: number
   label: string
   meta: string
@@ -135,13 +137,17 @@ export function Shelf({ label, meta, groups, progress, activeBookId, selected, o
       <div ref={booksRef} className={activeBookId ? 'wrShelfBooks wrShelfBooks--picked' : 'wrShelfBooks'}>
         {groups.every(g => g.books.length === 0 && g.series === null) && <span className="wrShelfEmpty">No books yet</span>}
         {groups.map((g, i) => {
+          const hue = (g.series ? ownHue(g.series) : null) ?? projectHue
           const spines = g.books.map(b => {
             counted += 1
-            return <Spine key={b.id} book={b} projectHue={projectHue} number={counted} progress={progress?.[b.id]} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
+            return <Spine key={b.id} book={b} projectHue={hue} number={counted} progress={progress?.[b.id]} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
           })
           if (!g.series) return <div key={`loose-${i}`} className="wrShelfLoose">{spines}</div>
           return (
-            <div key={g.series.id} className="wrShelfSeries" role="group" aria-label={`Series: ${nodeLabel(g.series)}`}>
+            <div
+              key={g.series.id} className={hue === undefined ? 'wrShelfSeries' : 'wrShelfSeries wrShelfSeries--hued'} role="group" aria-label={`Series: ${nodeLabel(g.series)}`}
+              style={hue === undefined ? undefined : { '--wr-series': fillColorCss(hue, outlineSat('series')) } as CSSProperties}
+            >
               <span className="wrShelfSeriesLabel" title={nodeLabel(g.series)}>{g.series.title.trim() || 'Untitled series'}</span>
               <div className="wrShelfSeriesBooks">{spines}</div>
             </div>

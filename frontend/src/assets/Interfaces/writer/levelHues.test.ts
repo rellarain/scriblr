@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode } from '../../../api/types'
-import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelRange, levelTint, rangeCapOf, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, hueSiblings, levelHue, levelRange, levelTint, ownHue, rangeCapOf, reconcileHues } from './levelHues'
 
 const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, themeHue?: number, hueRange?: number): OutlineNode =>
   ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, themeHue, hueRange } as OutlineNode)
@@ -23,24 +23,30 @@ describe('levelHue', () => {
     expect(levelHue(nodes[6], map, PROJECT)).toBe(190) // and its own over that
   })
 
-  it("keeps a book's own colour (a book with none inherits the project's) whatever its series is", () => {
+  it("keeps a book's own colour (a book with none inherits its series', a loose one the project's)", () => {
     expect(levelHue(node('lone', 'book', null), byId([]), PROJECT)).toBe(PROJECT)
     expect(levelHue(nodes[1], map, PROJECT)).toBe(210)
   })
 
-  it('has no colour for a series, whatever is stored on it: it shows the project\'s', () => {
-    expect(levelHue(node('s2', 'series', null, 300), byId([]), PROJECT)).toBe(PROJECT)
+  it('gives a series its own colour, which its books, arcs and chapters show until they have their own', () => {
+    const tree = [node('s2', 'series', null, 120), node('b2', 'book', 's2'), node('a3', 'arc', 'b2'), node('c4', 'chapter', 'a3'), node('b3', 'book', 's2', 100)]
+    const m = byId(tree)
+    expect(tree.map(n => levelHue(n, m, PROJECT))).toEqual([120, 120, 120, 120, 100])
+    expect(ownHue(tree[0])).toBe(120)
+    expect(ownHue(tree[1])).toBeNull()
   })
 })
 
 describe('hueCentre', () => {
-  it('is the hue the parent shows: the project\'s for a book (its series has no colour), a book\'s for an arc, an arc\'s for a chapter', () => {
+  it('is the hue the parent shows: the project\'s for a series, the series\' for a book, a book\'s for an arc, an arc\'s for a chapter', () => {
     const nodes = [node('s', 'series', null), node('b', 'book', 's', 210), node('a', 'arc', 'b', 250), node('c', 'chapter', 'a')]
     const map = byId(nodes)
-    expect(hueCentre(nodes[0], map, PROJECT)).toBeNull() // a series has no colour
-    expect(hueCentre(nodes[1], map, PROJECT)).toBe(150) // a book is measured from the project through its series
+    expect(hueCentre(nodes[0], map, PROJECT)).toBe(150) // a series is measured from the project
+    expect(hueCentre(nodes[1], map, PROJECT)).toBe(150) // a book from its series, which shows the project's
     expect(hueCentre(nodes[2], map, PROJECT)).toBe(210)
     expect(hueCentre(nodes[3], map, PROJECT)).toBe(250)
+    const coloured = byId([{ ...nodes[0], themeHue: 120 }, nodes[1]])
+    expect(hueCentre(nodes[1], coloured, PROJECT)).toBe(120) // a series' own colour
   })
 
   it('is the project\'s hue for a book outside any series, and the book\'s for a chapter outside an arc', () => {
@@ -112,12 +118,20 @@ describe('reconcileHues', () => {
     expect(reconcileHues([node('b', 'book', null, 10), node('a', 'arc', 'b', 40)], PROJECT, 'b').map(n => n.themeHue)).toEqual([10, 40])
   })
 
-  it('clears a series colour, and dropSeriesHues does the same without a project hue', () => {
-    expect(reconcileHues([node('s', 'series', null, 300)], PROJECT)[0].themeHue).toBeNull()
-    const nodes = [node('s', 'series', null, 300), node('b', 'book', 's', 100)]
-    expect(dropSeriesHues(nodes).map(n => n.themeHue)).toEqual([null, 100])
-    const clean = [node('s', 'series', null), node('b', 'book', 's', 100)]
-    expect(dropSeriesHues(clean)).toBe(clean)
+  it("holds a series within 90 of the project's hue, and its books within 90 of the series'", () => {
+    expect(reconcileHues([node('s', 'series', null, 300)], PROJECT)[0].themeHue).toBe(240)
+    expect(reconcileHues([node('s', 'series', null, 100)], PROJECT)[0].themeHue).toBe(100)
+    // The series is at 100: its book at 230 comes within 90 of it (to 190); the loose book stays measured from the project.
+    const nodes = [node('s', 'series', null, 100), node('b', 'book', 's', 230), node('lone', 'book', null, 230)]
+    expect(reconcileHues(nodes, PROJECT, 's').map(n => n.themeHue)).toEqual([100, 190, 230])
+    expect(reconcileHues(nodes, PROJECT).map(n => n.themeHue)).toEqual([100, 190, 230])
+  })
+
+  it("holds a book's range to its series' range", () => {
+    const nodes = [node('s', 'series', null, 150, 30), node('b', 'book', 's', 220, 90)]
+    const [series, book] = reconcileHues(nodes, PROJECT)
+    expect(series.hueRange).toBe(30)
+    expect([book.hueRange, book.themeHue]).toEqual([30, 180])
   })
 })
 
@@ -143,7 +157,8 @@ describe('levelRange', () => {
     expect(levelRange(nodes[3], map, 360)).toBe(30)
     expect(levelRange(nodes[4], map, 360)).toBe(60) // chose 120 under an arc of 60
     expect(rangeCapOf(nodes[3], map, 360)).toBe(60)
-    expect(rangeCapOf(nodes[1], map, 360)).toBe(360) // a book's parent is a series with no colour: the project's
+    expect(rangeCapOf(nodes[1], map, 360)).toBe(90) // a book's parent is a series, of 90 until another is chosen
+    expect(rangeCapOf(nodes[0], map, 360)).toBe(360) // a series hangs from the project
     expect(rangeCapOf(nodes[1], map, 60)).toBe(60)
     expect(levelRange(nodes[1], map, 60)).toBe(60) // the project's range holds a book of 90 to 60
   })
@@ -180,5 +195,17 @@ describe('reconcileHues with ranges of their own', () => {
   it('leaves an inheriting node alone (it follows the parent live)', () => {
     const nodes = [node('b', 'book', null), node('a', 'arc', 'b')]
     expect(reconcileHues(nodes, PROJECT)).toEqual(nodes)
+  })
+})
+
+describe('hueSiblings', () => {
+  it('are the nodes of its kind under the same parent: the series of the project, the books of one series, the loose books', () => {
+    const nodes = [node('s1', 'series', null), node('s2', 'series', null), node('b1', 'book', 's1'), node('b2', 'book', 's1'), node('b3', 'book', 's2'), node('l1', 'book', null), node('l2', 'book', null)]
+    const map = byId(nodes)
+    const ids = (id: string) => hueSiblings(map.get(id)!, map).map(n => n.id)
+    expect(ids('s1')).toEqual(['s1', 's2'])
+    expect(ids('b1')).toEqual(['b1', 'b2'])
+    expect(ids('b3')).toEqual(['b3'])
+    expect(ids('l1')).toEqual(['l1', 'l2'])
   })
 })

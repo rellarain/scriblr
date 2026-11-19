@@ -73,6 +73,24 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   // a shape's centre (C1): a ring and a cross of the ink (over a ring of the raised surface), filled with the accent or the alert colour when chosen or about to be linked to
   add('centre-ring/deep', 'Designer canvas', 'Ink ring and cross of a shape centre, on the canvas', 'ui', ink, rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[2], 0, 100))))
 
+  // ---- the Project outline's series card (ProjectOutline.tsx, .wrProjSeries): the series' colour at the theme's saturation (its quiet tier) and
+  // lightness is the card's ground, under the ink, the ink at 90% (its number and counts) and its fields and buttons (recesses, --ov-sink-2, in it).
+  // A series' colour is any hue, so each pair is the worst of them.
+  {
+    const sunkAlpha = SINK_ALPHAS[2] * shadeK(look.mode)
+    let [onTint, mutedOnTint, onSunk] = [Infinity, Infinity, Infinity]
+    for (let h = 0; h < 360; h += 5) {
+      const tint = rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))
+      const sunk = over(BLACK, sunkAlpha, tint)
+      onTint = Math.min(onTint, ratioOfRgb(ink, tint))
+      mutedOnTint = Math.min(mutedOnTint, ratioOfRgb(over(ink, 0.9, tint), tint))
+      onSunk = Math.min(onSunk, ratioOfRgb(ink, sunk))
+    }
+    out.push({ id: 'proj-series/ink', group: 'Project outline', label: "Ink on a series card's tint, the worst series hue", kind: 'text', ratio: onTint })
+    out.push({ id: 'proj-series/ink-90', group: 'Project outline', label: "The ink at 90% (number, counts) on a series card's tint, the worst series hue", kind: 'text', ratio: mutedOnTint })
+    out.push({ id: 'proj-series/field', group: 'Project outline', label: "Ink in a field or button (a recess) on a series card's tint, the worst series hue", kind: 'text', ratio: onSunk })
+  }
+
   // ---- text on the accent, alert and admin-accent fills (and their hover / dim shades)
   const onAccent = fillInk(colors.accent, hues.theme)
   const shade = (c: HSL, step: number, dir: 1 | -1, s = c.s) => rgbOf(hsl(c.h, s, clamp(c.l + step * dir, 0, 100)))

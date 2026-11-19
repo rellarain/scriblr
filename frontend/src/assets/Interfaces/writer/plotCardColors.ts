@@ -2,6 +2,7 @@ import type { OutlineNode, PlotNode, PlotPlacement } from '../../../api/types'
 import { accentColorCss, bookThemeHue, themeColorCss } from '../../../theme/bookColors'
 import type { ZoneKey } from '../../../theme/types'
 import { awarenessStyle } from './awareness'
+import { ownHue } from './levelHues'
 import { nearestOfKind } from './outlineTree'
 import { chapterOfTarget, levelOfTarget, type TargetLevel } from './plotTree'
 import { plotColorVars, plotColors } from './plotColors'
@@ -15,10 +16,12 @@ import { plotColorVars, plotColors } from './plotColors'
 
 export interface BookHues { book: OutlineNode | undefined; themeHue: number }
 
-// A book with no colour of its own shows the project's (`projectHue`).
+// A book with no colour of its own shows its series' (a series with none shows the project's, `projectHue`).
 export function bookHuesOf(chapterId: string, outlineNodes: OutlineNode[], projectHue?: number): BookHues {
   const book = nearestOfKind(outlineNodes, chapterId, 'book')
-  const themeHue = book ? bookThemeHue(book, projectHue) : bookThemeHue({}, projectHue)
+  const series = book?.parentId ? outlineNodes.find(n => n.id === book.parentId && n.kind === 'series') : undefined
+  const fallback = (series ? ownHue(series) : null) ?? projectHue
+  const themeHue = book ? bookThemeHue(book, fallback) : bookThemeHue({}, projectHue)
   return { book, themeHue }
 }
 

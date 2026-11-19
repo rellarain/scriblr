@@ -150,6 +150,35 @@ describe('Shelf', () => {
     expect(Array.from(document.querySelectorAll('.wrSpineNumber')).map(n => n.textContent)).toEqual(['1', '2', '3'])
   })
 
+  it("darkens a series' section in its colour (its own, else the project's), and colours its books that have none of their own with it", () => {
+    const series = { id: 's1', kind: 'series', parentId: null, order: 0, title: 'The Cycle', synopsis: '', themeHue: 120 } as OutlineNode
+    const plain = { ...series, id: 's2', title: 'Plain', themeHue: null } as OutlineNode
+    render(
+      <Shelf
+        label="Saga" meta="4 books" activeBookId={null} onOpenBook={() => {}} projectHue={300}
+        groups={[
+          { series, books: [book({ id: 'b2', title: 'Two', themeHue: null }), book({ id: 'b3', title: 'Three', themeHue: 40 })] },
+          { series: plain, books: [book({ id: 'b4', title: 'Four', themeHue: null })] },
+          { series: null, books: [book({ id: 'b5', title: 'Five', themeHue: null })] },
+        ]}
+      />,
+    )
+    const section = screen.getByRole('group', { name: 'Series: The Cycle' })
+    expect(section).toHaveClass('wrShelfSeries--hued')
+    expect(section.style.getPropertyValue('--wr-series')).toMatch(/^hsl\(120,/)
+    expect(screen.getByRole('group', { name: 'Series: Plain' }).style.getPropertyValue('--wr-series')).toMatch(/^hsl\(300,/)
+    const spine = (name: string) => screen.getByRole('button', { name }).style.getPropertyValue('--wr-spine')
+    expect([spine('Two'), spine('Three'), spine('Four'), spine('Five')].map(c => c.slice(0, 8))).toEqual(['hsl(120,', 'hsl(40, ', 'hsl(300,', 'hsl(300,'])
+  })
+
+  it('keeps a series section plain where no colour is known (the reader\'s shelves)', () => {
+    const series = { id: 's1', kind: 'series', parentId: null, order: 0, title: 'The Cycle', synopsis: '' } as OutlineNode
+    render(<Shelf label="Stack" meta="1 book" activeBookId={null} onOpenBook={() => {}} groups={[{ series, books: [book()] }]} />)
+    const section = screen.getByRole('group', { name: 'Series: The Cycle' })
+    expect(section).not.toHaveClass('wrShelfSeries--hued')
+    expect(section.style.getPropertyValue('--wr-series')).toBe('')
+  })
+
   it('passes each book its own bars', () => {
     render(
       <Shelf

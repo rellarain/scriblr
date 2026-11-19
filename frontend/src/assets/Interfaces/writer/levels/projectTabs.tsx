@@ -17,7 +17,7 @@ import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
-const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series and books, schedule, its project plan (phases, goals, processes, exercises, routines and tasks), history and analytics, and its own settings.'
+const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series, books, arcs and chapters, schedule, its project plan (phases, goals, processes, exercises, routines and tasks), history and analytics, and its own settings.'
 
 const body = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.body
 const label = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.label ?? ''
@@ -36,7 +36,7 @@ function OutlineSummary({ w }: { w: WriterWorkspace }) {
           <span>{b.title}</span><span className="wrOutlineMeta">{b.chapters} ch</span>
         </button>
       ))}
-      <p className="wrHint">Open the Project to arrange series and books.</p>
+      <p className="wrHint">Open the Project to arrange series, books, arcs and chapters.</p>
     </div>
   )
 }

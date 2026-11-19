@@ -53,6 +53,19 @@ Beside the focused level, the others sit in a **side column** (`.wrLevelsSide`):
 - **Narrow windows**: until the button is pressed, the column is hidden by itself while the window is narrower than 1000px, and shown again when it grows.
 - Both are kept on this machine (`scriblr.writer.sidebar`: `{ width, hidden }`; `null` = the default, or automatic).
 
+## The Project outline
+
+The Project level's **Outline** tab at Max (`ProjectOutline.tsx`; at Mid a list of the books, `OutlineSummary`) edits the project's **series, books, arcs and chapters** as **nested cards in one column**, on the tab's light surface in the ink: a series holds its books, a book its arcs and the chapters outside any arc, an arc its chapters; books outside a series stand at the top level.
+
+- **A card** (`.wrProjCard`): the number ("Series 1", "Book 2", "Arc 1", "Chapter 3"; arcs and chapters are numbered across their book, so their controls are named with it: *Book 2, Chapter 1 title*) over the title, between its grip and its tools; then its **summary** (as tall as its text) and its **colour slider** (`HueSlider`, range and Inherit as everywhere). A 7px stripe of the card's colour runs down its left edge.
+- **A series** (`.wrProjSeries`) is **tinted in its own colour** (`--wr-node-tint`: the theme's lightness in the series' quiet tier; the ink, the ink at 90% and a field on it are audited for every hue as `proj-series/*`), with its books and **+ Book**. Its trash deletes only the series; its books stay.
+- **A book** (`.wrProjBook`, raised) has **Open book** and a fold chevron; folded it shows its counts, open it adds its summary, colour, **Chapter target** and **Word goal** (`GoalField`), its arcs and chapters, **+ Arc** and **+ Chapter**.
+- **An arc** (`.wrProjArc`, a recess in its book) folds too: its counts, then its summary, colour, chapters and **+ Chapter**.
+- **A chapter** (`.wrProjChapter`, raised) has the **Write** pencil (opens it in the Draft) and, under its summary, its colour and its counts (acts, scenes, moments, words). Acts, scenes and moments stay on the book's own Outline.
+- **Folding** is remembered per card (`scriblr.writer.projectOutlineOpen`): a book starts folded, an arc open. Adding a card inside a folded book or arc opens it.
+- **Dragging** a grip moves a card: a series among the series, a book into or out of a series, an arc into another book, a chapter into another arc or book (`useNodeDnd` with the gaps that may take it).
+- **Keys** (`lib/nodeKeys.ts`): Enter adds a sibling, Shift+Enter a child (a series a book, a book or an arc a chapter), Ctrl+Enter a sibling of the parent.
+
 ## The project shelves beside the Dash
 
 At the Dash, the project shelves are a column on the right (`.wrLevelsShelves`), a third of the width by default. A **handle on the column's left edge** (`.wrSideResizer--left`, `role="separator"`, "Shelves width") sets its width: drag left to widen, right to narrow. It is held between **200px and 60%** of the Writer (so the Dash keeps its room), shown live, and **kept on this machine** (`scriblr.writer.shelvesWidth`); a double click puts it back to the default.

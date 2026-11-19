@@ -28,6 +28,10 @@ beforeEach(() => {
   __resetSettingsForTests()
 })
 
+// The fixture's book stands in a series, whose range (90 until another is chosen) caps the book's: a test of a book's wider range first opens the
+// series to 360 (it keeps the project's hue as its own, so the book is still measured from the project's).
+const freeSeries = (result: { current: ReturnType<typeof useWriterWorkspace> }) => act(() => { result.current.setNodeHueRange('s1', 360) })
+
 async function opened() {
   const backend = standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: OUTLINE, plot: PLOT } })
   const hook = renderHook(() => useWriterWorkspace())
@@ -275,7 +279,7 @@ describe('useWriterWorkspace: saving the outline', () => {
 })
 
 describe('useWriterWorkspace: colour ranges', () => {
-  it('starts a new book at the project\'s hue, a new chapter inside 30 of its book\'s, and gives a series none', async () => {
+  it('starts a new book at the project\'s hue, a new chapter inside 30 of its book\'s, and a new series inside 90 of the project\'s', async () => {
     const { result, get } = await opened()
     let book = ''
     let chapter = ''
@@ -285,7 +289,7 @@ describe('useWriterWorkspace: colour ranges', () => {
     act(() => { series = result.current.addOutlineNode(null, 'series') })
     expect(get(book)?.themeHue).toBe(result.current.projectHue)
     expect(Math.abs(hueDelta(result.current.projectHue, get(chapter)?.themeHue as number))).toBeLessThanOrEqual(30) // b1 has no colour: it shows the project's
-    expect(get(series)?.themeHue).toBeUndefined()
+    expect(Math.abs(hueDelta(result.current.projectHue, get(series)?.themeHue as number))).toBe(90) // as far as it may go from s1, which shows the project's
   })
 
   it('holds a book within 90 degrees of the project, and a chapter within 30 of its book', async () => {
@@ -299,10 +303,11 @@ describe('useWriterWorkspace: colour ranges', () => {
     expect(get('c1')?.themeHue).toBe(wrapHue(project + 40 + 30))
   })
 
-  it('does not accept a colour for a series', async () => {
+  it('does not accept a colour for an act, a scene or a moment (they show their chapter\'s)', async () => {
     const { result } = await opened()
     const before = result.current.outlineNodes
-    act(() => { result.current.setNodeHue('s1', 200) })
+    act(() => { result.current.setNodeHue('a1', 200) })
+    act(() => { result.current.setNodeHueRange('m1', 60) })
     expect(result.current.outlineNodes).toBe(before)
   })
 
@@ -315,18 +320,35 @@ describe('useWriterWorkspace: colour ranges', () => {
     expect(get('c2')?.themeHue).toBe(80)
   })
 
-  it('clears a series colour saved by an older version the next time the outline is saved', async () => {
-    const withColour = OUTLINE.map(n => (n.id === 's1' ? { ...n, themeHue: 300 } : n))
-    const backend = standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: withColour, plot: PLOT } })
-    const hook = renderHook(() => useWriterWorkspace())
-    await waitFor(() => expect(hook.result.current.projects).toHaveLength(1))
-    await act(async () => { await hook.result.current.openProject('p1') })
-    await waitFor(() => expect(hook.result.current.outlineStatus).toBe('idle'))
-    expect(hook.result.current.outlineNodes.find(n => n.id === 's1')?.themeHue).toBe(300) // loading changes nothing
-    act(() => { hook.result.current.updateOutlineNode('c2', { title: 'Two' }) })
-    await act(async () => { await hook.result.current.saveNow() })
-    expect(backend.saved.outline.at(-1)?.find(n => n.id === 's1')?.themeHue).toBeNull()
-    expect(hook.result.current.levelHueOf(hook.result.current.outlineNodes.find(n => n.id === 's1')!)).toBe(hook.result.current.projectHue)
+  it("gives a series a colour of its own, held within 90 of the project's and kept through a save, which its books follow", async () => {
+    const { result, get, backend } = await opened()
+    const project = result.current.projectHue
+    expect(result.current.hueSliderOf(get('s1')!)).toMatchObject({ inherit: true, hue: project, centre: project, range: 90, maxRange: 360 })
+    act(() => { result.current.setNodeHue('s1', project + 60) })
+    expect(get('s1')?.themeHue).toBe(wrapHue(project + 60))
+    expect(result.current.levelHueOf(get('b1')!)).toBe(wrapHue(project + 60)) // its book inherits it
+    expect(result.current.hueSliderOf(get('b1')!)).toMatchObject({ centre: wrapHue(project + 60), maxRange: 90 })
+    act(() => { result.current.setNodeHue('s1', project + 170) })
+    expect(get('s1')?.themeHue).toBe(wrapHue(project + 90))
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.outline.at(-1)?.find(n => n.id === 's1')?.themeHue).toBe(wrapHue(project + 90))
+    act(() => { result.current.setNodeInherit('s1', true) })
+    expect(get('s1')?.themeHue).toBeNull()
+    expect(result.current.levelHueOf(get('b1')!)).toBe(project)
+  })
+
+  it("starts a new series at a hue in its range spread away from the other series', and a new book in it at the series' colour", async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHue('s1', project + 90) })
+    let id = ''
+    act(() => { id = result.current.addOutlineNode(null, 'series') })
+    const hue = get(id)?.themeHue as number
+    expect(Math.abs(hueDelta(project, hue))).toBeLessThanOrEqual(90)
+    expect(Math.abs(hueDelta(wrapHue(project + 90), hue))).toBeGreaterThanOrEqual(90)
+    let book = ''
+    act(() => { book = result.current.addOutlineNode(id, 'book') })
+    expect(get(book)?.themeHue).toBe(hue)
   })
 })
 
@@ -334,6 +356,10 @@ describe('useWriterWorkspace: the range and inherit of a colour', () => {
   it('records the range a node chose, held to its parent\'s, and lowers the ranges under a parent that is narrowed', async () => {
     const { result, get } = await opened()
     const project = result.current.projectHue
+    act(() => { result.current.setNodeHueRange('b1', 180) })
+    expect(get('b1')?.hueRange).toBe(90) // held to its series' range
+    freeSeries(result)
+    act(() => { result.current.setNodeHueRange('b1', 90) })
     act(() => { result.current.setNodeHueRange('c1', 120) })
     expect(get('c1')?.hueRange).toBe(90) // the book's own range is 90 until it chooses another
     act(() => { result.current.setNodeHueRange('b1', 180) })
@@ -351,6 +377,7 @@ describe('useWriterWorkspace: the range and inherit of a colour', () => {
   it('pulls a node\'s own hue into a narrower window of its parent, and never moves it for a wider one', async () => {
     const { result, get } = await opened()
     const project = result.current.projectHue
+    freeSeries(result)
     act(() => { result.current.setNodeHueRange('b1', 120) })
     act(() => { result.current.setNodeHue('b1', project + 100) })
     expect(get('b1')?.themeHue).toBe(wrapHue(project + 100))
@@ -363,6 +390,7 @@ describe('useWriterWorkspace: the range and inherit of a colour', () => {
   it('does not move a child of a node with a range of 180 or 360 when the parent changes', async () => {
     const { result, get } = await opened()
     const project = result.current.projectHue
+    freeSeries(result)
     act(() => { result.current.setNodeHueRange('b1', 360) })
     act(() => { result.current.setNodeHueRange('c1', 180) })
     act(() => { result.current.setNodeHue('c1', project + 170) })
@@ -395,6 +423,7 @@ describe('useWriterWorkspace: the range and inherit of a colour', () => {
 
   it('has no Inherit at a range of 360 (it keeps the hue it showed as its own), and refuses it', async () => {
     const { result, get } = await opened()
+    freeSeries(result)
     act(() => { result.current.setNodeHueRange('b1', 360) })
     expect(get('b1')?.themeHue).toBe(result.current.projectHue)
     act(() => { result.current.setNodeInherit('b1', true) })
@@ -404,9 +433,12 @@ describe('useWriterWorkspace: the range and inherit of a colour', () => {
 
   it('offers a node the ranges up to its parent\'s', async () => {
     const { result, get } = await opened()
+    expect(result.current.hueSliderOf(get('b1')!).maxRange).toBe(90) // its series'
+    freeSeries(result)
     act(() => { result.current.setNodeHueRange('b1', 120) })
     expect(result.current.hueSliderOf(get('c1')!).maxRange).toBe(120)
     expect(result.current.hueSliderOf(get('b1')!).maxRange).toBe(360)
+    expect(result.current.hueSliderOf(get('s1')!).maxRange).toBe(360) // the project's
   })
 })
 
@@ -469,6 +501,7 @@ describe('useWriterWorkspace: a range is the range of every sibling', () => {
   it('sets the range of a chapter on the chapters beside it, and pulls their own hues into the new window', async () => {
     const { result, get } = await opened()
     const project = result.current.projectHue
+    freeSeries(result)
     act(() => { result.current.setNodeHueRange('b1', 360) })
     act(() => { result.current.setNodeHueRange('c1', 120) })
     expect([get('c1')?.hueRange, get('c2')?.hueRange]).toEqual([120, 120])
@@ -505,6 +538,7 @@ describe('useWriterWorkspace: a range is the range of every sibling', () => {
 
   it('has every sibling inherit at 360 keep the hue it showed as its own', async () => {
     const { result, get } = await opened()
+    freeSeries(result)
     act(() => { result.current.setNodeHueRange('b1', 360) })
     act(() => { result.current.setNodeHueRange('c1', 360) })
     expect([get('c1')?.themeHue, get('c2')?.themeHue]).toEqual([result.current.projectHue, result.current.projectHue])

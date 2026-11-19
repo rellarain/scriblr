@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { OutlineNode, PlotNode, PlotPlacement } from '../../../api/types'
-import { accentColorCss, bookThemeHue, themeColorCss } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, accentColorCss, themeColorCss } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { ChevronDownIcon, ChevronRightIcon, CloseIcon, LockIcon } from '../../icons'
 import { AwarenessEye } from './AwarenessEye'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
+import { levelHue } from './levelHues'
 import { placementLook, type PlacementLook } from './plotCardColors'
 import { textOf } from './plotFields'
 import { LevelDots } from './LevelDots'
@@ -16,8 +17,9 @@ import { useStoredState } from './storage'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The plotline editor's outline: the project's series, books, arcs and chapters as nested
-// cards. Only chapters take plotpoints (dragged from the field lists, as many times as a plotpoint is wanted in different chapters). Book
-// and arc cards wear the book's primary colour, chapters a muted shade of its secondary colour. A chapter
+// cards. Only chapters take plotpoints (dragged from the field lists, as many times as a plotpoint is wanted in different chapters). A series
+// card wears the series' colour (its own, else the project's), book and arc cards the book's (its own, else its series'), chapters a muted
+// shade of it. A chapter
 // lists the placements of this plotline's plotpoints in it (on the chapter, or on an act, scene or moment of it) in one wrapping row of
 // boxes, one box for each placement, each with an icon on the right: an x on a placement on the chapter itself (it takes that placement
 // away), the awareness eye on a placement on a moment, a lock on an act or scene. Given several plotlines (the compare view) it lists all
@@ -121,15 +123,16 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
     )
   }
 
+  // The colour a card wears: a series' own, else the book's it is in (a chapter or arc outside any book: the project's).
+  const projectHue = w.projectHue ?? DEFAULT_BOOK_HUE
+  const hueOf = (node: OutlineNode, book: OutlineNode | undefined) => levelHue(node.kind === 'series' ? node : book ?? node, outlineById, projectHue)
+
   function card(node: OutlineNode, book: OutlineNode | undefined, chapterNumbers: Map<string, number>): React.ReactNode {
     const kids = (index.get(node.id) ?? []).filter(k => SHOWN.has(k.kind))
-    if (node.kind === 'chapter') {
-      const themeHue = book ? bookThemeHue(book, w.projectHue) : bookThemeHue({}, w.projectHue)
-      return chapterCard(node, chapterNumbers.get(node.id) ?? 0, { themeHue })
-    }
+    if (node.kind === 'chapter') return chapterCard(node, chapterNumbers.get(node.id) ?? 0, { themeHue: book ? hueOf(node, book) : projectHue })
     const isBook = node.kind === 'book'
     const b = isBook ? node : book
-    const themeHue = b ? bookThemeHue(b, w.projectHue) : null
+    const themeHue = node.kind === 'series' || b ? hueOf(node, b) : null
     const isOpen = !collapsed.has(node.id)
     const style = themeHue === null ? undefined : { ['--wr-plot-card' as string]: themeColorCss(themeHue), ['--wr-plot-edge' as string]: accentColorCss(themeHue) }
     const numbers = isBook ? new Map(chaptersOfBook(w.outlineNodes, node.id).map((c, i) => [c.id, i + 1])) : chapterNumbers

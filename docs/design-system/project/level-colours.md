@@ -1,6 +1,6 @@
 # Level colours
 
-Every level of the Writer, every book, arc and chapter, and every plot category has a colour. It is **a hue in degrees, 0 to 360** (0 and 360 are both red), stored as one number (`OutlineNode.themeHue`, `ProjectSettings.themeHue`, `PlotNode.hue`). Saturation and lightness are the zone's, so the same colour is paler by day and deeper at night; the saturation comes in **three tiers** (below). Code: `frontend/src/theme/bookColors.ts`, `assets/Interfaces/writer/levelHues.ts`; mirrored in `backend/app/storage/schema.py` (`MIN_LEVEL_HUE` 0, `MAX_LEVEL_HUE` 360, `HUE_SCHEME` 4).
+Every level of the Writer, every series, book, arc and chapter, and every plot category has a colour. It is **a hue in degrees, 0 to 360** (0 and 360 are both red), stored as one number (`OutlineNode.themeHue`, `ProjectSettings.themeHue`, `PlotNode.hue`). Saturation and lightness are the zone's, so the same colour is paler by day and deeper at night; the saturation comes in **three tiers** (below). Code: `frontend/src/theme/bookColors.ts`, `assets/Interfaces/writer/levelHues.ts`; mirrored in `backend/app/storage/schema.py` (`MIN_LEVEL_HUE` 0, `MAX_LEVEL_HUE` 360, `HUE_SCHEME` 4).
 
 (Earlier versions also stored a brightness, darker, base or lighter, in the same number. It is gone: the backend converts those colours to their hue once, on load.)
 
@@ -10,15 +10,15 @@ Every level of the Writer, every book, arc and chapter, and every plot category 
 |---|---|
 | Dash | the app theme's own colour |
 | Project | its own, else the app theme's hue + 120, so the Dash and the Project read as different tints. Its shelf in the column beside the Dash is this colour too: **each project's shelf is its own project's colour**, not the open project's |
-| Series | none: it shows the project's colour (a colour stored on a series by an older version is ignored, and cleared the next time the outline is saved) |
-| Book | within **90** degrees of the project's hue; a book with no hue of its own shows the project's |
+| Series | within **90** degrees of the project's hue; a series with no hue of its own shows the project's. Its section on a shelf is a darkened shade of it, and its card in the Project outline and the Plot outline panel are tinted with it |
+| Book | within **90** degrees of its series' hue (the project's outside any series); a book with no hue of its own shows its series' (the project's) |
 | Arc | within **60** degrees of its book's |
 | Chapter | within **30** degrees of its arc's (its book's outside an arc) |
 | Plot category | within **90** degrees of the project's hue |
 | Plot subcategory | within **60** degrees of its category's |
 | Plot cluster | within **30** degrees of its subcategory's (its category's when it sits straight under one) |
 
-These are the **defaults** (`HUE_RANGES` in `bookColors.ts`, also published as the `hue-range-*` tokens). A range is a **choice per node, shared by its siblings** (the nodes of its kind under the same parent) (30, 60, 90, 120, 180 or 360 degrees either side of its parent's hue, kept in the project as `hueRange`), never wider than its parent's own range; the project's parent is the app theme's own hue, and the account's theme hues have no parent, so they are the whole wheel, locked at 360. A range is a **rule**: a colour is held inside it when it, or the colour above it, or its own range, is changed, and a colour already outside its range stays as it is until then, shown on the nearest end of the slider. A node with a range of 180 or 360 is never moved by its parent. A node can **inherit**: it then stores no colour of its own, shows its parent's and follows it (a book, an arc, a chapter, a plot category, subcategory or cluster, and the project, which follows the app theme's hue); a node with a range of 360 cannot. A new arc or chapter takes a hue in its range, spread away from its siblings'; a **new book or plot category starts at the project's hue**, and a new subcategory or cluster inherits. Changing a parent pulls what is under it back inside its range, and nothing elsewhere.
+These are the **defaults** (`HUE_RANGES` in `bookColors.ts`, also published as the `hue-range-*` tokens). A range is a **choice per node, shared by its siblings** (the nodes of its kind under the same parent) (30, 60, 90, 120, 180 or 360 degrees either side of its parent's hue, kept in the project as `hueRange`), never wider than its parent's own range; the project's parent is the app theme's own hue, and the account's theme hues have no parent, so they are the whole wheel, locked at 360. A range is a **rule**: a colour is held inside it when it, or the colour above it, or its own range, is changed, and a colour already outside its range stays as it is until then, shown on the nearest end of the slider. A node with a range of 180 or 360 is never moved by its parent. A node can **inherit**: it then stores no colour of its own, shows its parent's and follows it (a series, a book, an arc, a chapter, a plot category, subcategory or cluster, and the project, which follows the app theme's hue); a node with a range of 360 cannot. A new series, arc or chapter takes a hue in its range, spread away from its siblings'; a **new book starts at the hue it is measured from** (its series', else the project's), a **new plot category at the project's**, and a new subcategory or cluster inherits. A series saved before series had colours has none: it shows the project's until one is chosen. Changing a parent pulls what is under it back inside its range, and nothing elsewhere.
 
 The hue slider is **one row**: an Inherit toggle (a square in the parent's hue), a chip with the hue's degrees, the track (the whole wheel from 0 to 360, or the range either side of the parent's hue) and a range button (`HueSlider`, [the preview](components/HueSlider/README.md)).
 
@@ -28,7 +28,7 @@ A tree's colours get louder the deeper they go. The tier is a factor of the zone
 
 | Tier | Plot tree | Outline |
 |---|---|---|
-| quiet, 0.5 | category (surface and stripe) | series |
+| quiet, 0.5 | category (surface and stripe) | series (its shelf section, its card's tint and stripe) |
 | middle, 0.75 | subcategory (fill and stripe) | book (spine, cover, rail, card stripe) |
 | loud, 1 | cluster (fill and stripe) | arc, chapter and everything under them |
 

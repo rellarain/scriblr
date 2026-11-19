@@ -246,7 +246,9 @@ class OutlineNode(BaseModel):
     # OutlineNodes structurally.
     color: Optional[str] = None
     # The Writer's level colours: `themeHue` is also set on series, arcs and chapters (each
-    # within 60 degrees of its parent's hue; none = the parent's hue). On a book it is
+    # within its range, `hueRange`, of its parent's hue: a series of the project's, a book of
+    # its series' (the project's outside any series), an arc of its book's, a chapter of its
+    # arc's or book's; none = the parent's hue). On a book it is
     # the book's one colour (0-360): the cover / spine colour, and the tint of the book's
     # editors' surfaces and active items. A legacy hex `color` becomes the theme hue.
     # (Books used to have a second, accent hue; files that still carry one load fine and

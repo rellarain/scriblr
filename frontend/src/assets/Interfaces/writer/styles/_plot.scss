@@ -199,8 +199,19 @@
   .wrProjHead { display: flex; align-items: center; justify-content: space-between; .wrLabel { margin-bottom: 0; } }
   .wrProjHeadActions { display: flex; gap: var(--space-3); }
   .wrProjStack { display: flex; flex-direction: column; }
-  .wrProjSeries { background: var(--ov-sink-2); border-radius: var(--radius-none); padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
-  .wrProjBook { background: var(--wr-card); border-radius: var(--radius-none); padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; box-shadow: inset 7px 0 0 var(--wr-node-color, transparent); }
+  // A card of the project outline (ProjectOutline.tsx): a stripe of its colour at its left edge. A series is tinted in its own colour (the
+  // theme's lightness, in the series' quiet tier: the ink reads on it for every hue, contrastAudit.ts proj-series); a book and a chapter are
+  // raised, an arc is a recess in its book.
+  .wrProjCard { border-radius: var(--radius-none); padding: var(--space-4) var(--space-5) var(--space-4) calc(var(--space-5) + 4px); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; box-shadow: inset 7px 0 0 var(--wr-node-color, transparent); }
+  .wrProjSeries { background: var(--wr-node-tint, var(--ov-sink-2)); padding: var(--space-5) var(--space-6) var(--space-5) calc(var(--space-6) + 4px); gap: var(--space-4); }
+  .wrProjBook, .wrProjChapter { background: var(--wr-card); }
+  // A card inside another keeps less of the room to its sides, so four levels deep still fit a narrow tile.
+  .wrProjCard .wrProjCard { padding-right: var(--space-4); padding-left: calc(var(--space-4) + 7px); }
+  .wrProjArc { background: var(--ov-sink-1); }
+  .wrProjHue { margin: 0; }
+  .wrProjGoals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: var(--space-4) var(--space-6); }
+  // The count above a goal is the ink here (the accent's light shade is for the book's dark cover).
+  .wrProjectOutline .wrGoalCurrent { color: var(--ink); }
   // Two rows: the number over the title; the grip, title input and action buttons share the second row.
   .wrProjTop {
     display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--space-4); row-gap: var(--space-2); align-items: start;
@@ -213,7 +224,9 @@
   .wrProjSummary { box-sizing: border-box; width: 100%; background: var(--wr-field); border: 0; outline: none; color: var(--ink); font-size: var(--text-ui); padding: var(--space-3) var(--space-4); border-radius: var(--radius-none); resize: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
   .wrProjActions { display: inline-flex; align-items: center; gap: var(--space-2); }
   .wrProjStats { display: flex; gap: var(--space-4); font-size: var(--text-small); opacity: 0.9; padding-left: 24px; span + span::before { content: '\00b7'; margin-right: var(--space-4); } }
-  .wrProjFoot { display: flex; }
+  .wrProjFoot { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  // A chapter's footer: its colour at the left (taking what is left, up to a width), its counts at the right.
+  .wrProjFoot--tools { align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); .wrNodeHue { flex: 1 1 140px; min-width: 120px; max-width: 260px; margin: 0; } .wrProjStats { padding-left: 0; margin-left: auto; } }
 
   .wrPlotlineEditor { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
   // A parent chip opened onto its own fields: the title and description, the colour and the keywords, in the chip's colour.
