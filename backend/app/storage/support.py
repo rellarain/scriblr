@@ -11,7 +11,8 @@ How the pieces fit:
     tier (1 to 4 on each console: helpers promoted on the console, helpers promoted on its interface, the console's channel
     support, admins with helper hours promoted on it; staff.py).
   - The queues' settings and helper time (schedules, levels, the switchboard) are kept here too (queues.py).
-  - Feedback drafted in a chat becomes the user's feedback when they confirm it, already checked by that staff member.
+  - Feedback drafted in a chat becomes the user's feedback when they confirm it, and waits in the Outbox of the staff
+    member who drafted it (HUI), who completes it and sends it on to the Inbox (AUI's Office) to be checked.
   - The user sees their own chats; staff see what is waiting and the chats they are in.
 """
 
@@ -256,7 +257,9 @@ def user_close(file: SupportFile, user_id: str, chat_id: str) -> None:
 
 
 def confirm_draft(file: SupportFile, root: Path, user_id: str, user_name: str, chat_id: str, event_id: str, known: set[str]) -> None:
-    """The user confirms feedback drafted in the chat: it is sent as theirs, already checked by the staff member."""
+    """The user confirms feedback drafted in the chat: it is sent as theirs, and waits in the drafter's Outbox (with the
+    draft's subject, verb and tone) until they send it on to the Inbox. A drafter who is not on the feedback staff has no
+    Outbox: the feedback goes straight to the Inbox."""
     chat = _chat(file, chat_id)
     _own(chat, user_id)
     event = next((e for e in chat.events if e.id == event_id and e.kind == "feedbackInitiated"), None)
@@ -268,10 +271,10 @@ def confirm_draft(file: SupportFile, root: Path, user_id: str, user_name: str, c
 
     def send(fb: feedback.FeedbackFile) -> None:
         m = feedback.create_message(fb, user_name, user_id, draft.text, None, draft.channelId, draft.verbId, chat.focal, known)
-        if draft.tone and any(a.id == event.staffId for a in fb.admins):
-            m.tone = draft.tone
-            m.checkedBy = event.staffId
-            m.checkedAt = utcnow()
+        m.tone = draft.tone
+        if any(a.id == event.staffId for a in fb.admins):
+            m.heldBy = event.staffId
+            m.heldChat = chat.id
         draft.messageId = m.id
 
     try:

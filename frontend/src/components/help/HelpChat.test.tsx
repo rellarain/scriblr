@@ -58,7 +58,8 @@ describe('Help tile > Chat', () => {
     expect(await within(draft).findByText('Sent. It is under My feedback.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /My feedback/ }))
     const sent = (await screen.findByText('Saving does nothing.')).closest('article') as HTMLElement
-    expect(within(sent).getByRole('listitem', { current: 'step' })).toHaveTextContent('In voting')
+    // It waits in the helper's Outbox to be completed and sent on to the Inbox, so it is received, not checked yet.
+    expect(within(sent).getByRole('listitem', { current: 'step' })).toHaveTextContent('Received')
   })
 
   it('closes the chat, and a new question starts a new one', async () => {

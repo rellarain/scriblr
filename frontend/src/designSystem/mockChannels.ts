@@ -16,7 +16,7 @@ const SAMPLE: [string, string][] = [
   ['reader', 'Reader'], ['reader/nook', 'Nook'], ['reader/nook/stack', 'Stack'], ['reader/library', 'Library'], ['reader/library/catalog', 'Catalog'],
   ['training', 'Training'], ['training/desk', 'Desk'], ['training/desk/courses', 'Courses'],
   ['user', 'User'], ['user/dashboard', 'Dashboard'], ['user/dashboard/notifications', 'Notifications'],
-  ['helper', 'Helper'], ['helper/inbox', 'Inbox'], ['helper/inbox/check', 'Check'], ['helper/queue', 'Queue'], ['helper/chat', 'Chat'],
+  ['helper', 'Helper'], ['helper/inbox', 'Inbox'], ['helper/inbox/check', 'Check'], ['helper/queue', 'Queue'], ['helper/chat', 'Chat'], ['helper/outbox', 'Outbox'],
   ['admin', 'Admin'], ['admin/project-plan', 'Project Plan'], ['admin/office', 'Office'], ['admin/office/desk', 'Desk'],
   ['admin/office/channel', 'Channel'], ['admin/configuration', 'Configuration'], ['admin/configuration/channels', 'Channels'],
 ]

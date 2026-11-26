@@ -2,7 +2,7 @@
 
 How a writer's feedback reaches the people who decide on it, in as few steps as possible. A writer writes it as a **statement** (a subject in the [channel list](../Channels/README.md) and a verb, such as *Fix Writer > Draft > Draft*) in the Help tile of the console they are in. A checker **checks** it in the Inbox, a tab of the Office's Desk (AUI). In the Office it is then **voted on** (advice only) and **corrected** by Channel Management. The Project Plan's planner then accepts or vetoes it. Messages with the same subject and verb are **one statement**: they share its votes and are listed under it.
 
-Code: `support/` (the chat stores and API: `supportStores.ts`, `supportApi.ts`, `supportTypes.ts`); `feedback/` (the shared pieces: `StatementCard`, `MessageCard`, `VoteControl`, `ChannelPicker`, `ToneFaces`, `ActingAs`, `MyFeedback`, the stores `staffStore.ts` and `mineStore.ts`, `feedbackApi.ts`, `feedbackLogic.ts`, `feedback.scss`); the Help tile `components/help/HelpTile.tsx`; the Inbox `admin/office/inbox/` (`InboxSection`, `CheckView`, `ConfigurationView`); the Office pages `admin/office/StatementPages.tsx`; Assignment `admin/RoleAssignment.tsx`; the user's dashboard `user/UserNotifications.tsx`. Storage: `feedback.json` and `support.json` in the app's data folder (backend `storage/feedback.py` and `storage/support.py`, API `api/feedback.py` and `api/support.py`).
+Code: `support/` (the chat stores and API: `supportStores.ts`, `supportApi.ts`, `supportTypes.ts`); `feedback/` (the shared pieces: `StatementCard`, `MessageCard`, `VoteControl`, `ChannelPicker`, `ToneFaces`, `ActingAs`, `MyFeedback`, the stores `staffStore.ts` and `mineStore.ts`, `feedbackApi.ts`, `feedbackLogic.ts`, `feedback.scss`); the Help tile `components/help/HelpTile.tsx`; the Inbox `admin/office/inbox/` (`InboxSection`, `CheckView`, `ConfigurationView`); the Outbox `helper/outbox/OutboxSection.tsx`; the Office pages `admin/office/StatementPages.tsx`; Assignment `admin/RoleAssignment.tsx`; the user's dashboard `user/UserNotifications.tsx`. Storage: `feedback.json` and `support.json` in the app's data folder (backend `storage/feedback.py` and `storage/support.py`, API `api/feedback.py` and `api/support.py`).
 
 ## The Help tile (every console)
 
@@ -21,7 +21,7 @@ Four icon tabs (`role="tablist"`), each with an `aria-label` and a title:
   - **Before a chat**: the subject picker (it must be inside a console: the chat goes to that console's queue) and **Your question**; **Start the chat**.
   - **During a chat**: the conversation (`role="log"`, labelled *Conversation*): the writer's messages on one side, staff's on the other, and short notes for what staff did (*Someone is here to help.*, put on hold, checked in, sent to another console, passed to a more experienced helper).
   - A **guide** staff sent opens in place (a `<details>` with the Resources articles of that part of the app).
-  - **Feedback drafted for you** (a group): the statement and the words staff wrote with the writer, and **Send this feedback as mine**. Once sent it is the writer's own feedback, already checked by that staff member (so it goes straight into voting), and listed under My feedback.
+  - **Feedback drafted for you** (a group): the statement and the words staff wrote with the writer, and **Send this feedback as mine**. Once sent it is the writer's own feedback, listed under My feedback as received, and waits in the [Outbox](#the-outbox-helper) of the staff member who drafted it.
   - **Your message** with **Send the message**, and **Close the chat**. A closed chat lets the writer start a new one.
 - **My feedback** (`ListIcon`): everything the writer sent, newest first. Each card shows:
   - its statement;
@@ -32,6 +32,17 @@ Four icon tabs (`role="tablist"`), each with an `aria-label` and a title:
   A badge on the tab counts the unanswered questions.
 
 The Writer's levels, the Draft, Learning, every Reader page and the Admin, User and Helper panels each have one.
+
+## The Outbox (Helper)
+
+A console of HUI (`OutboxIcon`, with the count on its button in the band). It holds the feedback writers confirmed in the staff member's chats, waiting for them to complete it: **From today's chats** first, then **Earlier** (nothing is dropped until it is sent). Each card shows who it is from and the writer's words, then:
+
+- **About** and **Verb**, as the chat showed them;
+- **Tone** (Pleasant, Unpleasant, Mixed, Neutral);
+- **Note**: an optional comment for staff, sent with it;
+- **Send** (enabled once a tone is set), which puts it in the Inbox.
+
+Changes save at once. Only the staff member who drafted it sees it or sends it, and until it is sent it is in nobody's Inbox. A drafter who is not on the feedback staff has no Outbox: the confirmed feedback goes straight to the Inbox.
 
 ## The Inbox (Office > Desk)
 

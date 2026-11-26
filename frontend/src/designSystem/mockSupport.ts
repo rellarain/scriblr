@@ -23,7 +23,8 @@ export function createMockSupport(opts: {
   tierFor?: (pid: string, console: string) => number | null
   consoles?: () => string[]
   now?: () => Date
-  send: (draft: { channelId: string; verbId: string; text: string; tone: string | null }, userId: string, userName: string, checkedBy: string) => string
+  // The user confirmed feedback drafted in a chat: it is theirs, and waits in its drafter's Outbox (returns the message id).
+  send: (draft: { channelId: string; verbId: string; text: string; tone: string | null }, userId: string, userName: string, staffId: string, chatId: string) => string
   seed?: boolean
 }) {
   let next = 1
@@ -79,7 +80,7 @@ export function createMockSupport(opts: {
       const e = c.events.find(x => x.id === eventId && x.kind === 'feedbackInitiated')
       if (!e?.draft) throw new Refused(404, 'No drafted feedback there.')
       if (e.draft.confirmed) throw new Refused(400, 'That feedback was sent already.')
-      e.draft.messageId = opts.send(e.draft, userId, String(body.userName ?? ''), e.staffId)
+      e.draft.messageId = opts.send(e.draft, userId, String(body.userName ?? ''), e.staffId, c.id)
       e.draft.confirmed = true
       c.events.push(ev({ kind: 'feedbackConfirmed', by: 'user', draft: { ...e.draft } }))
     }

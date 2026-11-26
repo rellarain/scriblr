@@ -20,7 +20,9 @@ NodeKind = Literal["interface", "console", "component", "feature"]
 CHILD_KIND: dict[str, Optional[str]] = {"interface": "console", "console": "component", "component": "feature", "feature": None}
 
 # Version 2 (2026-11-16): the Office's seven tiles; its twelve pages before them stay in a tree until an admin deletes them.
-SCREENS_VERSION = 2
+# Version 3 (2026-11-26): HUI's Outbox (feedback confirmed in a chat, completed and sent on to the Inbox, which is now a tab
+# of the Office's Desk; Helper > Inbox stays, since the Checker and Channel manager roles are kept on it).
+SCREENS_VERSION = 3
 
 # Interface -> its consoles -> the tiles (components) of each console, in screen order.
 _SCREENS: list[tuple[str, list[tuple[str, list[str]]]]] = [
@@ -50,6 +52,7 @@ _SCREENS: list[tuple[str, list[tuple[str, list[str]]]]] = [
         ("Inbox", ["Check", "Configuration"]),
         ("Queue", ["Switchboard", "Overview"]),
         ("Chat", ["Conversation"]),
+        ("Outbox", ["Cases"]),
         ("Settings", ["Schedule"]),
     ]),
     ("Admin", [

@@ -123,6 +123,10 @@ class Message(BaseModel):
     tone: Optional[Tone] = None
     checkedBy: Optional[str] = None
     checkedAt: Optional[datetime] = None
+    # Feedback a user confirmed in a support chat waits in the Outbox of the staff member who drafted it (HUI), who
+    # completes it and sends it on to the Inbox; until then nobody else sees it, and it is not checked.
+    heldBy: Optional[str] = None
+    heldChat: Optional[str] = None
     questions: list[Question] = Field(default_factory=list)
     comments: list[Comment] = Field(default_factory=list)
     history: list[HistoryEvent] = Field(default_factory=list)
@@ -660,8 +664,13 @@ def _message_view(file: FeedbackFile, m: Message, me: str, work_of: Optional[Wor
     }
 
 
+def _outbox_view(file: FeedbackFile, m: Message, me: str, work_of: Optional[WorkOf]) -> dict:
+    return {**_message_view(file, m, me, work_of), "author": m.author, "chatId": m.heldChat}
+
+
 def bundle(file: FeedbackFile, admin_id: str, work_of: Optional[WorkOf] = None) -> dict:
-    """Everything the Inbox, Office > Voting, Channel Management and the Project Plan show, for one admin."""
+    """Everything the Inbox, Office > Voting, Channel Management and the Project Plan show, for one admin, and the
+    Outbox of what they drafted in chats (newest first). A message in someone's Outbox is in nobody's Inbox yet."""
     me = admin_by_id(file, admin_id)
     statements = []
     for s in derive_statements(file):
@@ -688,7 +697,9 @@ def bundle(file: FeedbackFile, admin_id: str, work_of: Optional[WorkOf] = None) 
         "me": me.id,
         "admins": [{"id": a.id, "name": a.name, "roles": a.roles} for a in file.admins],
         "verbCategories": [v.model_dump(mode="json") for v in file.verbCategories],
-        "messages": [_message_view(file, m, admin_id, work_of) for m in file.messages],
+        "messages": [_message_view(file, m, admin_id, work_of) for m in file.messages if m.heldBy is None],
+        "outbox": [_outbox_view(file, m, admin_id, work_of)
+                   for m in sorted((m for m in file.messages if m.heldBy == admin_id), key=lambda m: m.submittedAt, reverse=True)],
         "statements": statements,
         "roleHistory": _history_view(file.roleHistory, admin_id),
         "can": {"check": has_role(me, "checker", INBOX), "manageVerbs": has_role(me, "channelManager", INBOX)},
@@ -767,6 +778,8 @@ def edit_message(
     `checked` only ever checks."""
     admin = admin_by_id(file, admin_id)
     m = _message(file, message_id)
+    if m.heldBy is not None:
+        raise Conflict("That feedback is still in a helper's Outbox.")
     if m.checked:
         require_role(admin, "channelManager", scope_of(m.channelId), "Correcting a statement")
     else:
@@ -793,6 +806,45 @@ def edit_message(
         changes.append("checked it")
     if changes:
         m.history.append(HistoryEvent(adminId=admin_id, kind="check" if not m.checked or checked else "correct", detail=", ".join(changes)))
+
+
+def _held(file: FeedbackFile, admin_id: str, message_id: str) -> Message:
+    admin_by_id(file, admin_id)
+    m = _message(file, message_id)
+    if m.heldBy != admin_id:
+        raise Forbidden("Only the staff member who drafted it in the chat can complete this feedback.")
+    return m
+
+
+def edit_held(
+    file: FeedbackFile, admin_id: str, message_id: str, known: set[str],
+    channel_id: Optional[str] = None, verb_id: Optional[str] = None, tone: Optional[Tone] = None,
+) -> None:
+    """Completing feedback in the Outbox: what it is about, the verb and its tone, as the chat showed them. Only its
+    drafter; fields left out stay as they are."""
+    m = _held(file, admin_id, message_id)
+    if channel_id is not None and channel_id != m.channelId:
+        _check_place(channel_id, known)
+        m.channelId = channel_id
+    if verb_id is not None and verb_id != m.verbId:
+        _check_verb(file, verb_id)
+        m.verbId = verb_id
+    if tone is not None:
+        m.tone = tone
+
+
+def send_held(file: FeedbackFile, admin_id: str, message_id: str, comment: str = "") -> None:
+    """Sends completed feedback from the Outbox to the Inbox, where a checker checks it like any other (its subject,
+    verb and tone come as the helper set them). A comment goes with it, for staff."""
+    m = _held(file, admin_id, message_id)
+    if m.tone is None:
+        raise FeedbackError("Set its tone before sending it.")
+    note = comment.strip()[:NOTE_MAX]
+    if note:
+        m.comments.append(Comment(id=project_store.new_id("c"), by=admin_id, text=note))
+    m.heldBy = None
+    m.heldChat = None
+    m.history.append(HistoryEvent(adminId=admin_id, kind="sent", detail="sent it from the Outbox"))
 
 
 def ask_question(file: FeedbackFile, admin_id: str, message_id: str, text: str) -> Question:

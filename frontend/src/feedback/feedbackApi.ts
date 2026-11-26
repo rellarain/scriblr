@@ -18,6 +18,11 @@ export const userFeedbackApi = {
 export const staffFeedbackApi = {
   load: (adminId: string) => api.get<StaffBundle>('/feedback', as(adminId)),
   edit: (adminId: string, messageId: string, edit: MessageEdit) => api.put<StaffBundle>(`/feedback/messages/${id(messageId)}`, edit, as(adminId)),
+  // The Outbox: complete feedback confirmed in a chat (only its drafter), then send it on to the Inbox.
+  editHeld: (adminId: string, messageId: string, edit: Pick<MessageEdit, 'channelId' | 'verbId' | 'tone'>) =>
+    api.put<StaffBundle>(`/feedback/outbox/${id(messageId)}`, edit, as(adminId)),
+  sendHeld: (adminId: string, messageId: string, comment: string) =>
+    api.post<StaffBundle>(`/feedback/outbox/${id(messageId)}/send`, { comment }, as(adminId)),
   ask: (adminId: string, messageId: string, text: string) => api.post<StaffBundle>(`/feedback/messages/${id(messageId)}/questions`, { text }, as(adminId)),
   comment: (adminId: string, messageId: string, text: string) => api.post<StaffBundle>(`/feedback/messages/${id(messageId)}/comments`, { text }, as(adminId)),
   vote: (adminId: string, statementId: string, vote: VoteInput) => api.put<StaffBundle>(`/feedback/statements/${id(statementId)}/vote`, vote, as(adminId)),

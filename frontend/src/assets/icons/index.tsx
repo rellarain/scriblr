@@ -162,6 +162,15 @@ export function InboxIcon(props: IconProps) {
   </IconBase>
 }
 
+// The Inbox's tray, open, with an arrow going up out of it -- feedback completed and sent on (HUI's Outbox).
+export function OutboxIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M2 13v6a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-6" />
+    <path d="M2 13h5l2 3h6l2-3h5" />
+    <path d="M12 11V3M8.5 6.5 12 3l3.5 3.5" />
+  </IconBase>
+}
+
 // A hexagon, not a literal gear -- IconBase's shared strokeLinejoin="round"
 // rounds its corners automatically, no separate arc path needed.
 export function GearIcon(props: IconProps) {

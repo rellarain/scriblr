@@ -80,7 +80,8 @@ def test_screens_of_a_newer_version_are_merged_in_once(client: TestClient, app_d
     assert body["content"]["writer/shelf/plot"]["guide"] == "kept"
     assert by_id["writer/dashboard"]["order"] > by_id["writer/shelf"]["order"]  # after the siblings already there
     assert "admin/office/desk" in by_id
-    assert body["screensVersion"] == 2
+    assert by_id["helper/outbox"]["parentId"] == "helper"  # added on the next load (version 3)
+    assert body["screensVersion"] == 3
     # Deleting a screen branch is not undone by the next load.
     assert client.delete("/api/resources/nodes/training/lesson").status_code == 200
     assert not any(n["id"].startswith("training/lesson") for n in _tree(client)["nodes"])
@@ -106,7 +107,7 @@ def test_the_office_tiles_arrive_beside_its_old_pages(client: TestClient, app_da
     body = _tree(client)
     office = sorted((n for n in body["nodes"] if n["parentId"] == "admin/office"), key=lambda n: n["order"])
     assert [n["name"] for n in office] == ["Voting", "Site", "Department", "Team", "Channel", "Desk", "Admin/Helper", "User"]
-    assert body["screensVersion"] == 2
+    assert body["screensVersion"] == 3
 
 
 def test_a_node_something_points_at_cannot_be_deleted(client: TestClient) -> None:

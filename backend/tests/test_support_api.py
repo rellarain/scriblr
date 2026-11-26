@@ -76,7 +76,7 @@ def test_transfer_and_escalate_send_it_back_to_waiting(client: TestClient) -> No
     assert act(client, chat["id"], DANA, action="escalation").status_code == 400  # tier 4 is the top
 
 
-def test_feedback_drafted_in_a_chat_becomes_the_users_once_confirmed_already_checked(client: TestClient) -> None:
+def test_feedback_drafted_in_a_chat_waits_in_the_drafters_outbox_once_confirmed(client: TestClient) -> None:
     chat = start(client)
     staff(client)
     client.post(f"/api/support/chats/{chat['id']}/take", headers=ARI)
@@ -89,8 +89,39 @@ def test_feedback_drafted_in_a_chat_becomes_the_users_once_confirmed_already_che
     assert confirmed[-1]["kind"] == "feedbackConfirmed"
     assert next(e for e in confirmed if e["id"] == ev["id"])["draft"]["confirmed"] is True
     sent = client.get("/api/feedback/mine", params={"authorId": USER}).json()["messages"][0]
-    assert (sent["text"], sent["status"]) == ("Saving does nothing.", "voting")  # checked by Ari, so straight into voting
+    assert (sent["text"], sent["status"]) == ("Saving does nothing.", "received")  # the user has it; nobody has checked it
+    held = client.get("/api/feedback", headers=ARI).json()["outbox"]
+    assert [(m["id"], m["author"], m["chatId"], m["tone"], m["checked"]) for m in held] == [(sent["id"], "Jordan", chat["id"], "unpleasant", False)]
+    dana = client.get("/api/feedback", headers=DANA).json()
+    assert dana["outbox"] == [] and all(m["id"] != sent["id"] for m in dana["messages"])  # in nobody's Inbox yet
     assert client.post(f"/api/support/chats/{chat['id']}/drafts/{ev['id']}/confirm", json={"userId": USER}).status_code == 400
+
+
+def test_the_outbox_completes_feedback_and_sends_it_to_the_inbox(client: TestClient) -> None:
+    chat = start(client)
+    staff(client)
+    client.post(f"/api/support/chats/{chat['id']}/take", headers=ARI)
+    v = act(client, chat["id"], action="feedbackInitiated", draft={"channelId": "writer/draft/draft", "verbId": "verb-fix", "text": "Saving does nothing."}).json()
+    ev = v["mine"][0]["events"][-1]
+    client.post(f"/api/support/chats/{chat['id']}/drafts/{ev['id']}/confirm", json={"userId": USER, "userName": "Jordan"})
+    mid = client.get("/api/feedback", headers=ARI).json()["outbox"][0]["id"]
+
+    # Only its drafter completes it, with a subject, a verb and a tone the store knows; nobody checks it meanwhile.
+    assert client.put(f"/api/feedback/outbox/{mid}", headers=DANA, json={"tone": "mixed"}).status_code == 403
+    assert client.put(f"/api/feedback/outbox/{mid}", headers=ARI, json={"verbId": "verb-nope"}).status_code == 400
+    assert client.put(f"/api/feedback/messages/{mid}", headers=DANA, json={"checked": True}).status_code == 409
+    assert client.post(f"/api/feedback/outbox/{mid}/send", headers=ARI, json={}).status_code == 400  # no tone yet
+    done = client.put(f"/api/feedback/outbox/{mid}", headers=ARI, json={"tone": "mixed", "channelId": "writer/draft"}).json()
+    assert (done["outbox"][0]["tone"], done["outbox"][0]["channelId"]) == ("mixed", "writer/draft")
+
+    out = client.post(f"/api/feedback/outbox/{mid}/send", headers=ARI, json={"comment": "Asked about it twice."}).json()
+    assert out["outbox"] == []
+    inbox = next(m for m in client.get("/api/feedback", headers=DANA).json()["messages"] if m["id"] == mid)
+    assert (inbox["checked"], inbox["tone"], inbox["channelId"]) == (False, "mixed", "writer/draft")  # to check, as the helper set it
+    assert [c["text"] for c in inbox["comments"]] == ["Asked about it twice."]
+    assert client.post(f"/api/feedback/outbox/{mid}/send", headers=ARI, json={}).status_code == 403  # sent already
+    checked = client.put(f"/api/feedback/messages/{mid}", headers=DANA, json={"checked": True}).json()
+    assert next(m for m in checked["messages"] if m["id"] == mid)["checked"] is True
 
 
 def test_closing_and_the_users_list(client: TestClient) -> None:

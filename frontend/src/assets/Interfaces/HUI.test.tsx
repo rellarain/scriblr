@@ -8,6 +8,7 @@ import { mockFetch } from '../../test/mockFetch'
 
 vi.mock('./helper/QueueSection', () => ({ default: () => <div>queue console</div> }))
 vi.mock('./helper/ChatsSection', () => ({ default: () => <div>chat console</div> }))
+vi.mock('./helper/outbox/OutboxSection', () => ({ default: () => <div>outbox console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -34,6 +35,13 @@ describe('HUI (the Helper panel as tiles)', () => {
     expect(tile('queue')).toBeNull()
   })
 
+  it('opens the Outbox from the band', () => {
+    render(<HUI side="right" helper={helper()} panel="outbox" />)
+    expect(screen.getByRole('region', { name: 'Outbox' })).toBeTruthy()
+    expect(screen.getByText('outbox console')).toBeTruthy()
+    expect(tile('queue')).toBeNull()
+  })
+
   it('has no Inbox: it is in the Office', () => {
     render(<HUI side="right" helper={helper()} panel="queue" />)
     const bar = screen.getByRole('toolbar', { name: 'Helper tiles tabs' })
@@ -44,7 +52,7 @@ describe('HUI (the Helper panel as tiles)', () => {
     const user = userEvent.setup()
     render(<HUI side="right" helper={helper()} panel="queue" />)
     const bar = screen.getByRole('toolbar', { name: 'Helper tiles tabs' })
-    expect(within(bar).getAllByRole('button').map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([['Queue', 'true'], ['Help', 'false'], ['Settings', 'false']])
+    expect(within(bar).getAllByRole('button').map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([['Queue', 'true'], ['Outbox', 'false'], ['Help', 'false'], ['Settings', 'false']])
     await user.click(within(bar).getByRole('button', { name: 'Help' }))
     expect(tile('queue')).toBeTruthy()
     expect(tile('help')).toBeTruthy()

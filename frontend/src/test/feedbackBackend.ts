@@ -13,7 +13,7 @@ export function feedbackBackend() {
   const feedback = createMockFeedback({ isTrainable: id => ['interface', 'console'].includes(node(id)?.kind ?? '') })
   const support = createMockSupport({
     isNode: id => !!node(id), isConsole: id => node(id)?.kind === 'console',
-    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), people: () => feedback.staffPeople(), tierFor: (pid, q) => feedback.tierFor(pid, q), consoles: () => consoleIds((channels.channels().body as { nodes: Parameters<typeof consoleIds>[0] }).nodes), send: (d, u, n, by) => feedback.sendChecked(d, u, n, by),
+    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), people: () => feedback.staffPeople(), tierFor: (pid, q) => feedback.tierFor(pid, q), consoles: () => consoleIds((channels.channels().body as { nodes: Parameters<typeof consoleIds>[0] }).nodes), send: (d, u, n, by, chat) => feedback.sendHeld(d, u, n, by, chat),
   })
   const calls: string[] = []
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -35,5 +35,6 @@ export function feedbackBackend() {
     return { ok: answer.status < 400, status: answer.status, statusText: answer.status < 400 ? 'OK' : 'Error', json: async () => answer.body }
   })
   vi.stubGlobal('fetch', fn)
-  return { fetch: fn, calls }
+  // `hold` puts feedback in a staff member's Outbox, as a writer confirming it in their chat would.
+  return { fetch: fn, calls, hold: feedback.sendHeld }
 }

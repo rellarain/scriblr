@@ -78,11 +78,21 @@ export interface Statement {
 
 export interface FeedbackAdmin { id: string; name: string; roles: Record<string, Role[]> }
 
+// Feedback a user confirmed in a support chat, waiting in the Outbox of the staff member who drafted it (HUI) to be
+// completed and sent on to the Inbox: the writer's name and the chat it came from.
+export interface OutboxMessage extends StaffMessage {
+  author: string
+  chatId: string | null
+}
+
 export interface StaffBundle {
   me: string
   admins: FeedbackAdmin[]
   verbCategories: VerbCategory[]
+  // Everything in the Inbox and beyond (a message still in someone's Outbox is not here).
   messages: StaffMessage[]
+  // The acting staff member's own Outbox, newest first (missing from an older server: none).
+  outbox?: OutboxMessage[]
   statements: Statement[]
   roleHistory: HistoryEntry[]
   can: { check: boolean; manageVerbs: boolean }

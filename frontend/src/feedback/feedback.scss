@@ -105,3 +105,24 @@ textarea.fbField { resize: vertical; min-height: 64px; line-height: 1.4; }
 
 // The writer's smile and frown (FeelingPicker): two square faces, not a row-wide set.
 .fbFeelings .toneFace { flex: 0 0 36px; width: 36px; padding: 0; cursor: pointer; }
+
+// The Outbox console (HUI, helper/outbox/OutboxSection.tsx): the Inbox's tone colours and layout, one card per feedback a
+// writer confirmed in a chat, today's first.
+.outboxSection {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  --tone-yes: var(--accent2);
+  --tone-yes-ink: var(--on-accent2);
+  --tone-no: var(--alert);
+  --tone-no-ink: var(--on-alert);
+  --tone-mid: color-mix(in srgb, var(--ink) 34%, var(--surface-sidebar-2));
+  --tone-mid-ink: var(--ink);
+  --field-bg: var(--ov-sink-2);
+  .sectionBody { display: flex; flex-direction: column; gap: 14px; }
+}
+.outboxHead { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-muted); }
+.outboxCard { display: flex; flex-direction: column; gap: 4px; }
+.outboxFrom { margin: 0; }

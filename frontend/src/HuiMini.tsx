@@ -1,4 +1,5 @@
-import { GearIcon, PlusIcon } from './assets/icons'
+import { GearIcon, OutboxIcon, PlusIcon } from './assets/icons'
+import { useStaff } from './feedback/staffStore'
 import type { HuiPanel } from './interfaceShellTypes'
 import type { HelperConversation } from './assets/Interfaces/helper/helperTypes'
 
@@ -23,7 +24,8 @@ interface HuiMiniProps {
 const USER_UNIT_WIDTH = 5
 const MAX_FIXED_USERS = 30
 
-// HUI's mini form, in the band under the header while HUI is on: the queue meter, the chats, New chat and Settings. A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
+// HUI's mini form, in the band under the header while HUI is on: the queue meter, the chats, New chat, the Outbox and
+// Settings. A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
 function HuiMini({
   conversations, selectedChatId, onActivateChats, onCreateChat, panel, onSelectPanel, expanded,
   activeAdminCount, activeStandardCount, pendingAdminCount, pendingStandardCount,
@@ -32,6 +34,9 @@ function HuiMini({
   const usesFixedWidth = totalChatCount < MAX_FIXED_USERS
   const isSettingsActive = expanded && panel === 'settings' && selectedChatId == null
   const isQueueActive = expanded && panel === 'queue' && selectedChatId == null
+  const isOutboxActive = expanded && panel === 'outbox' && selectedChatId == null
+  // Feedback writers confirmed in the staff member's chats, waiting to be completed and sent on.
+  const toSend = useStaff().bundle?.outbox?.length ?? 0
 
   function segmentStyle(count: number) {
     return usesFixedWidth
@@ -94,6 +99,16 @@ function HuiMini({
         onClick={onCreateChat}
       >
         <PlusIcon size={21} />
+      </button>
+
+      <button
+        type="button"
+        className={isOutboxActive ? 'bandToggle bandToggle--active' : 'bandToggle'}
+        aria-pressed={isOutboxActive} aria-label={toSend > 0 ? `Outbox, ${toSend} to send` : 'Outbox'} title={toSend > 0 ? `Outbox: ${toSend} to send` : 'Outbox'}
+        onClick={() => onSelectPanel('outbox')}
+      >
+        <OutboxIcon size={21} />
+        {toSend > 0 && <span className="bandBadge" aria-hidden="true">{toSend > 99 ? '99+' : toSend}</span>}
       </button>
 
       <button

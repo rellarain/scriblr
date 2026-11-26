@@ -18,7 +18,7 @@ A fixed **50px** across the whole width: a 40px row and a 10px activity ribbon. 
 
 A 40px row under the header, across the whole width, shown while a side interface is on (`ShellBand.tsx`). It holds each side interface's **mini form**, right-aligned under the interface container, on the sidebar's surface (`surface-sidebar-1`). The page and the sidebar start below it; an open account drawer covers it.
 
-- **HUI** (`HuiMini.tsx`): the **queue meter** (150 x 30, no icon: one segment per slice of chats, escalated and first-tier, in progress and waiting; below 30 chats each is a 5px block from the left edge, from 30 on they share the width), the **chat heads**, **New chat** and **Settings**. (The Inbox is a tab of AUI's Office > Desk.) A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
+- **HUI** (`HuiMini.tsx`): the **queue meter** (150 x 30, no icon: one segment per slice of chats, escalated and first-tier, in progress and waiting; below 30 chats each is a 5px block from the left edge, from 30 on they share the width), the **chat heads**, **New chat**, the **Outbox** (with the count to send) and **Settings**. (The Inbox is a tab of AUI's Office > Desk.) A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
 
 ## Sidebar
 

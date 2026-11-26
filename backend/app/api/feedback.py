@@ -72,6 +72,16 @@ class TextBody(BaseModel):
     text: str = Field(max_length=store.NOTE_MAX)
 
 
+class HeldEditBody(BaseModel):
+    channelId: Optional[str] = None
+    verbId: Optional[str] = None
+    tone: Optional[store.Tone] = None
+
+
+class SendBody(BaseModel):
+    comment: str = Field(default="", max_length=store.NOTE_MAX)
+
+
 class AnswerBody(BaseModel):
     authorId: str = Field(max_length=120)
     answer: str = Field(max_length=store.NOTE_MAX)
@@ -152,6 +162,25 @@ def put_message(
     known = _known(root)
     return _run(root, admin_id, lambda f: store.edit_message(
         f, admin_id, message_id, known, body.channelId, body.verbId, body.tone, body.checked))
+
+
+# The Outbox (HUI): feedback a user confirmed in a chat, completed by the staff member who drafted it, then sent on to
+# the Inbox.
+@router.put("/outbox/{message_id}")
+def put_held(
+    message_id: str, body: HeldEditBody,
+    admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
+) -> dict:
+    known = _known(root)
+    return _run(root, admin_id, lambda f: store.edit_held(f, admin_id, message_id, known, body.channelId, body.verbId, body.tone))
+
+
+@router.post("/outbox/{message_id}/send")
+def post_send(
+    message_id: str, body: SendBody,
+    admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
+) -> dict:
+    return _run(root, admin_id, lambda f: store.send_held(f, admin_id, message_id, body.comment))
 
 
 @router.post("/messages/{message_id}/questions")

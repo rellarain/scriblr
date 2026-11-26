@@ -20,6 +20,8 @@ interface Message {
   id: string; text: string; authorId: string; submittedAt: string; senderTone: Tone | null; channelId: string; verbId: string
   fromChannel: string | null; tone: Tone | null; checkedBy: string; checkedAt: string | null
   questions: Question[]; comments: Comment[]; history: Event[]
+  // Feedback confirmed in a chat waits in its drafter's Outbox ('' when it is not held).
+  author?: string; heldBy?: string; heldChat?: string
 }
 interface Vote { adminId: string; approve: boolean; deny: boolean; passed: boolean; approveNote: string; denyNote: string; passNote: string; updatedAt: string }
 interface State { id: string; key: string; votes: Vote[]; decision: 'accepted' | 'vetoed' | null; decisionNote: string; decidedAt: string | null; history: Event[] }
@@ -406,7 +408,9 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
       }
     })
     return {
-      me: me.id, admins: admins.map(a => ({ ...a, roles: { ...a.roles } })), verbCategories: verbs, messages: messages.map(view), statements,
+      me: me.id, admins: admins.map(a => ({ ...a, roles: { ...a.roles } })), verbCategories: verbs, messages: messages.filter(m => !m.heldBy).map(view), statements,
+      outbox: messages.filter(m => m.heldBy === me.id).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+        .map(m => ({ ...view(m), author: m.author ?? '', chatId: m.heldChat || null })),
       roleHistory: hist(roleHistory), can: { check: has(me, 'checker', INBOX), manageVerbs: has(me, 'channelManager', INBOX) },
     }
   }
@@ -429,8 +433,31 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
     const me = admin(meId)
     const [what, id, sub] = parts
     if (method === 'GET' && parts.length === 0) return bundle(me.id)
+    if (what === 'outbox') {
+      const m = msg(id)
+      if (m.heldBy !== me.id) throw new Refused(403, 'Only the staff member who drafted it in the chat can complete this feedback.')
+      if (method === 'PUT' && !sub) {
+        if (typeof body.channelId === 'string') m.channelId = body.channelId
+        if (typeof body.verbId === 'string') {
+          if (!verbs.some(v => v.id === body.verbId)) throw new Refused(400, `Unknown verb category '${body.verbId}'`)
+          m.verbId = body.verbId
+        }
+        if (typeof body.tone === 'string') m.tone = body.tone as Tone
+        return bundle(me.id)
+      }
+      if (method === 'POST' && sub === 'send') {
+        if (!m.tone) throw new Refused(400, 'Set its tone before sending it.')
+        const note = String(body.comment ?? '').trim()
+        if (note) m.comments.push({ id: `c-${next++}`, by: me.id, text: note, at: now() })
+        m.heldBy = ''
+        m.heldChat = ''
+        m.history.push({ at: now(), adminId: me.id, kind: 'sent', detail: 'sent it from the Outbox' })
+        return bundle(me.id)
+      }
+    }
     if (what === 'messages' && method === 'PUT' && !sub) {
       const m = msg(id)
+      if (m.heldBy) throw new Refused(409, "That feedback is still in a helper's Outbox.")
       if (m.checkedAt) need(me, 'channelManager', scopeOf(m.channelId), 'Correcting a statement')
       else need(me, 'checker', INBOX, 'Checking feedback')
       if (typeof body.channelId === 'string' && body.channelId !== m.channelId) {
@@ -512,11 +539,13 @@ export function createMockFeedback(opts: { planSeed?: boolean; isTrainable?: (no
       const pp = people.find(x => x.id === id)
       return pp ? pp.kind : admins.some(a => a.id === id) ? 'admin' : null
     },
-    sendChecked(draft: { channelId: string; verbId: string; text: string; tone: string | null }, authorId: string, author: string, checkedBy: string): string {
-      const m = message(`fb-${next++}`, draft.text, authorId, now(), 'neutral', draft.channelId, draft.verbId, (draft.tone as Tone | null) ?? undefined, checkedBy)
+    // Feedback a user confirmed in a chat: theirs, unchecked, waiting in its drafter's Outbox (when the drafter is on the feedback staff).
+    sendHeld(draft: { channelId: string; verbId: string; text: string; tone: string | null }, authorId: string, author: string, staffId: string, chatId: string): string {
+      const m = message(`fb-${next++}`, draft.text, authorId, now(), 'neutral', draft.channelId, draft.verbId)
       m.senderTone = null
-      if (!draft.tone) { m.checkedBy = ''; m.checkedAt = null }
-      void author
+      m.tone = (draft.tone as Tone | null) ?? null
+      m.author = author
+      if (admins.some(a => a.id === staffId)) { m.heldBy = staffId; m.heldChat = chatId }
       messages.push(m)
       return m.id
     },

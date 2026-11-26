@@ -215,7 +215,7 @@ export function createMockBackend() {
   // Support chats, with one waiting and one in progress for the cards.
   const support = createMockSupport({
     isNode: id => !!channelNode(id), isConsole: id => channelNode(id)?.kind === 'console',
-    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), people: () => feedback.staffPeople(), tierFor: (pid, q) => feedback.tierFor(pid, q), consoles: () => consoleIds((channels.channels().body as { nodes: Parameters<typeof consoleIds>[0] }).nodes), send: (d, u, n, by) => feedback.sendChecked(d, u, n, by), seed: true,
+    staffKind: id => feedback.staffKind(id), actingAs: id => feedback.actingAs(id), people: () => feedback.staffPeople(), tierFor: (pid, q) => feedback.tierFor(pid, q), consoles: () => consoleIds((channels.channels().body as { nodes: Parameters<typeof consoleIds>[0] }).nodes), send: (d, u, n, by, chat) => feedback.sendHeld(d, u, n, by, chat), seed: true,
   })
   const libraryShapes = createMockMapShapes()
   // The Characters console's cast, which its edits change in memory only.

@@ -2,6 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import HuiMini from './HuiMini'
 
+// The Outbox's count: two pieces of feedback waiting to be sent.
+vi.mock('./feedback/staffStore', () => ({ useStaff: () => ({ bundle: { outbox: [{ id: 'fb-1' }, { id: 'fb-2' }] }, status: 'ready', error: null }) }))
+
 const props = {
   conversations: [{ id: 'c1', label: 'Ada' }, { id: 'c2', label: 'Ben' }],
   selectedChatId: null,
@@ -17,10 +20,10 @@ const props = {
 }
 
 describe("HuiMini, HUI's part of the band", () => {
-  it('lays out the queue meter, the chats, New chat and Settings, in that order (the Inbox is in the Office)', () => {
+  it('lays out the queue meter, the chats, New chat, the Outbox and Settings, in that order (the Inbox is in the Office)', () => {
     render(<HuiMini {...props} />)
     expect(screen.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual([
-      'Queue console: 3 chats in progress (1 escalated), 3 waiting for you (0 escalated)', 'Ada', 'Ben', 'New chat', 'Settings',
+      'Queue console: 3 chats in progress (1 escalated), 3 waiting for you (0 escalated)', 'Ada', 'Ben', 'New chat', 'Outbox, 2 to send', 'Settings',
     ])
   })
 
@@ -28,10 +31,11 @@ describe("HuiMini, HUI's part of the band", () => {
     const onSelectPanel = vi.fn(), onActivateChats = vi.fn(), onCreateChat = vi.fn()
     render(<HuiMini {...props} onSelectPanel={onSelectPanel} onActivateChats={onActivateChats} onCreateChat={onCreateChat} />)
     fireEvent.click(screen.getByRole('button', { name: /^Queue console/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Outbox/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     fireEvent.click(screen.getByRole('button', { name: 'Ben' }))
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
-    expect(onSelectPanel.mock.calls).toEqual([['queue'], ['settings']])
+    expect(onSelectPanel.mock.calls).toEqual([['queue'], ['outbox'], ['settings']])
     expect(onActivateChats).toHaveBeenCalledWith('c2')
     expect(onCreateChat).toHaveBeenCalledTimes(1)
   })
