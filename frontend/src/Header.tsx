@@ -14,13 +14,19 @@ interface HeaderProps {
   drawerOpen: boolean
   onToggleDrawer: () => void
   currentUser: CurrentUser
+  isAdmin: boolean
+  auiOn: boolean
+  onToggleAui: () => void
+  huiOn: boolean
+  onToggleHui: () => void
+  waitingChats: number
 }
 
 // Two independent layers (see App.scss), not one growing box:
-// - .header (always a fixed 40+10=50px, z-index above the Sidebar) -- the
-//   nav row (user card isolated left, page-switch buttons right -- literal
-//   left/right, independent of handedness, by design) and the activity
-//   ribbon.
+// - .header (always a fixed 40+10=50px across the whole width, z-index above
+//   the page) -- the nav row (user card isolated left, the interface
+//   container and the sky toggle right -- literal left/right, independent of
+//   handedness, by design) and the activity ribbon.
 // - .headerDrawerClip, sitting right under row 1 (top: 40px) -- an always
 //   fixed-size clipping window (z-index BELOW the Sidebar, so an expanded
 //   Sidebar overlaps it, the same way it overlaps Mainscreen/VUI). Inside
@@ -32,6 +38,7 @@ interface HeaderProps {
 //   unmounts UUI, just slides it out of the visible window.
 function Header({
   active, onSelect, vuiOpen, drawerOpen, onToggleDrawer, currentUser,
+  isAdmin, auiOn, onToggleAui, huiOn, onToggleHui, waitingChats,
 }: HeaderProps) {
   return (
     <>
@@ -42,7 +49,11 @@ function Header({
             <HeaderUserCard user={currentUser} open={drawerOpen} onToggle={onToggleDrawer} />
           </div>
           <div className="headerNavRight">
-            <NavSwitcher active={active} onSelect={onSelect} vuiOpen={vuiOpen} />
+            <NavSwitcher
+              active={active} onSelect={onSelect} vuiOpen={vuiOpen}
+              isAdmin={isAdmin} auiOn={auiOn} onToggleAui={onToggleAui}
+              huiOn={huiOn} onToggleHui={onToggleHui} waitingChats={waitingChats}
+            />
             <SkyToggle />
           </div>
         </div>

@@ -4,11 +4,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { mainOf, redirectOf } from './App'
 import NavSwitcher from './NavSwitcher'
 
-describe('NavSwitcher', () => {
-  it('offers Reader, Learning and Writer, and marks the active one', async () => {
+const props = {
+  active: 'learning' as const, onSelect: vi.fn(), vuiOpen: false,
+  isAdmin: true, auiOn: false, onToggleAui: vi.fn(), huiOn: false, onToggleHui: vi.fn(), waitingChats: 0,
+}
+
+describe('NavSwitcher, the interface container', () => {
+  it('holds the side interfaces (Admin, Helper), then the pages (Writer, Reader, Learning), and marks the page that is on', async () => {
     const onSelect = vi.fn()
-    render(<NavSwitcher active="learning" onSelect={onSelect} vuiOpen={false} />)
-    expect(screen.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Reader', 'Learning', 'Writer'])
+    render(<NavSwitcher {...props} onSelect={onSelect} />)
+    expect(screen.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Admin', 'Helper', 'Writer', 'Reader', 'Learning'])
+    expect(screen.getByRole('group', { name: 'Side interfaces' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Learning' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Writer' })).toHaveAttribute('aria-pressed', 'false')
     await userEvent.click(screen.getByRole('button', { name: 'Reader' }))
@@ -16,8 +22,33 @@ describe('NavSwitcher', () => {
   })
 
   it('shows no page as active while the base layer is open', () => {
-    render(<NavSwitcher active="learning" onSelect={() => {}} vuiOpen />)
+    render(<NavSwitcher {...props} vuiOpen />)
     expect(screen.getByRole('button', { name: 'Learning' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('offers Admin only to admins', () => {
+    render(<NavSwitcher {...props} isAdmin={false} />)
+    expect(screen.queryByRole('button', { name: 'Admin' })).toBeNull()
+    expect(screen.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Helper', 'Writer', 'Reader', 'Learning'])
+  })
+
+  it('turns Admin and Helper on and off, each on its own', async () => {
+    const onToggleAui = vi.fn(), onToggleHui = vi.fn()
+    const { rerender } = render(<NavSwitcher {...props} onToggleAui={onToggleAui} onToggleHui={onToggleHui} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Admin' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Helper' }))
+    expect(onToggleAui).toHaveBeenCalledTimes(1)
+    expect(onToggleHui).toHaveBeenCalledTimes(1)
+    rerender(<NavSwitcher {...props} auiOn huiOn />)
+    expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Helper' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it("counts the waiting chats on Helper while it is off, and not once it is on (the band's queue meter shows them)", () => {
+    const { rerender } = render(<NavSwitcher {...props} waitingChats={3} />)
+    expect(screen.getByRole('button', { name: 'Helper, 3 waiting' })).toHaveTextContent('3')
+    rerender(<NavSwitcher {...props} waitingChats={3} huiOn />)
+    expect(screen.getByRole('button', { name: 'Helper' })).toHaveTextContent('')
   })
 })
 

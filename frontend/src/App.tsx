@@ -5,6 +5,8 @@ import WUI from './assets/Interfaces/WUI'
 import VUI from './assets/Interfaces/VUI'
 import Header from './Header'
 import Sidebar from './Sidebar'
+import ShellBand from './ShellBand'
+import HuiMini from './HuiMini'
 import type { MainInterface, HuiPanel } from './interfaceShellTypes'
 import { useHelperChats } from './assets/Interfaces/helper/useHelperChats'
 import { useQueueMeter } from './support/supportStores'
@@ -17,8 +19,9 @@ import { useThemeEngine } from './theme/useTheme'
 const RUI = lazy(() => import('./assets/Interfaces/RUI'))
 const LUI = lazy(() => import('./assets/Interfaces/LUI'))
 
-const SIDEBAR_DIVIDER_W = 40
 const SIDEBAR_PANEL_W = 400
+// The band under the header, shown while a side interface's mini form is in it.
+const BAND_H = 40
 // AUI's own width snaps to multiples of this (a "column"), at any container size.
 const AUI_COLUMN_W = 400
 
@@ -51,6 +54,8 @@ function App() {
   const handedness = ui.handedness
   const theme = useThemeEngine()
   const isAdmin = theme.effectiveRole === 'admin'
+  // HUI is on (its mini form in the band) and, on top of that, its panel open (huiExpanded); AUI is on or off.
+  const [huiOn, setHuiOn] = useState<boolean>(false)
   const [huiExpanded, setHuiExpanded] = useState<boolean>(false)
   const [auiOpen, setAuiOpen] = useState<boolean>(false)
   // Dragged from AUI's own outer edge (Sidebar.tsx's AuiResize), snapped to
@@ -95,14 +100,15 @@ function App() {
     setHuiPanel('inbox')
   }
 
-  // Clicking the divider's own background (not one of its buttons) is an
-  // alternate way to collapse, alongside re-clicking the active button.
-  function handleCollapseSidebar() {
-    setHuiExpanded(false)
+  // The header's HUI toggle: on shows its mini form in the band (its panel stays folded until a console is chosen there);
+  // off takes HUI away, panel and all.
+  function handleToggleHui() {
+    if (huiOn) setHuiExpanded(false)
+    setHuiOn(!huiOn)
   }
 
   // AUI has no panel-selection dimension to track like HUI does -- just a
-  // direct open/closed flip, independent of huiExpanded (both can be open
+  // direct open/closed flip, independent of HUI (both can be open
   // at once; Mainscreen just narrows further).
   function handleToggleAui() {
     setAuiOpen(open => !open)
@@ -143,23 +149,23 @@ function App() {
     }
   }
 
-  // Sidebar now has up to three columns: AUI's panel (outermost), the
-  // persistent 40px divider, and HUI's own panel (innermost, Mainscreen
-  // edge). AUI's own width is dragged from its outer edge (Sidebar.tsx's
-  // AuiResize) and snapped to AUI_COLUMN_W columns; `min()` keeps it from
-  // ever exceeding the rest of the screen (minus the divider and whatever
-  // width HUI's own panel currently occupies) even if the window shrinks --
-  // wide enough to cover the whole screen is effectively an admin takeover
-  // (Mainscreen's own width collapses to 0 via --sidebar-w below).
-  const huiWidthExpr = huiExpanded ? `${SIDEBAR_PANEL_W}px` : '0px'
-  const auiOpenWidthExpr = `min(${auiWidth}px, calc(100vw - ${SIDEBAR_DIVIDER_W}px - ${huiWidthExpr}))`
+  // The sidebar, below the header and the band, has up to two columns: AUI's panel (outermost) and HUI's own panel
+  // (innermost, Mainscreen edge); their console buttons are in the band. AUI's own width is dragged from its edge
+  // (Sidebar.tsx's AuiResize) and snapped to AUI_COLUMN_W columns; `min()` keeps it from ever exceeding the rest of the
+  // screen (minus whatever width HUI's own panel currently occupies) even if the window shrinks -- wide enough to cover the
+  // whole screen is effectively an admin takeover (Mainscreen's own width collapses to 0 via --sidebar-w below).
+  const huiPanelOpen = huiOn && huiExpanded
+  const huiWidthExpr = huiPanelOpen ? `${SIDEBAR_PANEL_W}px` : '0px'
+  const auiOpenWidthExpr = `min(${auiWidth}px, calc(100vw - ${huiWidthExpr}))`
   const auiWidthExpr = auiOpen && isAdmin ? auiOpenWidthExpr : '0px'
-  const sidebarWidthExpr = `calc(${SIDEBAR_DIVIDER_W}px + ${auiWidthExpr} + ${huiWidthExpr})`
+  const sidebarWidthExpr = `calc(${auiWidthExpr} + ${huiWidthExpr})`
+  const bandOpen = huiOn
 
   const shellVars = {
     '--sidebar-w': sidebarWidthExpr,
     '--hui-w': huiWidthExpr,
     '--aui-w': auiWidthExpr,
+    '--band-h': bandOpen ? `${BAND_H}px` : '0px',
   } as React.CSSProperties
 
   return (
@@ -171,25 +177,41 @@ function App() {
         drawerOpen={drawerOpen}
         onToggleDrawer={() => setDrawerOpen(v => !v)}
         currentUser={CURRENT_USER}
+        isAdmin={isAdmin}
+        auiOn={auiOpen && isAdmin}
+        onToggleAui={handleToggleAui}
+        huiOn={huiOn}
+        onToggleHui={handleToggleHui}
+        waitingChats={pendingAdminCount + pendingStandardCount}
       />
+
+      {bandOpen && (
+        <ShellBand>
+          {huiOn && (
+            <HuiMini
+              conversations={helper.conversations}
+              selectedChatId={helper.selectedChatId}
+              onActivateChats={handleActivateChats}
+              onCreateChat={handleCreateChat}
+              panel={huiPanel}
+              onSelectPanel={handleSelectHuiPanel}
+              expanded={huiPanelOpen}
+              activeAdminCount={activeAdminCount}
+              activeStandardCount={activeStandardCount}
+              pendingAdminCount={pendingAdminCount}
+              pendingStandardCount={pendingStandardCount}
+            />
+          )}
+        </ShellBand>
+      )}
 
       <Suspense fallback={null}>{renderMainscreen()}</Suspense>
 
       <Sidebar
         side={handedness}
-        onActivateChats={handleActivateChats}
-        onCreateChat={handleCreateChat}
         helper={helper}
         panel={huiPanel}
-        onSelectPanel={handleSelectHuiPanel}
-        expanded={huiExpanded}
-        onCollapse={handleCollapseSidebar}
-        activeAdminCount={activeAdminCount}
-        activeStandardCount={activeStandardCount}
-        pendingAdminCount={pendingAdminCount}
-        pendingStandardCount={pendingStandardCount}
         auiOpen={auiOpen && isAdmin}
-        onToggleAui={handleToggleAui}
         auiWidth={auiWidth}
         onSetAuiWidth={handleSetAuiWidth}
         isAdmin={isAdmin}

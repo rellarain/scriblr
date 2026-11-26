@@ -12,7 +12,6 @@ import { mockFetch } from './test/mockFetch'
 // needing their data dependencies (feedback store, chats, etc.) set up.
 vi.mock('./assets/Interfaces/AUI', () => ({ default: () => <div>AUI</div> }))
 vi.mock('./assets/Interfaces/HUI', () => ({ default: () => <div>HUI</div> }))
-vi.mock('./SidebarDivider', () => ({ default: () => <div>divider</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -26,23 +25,20 @@ beforeEach(() => {
 const helper = { conversations: [], selectedChatId: null } as unknown as HelperChats
 
 const baseProps = {
-  onActivateChats: vi.fn(),
-  onCreateChat: vi.fn(),
   helper,
   panel: 'inbox' as const,
-  onSelectPanel: vi.fn(),
-  expanded: false,
-  onCollapse: vi.fn(),
-  activeAdminCount: 0,
-  activeStandardCount: 0,
-  pendingAdminCount: 0,
-  pendingStandardCount: 0,
   auiOpen: true,
-  onToggleAui: vi.fn(),
   isAdmin: true,
 }
 
 describe('Sidebar', () => {
+  it('holds the panels only: their console buttons are in the band under the header', () => {
+    render(<Sidebar side="right" {...baseProps} auiWidth={800} onSetAuiWidth={vi.fn()} />)
+    expect(screen.getByText('AUI')).toBeTruthy()
+    expect(screen.getByText('HUI')).toBeTruthy()
+    expect(screen.queryByRole('navigation', { name: 'Sidebar controls' })).toBeNull()
+  })
+
   it('offers no Admin resize handle unless the panel is both admin and open', () => {
     const { rerender } = render(<Sidebar side="right" {...baseProps} auiOpen={false} auiWidth={800} onSetAuiWidth={vi.fn()} />)
     expect(screen.queryByRole('separator', { name: 'Resize Admin panel' })).toBeNull()

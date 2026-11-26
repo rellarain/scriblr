@@ -76,28 +76,28 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   // background instead (since .uiShell, with no z-index of its own, isn't
   // a stacking context boundary), making VUI invisible even when revealed.
   z-index: 0;
+  // Where the page, the base, the sidebar and the drawer's content start: below the header (50px) and the band under it
+  // while it is shown (--band-h, set in App.tsx).
+  --shell-top: calc(50px + var(--band-h, 0px));
 }
 
-// Header: a fixed 50px top bar (nav row 40px + ribbon row 10px) that never
-// resizes vertically. Since the Sidebar now spans the full viewport height
-// (see .sidebar) instead of starting below row 1, the header is inset by
-// --sidebar-w on the handedness side instead of running the full 100vw --
-// same treatment .headerRibbonRow already used, now shared by the whole
-// header so the nav row's content is never covered. The drawer holding
-// UUI is a SEPARATE layer (.headerDrawerClip below) rather than a 3rd/4th
-// row inside this box, so its own z-index can sit below the Sidebar too.
+// Header: a fixed 50px top bar (nav row 40px + ribbon row 10px) across the
+// whole width that never resizes. The Sidebar starts below it (and below the
+// band under it), so nothing a side interface does -- AUI at its widest
+// included -- can push the interface toggles off the screen. The drawer
+// holding UUI is a SEPARATE layer (.headerDrawerClip below) rather than a
+// 3rd/4th row inside this box, so its own z-index can sit below the Sidebar too.
 .header {
   position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
   height: 50px;
   z-index: 5;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: left 1s, right 1s;
 }
-.hand-right .header { left: 0; right: var(--sidebar-w); }
-.hand-left  .header { left: var(--sidebar-w); right: 0; }
 
 // Row 1 (40px): the user card is isolated on the left, the page-switch nav
 // on the right -- literal left/right, independent of handedness (a
@@ -158,15 +158,22 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   gap: 8px;
 }
 
+// The interface container (NavSwitcher.tsx): the side interfaces (AUI, HUI), a hairline, then the pages (WUI, RUI, LUI).
 .navSwitcher {
   display: flex;
+  align-items: center;
   gap: 4px;
   margin: 5px;
   padding: 4px;
   border-radius: 4px;
   background: transparent;
 
+  &Group { display: flex; gap: 4px; }
+  // Decorative: it only groups the buttons, which carry their own names.
+  &Rule { align-self: stretch; width: 1px; margin: 4px 2px; background: color-mix(in srgb, var(--ink) 30%, transparent); }
+
   &Btn {
+    position: relative;
     color: var(--ink);
     background: transparent;
     padding: 6px 10px;
@@ -177,12 +184,22 @@ button {border: none; cursor: pointer; border-radius: 4px;}
     &:hover { background: var(--accent-hover); color: var(--on-accent); }
     &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
   }
+  // AUI wears the admin (second) accent.
+  &Btn--admin {
+    &:hover { background: var(--accent2-hover); color: var(--on-accent2); }
+    &.navSwitcherBtn--active { background: var(--accent2); color: var(--on-accent2); }
+  }
+  // HUI's waiting chats while HUI is off: the alert colour, at the button's top right.
+  &Badge {
+    position: absolute; top: -2px; right: -2px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box;
+    background: var(--alert); color: var(--on-alert); font-size: var(--text-small); font-weight: 700; line-height: 15px; text-align: center;
+    pointer-events: none;
+  }
 }
 
 // Row 2 (10px): today's activity, one thin segment per 10-minute interval.
-// Now that .header itself is inset by --sidebar-w (see above), this just
-// fills the header's own already-narrowed width -- no separate handedness
-// inset needed here anymore.
+// Across the header's whole width. Its ground is the drawer's footer strip, which peeks out behind it (.headerDrawerSlide)
+// over the page; over the sidebar, where the drawer does not reach, ::before paints the same colour.
 .headerRibbonRow {
   position: absolute;
   top: 40px;
@@ -195,7 +212,13 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   // see .headerRibbonSegment.
   align-items: flex-start;
   background: transparent;
+  &::before {
+    content: ''; position: absolute; top: 0; bottom: 0; width: var(--sidebar-w); z-index: -1; transition: width 1s;
+    background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
+  }
 }
+.hand-right .headerRibbonRow::before { right: 0; }
+.hand-left  .headerRibbonRow::before { left: 0; }
 // Each segment is opaque and animates its own height between 0 and 10px
 // (rather than just toggling visibility) -- growing from 0, anchored at
 // the row's top (row 1's bottom edge), reads as the segment extending out
@@ -236,7 +259,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   top: 40px;
   height: calc(100vh - 40px);
   overflow: hidden;
-  z-index: 1;
+  // Above the band (1), so an open drawer covers it as it covers the page; below the Sidebar (6).
+  z-index: 2;
   transition: left 1s, right 1s;
   // Transparent everywhere its content isn't -- without this, its own box
   // (always full Mainscreen-width/height, even while minimized) silently
@@ -371,7 +395,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 // .aUI/.aUIPanel and the .sidebar comment below).
 .uUI, .rUI, .lUI, .wUI {
   position: absolute;
-  top: 50px;
+  top: var(--shell-top);
   bottom: 0;
   transition: left 1s, right 1s;
   overflow: hidden;
@@ -387,7 +411,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 // ready for future use (e.g. a pre-login/visitor backdrop).
 .base {
   position: absolute;
-  top: 50px;
+  top: var(--shell-top);
   bottom: 0;
   z-index: -1;
   overflow: hidden;
@@ -400,8 +424,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  // Fills .base completely -- .base already sits below the fixed 50px
-  // header and matches Sidebar/Mainscreen's height exactly (top: 50px;
+  // Fills .base completely -- .base already sits below the header and the
+  // band and matches Sidebar/Mainscreen's height exactly (top: var(--shell-top);
   // bottom: 0;), so mirroring that here (rather than an independent
   // viewport-relative height) keeps VUI's box identically sized, with no
   // separate assumption about the header's height to keep in sync.
@@ -470,18 +494,16 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 // assets/Interfaces/writer/writer.scss).
 .shelfConfirmRow { display: flex; gap: 4px; }
 
-// The Sidebar has up to three columns, outermost to innermost: AUI's own
-// panel (persistent Admin toggle, moved back in from Mainscreen), the
-// 40px navigation divider (persistent toggles), then HUI (Mainscreen
-// edge). DOM order is fixed (AUI, divider, HUI); flex-direction below
-// mirrors it per handedness so AUI always lands on the screen-edge side
-// and HUI always lands adjacent to Mainscreen, regardless of handedness.
-// Spans the full viewport height (top: 0 to bottom: 0) rather than starting
-// below the header's nav row -- .header is inset by this sidebar's own
-// width instead, so nothing underneath ever needs covering.
+// The Sidebar has up to two columns, outermost to innermost: AUI's own
+// panel, then HUI's (Mainscreen edge). Their console buttons live in the band
+// under the header (.shellBand), not in a divider here. DOM order is fixed
+// (AUI, HUI); flex-direction below mirrors it per handedness so AUI always
+// lands on the screen-edge side and HUI always lands adjacent to Mainscreen,
+// regardless of handedness. It starts below the header and the band
+// (--shell-top) and runs to the bottom of the screen.
 .sidebar {
   position: absolute;
-  top: 0;
+  top: var(--shell-top);
   bottom: 0;
   width: var(--sidebar-w);
   transition: width 1s;
@@ -492,33 +514,38 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 .hand-right .sidebar { right: 0; left: auto; flex-direction: row-reverse; }
 .hand-left  .sidebar { left: 0; right: auto; flex-direction: row; }
 
-.sidebarDivider {
-  flex: 0 0 40px;
-  width: 40px;
-  height: 100%;
+// The band under the header (ShellBand.tsx): the side interfaces' mini forms, side by side and right-aligned under the
+// header's interface container (literal right, like the header's own right group). On the sidebar's surface, since each
+// part is its interface's console bar. Below the drawer (2), so an open drawer covers it.
+.shellBand {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  right: 0;
+  height: 40px;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  // Slightly darker than HUI's (.hUIMain) and AUI's (.aUIPanel) matching
-  // 26% shade, so the divider reads as a seam between them rather than
-  // blending into either.
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 12px;
   background-color: var(--surface-sidebar-1);
-  // Once enough chat heads are open to exceed the sidebar's height, scroll
-  // instead of overflowing -- but stay a plain nav, not a styled scroll
-  // region, so the scrollbar itself is hidden (still scrollable via wheel/
-  // touch/keyboard).
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none; // Firefox
-  -ms-overflow-style: none; // old Edge/IE
-  &::-webkit-scrollbar { display: none; } // Chrome/Safari
+  // Many chat heads scroll the band sideways instead of overflowing it; the scrollbar itself is hidden (still scrollable
+  // by wheel, touch and keyboard).
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
 }
 
-.dividerToggle {
+// HUI's mini form (HuiMini.tsx): the queue meter, the chats, New chat, the Inbox and Settings, in a row.
+.huiMini { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
+
+.bandToggle {
+  position: relative;
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
-  margin: 5px 0;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -529,31 +556,18 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
 
-// The Admin toggle wears the admin (second) accent.
-.dividerToggle--admin {
-  &:hover { background: var(--accent2-hover); color: var(--on-accent2); }
-  &.dividerToggle--active { background: var(--accent2); color: var(--on-accent2); }
-}
+.bandToggle--newChat { background: var(--ov-sink-2); }
 
-.dividerToggle--newChat {
-  background: var(--ov-sink-2);
-  // Inbox (just above) already contributes its own 5px bottom margin, so
-  // zeroing this one keeps the Inbox-to-New-chat gap at 5px instead of the
-  // 10px two adjacent .dividerToggle margins would otherwise stack up to.
-  margin-top: 0;
-}
-
-// No icon: each segment is one queue (active/pending), sized to the count
-// of users in it -- see SidebarDivider.tsx. Always 30px wide, 150px tall;
-// below 30 total users the segments (5px/user, also 30px wide) stack at
-// the bottom via justify-content, leaving empty space above, rather than
-// filling the full height.
+// No icon: each segment is one queue slice (active/pending), sized to the count of chats in it -- see HuiMini.tsx. Always
+// 150px wide and 30px tall; below 30 chats the segments (5px a chat) stack from the left edge, leaving empty space at the
+// right, rather than filling the full width. row-reverse puts the last segment (the first-tier chats in progress) at the
+// left edge, the meter's base.
 .queueButton {
-  width: 30px;
-  height: 150px;
+  width: 150px;
+  height: 30px;
   flex: 0 0 150px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row-reverse;
   justify-content: flex-end;
   padding: 0;
   margin: 0;
@@ -564,12 +578,12 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 }
 
 // Active (open, currently being helped) segments use accent hue; pending
-// (waiting to be helped) segments use alert hue. Within each, admin users
-// get the darker shade, standard users the lighter one.
+// (waiting to be helped) segments use alert hue. Within each, escalated chats
+// get the darker shade, first-tier ones the lighter one.
 .queueButtonSegment {
-  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
-  min-height: 0;
+  min-width: 0;
   padding: 0;
   margin: 0;
   // A fill, and the same colour stepped away from its text (see --accent-dir).
@@ -579,16 +593,10 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   &--pendingStandard { background: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) + 15% * var(--alert-dir))); color: var(--on-alert); }
 }
 
-.dividerSpacer { flex: 1 1 auto; }
-
 .chatStack {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
   gap: 5px;
-  // No top padding: the New Chat button's own 5px bottom margin already
-  // provides the gap above the first chat head.
-  padding: 0 0 4px;
 }
 .chatStackItem {
   // Empty avatar slot — will hold a user photo; deliberately no icon/content.
@@ -601,8 +609,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
 
-// AUI is now a third Sidebar slide-out panel (outermost, alongside the
-// divider and HUI -- see the .sidebar comment below). Unlike HUI's own
+// AUI is a Sidebar slide-out panel (outermost, beside HUI -- see the
+// .sidebar comment above). Unlike HUI's own
 // fixed-400px clipping-slot/sliding-reveal technique, AUI's target width
 // (--aui-w, set in App.tsx) is itself dynamic -- the rest of the screen
 // minus HUI's own current width -- so .aUIPanel just fills .aUI at 100%
@@ -622,9 +630,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   height: 100%;
   display: flex;
   flex-direction: row;
-  // Matches the sidebar divider's own background (rather than the rest of the
-  // Sidebar's desaturated-accent panels) now that AUI's width is set by dragging
-  // that divider -- the two read as one continuous surface.
+  // The band's surface (rather than the rest of the Sidebar's desaturated-accent
+  // panels): AUI and its part of the band read as one surface.
   background-color: var(--surface-sidebar-1);
   // Everything in the admin panel wears the admin accent where the rest of the app wears the accent: the
   // accent tokens are re-pointed at the admin accent for this subtree (the derived --accent, hover, dim
@@ -646,7 +653,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 
 // Dragged to set AUI's own width (--aui-w), snapping to 400px columns. A child of
 // .sidebar itself (not .aUI), positioned off the live --aui-w var so it always sits
-// exactly on AUI's outer edge, between it and the sidebar divider.
+// exactly on AUI's inner edge, between it and HUI (or the page).
 .aUIResize {
   position: absolute;
   top: 0;
@@ -1079,9 +1086,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   --field-bg: var(--ov-sink-2);
 }
 
-.dividerToggle { position: relative; }
-// The count of what needs your vote: alert colour, centred along the bottom edge of the Inbox button.
-.dividerBadge {
+// The count of what needs your check: alert colour, centred along the bottom edge of the Inbox button in the band.
+.bandBadge {
   position: absolute;
   bottom: -5px;
   left: 50%;
