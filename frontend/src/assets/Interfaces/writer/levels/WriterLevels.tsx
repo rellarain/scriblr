@@ -63,12 +63,19 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
 
   function panel(level: Level, size: Exclude<LevelSize, 'hidden'>): ReactNode {
     switch (level) {
-      case 'dash':
+      case 'dash': {
+        // While the Project level is the editor, the collapsed Dash also holds every project's shelf, to switch the project being edited.
+        const shelves = focus === 'project'
         return (
-          <LevelPanel key={level} level={level} size={size} title="Writer Dashboard" headerExtras={dashTabs.headerExtras} onPromote={w.showDash} onSetSize={setSize(level)} minBody={<DashMin w={w} />}>
+          <LevelPanel
+            key={level} level={level} size={size} title="Writer Dashboard" headerExtras={dashTabs.headerExtras} onPromote={w.showDash} onSetSize={setSize(level)}
+            className={shelves ? 'wrDashShelves' : undefined}
+            minBody={<DashMin w={w}>{shelves && <ProjectTiles w={w} />}</DashMin>}
+          >
             {dashTabs.body}
           </LevelPanel>
         )
+      }
       case 'project': {
         // Beside the Dash, the Project level is a tile for every project.
         if (focus === 'dash') {

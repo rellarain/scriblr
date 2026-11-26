@@ -953,7 +953,10 @@ mounted it; it remains in git history.
   a level's title brings the focus back, its header strip opens a Min level to Mid and
   its chevron toggles Min/Mid (remembered). Beside the Dash the Project level is a
   tile for every project (its books on a shelf, `levelBodies.tsx` `ProjectTiles`), each in its own
-  project's colour (`projectHueOf` in the workspace: its own hue, else the default).
+  project's colour (`projectHueOf` in the workspace: its own hue, else the default). While the Project
+  level is the editor, the same shelves stand under the collapsed Dash's facts in the side column, to switch
+  the project being edited (the open one is shown, not reopened). A shelf has no delete: a project is
+  deleted only from its own Settings tab (`ProjectEditor.tsx`, Delete project).
   A level's header carries its **tabs** (`levels/LevelTabs.tsx`, `useTabbedLevel`): 30×30 icon
   buttons, ending with Settings and Help, then quick actions (Search, a context-aware New and
   Save). At Mid one tab shows at a time; at Max each tab is a tile that its button opens or

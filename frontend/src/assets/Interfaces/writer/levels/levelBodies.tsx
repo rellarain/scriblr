@@ -4,7 +4,7 @@ import { emptyPlanner } from '../../../../lib/facets'
 import { copyIntoPlanner, isEmptyPlan, selectAll } from '../../../../lib/template'
 import { PROJECT_NAME_MAX, type WriterWorkspace } from '../useWriterWorkspace'
 import { shelfGroups } from '../outlineTree'
-import { DeleteControl, useStoredState } from '../shared'
+import { useStoredState } from '../shared'
 import { ProjectSummary } from '../plan/ProjectSummary'
 import { useTemplate } from '../plan/useTemplate'
 import { newId } from '../schedule/ids'
@@ -28,8 +28,8 @@ export function ProjectMin({ w }: { w: WriterWorkspace }) {
   )
 }
 
-// What stands beside the Dash while it has the focus: one tile per project (its books on a shelf), stacked,
-// with the way to start a new project beneath them.
+// One tile per project (its books on a shelf), stacked, with the way to start a new project beneath them: beside the Dash while it has
+// the focus, and under the collapsed Dash's facts while the Project level is the editor. A project is deleted from its own Settings, not here.
 export function ProjectTiles({ w }: { w: WriterWorkspace }) {
   const [newTitle, setNewTitle] = useState('')
   const { template } = useTemplate()
@@ -65,9 +65,9 @@ export function ProjectTiles({ w }: { w: WriterWorkspace }) {
               progress={w.projectProgress[p.projectId]}
               activeBookId={open ? w.activeBookId : null}
               selected={open}
-              onOpenBook={bookId => void w.openProject(p.projectId, bookId)}
-              onOpen={() => void w.openProject(p.projectId)}
-              right={<DeleteControl tone="dark" message={`Delete ${p.title}?`} onConfirm={() => void w.deleteProject(p.projectId)} />}
+              // The open project is not opened again: that would reload it and clear its undo history.
+              onOpenBook={bookId => (open ? w.openBook(bookId) : void w.openProject(p.projectId, bookId))}
+              onOpen={() => (open ? w.showProject() : void w.openProject(p.projectId))}
             />
           </div>
         )

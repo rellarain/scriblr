@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { dayValue } from '../../../../lib/facets'
 import { durationText, nextUp } from '../../../../lib/nextUp'
 import { addDays } from '../../../../lib/projection'
@@ -24,7 +24,8 @@ function Bar({ label, value, of, unit }: { label: string; value: number; of: num
 }
 
 // The Dash: the shift running now (with what is left of it) or the next one, the words written today against the day's goal, and the tasks waiting.
-export function DashMin({ w }: { w: WriterWorkspace }) {
+// `children` stand below the facts (the project shelves, while the Project level is the editor).
+export function DashMin({ w, children }: { w: WriterWorkspace; children?: ReactNode }) {
   const ids = useMemo(() => w.projects.map(p => p.projectId), [w.projects])
   const s = useSchedule(ids)
   const today = s.loading ? localToday() : s.facets.today
@@ -35,24 +36,26 @@ export function DashMin({ w }: { w: WriterWorkspace }) {
     () => nextUp(planners.flatMap(p => shiftOccurrences(p.shifts, p.restDays, today, addDays(today, 14))), today, nowSlot),
     [s.planners, today, nowSlot], // eslint-disable-line react-hooks/exhaustive-deps
   )
-  if (s.error) return <p className="wrError" role="alert">{s.error}</p>
   const words = dayValue(s.facets.daily[today], 'draft')
   const daily = planners.flatMap(p => p.goals).find(g => g.facet === 'draft' && g.daily)?.daily ?? 0
   const waiting = planners.reduce((n, p) => n + p.items.filter(i => !i.shiftId && !i.doneOn).length, 0)
   return (
     <div className="wrLevelMinBody">
-      <div className="wrSummary">
-        {s.loading && <p className="wrMuted">Loading…</p>}
-        {!s.loading && !up && <p className="wrMuted">No shifts coming up.</p>}
-        {up && (
-          <div className="wrKv">
-            <span>{up.kind === 'running' ? 'Now' : 'Next'} · {up.occ.title || 'Shift'}</span>
-            <span>{up.kind === 'running' ? `${durationText(up.minutes)} left` : `in ${durationText(up.minutes)}`}</span>
-          </div>
-        )}
-        {daily > 0 ? <Bar label="Written today" value={words} of={daily} unit="words" /> : <div className="wrKv"><span>Written today</span><span>{plural(words, 'word')}</span></div>}
-        <div className="wrKv"><span>Tasks waiting</span><span>{waiting}</span></div>
-      </div>
+      {s.error ? <p className="wrError" role="alert">{s.error}</p> : (
+        <div className="wrSummary">
+          {s.loading && <p className="wrMuted">Loading…</p>}
+          {!s.loading && !up && <p className="wrMuted">No shifts coming up.</p>}
+          {up && (
+            <div className="wrKv">
+              <span>{up.kind === 'running' ? 'Now' : 'Next'} · {up.occ.title || 'Shift'}</span>
+              <span>{up.kind === 'running' ? `${durationText(up.minutes)} left` : `in ${durationText(up.minutes)}`}</span>
+            </div>
+          )}
+          {daily > 0 ? <Bar label="Written today" value={words} of={daily} unit="words" /> : <div className="wrKv"><span>Written today</span><span>{plural(words, 'word')}</span></div>}
+          <div className="wrKv"><span>Tasks waiting</span><span>{waiting}</span></div>
+        </div>
+      )}
+      {children}
     </div>
   )
 }

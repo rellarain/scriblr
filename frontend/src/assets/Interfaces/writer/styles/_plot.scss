@@ -118,6 +118,7 @@
   }
   .wrCardPanel { background: var(--wr-card); border-radius: var(--radius-none); padding: 16px var(--space-7); box-shadow: inset 0 0 0 1px var(--hairline); display: flex; flex-direction: column; gap: var(--space-5); }
   .wrCardPanelHead { display: flex; align-items: center; gap: var(--space-4); }
+  .wrCardPanelFoot { display: flex; justify-content: flex-end; }
   // The parents of a node as read-only chips (PlotParents.tsx). Each is in its own plot colour, with the stripes of its place in the tree at its
   // left (a cluster's chip: category, subcategory, cluster); the text on them is the audited ink on that level's colour (the tile ink on a category,
   // white on a subcategory's or cluster's fill). The title is in capitals, spaced out.

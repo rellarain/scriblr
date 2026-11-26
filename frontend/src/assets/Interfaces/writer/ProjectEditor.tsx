@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PROJECT_NAME_MAX, type WriterWorkspace } from './useWriterWorkspace'
 import HueSlider from './HueSlider'
 import TimeSystemEditor from './TimeSystemEditor'
+import { DeleteControl } from './shared'
 
 // The project's name. While it is being typed the text is the field's own: it can be cleared on the way to another name, but only a name
 // is saved (the project keeps its last one until there is a new one), and leaving the field puts the saved name back and trims it.
@@ -24,8 +25,10 @@ function ProjectName({ w }: { w: WriterWorkspace }) {
 }
 
 // The Project editor: the project's own settings -- its name, its colour (the root of the level
-// colours: a book stays within 90 degrees of it) and its time systems.
+// colours: a book stays within 90 degrees of it), its time systems, and the one place to delete it.
 export default function ProjectEditor({ w }: { w: WriterWorkspace }) {
+  const id = w.activeProjectId
+  const title = w.activeProject?.title ?? 'this project'
   return (
     <div className="wrTimeSystems">
       <div className="wrCardPanel">
@@ -37,6 +40,15 @@ export default function ProjectEditor({ w }: { w: WriterWorkspace }) {
         <HueSlider label="Project colour" className="wrNodeHue" {...w.projectHueSlider()} />
       </div>
       <TimeSystemEditor w={w} />
+      {id && (
+        <div className="wrCardPanel">
+          <div className="wrCardPanelHead"><strong>Delete project</strong></div>
+          <p className="wrHint">Takes the project off the shelves, with its books, outline, plot and drafts.</p>
+          <div className="wrCardPanelFoot">
+            <DeleteControl tone="dark" message={`Delete ${title}?`} onConfirm={() => void w.deleteProject(id)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

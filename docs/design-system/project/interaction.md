@@ -4,7 +4,7 @@ How the Writer responds. The rule behind all of it: **everything you can do with
 
 ## Levels and their sizes
 
-Four stacked levels, each Min, Mid or Max (`levels/levelSizes.ts`). Exactly one has the focus (Max); the level above it is Mid, the ones further up Min; the ones below are not shown. At Dash focus the project shelves sit beside it. Opening something moves the focus down a level (a project, a book, a chapter); a level's **title** brings the focus back to it; a Min level's header strip opens it to Mid; the chevron toggles Min and Mid.
+Four stacked levels, each Min, Mid or Max (`levels/levelSizes.ts`). Exactly one has the focus (Max); the level above it is Mid, the ones further up Min; the ones below are not shown. At Dash focus the project shelves sit beside it; at Project focus they are under the collapsed Dash's facts in the side column, to switch the project being edited. Opening something moves the focus down a level (a project, a book, a chapter); a level's **title** brings the focus back to it; a Min level's header strip opens it to Mid; the chevron toggles Min and Mid.
 
 ## Tabs
 

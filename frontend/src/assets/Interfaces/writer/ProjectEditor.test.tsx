@@ -26,6 +26,35 @@ describe('ProjectEditor: the colour', () => {
   })
 })
 
+describe('ProjectEditor: deleting the project (the one place it can be deleted)', () => {
+  function deletable() {
+    const deleteProject = vi.fn(async () => {})
+    render(<ProjectEditor w={makeWorkspace({
+      activeProjectId: 'p1', activeProject: { projectId: 'p1', title: 'First' }, projectHue: 200,
+      projectHueSlider: () => ({ hue: 200, centre: null, range: 360, onChange: vi.fn() }), deleteProject,
+    })} />)
+    return deleteProject
+  }
+
+  it('asks first, then deletes the open project', () => {
+    const deleteProject = deletable()
+    expect(screen.getByText('Delete project')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Delete First?')).toBeInTheDocument()
+    expect(deleteProject).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(deleteProject).toHaveBeenCalledWith('p1')
+  })
+
+  it('does nothing when the question is cancelled', () => {
+    const deleteProject = deletable()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(deleteProject).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+})
+
 describe('ProjectEditor: the project\'s name', () => {
   it('shows the name the project has, in a field that stops at the longest name', () => {
     const { field } = editor()

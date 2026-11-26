@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { OutlineNode } from '../../../../api/types'
 import { emptyPlanner, newPhase, type Planner } from '../../../../lib/facets'
 import { setKv } from '../../../../settings/settingsStore'
 import { mockFetchBy } from '../../../../test/mockFetch'
@@ -40,6 +41,41 @@ describe('ProjectTiles: the colour of each shelf', () => {
     const { rerender } = render(<ProjectTiles w={tiles([project('a', 'Alpha', 200), project('b', 'Beta', 10)])} />)
     rerender(<ProjectTiles w={tiles([project('a', 'Alpha', 90), project('b', 'Beta', 10)])} />)
     expect(fills()).toEqual([fillColorCss(90), fillColorCss(10)])
+  })
+})
+
+describe('ProjectTiles: switching projects', () => {
+  const book = (id: string, title: string) => ({ id, kind: 'book', parentId: null, order: 0, title, synopsis: '', draftRef: null }) as OutlineNode
+  function switching() {
+    const actions = { openProject: vi.fn(async () => {}), showProject: vi.fn(), openBook: vi.fn() }
+    render(<ProjectTiles w={tiles([project('a', 'Alpha'), project('b', 'Beta')], {
+      activeProjectId: 'a', projectOutlines: { a: [book('ba', 'Ash')], b: [book('bb', 'Bone')] }, ...actions,
+    })} />)
+    return actions
+  }
+
+  it('has no delete on a shelf: a project is deleted from its own Settings', () => {
+    switching()
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
+  })
+
+  it('opens another project at its Project level, or straight into one of its books', async () => {
+    const user = userEvent.setup()
+    const { openProject } = switching()
+    await user.click(screen.getByRole('button', { name: 'Beta' }))
+    expect(openProject).toHaveBeenCalledWith('b')
+    await user.click(screen.getByRole('button', { name: 'Bone' }))
+    expect(openProject).toHaveBeenLastCalledWith('b', 'bb')
+  })
+
+  it('does not open the open project again (which would reload it and clear its undo history): it shows it, or opens its book', async () => {
+    const user = userEvent.setup()
+    const { openProject, showProject, openBook } = switching()
+    await user.click(screen.getByRole('button', { name: 'Alpha' }))
+    expect(showProject).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Ash' }))
+    expect(openBook).toHaveBeenCalledWith('ba')
+    expect(openProject).not.toHaveBeenCalled()
   })
 })
 

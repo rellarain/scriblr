@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -35,7 +36,7 @@ vi.mock('./outlineTabs', () => ({
   NoBook: () => <div>no book</div>,
 }))
 vi.mock('./levelMins', () => ({
-  DashMin: () => <div>dash min</div>,
+  DashMin: ({ children }: { children?: ReactNode }) => <div>dash min{children}</div>,
   OutlineMin: () => <div>outline min</div>,
 }))
 vi.mock('./levelBodies', () => ({
@@ -138,6 +139,35 @@ describe('WriterLevels', () => {
     first.unmount()
     renderLevels(workspace('page'))
     expect(levelsOf()[0]).toBe('dash:mid')
+  })
+
+  describe('the project shelves in the collapsed Dash', () => {
+    const dash = () => document.querySelector<HTMLElement>('[data-level="dash"]')!
+
+    it('holds every project\'s shelf under its facts while the Project level is the editor and the Dash is collapsed', async () => {
+      const user = userEvent.setup()
+      renderLevels(workspace('shelf'))
+      expect(within(dash()).queryByText('project tiles')).toBeNull() // at Mid the Dash shows its tabs
+      await user.click(screen.getByRole('button', { name: 'Minimize Writer Dashboard' }))
+      expect(dash().dataset.size).toBe('min')
+      expect(dash()).toHaveClass('wrDashShelves')
+      expect(within(dash()).getByText('dash min')).toBeTruthy()
+      expect(within(dash()).getByText('project tiles')).toBeTruthy()
+    })
+
+    it('shows only the facts beside an open book or chapter, where the Project tile has the open project\'s shelf', () => {
+      const { unmount } = renderLevels(workspace('book'))
+      expect(dash().dataset.size).toBe('min')
+      expect(within(dash()).getByText('dash min')).toBeTruthy()
+      expect(screen.queryByText('project tiles')).toBeNull()
+      expect(dash()).not.toHaveClass('wrDashShelves')
+      unmount()
+
+      renderLevels(workspace('page'))
+      expect(within(dash()).getByText('dash min')).toBeTruthy()
+      expect(screen.queryByText('project tiles')).toBeNull()
+      expect(screen.getByText('project spines')).toBeTruthy()
+    })
   })
 
   it("tints each level from its own hue: project, book and chapter (the Dash keeps the theme's)", () => {

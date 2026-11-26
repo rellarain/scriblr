@@ -72,6 +72,9 @@
   }
   .wrLevelsSide .wrLevel--mid { flex: 1 1 0; }
   .wrLevelsSide .wrLevel--min { flex: 0 0 auto; }
+  // The collapsed Dash holding the project shelves (Project focus) may be taller than the column: it shrinks to it, and the shelves
+  // (.wrProjectTiles) scroll under the facts.
+  .wrLevelsSide .wrLevel--min.wrDashShelves { flex: 0 1 auto; }
   .wrLevelHeader {
     flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-base); min-height: 40px; box-sizing: border-box; padding: var(--space-base) 22px;
     background: var(--wr-fill);

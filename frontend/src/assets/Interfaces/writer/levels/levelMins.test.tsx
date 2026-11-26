@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode } from '../../../../api/types'
 import { emptyDay, emptyPlanner, newTask, type FacetActivityData, type Goal, type Planner } from '../../../../lib/facets'
-import { mockFetchBy } from '../../../../test/mockFetch'
+import { mockFetch, mockFetchBy } from '../../../../test/mockFetch'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 import { __resetPlanStoreForTests } from '../schedule/planStore'
 import { DashMin, OutlineMin } from './levelMins'
@@ -49,6 +49,23 @@ describe('DashMin', () => {
     expect(await screen.findByText('No shifts coming up.')).toBeTruthy()
     expect(screen.getByText('30 words')).toBeTruthy()
     expect(screen.queryByRole('progressbar')).toBeNull()
+  })
+
+  it('puts what it is given (the project shelves) under the facts', async () => {
+    backend(emptyPlanner(), 30)
+    render(<DashMin w={w}><div>the shelves</div></DashMin>)
+    await screen.findByText('No shifts coming up.')
+    const facts = screen.getByText('Tasks waiting').closest('.wrSummary')!
+    const shelves = screen.getByText('the shelves')
+    expect(facts.compareDocumentPosition(shelves) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(shelves.closest('.wrLevelMinBody')).toBe(facts.parentElement)
+  })
+
+  it('keeps what it is given when the schedule cannot be loaded', async () => {
+    mockFetch({ detail: 'down' }, { ok: false, status: 500 })
+    render(<DashMin w={w}><div>the shelves</div></DashMin>)
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText('the shelves')).toBeTruthy()
   })
 })
 
