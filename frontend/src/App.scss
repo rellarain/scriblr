@@ -369,7 +369,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 // overlaps on top of it (z-index above) instead. AUI is NOT one of these
 // -- it moved back into the Sidebar as its own slide-out panel (see
 // .aUI/.aUIPanel and the .sidebar comment below).
-.uUI, .rUI, .tUI, .wUI {
+.uUI, .rUI, .lUI, .wUI {
   position: absolute;
   top: 50px;
   bottom: 0;
@@ -379,8 +379,8 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   z-index: 0;
   background-color: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
 }
-.hand-right .uUI, .hand-right .rUI, .hand-right .tUI, .hand-right .wUI { left: 0; right: var(--sidebar-w); }
-.hand-left  .uUI, .hand-left  .rUI, .hand-left  .tUI, .hand-left  .wUI { left: var(--sidebar-w); right: 0; }
+.hand-right .uUI, .hand-right .rUI, .hand-right .lUI, .hand-right .wUI { left: 0; right: var(--sidebar-w); }
+.hand-left  .uUI, .hand-left  .rUI, .hand-left  .lUI, .hand-left  .wUI { left: var(--sidebar-w); right: 0; }
 // Base: bottom-most layer, same footprint as Mainscreen above (opposite the
 // sidebar), holding VUI. In practice always fully covered by Mainscreen's
 // opaque background -- present per scrilbrPlan.md's Structure section,

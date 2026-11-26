@@ -34,13 +34,13 @@ describe('UUI (the User panel as tiles)', () => {
   it('shows Dashboard and Account as consoles holding their pages as tiles, with Settings and Help as consoles of their own', async () => {
     render(<UUI />)
     const top = Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).filter(id => ['dashboard', 'account', 'training', 'settings', 'help'].includes(id!))
-    expect(top).toEqual(['dashboard', 'account', 'settings', 'help']) // Training is an interface of its own now (TUI)
+    expect(top).toEqual(['dashboard', 'account', 'settings', 'help']) // Learning is an interface of its own now (LUI)
     expect(within(tile('dashboard')).getByText('Activity Log')).toBeTruthy()
     expect(within(tile('account')).getByText('Manage your profile details here.')).toBeTruthy()
     // Settings and Help are not tiles of a section: they are the panel's own consoles.
     expect(within(tile('dashboard')).queryByText(/using the Dashboard console/)).toBeNull()
     expect(await within(tile('help')).findByText(/using the Dashboard console/)).toBeTruthy()
-    expect(within(tile('help')).queryByText(/Training/)).toBeNull()
+    expect(within(tile('help')).queryByText(/Learning/)).toBeNull()
     expect(within(tile('settings')).getByRole('heading', { name: 'Account' })).toBeTruthy()
   })
 

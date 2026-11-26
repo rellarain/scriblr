@@ -100,10 +100,10 @@ describe('ArticleBuilder', () => {
     expect(screen.queryByText('Check your understanding')).toBeNull()
   })
 
-  it('preview as Training shows the assessment line', async () => {
+  it('preview as Learning shows the assessment line', async () => {
     await renderReady()
     fireEvent.click(screen.getByRole('button', { name: 'Preview ▸' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview as Training' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Preview as Learning' }))
     expect(screen.getByText('Check your understanding')).toBeTruthy()
   })
 

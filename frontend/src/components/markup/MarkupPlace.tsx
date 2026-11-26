@@ -3,7 +3,7 @@ import type { ResourceContent, ResourceNode } from '../../api/types'
 import { articleText } from '../../channels/articles'
 import { useResourcesFile } from '../../channels/resourcesStore'
 import { ChevronLeftIcon } from '../../assets/icons'
-import { useTraining } from '../../assets/Interfaces/training/trainingStore'
+import { useLearning } from '../../assets/Interfaces/learning/learningStore'
 import type { LinkTarget } from '../../lib/markup/links'
 import CopyPlainText from './CopyPlainText'
 import Markup from './Markup'
@@ -49,8 +49,8 @@ function ArticleView({ nodeId }: { nodeId: string }) {
   return <ArticleBody node={node} content={content} />
 }
 
-function TrainingItemView({ id }: { id: string }) {
-  const { training, status } = useTraining()
+function LearningItemView({ id }: { id: string }) {
+  const { training, status } = useLearning()
   const found = useMemo(() => {
     for (const course of training?.content.courses ?? []) {
       if (course.id === id) return { title: course.title, about: course.description, body: '' }
@@ -61,9 +61,9 @@ function TrainingItemView({ id }: { id: string }) {
     }
     return null
   }, [training, id])
-  if (!found) return <p className="mkEmpty">{status === 'ready' ? 'This is not in Training any more.' : 'Loading…'}</p>
+  if (!found) return <p className="mkEmpty">{status === 'ready' ? 'This is not in Learning any more.' : 'Loading…'}</p>
   return (
-    <article className="mkTrainingItem">
+    <article className="mkLearningItem">
       <div className="mkHead wrHelpHead"><h4>{found.title}</h4>{found.body.trim() && <CopyPlainText text={found.body} label={`Copy ${found.title} as plain text`} />}</div>
       {found.about.trim() && <Markup text={found.about} baseLevel={4} />}
       {found.body.trim() && <Markup text={found.body} baseLevel={4} />}
@@ -87,7 +87,7 @@ function Opened({ entry, shown, onBack }: { entry: Entry; shown: boolean; onBack
       <div className="mkPlaceBar">
         <button ref={back} type="button" className="mkIconBtn" aria-label="Back" title="Back" onClick={onBack}><ChevronLeftIcon size={16} /></button>
       </div>
-      {entry.target.kind === 'article' ? <ArticleView nodeId={entry.target.nodeId} /> : <TrainingItemView id={entry.target.id} />}
+      {entry.target.kind === 'article' ? <ArticleView nodeId={entry.target.nodeId} /> : <LearningItemView id={entry.target.id} />}
     </div>
   )
 }

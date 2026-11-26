@@ -47,7 +47,7 @@ function WScreen() {
                             <button onClick={openAccount}>account</button>
                             <button onClick={openInterface}>VUI</button>
                             <button onClick={openInterface}>UUI</button>
-                            <button onClick={openInterface}>TUI</button>
+                            <button onClick={openInterface}>LUI</button>
                             <button onClick={openInterface}>RUI</button>
                             <button onClick={openInterface}>WUI</button>
                             <button onClick={openInterface}>AUI</button>
@@ -60,7 +60,7 @@ function WScreen() {
                     <div className="testInterfaces">
                         <div className="testVUI">+ VUI: welcome interface, all users</div>
                         <div className="testUUI">+ UUI: social interface, registered users; /community, /forum</div>
-                        <div className="testTUI">+ TUI: training interface, registered users;/modules, /project</div>
+                        <div className="testLUI">+ LUI: learning interface, registered users;/modules, /project</div>
                         <div className="testRUI">+ RUI: reader & admin users; ShelvesUI/library, ShelfUI/collection, BookUI/details/forum, PagesUI/reading </div>
                         <div className="testWUI">+ WUI: writer & admin users; ShelvesUI/projects, ShelfUI/project, BookUI/outline, PagesUI/draft/review, PressUI/export</div>
                         <div className="testAUI">+ AUI: administrative interface, only authorized users; tool config, user mgmt</div>

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { emptyProgress, seedContent } from '../../../designSystem/mockTraining'
+import { emptyProgress, seedContent } from '../../../designSystem/mockLearning'
 import {
   assessmentResult, courseById, courseHue, courseProgress, curriculaOf, exerciseOf, indexOf, lessonOf, looseCourses, moduleOf, progressText, projectOf, resultText,
-} from './trainingContent'
+} from './learningContent'
 
 const content = () => seedContent()
 const writer = () => courseById(content(), 'writer-c1')!

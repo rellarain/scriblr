@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { seedContent } from '../../../designSystem/mockTraining'
-import { DESK, focusOf, levelsOf, openCourse, openExercise, openLesson, openModule, openProject, promote, resolvePath, sizesFor } from './trainingPath'
+import { seedContent } from '../../../designSystem/mockLearning'
+import { DESK, focusOf, levelsOf, openCourse, openExercise, openLesson, openModule, openProject, promote, resolvePath, sizesFor } from './learningPath'
 
 const content = seedContent()
 const lesson = () => openLesson(openModule(openCourse('writer-c1'), 'writer-c1-m1'), 'writer-c1-m1-l1')

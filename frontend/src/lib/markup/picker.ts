@@ -4,7 +4,7 @@ import type { Heading } from './links'
 import { parseCached } from './parse'
 
 // The editor's link picker: while a link is being typed (a `@` where a link may start, then names, `@`s and `#`, up to the caret), it lists
-// what the link could point at by title (the articles of the channel list, the Training courses, modules and lessons, the text's own
+// what the link could point at by title (the articles of the channel list, the Learning courses, modules and lessons, the text's own
 // headings) and puts the chosen one's id path in place of what was typed.
 
 // `mode`: a link (`@…`), or the question a `?????` line pulls in.
@@ -33,7 +33,7 @@ export function pullInQueryAt(text: string, caret: number): LinkQuery | null {
 
 const words = (query: string) => query.toLowerCase().replace(/[@#_-]+/g, ' ').split(/\s+/).filter(Boolean)
 
-// Every question with an id in a quiz, test or exam: the Resources assessments, then Training's exams, tests and quizzes.
+// Every question with an id in a quiz, test or exam: the Resources assessments, then Learning's exams, tests and quizzes.
 export function questionOptions(query: string, resources: ResourcesFile | null, training: TrainingContent | null, limit = 8): PickerOption[] {
   const all: PickerOption[] = []
   const add = (path: string, owner: string, text: string) => {
@@ -76,10 +76,10 @@ export function linkOptions(query: string, resources: ResourcesFile | null, trai
   }
   if (training) {
     for (const c of training.courses) {
-      all.push({ id: `t:${c.id}`, label: `Training › ${c.title}`, insert: `@training@${c.id}`, kind: 'training' })
+      all.push({ id: `t:${c.id}`, label: `Learning › ${c.title}`, insert: `@training@${c.id}`, kind: 'training' })
       for (const m of c.modules) {
-        all.push({ id: `t:${m.id}`, label: `Training › ${c.title} › ${m.title}`, insert: `@training@${c.id}@${m.id}`, kind: 'training' })
-        for (const l of m.lessons) all.push({ id: `t:${l.id}`, label: `Training › ${c.title} › ${m.title} › ${l.title}`, insert: `@training@${c.id}@${m.id}@${l.id}`, kind: 'training' })
+        all.push({ id: `t:${m.id}`, label: `Learning › ${c.title} › ${m.title}`, insert: `@training@${c.id}@${m.id}`, kind: 'training' })
+        for (const l of m.lessons) all.push({ id: `t:${l.id}`, label: `Learning › ${c.title} › ${m.title} › ${l.title}`, insert: `@training@${c.id}@${m.id}@${l.id}`, kind: 'training' })
       }
     }
   }

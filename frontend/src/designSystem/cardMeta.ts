@@ -9,8 +9,8 @@ export const CARD_META: CardMeta[] = [
     summary: 'The four stacked levels (Dash, Project, Outline, Draft) at Min, Mid and Max, each with its header, 30x30 icon tabs and quick actions.',
   },
   {
-    id: 'training', dir: 'TrainingLevels', title: 'Training: five stacked levels', group: 'Layout', height: 640,
-    summary: 'The Training interface: the Desk, the open Course, its Module, the Lesson and the Practice as stacked levels, each with its tabs, the deepest focused and the others in a side column.',
+    id: 'learning', dir: 'LearningLevels', title: 'Learning: five stacked levels', group: 'Layout', height: 640,
+    summary: 'The Learning interface (LUI): the Desk, the open Course, its Module, the Lesson and the Practice as stacked levels, each with its tabs, the deepest focused and the others in a side column.',
   },
   {
     id: 'split-tiles', dir: 'SplitTiles', title: 'Tiles, split grid and dividers', group: 'Layout', height: 520,
@@ -37,8 +37,8 @@ export const CARD_META: CardMeta[] = [
     summary: "Admin > Configuration > Plot, where presets are set up, saved as drafts and published one by one, and the Plot sidebar's + Preset that adds a published preset to a project.",
   },
   {
-    id: 'instructor', dir: 'Instructor', title: 'Instructor: the Training builder', group: 'Outline', height: 700,
-    summary: 'Admin > Instructor, where the Training curricula and courses are written: a tree of courses, modules, lessons and assessments beside the open item, with the Save cluster.',
+    id: 'instructor', dir: 'Instructor', title: 'Instructor: the Learning builder', group: 'Outline', height: 700,
+    summary: 'Admin > Instructor, where the Learning curricula and courses are written: a tree of courses, modules, lessons and assessments beside the open item, with the Save cluster.',
   },
   {
     id: 'maps', dir: 'Maps', title: 'Maps: the setting builder', group: 'Outline', height: 700,
@@ -98,7 +98,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'markup', dir: 'Markup', title: 'Markup: the editor and the formatted text', group: 'Controls', height: 760,
-    summary: "Scriblr's own markup for Resources articles and Training lessons: headings from ###### down to #, lists from > to >>>>, quotes, bold and italic, and knowledge checks; the editor's Write, Read-only and Side by side views, its checks and cheat sheet, and Copy as plain text.",
+    summary: "Scriblr's own markup for Resources articles and Learning lessons: headings from ###### down to #, lists from > to >>>>, quotes, bold and italic, and knowledge checks; the editor's Write, Read-only and Side by side views, its checks and cheat sheet, and Copy as plain text.",
   },
   {
     id: 'reader', dir: 'Reader', title: 'Reader: pages, rails and consoles', group: 'Reader', height: 760,

@@ -13,29 +13,39 @@ import { CURRENT_USER } from './userSeed'
 import { useSettings } from './settings/settingsStore'
 import { useThemeEngine } from './theme/useTheme'
 
-// The Reader and Training are loaded when first opened: the Writer, the page the app starts on, does not carry them.
+// The Reader (RUI) and Learning (LUI) are loaded when first opened: the Writer (WUI), the page the app starts on, does not carry them.
 const RUI = lazy(() => import('./assets/Interfaces/RUI'))
-const TUI = lazy(() => import('./assets/Interfaces/TUI'))
+const LUI = lazy(() => import('./assets/Interfaces/LUI'))
 
 const SIDEBAR_DIVIDER_W = 40
 const SIDEBAR_PANEL_W = 400
 // AUI's own width snaps to multiples of this (a "column"), at any container size.
 const AUI_COLUMN_W = 400
 
-// The page the URL names: /read is the Reader, /train Training, anything else (/, /write) the Writer.
-const MAIN_PATH: Record<MainInterface, string> = { reader: '/read', training: '/train', writer: '/write' }
+// The page the URL names: /read is the Reader, /learn Learning, anything else (/, /write) the Writer.
+const MAIN_PATH: Record<MainInterface, string> = { reader: '/read', learning: '/learn', writer: '/write' }
+// Learning was Training, at /train: an old address (a bookmark) is Learning's, and is moved to its new one.
+const isOldLearningPath = (pathname: string) => pathname === '/train' || pathname.startsWith('/train/')
 export function mainOf(pathname: string): MainInterface {
   if (pathname === '/read' || pathname.startsWith('/read/')) return 'reader'
-  if (pathname === '/train' || pathname.startsWith('/train/')) return 'training'
+  if (pathname === '/learn' || pathname.startsWith('/learn/') || isOldLearningPath(pathname)) return 'learning'
   return 'writer'
+}
+// Where an address that is not a page's own goes: the bare address to the Writer, Learning's old one to its new one.
+export function redirectOf(pathname: string): string | null {
+  if (pathname === '/') return MAIN_PATH.writer
+  if (isOldLearningPath(pathname)) return MAIN_PATH.learning + pathname.slice('/train'.length)
+  return null
 }
 
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const activeMain = mainOf(location.pathname)
-  // The bare address is the Writer's.
-  useEffect(() => { if (location.pathname === '/') navigate(MAIN_PATH.writer, { replace: true }) }, [location.pathname, navigate])
+  useEffect(() => {
+    const to = redirectOf(location.pathname)
+    if (to) navigate(to, { replace: true })
+  }, [location.pathname, navigate])
   const [showVUI, setShowVUI] = useState<boolean>(false)
   const { ui } = useSettings()
   const handedness = ui.handedness
@@ -112,7 +122,7 @@ function App() {
   const pendingStandardCount = meter.waitingFirst
 
   // Re-clicking the already-active page's header icon reveals VUI (the
-  // Base layer, normally fully covered by Mainscreen's opaque background)
+  // Visitor UI: the Base layer, normally fully covered by Mainscreen's opaque background)
   // instead of re-selecting it -- same toggle convention as the sidebar.
   // Clicking a different icon always switches page and hides VUI again.
   function handleSelectMain(next: MainInterface) {
@@ -128,7 +138,7 @@ function App() {
     if (showVUI) return null
     switch (activeMain) {
       case 'reader': return <RUI />
-      case 'training': return <TUI />
+      case 'learning': return <LUI />
       case 'writer': return <WUI />
     }
   }

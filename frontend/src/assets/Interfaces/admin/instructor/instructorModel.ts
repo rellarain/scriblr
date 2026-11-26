@@ -1,5 +1,5 @@
 import type { TrainingContent, TrainingContentDraft, TrainingCourse, TrainingCurriculum, TrainingLesson, TrainingModule } from '../../../../api/types'
-import { indexOf, type TrainingItemKind } from '../../training/trainingContent'
+import { indexOf, type LearningItemKind } from '../../learning/learningContent'
 import { assignQuestionIds } from '../../../../lib/markup/questionIds'
 import { moveBefore, nudge } from '../plot/presetModel'
 
@@ -8,7 +8,7 @@ import { moveBefore, nudge } from '../plot/presetModel'
 // An id is the key of what a learner did (enrolled, completed, results), so it is made once and never changed: a move keeps it, a rename changes the title.
 
 export type Draft = TrainingContentDraft
-export type Kind = TrainingItemKind
+export type Kind = LearningItemKind
 export type MakeRandom = () => number
 
 // One quiz per lesson, one test per module, one exam per course: more questions go into it.

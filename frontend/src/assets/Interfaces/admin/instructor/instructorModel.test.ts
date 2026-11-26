@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { seedContent } from '../../../../designSystem/mockTraining'
+import { seedContent } from '../../../../designSystem/mockLearning'
 import {
   LIMITS, add, canAdd, draftOf, exercisesOfCourse, faults, find, inheritedHue, isBlank, kindOf, moveItem, moveTo, newId, nudgeItem, nudgeRef, parentChoices, patch, remove, reorderRefs,
   setMembership, setProjectExercises, takenIds, type Draft,

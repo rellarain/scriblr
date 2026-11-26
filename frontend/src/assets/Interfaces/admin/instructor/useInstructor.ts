@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { saveTrainingContent } from '../../../../api/trainingApi'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
-import { adoptTraining, loadTraining, useTraining } from '../../training/trainingStore'
+import { adoptLearning, loadLearning, useLearning } from '../../learning/learningStore'
 import * as model from './instructorModel'
 import type { Draft, Fault, Fields, Kind, MakeRandom } from './instructorModel'
 
@@ -11,11 +11,11 @@ import type { Draft, Fault, Fields, Kind, MakeRandom } from './instructorModel'
 // instructorModel.ts. A save the server would refuse (a blank title) is not sent: it fails with the reason, which rings the Save button. What the
 // server answers with is handed to the Training store, so a Training page that is open shows the new courses at once.
 export function useInstructor(random: MakeRandom = Math.random) {
-  const data = useTraining()
+  const data = useLearning()
   const [draft, setDraft] = useState<Draft | null>(null)
   const ref = useRef<Draft | null>(null)
 
-  useEffect(() => { void loadTraining() }, [])
+  useEffect(() => { void loadLearning() }, [])
   useEffect(() => {
     if (ref.current === null && data.status === 'ready' && data.training) {
       ref.current = model.draftOf(data.training.content)
@@ -35,7 +35,7 @@ export function useInstructor(random: MakeRandom = Math.random) {
         ref.current = ided
         setDraft(ided)
       }
-      adoptTraining(await saveTrainingContent(ided))
+      adoptLearning(await saveTrainingContent(ided))
     },
   })
 
@@ -52,7 +52,7 @@ export function useInstructor(random: MakeRandom = Math.random) {
   return {
     status: data.status === 'idle' ? 'loading' as const : data.status === 'ready' && draft === null ? 'loading' as const : data.status,
     loadError: data.error,
-    reload: () => { void loadTraining(true) },
+    reload: () => { void loadLearning(true) },
     draft,
     faults,
     faultOf: (id: string) => faults.find(f => f.id === id)?.message,

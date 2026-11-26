@@ -1,8 +1,8 @@
 import type { TrainingAttempt, TrainingContent, TrainingContentDraft, TrainingCourse, TrainingProgress, TrainingState } from '../api/types'
-import { COMPLETABLE, indexOf } from '../assets/Interfaces/training/trainingContent'
+import { COMPLETABLE, indexOf } from '../assets/Interfaces/learning/learningContent'
 import type { MockAnswer } from './mockPresets'
 
-// A pretend Training API (`/api/training`), shared by the design system's previews (mockBackend.ts) and the tests (test/trainingBackend.ts): the
+// A pretend Learning API (`/api/training`, under its old name), shared by the design system's previews (mockBackend.ts) and the tests (test/learningBackend.ts): the
 // courses and one learner's progress live in memory and answer the way the server does, every route with the whole state. A route returns its
 // status and JSON body. The first load is seeded as the backend seeds it: five curricula, a placeholder course each.
 
@@ -39,7 +39,7 @@ export const emptyProgress = (): TrainingProgress => ({ schemaVersion: 2, enroll
 
 const ASSESSMENT_KINDS = ['quiz', 'test', 'exam']
 
-export function createMockTraining(initial: TrainingContent = seedContent(), progress: TrainingProgress = emptyProgress()) {
+export function createMockLearning(initial: TrainingContent = seedContent(), progress: TrainingProgress = emptyProgress()) {
   const state: TrainingState = { content: structuredClone(initial), progress: structuredClone(progress) }
   const snapshot = () => structuredClone(state)
 

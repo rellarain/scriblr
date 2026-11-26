@@ -31,7 +31,7 @@ Four icon tabs (`role="tablist"`), each with an `aria-label` and a title:
   
   A badge on the tab counts the unanswered questions.
 
-The Writer's levels, the Draft, Training, every Reader page and the Admin, User and Helper panels each have one.
+The Writer's levels, the Draft, Learning, every Reader page and the Admin, User and Helper panels each have one.
 
 ## The Inbox (Helper)
 

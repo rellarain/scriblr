@@ -3,7 +3,7 @@ import { afterEach, vi } from 'vitest'
 import { __resetSettingsForTests } from '../settings/settingsStore'
 import { __resetDragEndedForTests } from '../components/tiles/tileDragBus'
 import { __resetPlanStoreForTests } from '../assets/Interfaces/writer/schedule/planStore'
-import { __resetTrainingForTests } from '../assets/Interfaces/training/trainingStore'
+import { __resetLearningForTests } from '../assets/Interfaces/learning/learningStore'
 import { __resetCastForTests } from '../assets/Interfaces/writer/characters/castStore'
 import { __resetItemsForTests } from '../assets/Interfaces/writer/items/itemStore'
 import { __resetPlacesForTests } from '../assets/Interfaces/writer/maps/placesStore'
@@ -28,7 +28,7 @@ afterEach(() => {
   __resetSettingsForTests()
   __resetDragEndedForTests()
   __resetPlanStoreForTests()
-  __resetTrainingForTests()
+  __resetLearningForTests()
   __resetResourcesForTests()
   __resetPlacesForTests()
   __resetBiomesForTests()

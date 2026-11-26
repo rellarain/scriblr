@@ -2,7 +2,7 @@ import { useState } from "react";
 import useWindowDimensions from "../functionality/viewport";
 import UserNav from "../assets/components/uUI/userNav";
 import UserSchedule from "../assets/components/uUI/userSchedule";
-import TrainingUI from "../assets/components/uUI/TrainingUI";
+import LearningUI from "../assets/components/uUI/LearningUI";
 import HelpUI from "../assets/components/uUI/HelpUI";
 import DashUI from "../assets/components/uUI/DashUI";
 import AdminUI from "./AdminUI";
@@ -41,7 +41,7 @@ return (<main className={"userUI screen" + screenOrientation+" screen"+screenRow
     <ReaderUI/>
     <AdminUI/>
     <header className="userHeader">
-        <TrainingUI/>
+        <LearningUI/>
         <HelpUI/>
         <UserSchedule/>
         <DashUI/>

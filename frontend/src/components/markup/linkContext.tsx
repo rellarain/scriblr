@@ -1,15 +1,15 @@
 import { createContext, useContext, useEffect, useMemo } from 'react'
 import type { TrainingContent, TrainingContentDraft } from '../../api/types'
 import { useResourcesFile } from '../../channels/resourcesStore'
-import { loadTraining, useTraining } from '../../assets/Interfaces/training/trainingStore'
+import { loadLearning, useLearning } from '../../assets/Interfaces/learning/learningStore'
 import { headingsOf, type LinkContext, type LinkTarget } from '../../lib/markup/links'
 
 // What a markup text's links resolve against: the Resources file and the Training courses, loaded only when the text has links (`enabled`),
 // and the text's own headings. `training` replaces the saved courses while they are being edited (the Instructor's draft).
 export function useLinkContext(text: string, enabled: boolean, training?: TrainingContentDraft): LinkContext {
   const { file } = useResourcesFile(enabled)
-  const saved = useTraining()
-  useEffect(() => { if (enabled && !training) void loadTraining() }, [enabled, training])
+  const saved = useLearning()
+  useEffect(() => { if (enabled && !training) void loadLearning() }, [enabled, training])
   const headings = useMemo(() => headingsOf(text), [text])
   const courses = useMemo<TrainingContent | null>(() => (training ? { schemaVersion: 2, ...training } : saved.training?.content ?? null), [training, saved.training])
   return useMemo(() => ({ resources: file, training: courses, headings }), [file, courses, headings])

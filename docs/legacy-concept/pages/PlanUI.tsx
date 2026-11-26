@@ -18,7 +18,7 @@ function PlanUI() {
                 <h3>Visitor UI</h3>
                 <p>Description</p>
                 <h3>User UI</h3>
-                <h3>Training UI</h3>
+                <h3>Learning UI</h3>
                 <ul>
                     <p><b>User Tools</b></p>
                     <li><b>Account</b>:</li>
@@ -162,7 +162,7 @@ function PlanUI() {
                 </ul>
                 <ul>
                     <p><b>Lead Admin</b> Tier 4</p>
-                    <p>Support Tier 3 admin and implement VUI/UUI/WUI/RUI/TUI/AUI action items </p>
+                    <p>Support Tier 3 admin and implement VUI/UUI/WUI/RUI/LUI/AUI action items </p>
                     <li><b>Integrate Feedback</b>: channel BREAD statements into project plan and task/action items for admin</li>
                     <li><b>Revenue Mgmt</b>: </li>
                     <li><b>Team Mgmt</b>: performance (),</li>

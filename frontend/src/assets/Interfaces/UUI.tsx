@@ -21,7 +21,7 @@ import UserNotifications from './user/UserNotifications'
 //
 // The root class is "uUIPanel"/"uUIContent", deliberately NOT "uUI" -- that class
 // already exists in App.scss as one of the shared, absolutely-positioned
-// Mainscreen-layer selectors (.uUI, .rUI, .tUI, .wUI, .aUI), and this UUI is a
+// Mainscreen-layer selectors (.uUI, .rUI, .lUI, .wUI, .aUI), and this UUI is a
 // header-drawer resident, not a Mainscreen member.
 
 // A page with a `Console` shows that editor in place of its placeholder text.

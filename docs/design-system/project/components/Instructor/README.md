@@ -1,6 +1,6 @@
-# Instructor (the Training builder)
+# Instructor (the Learning builder)
 
-The **Instructor** console is where the Training courses are written. It is a console of the Admin panel (the AUI), beside Resources, with the graduation-cap icon; Training (`/train`) shows whatever is saved here.
+The **Instructor** console is where the Learning courses are written. It is a console of the Admin panel (the AUI), beside Resources, with the graduation-cap icon; Learning (LUI, `/learn`) shows whatever is saved here.
 
 Code: `admin/instructor/` (`InstructorConsole.tsx`, `InstructorTree.tsx`, `InstructorEditor.tsx`, `useInstructor.ts`, `instructorModel.ts`, `instructor.scss`).
 
@@ -23,7 +23,7 @@ Every list orders by the **grip** (drag) or **Alt + Up / Down** on the grip, ins
 
 ## Saving
 
-The Save cluster behaves as in the Writer: **autosave is off by default**, so the Save button is the norm, and the toggle is in the cluster. The whole document goes in one request and the answer is handed to Training, so an open Training page shows it at once. A save the server would refuse (a blank title) is **held**: the item shows the reason beside it (`.instFault`, with the red edge) and the Save button says "Cannot save yet". What the server refuses is shown as readable text.
+The Save cluster behaves as in the Writer: **autosave is off by default**, so the Save button is the norm, and the toggle is in the cluster. The whole document goes in one request and the answer is handed to Learning, so an open Learning page shows it at once. A save the server would refuse (a blank title) is **held**: the item shows the reason beside it (`.instFault`, with the red edge) and the Save button says "Cannot save yet". What the server refuses is shown as readable text.
 
 ## Deleting
 
@@ -42,4 +42,4 @@ Surfaces `surface-raised`, `ov-sink-1`, `ov-sink-2`, `hairline`; text `ink`, `in
 - Don't let a title be saved blank: the server refuses it.
 - Don't offer an exercise of another course in a project: the server refuses it.
 - Don't show ids to the author, or make them editable.
-- Don't re-copy the courses from Training while the author is typing: the draft is copied once.
+- Don't re-copy the courses from Learning while the author is typing: the draft is copied once.

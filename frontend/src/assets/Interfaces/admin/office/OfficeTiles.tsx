@@ -148,7 +148,7 @@ export function TeamTile({ host }: Host) {
         ))),
         tab('performance', 'Performance', LineChartIcon, () => <Soon>Team performance: its plan work done within the SLA, chats taken and feedback checked.</Soon>),
         tab('members', 'Members', PeopleIcon, id => roster('Team members', v => <TeamMembers view={v} teamId={id} />)),
-        tab('applications', 'Applications', EnvelopeIcon, () => <Soon>Applications from users who passed the required exams in Training.</Soon>),
+        tab('applications', 'Applications', EnvelopeIcon, () => <Soon>Applications from users who passed the required exams in Learning.</Soon>),
       ]}
     />
   )
@@ -289,7 +289,7 @@ export function UserTile({ host }: Host) {
       id="user" label="User" host={host} subjectLabel="User" subjects={users}
       tabs={[
         tab('engagement', 'Engagement', HeartIcon, () => <Soon>Engagement: what this user writes, reads, sends and asks.</Soon>),
-        tab('training', 'Training', GraduationCapIcon, () => <Soon>Training: the courses this user took and the exams they passed.</Soon>),
+        tab('training', 'Learning', GraduationCapIcon, () => <Soon>Learning: the courses this user took and the exams they passed.</Soon>),
         tab('hire', 'Hire', BriefcaseIcon, id => roster('Hire', v => {
           const name = nameOf(id)
           const staff = v.people.find(p => p.name === name)

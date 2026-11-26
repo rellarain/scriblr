@@ -10,7 +10,7 @@ import { useLinkContext } from './linkContext'
 import { Markup } from './Markup'
 import './markup.scss'
 
-// The markup editor (Resources articles and quizzes, Training material, descriptions and assessments): a text field with three views,
+// The markup editor (Resources articles and quizzes, Learning material, descriptions and assessments): a text field with three views,
 // Write, Read-only (the formatted text) and Side by side, a checks panel that lists what is wrong by line (a click goes to the line) and a
 // cheat sheet of the markers. No insert toolbar: the text is typed. Typing `@` where a link may start opens the link picker: what the link could
 // point at, by title (arrows choose, Enter or Tab puts its id path in, Escape closes); on a `?????` line it lists the questions of the quizzes,
@@ -38,7 +38,7 @@ export interface MarkupEditorProps {
   className?: string
   // Shown under the field (e.g. the ids a quiz's questions were given).
   footer?: ReactNode
-  // The Training courses being edited, for links to them and the picker (the Instructor's draft); else the saved ones.
+  // The Learning courses being edited, for links to them and the picker (the Instructor's draft); else the saved ones.
   training?: TrainingContentDraft
 }
 

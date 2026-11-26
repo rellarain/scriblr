@@ -19,7 +19,7 @@ import { consoleIds, createMockChannels } from './mockChannels'
 import { createMockFeedback } from './mockFeedback'
 import { createMockSupport } from './mockSupport'
 import { createMockMapShapes } from './mockMapShapes'
-import { createMockTraining, emptyProgress } from './mockTraining'
+import { createMockLearning, emptyProgress } from './mockLearning'
 import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
 import type { Planner } from '../lib/facets'
 
@@ -203,7 +203,7 @@ export function createMockBackend() {
   // The writer's own models (the Characters console's Models section): another catalog, empty to begin with, whose ids start with "my-".
   const mine = createMockModels([], { writer: true })
   // Training: the five placeholder curricula, with a course enrolled in so the Desk has something on it.
-  const training = createMockTraining(undefined, { ...emptyProgress(), enrolled: { 'writer-c1': '2026-11-02T12:00:00.000Z' } })
+  const training = createMockLearning(undefined, { ...emptyProgress(), enrolled: { 'writer-c1': '2026-11-02T12:00:00.000Z' } })
   // The Maps console's maps, which its edits change in memory only.
   const maps = createMockMaps(seedMaps())
   // The admin's biome list (Configuration > Maps) and each project's own biomes.

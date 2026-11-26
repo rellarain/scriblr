@@ -10,7 +10,7 @@ interface NavSwitcherProps {
 
 const OPTIONS: Array<{ key: MainInterface; label: string; Icon: ComponentType<IconProps> }> = [
   { key: 'reader', label: 'Reader', Icon: BookFaceIcon },
-  { key: 'training', label: 'Training', Icon: GraduationCapIcon },
+  { key: 'learning', label: 'Learning', Icon: GraduationCapIcon },
   { key: 'writer', label: 'Writer', Icon: PencilIcon },
 ]
 

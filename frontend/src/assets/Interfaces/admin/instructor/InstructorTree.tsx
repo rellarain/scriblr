@@ -5,7 +5,7 @@ import {
   BookFaceIcon, BriefcaseIcon, CatalogIcon, CheckboxIcon, ChevronDownIcon, ChevronRightIcon, GripIcon, NoteIcon, PlusIcon, QuestionIcon, RevisionIcon, StackIcon, TicketIcon,
   type IconProps,
 } from '../../../icons'
-import { looseCourses } from '../../training/trainingContent'
+import { looseCourses } from '../../learning/learningContent'
 import { useReorder } from '../plot/useReorder'
 import { KIND_LABEL, canAdd, labelOf, type Draft, type Kind } from './instructorModel'
 import type { Instructor } from './useInstructor'

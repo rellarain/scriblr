@@ -1,4 +1,4 @@
-// Scriblr's markup (Markup.tsx) and its editor (MarkupEditor.tsx). The text takes the ink of what holds it (a level's ink in Training, the
+// Scriblr's markup (Markup.tsx) and its editor (MarkupEditor.tsx). The text takes the ink of what holds it (a level's ink in Learning, the
 // panel's in Admin), so nothing here sets a text colour on the formatted text; recesses are --ov-sink-*. Theme tokens only.
 
 .mk {
@@ -39,7 +39,7 @@
 .mkOptions { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .mkOption { display: flex; flex-direction: column; gap: 2px; padding: 2px var(--space-2); }
 // The app resets native form controls (App.scss), so the radio buttons and check boxes are drawn in the ink of the text they sit in (the level's
-// ink in Training, the on-accent ink on a right option): a ring, filled with a dot (radio) or a tick (check box) when chosen.
+// ink in Learning, the on-accent ink on a right option): a ring, filled with a dot (radio) or a tick (check box) when chosen.
 .mkOptionLabel {
   display: flex; align-items: baseline; gap: 0.5em; cursor: pointer;
   input {
@@ -131,7 +131,7 @@
 .mkPlace { min-width: 0; }
 .mkPlaceView[hidden] { display: none !important; }
 .mkPlaceBar { display: flex; margin-bottom: var(--space-2); }
-.mkTrainingItem { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: inherit; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; } }
+.mkLearningItem { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: inherit; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; } }
 [data-anchor]:focus { outline: none; }
 
 // The link picker, under the field while a link is being typed.

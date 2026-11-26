@@ -9,7 +9,7 @@ import type { LevelSize } from './levelSizes'
 // right end, and the tabs wrap beneath them when the header is narrow. The focused (Max)
 // level just shows its title.
 function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize, locked = false, headerless = false, headerExtras, className, minBody, children }: {
-  // The level's name: the Writer's (dash, project, outline, draft) or Training's (desk, course, module, lesson, practice); it makes the class wrLevel--<level>.
+  // The level's name: the Writer's (dash, project, outline, draft) or Learning's (desk, course, module, lesson, practice); it makes the class wrLevel--<level>.
   level: string
   size: Exclude<LevelSize, 'hidden'>
   title: string

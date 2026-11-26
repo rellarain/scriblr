@@ -15,7 +15,7 @@ import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
 
 // The article and quiz builder (and the Markdown renderer behind it) is loaded when its console is opened.
 const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole'))
-// The Training builder, loaded when the Instructor console is opened.
+// The Learning builder, loaded when the Instructor console is opened.
 const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsole'))
 // The plot presets page, loaded when Configuration > Plot is opened.
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
@@ -237,7 +237,7 @@ function AUI() {
     id: 'resources', title: 'Resources', Icon: InfoIcon,
     children: <Suspense fallback={null}><ResourcesConsole /></Suspense>,
   })
-  // The Instructor console is the Training builder (admin/instructor/InstructorConsole.tsx): the curricula, courses, modules, lessons and what Training
+  // The Instructor console is the Learning builder (admin/instructor/InstructorConsole.tsx): the curricula, courses, modules, lessons and what Learning
   // shows, saved through /api/training.
   tiles.push({
     id: 'instructor', title: 'Instructor', Icon: GraduationCapIcon,

@@ -15,7 +15,7 @@ Code: `admin/office/StaffPages.tsx` (`RosterPage`, `DepartmentsPage`, `Allotment
   - **tier 4**: an admin with helper hours promoted on that console.
 
   Someone with no tier on a console does not take its chats. The roster shows the highest tier a person has anywhere; someone who left has none.
-- **Promotion** follows training: a finished training on an interface or a console is recorded, then a director promotes the person on it (the director of their department, or any director when they have none). Until Training keeps records per staff member, finishing is recorded by hand on Monitor Training.
+- **Promotion** follows training: a finished training on an interface or a console is recorded, then a director promotes the person on it (the director of their department, or any director when they have none). Until Learning keeps records per staff member, finishing is recorded by hand on Monitor Training.
 - **Helper hours**: 5, 10, 20 or 30 a week, given by the Office.
 - **SLA**: hours per priority (urgent 4 h, high 1 day, normal 3 days, low 7 days to begin with).
 

@@ -16,7 +16,7 @@ function newLocalId(prefix: string): string {
 // Interface > Console > Component > Feature tree (ResourceTree.tsx) on the
 // left, and a Guide/Tutorials/FAQ editor for whichever node is selected on
 // the right (each written in the markup editor), with a Preview toggle that
-// shows the same content as a console's Help panel or Training page would.
+// shows the same content as a console's Help panel or Learning page would.
 function ArticleBuilder({ resources, selectedId, onSelectNode }: {
   resources: ResourcesWorkspace
   selectedId: string | null
@@ -24,7 +24,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
 }) {
   const [contentTab, setContentTab] = useState<'guide' | 'tutorials' | 'faq'>('guide')
   const [previewOn, setPreviewOn] = useState(false)
-  const [previewAs, setPreviewAs] = useState<'help' | 'training'>('help')
+  const [previewAs, setPreviewAs] = useState<'help' | 'learning'>('help')
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [promoteCandidates, setPromoteCandidates] = useState<PromotableFeedbackMessage[]>([])
 
@@ -98,14 +98,14 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
             <div className="resToolbar">
               <div className="resPillGroup">
                 <button type="button" className={previewAs === 'help' ? 'resPill resPill--active' : 'resPill'} onClick={() => setPreviewAs('help')}>Preview as Help</button>
-                <button type="button" className={previewAs === 'training' ? 'resPill resPill--active' : 'resPill'} onClick={() => setPreviewAs('training')}>Preview as Training</button>
+                <button type="button" className={previewAs === 'learning' ? 'resPill resPill--active' : 'resPill'} onClick={() => setPreviewAs('learning')}>Preview as Learning</button>
               </div>
               <button type="button" className="resLinkBtn" onClick={() => setPreviewOn(false)}>&larr; Back to editing</button>
             </div>
 
             <div className="resPreviewCard">
               <div className="resPreviewHead">
-                <span className="resBadge">{previewAs === 'help' ? 'Help' : 'Training'}</span>
+                <span className="resBadge">{previewAs === 'help' ? 'Help' : 'Learning'}</span>
                 <h2>{node.name || `Untitled ${node.kind}`}</h2>
               </div>
               <div className="resArticle"><Markup text={content.guide} baseLevel={2} empty={<p className="mkEmpty">No guide written yet.</p>} /></div>
@@ -139,7 +139,7 @@ function ArticleBuilder({ resources, selectedId, onSelectNode }: {
                 </>
               )}
 
-              {previewAs === 'training' && (
+              {previewAs === 'learning' && (
                 <div className="resFeedbackSection">
                   <div className="resFeedbackSectionHead">
                     <h3 className="resSubheading">Check your understanding</h3>

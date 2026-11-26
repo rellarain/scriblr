@@ -9,9 +9,9 @@ import { InstructorTree } from './InstructorTree'
 import { useInstructor } from './useInstructor'
 import './instructor.scss'
 
-// AUI > Instructor: where the Training courses are written. The courses as a tree (each curriculum with its courses, then the courses that are in none,
+// AUI > Instructor: where the Learning courses are written. The courses as a tree (each curriculum with its courses, then the courses that are in none,
 // and under a course its modules, lessons, exercises, quizzes, tests, projects and exams) and, beside it, the open item to edit. Edits save the way the
-// Writer's do: the Save button, and autosave when the user has turned it on. Training shows what is saved.
+// Writer's do: the Save button, and autosave when the user has turned it on. Learning shows what is saved.
 function InstructorConsole() {
   const ins = useInstructor()
   const { ui } = useSettings()

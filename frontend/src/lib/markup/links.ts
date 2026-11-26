@@ -5,9 +5,9 @@ import { parseCached } from './parse'
 
 // What a link points at, by permanent ids, so a reader always sees the current title:
 // - `@writer@draft@3f9c21ab`: a channel node's article (the names joined by `/` are its id);
-// - `@training@<course>[@<module>[@<lesson>]]`: a Training course, module or lesson (Training ids are unique, so the deepest one is the item);
-//   after `training` a course's id wins over a channel node, and `@training` alone, or with a name that is neither, is the Training interface's
-//   article;
+// - `@training@<course>[@<module>[@<lesson>]]`: a Learning (LUI) course, module or lesson (the ids are unique, so the deepest one is the item);
+//   the syntax keeps Learning's old name, Training, since it is saved in the texts. After `training` a course's id wins over a channel node, and
+//   `@training` alone, or with a name that is neither, is the Learning interface's article;
 // - `#Heading-words` after either: a heading in that text; `@#Heading-words` alone: a heading in the same text.
 // A link whose place is not loaded yet is `pending` (shown as typed, with no mark); one that points at nothing is `missing`.
 
@@ -26,7 +26,7 @@ export interface Heading { anchor: string; text: string }
 export interface LinkContext {
   // The channel nodes and their articles (null until loaded).
   resources: ResourcesFile | null
-  // The Training courses (null until loaded).
+  // The Learning courses (null until loaded).
   training: TrainingContent | null
   // The headings of the text the link is in (for `@#Heading`).
   headings: Heading[]
@@ -81,7 +81,7 @@ export function resolveLink(link: LinkToken, ctx: LinkContext): Resolved {
     if (!ctx.training) return { status: 'pending' }
     if (ctx.training.courses.some(c => c.id === path[1])) {
       const item = trainingItem(ctx.training, path[path.length - 1])
-      if (!item) return { status: 'missing', why: `There is no ${path[path.length - 1]} in Training.` }
+      if (!item) return { status: 'missing', why: `There is no ${path[path.length - 1]} in Learning.` }
       return withAnchor({ kind: 'training', itemKind: item.itemKind, id: item.id, anchor: null }, item.title, anchor, () => item.body)
     }
   }

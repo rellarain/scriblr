@@ -1,14 +1,14 @@
 import { vi } from 'vitest'
 import type { TrainingContent, TrainingProgress, TrainingState } from '../api/types'
-import { createMockTraining } from '../designSystem/mockTraining'
+import { createMockLearning } from '../designSystem/mockLearning'
 
-// A stand-in for the Training API (`/api/training`) for tests: the courses and the progress are kept in memory by the same pretend API the design
-// system uses (designSystem/mockTraining.ts), so a test drives Training against answers shaped like the server's. `calls` lists every request as
+// A stand-in for the Learning API (`/api/training`, under its old name) for tests: the courses and the progress are kept in memory by the same
+// pretend API the design system uses (designSystem/mockLearning.ts), so a test drives Learning against answers shaped like the server's. `calls` lists every request as
 // "METHOD /path"; `failNext(path, ...)` makes the next request to a path fail; `hold()` keeps every answer back until `release()` (a loading state).
 
-export { seedContent, emptyProgress } from '../designSystem/mockTraining'
+export { seedContent, emptyProgress } from '../designSystem/mockLearning'
 
-export interface TrainingBackend {
+export interface LearningBackend {
   fetch: ReturnType<typeof vi.fn>
   readonly state: TrainingState
   calls: string[]
@@ -17,8 +17,8 @@ export interface TrainingBackend {
   release(): void
 }
 
-export function trainingBackend(initial?: TrainingContent, progress?: TrainingProgress): TrainingBackend {
-  const mock = createMockTraining(initial, progress)
+export function learningBackend(initial?: TrainingContent, progress?: TrainingProgress): LearningBackend {
+  const mock = createMockLearning(initial, progress)
   const failures = new Map<string, { status: number; detail: unknown }>()
   const calls: string[] = []
   let gate: Promise<void> | null = null

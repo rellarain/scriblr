@@ -125,7 +125,7 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(await within(tile('resources')).findByText('resources console')).toBeTruthy()
   })
 
-  it('shows Instructor as the Training builder', async () => {
+  it('shows Instructor as the Learning builder', async () => {
     render(<AUI />)
     expect(await within(tile('instructor')).findByText('instructor console')).toBeTruthy()
   })

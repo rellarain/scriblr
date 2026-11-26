@@ -1,14 +1,14 @@
 import type { TrainingAttempt, TrainingContent, TrainingCourse, TrainingCurriculum, TrainingExercise, TrainingLesson, TrainingModule, TrainingProgress, TrainingProject } from '../../../api/types'
 
-// Looking things up in Training's courses, and what the learner's progress says about them. Pure: the content and the progress are passed in.
+// Looking things up in Learning's courses, and what the learner's progress says about them. Pure: the content and the progress are passed in.
 
-export type TrainingItemKind = 'curriculum' | 'course' | 'module' | 'lesson' | 'exercise' | 'project' | 'quiz' | 'test' | 'exam'
+export type LearningItemKind = 'curriculum' | 'course' | 'module' | 'lesson' | 'exercise' | 'project' | 'quiz' | 'test' | 'exam'
 // What can be marked complete by hand (an assessment is passed with an attempt).
-export const COMPLETABLE: TrainingItemKind[] = ['course', 'module', 'lesson', 'exercise', 'project']
+export const COMPLETABLE: LearningItemKind[] = ['course', 'module', 'lesson', 'exercise', 'project']
 
 // Every id in the courses: what it is and what it sits in (a quiz sits in a lesson, a test in a module, an exam in a course).
-export function indexOf(content: TrainingContent): Map<string, { kind: TrainingItemKind; parent: string | null }> {
-  const out = new Map<string, { kind: TrainingItemKind; parent: string | null }>()
+export function indexOf(content: TrainingContent): Map<string, { kind: LearningItemKind; parent: string | null }> {
+  const out = new Map<string, { kind: LearningItemKind; parent: string | null }>()
   for (const c of content.curricula) out.set(c.id, { kind: 'curriculum', parent: null })
   for (const course of content.courses) {
     out.set(course.id, { kind: 'course', parent: null })

@@ -6,7 +6,7 @@ Code: `admin/channels/` (`ChannelsConsole.tsx`, `channels.scss`); the shared sto
 
 ## Where the list comes from
 
-- **The app's own screens** (`APP_SCREENS` in `storage/channels.py`): every interface (Writer, Reader, Training, User, Helper, Admin), its consoles and the tiles of each, under fixed ids built from their names (`writer/draft/draft`, `admin/office/voting`). They are put in once per version of that list: missing nodes are added after the ones already there, nothing is renamed or removed, and a branch an admin deleted is not brought back.
+- **The app's own screens** (`APP_SCREENS` in `storage/channels.py`): every interface (Writer, Reader, Learning, User, Helper, Admin; Learning's nodes keep its old name, Training, as `training/*`), its consoles and the tiles of each, under fixed ids built from their names (`writer/draft/draft`, `admin/office/voting`). They are put in once per version of that list: missing nodes are added after the ones already there, nothing is renamed or removed, and a branch an admin deleted is not brought back.
 - **Features** are the admins' own: added under a component here.
 - A tree from before the list had ids keeps its own nodes, names and guides.
 

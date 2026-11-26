@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { TrainingContent, TrainingCourse } from '../../../../api/types'
-import { emptyProgress, trainingBackend, type TrainingBackend } from '../../../../test/trainingBackend'
-import { getTrainingData } from '../../training/trainingStore'
+import { emptyProgress, learningBackend, type LearningBackend } from '../../../../test/learningBackend'
+import { getLearningData } from '../../learning/learningStore'
 import InstructorConsole from './InstructorConsole'
 
 const tree = () => within(screen.getByRole('tree', { name: 'Curricula and courses' }))
@@ -36,18 +36,18 @@ const fixture = (): TrainingContent => ({
   courses: [course('writer', 'Writer'), course('reader', 'Reader'), course('extra', 'Extra')],
 })
 
-async function open(backend: TrainingBackend = trainingBackend(fixture())) {
+async function open(backend: LearningBackend = learningBackend(fixture())) {
   render(<InstructorConsole />)
   await screen.findByRole('heading', { name: 'Instructor' })
   return backend
 }
 
 // The courses as the backend holds them now.
-const stored = (b: TrainingBackend, id: string) => b.state.content.courses.find(c => c.id === id)!
+const stored = (b: LearningBackend, id: string) => b.state.content.courses.find(c => c.id === id)!
 
 describe('the Instructor console: loading', () => {
   it('says it is loading, then shows the tree with the first curriculum open for editing', async () => {
-    const backend = trainingBackend(fixture())
+    const backend = learningBackend(fixture())
     backend.hold()
     render(<InstructorConsole />)
     expect(screen.getByRole('status')).toHaveTextContent('Loading the courses')
@@ -59,7 +59,7 @@ describe('the Instructor console: loading', () => {
 
   it('says why it could not load, and tries again from the button', async () => {
     const user = userEvent.setup()
-    const backend = trainingBackend(fixture())
+    const backend = learningBackend(fixture())
     backend.failNext('/training', 500, 'The courses could not be read.')
     render(<InstructorConsole />)
     expect(await screen.findByRole('alert')).toHaveTextContent('The courses could not be read.')
@@ -76,7 +76,7 @@ describe('the Instructor console: loading', () => {
 })
 
 describe('the Instructor console: editing and saving', () => {
-  it('renames a course and describes it, and Save sends the courses once, which Training then shows', async () => {
+  it('renames a course and describes it, and Save sends the courses once, which Learning then shows', async () => {
     const user = userEvent.setup()
     const backend = await open()
     await user.click(row('Writer Course'))
@@ -86,13 +86,13 @@ describe('the Instructor console: editing and saving', () => {
     await user.click(save())
     await waitFor(() => expect(backend.calls.filter(c => c === 'PUT /training/content')).toHaveLength(1))
     expect(stored(backend, 'writer-c1')).toMatchObject({ title: 'Writing Well', description: 'How to write.' })
-    await waitFor(() => expect(getTrainingData().training!.content.courses.find(c => c.id === 'writer-c1')!.title).toBe('Writing Well'))
+    await waitFor(() => expect(getLearningData().training!.content.courses.find(c => c.id === 'writer-c1')!.title).toBe('Writing Well'))
     expect(row('Writing Well')).toBeInTheDocument()
   })
 
   it('keeps the progress of an item that was renamed (its id does not change)', async () => {
     const user = userEvent.setup()
-    const backend = await open(trainingBackend(fixture(), { ...emptyProgress(), enrolled: { 'writer-c1': 'x' }, completed: { 'writer-c1-m1-l1': 'x' } }))
+    const backend = await open(learningBackend(fixture(), { ...emptyProgress(), enrolled: { 'writer-c1': 'x' }, completed: { 'writer-c1-m1-l1': 'x' } }))
     await user.click(row('Writer Lesson'))
     fireEvent.change(editor('Lesson').getByLabelText('Title'), { target: { value: 'Acts' } })
     await user.click(save())

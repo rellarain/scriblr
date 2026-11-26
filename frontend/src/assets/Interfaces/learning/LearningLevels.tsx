@@ -1,57 +1,57 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { TrainingState as TrainingData } from '../../../api/types'
+import type { TrainingState } from '../../../api/types'
 import { RedoIcon } from '../../icons'
 import { sideVars, useSidebar } from '../writer/sidebarState'
 import BookScope from '../writer/BookScope'
 import LevelPanel from '../writer/levels/LevelPanel'
 import SideResizer from '../writer/levels/SideResizer'
-import { RowDetail, TrainingAbout, TrainingEmpty, TrainingPage } from './TrainingPage'
-import { TRAINING_PAGES } from './trainingPages'
-import { courseHue, courseById, exerciseOf, lessonOf, moduleOf, projectOf } from './trainingContent'
-import { levelsOf, sizesFor, type TrainingLevel, type TrainingPath } from './trainingPath'
-import { courseLine, courseTabs, deskLine, doneAction, deskTabs, lessonTabs, moduleTabs, useTrainingTabs } from './trainingTabs'
-import { loadTraining, useTraining } from './trainingStore'
-import { useTrainingState } from './useTrainingState'
+import { RowDetail, LearningAbout, LearningEmpty, LearningPage } from './LearningPage'
+import { LEARNING_PAGES } from './learningPages'
+import { courseHue, courseById, exerciseOf, lessonOf, moduleOf, projectOf } from './learningContent'
+import { levelsOf, sizesFor, type LearningLevel, type LearningPath } from './learningPath'
+import { courseLine, courseTabs, deskLine, doneAction, deskTabs, lessonTabs, moduleTabs, useLearningTabs } from './learningTabs'
+import { loadLearning, useLearning } from './learningStore'
+import { useLearningState } from './useLearningState'
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
 
 // What a level shows under its header strip when it is folded to Min: what the level is, and a line on what is in it.
-function MinBody({ level, line }: { level: Exclude<TrainingLevel, 'practice'>; line: string }) {
+function MinBody({ level, line }: { level: Exclude<LearningLevel, 'practice'>; line: string }) {
   return (
     <div className="wrLevelMinBody">
-      <p className="trMinDefinition">{TRAINING_PAGES[level].definition}</p>
-      <p className="trMinLine">{line}</p>
+      <p className="lrMinDefinition">{LEARNING_PAGES[level].definition}</p>
+      <p className="lrMinLine">{line}</p>
     </div>
   )
 }
 
-// Training: five stacked levels -- the Desk, the open Course, its Module, the Lesson and, deepest, the Practice (an exercise or a project) --
+// Learning: five stacked levels -- the Desk, the open Course, its Module, the Lesson and, deepest, the Practice (an exercise or a project) --
 // laid out like the Writer's (writer/levels/WriterLevels.tsx): the deepest on the path has the focus (Max), the level above it is Mid and
 // the rest Min, in a side column beside it. Opening a course, module, lesson or exercise moves the focus down a level, and a level's title
-// brings the focus back to it (closing what is below). The courses and the progress come from the backend (trainingStore.ts): the levels
+// brings the focus back to it (closing what is below). The courses and the progress come from the backend (learningStore.ts): the levels
 // are not drawn until they have loaded.
-function TrainingLevels({ startAt }: { startAt?: TrainingPath }) {
-  const data = useTraining()
-  useEffect(() => { void loadTraining() }, [])
+function LearningLevels({ startAt }: { startAt?: LearningPath }) {
+  const data = useLearning()
+  useEffect(() => { void loadLearning() }, [])
   if (data.status === 'ready' && data.training) return <ReadyLevels training={data.training} actionError={data.actionError} startAt={startAt} />
   return (
-    <div className="wrLevels trLevels trLevels--focus-desk">
-      <LevelPanel level="desk" size="max" title="Training Desk" onPromote={() => {}} onSetSize={() => {}}>
+    <div className="wrLevels lrLevels lrLevels--focus-desk">
+      <LevelPanel level="desk" size="max" title="Learning Desk" onPromote={() => {}} onSetSize={() => {}}>
         {data.status === 'error'
           ? (
-            <div className="trStatus" role="alert">
-              <p className="wrError">{data.error ?? 'Training could not be loaded.'}</p>
-              <button type="button" className="trRowAction" aria-label="Try loading again" title="Try loading again" onClick={() => { void loadTraining(true) }}><RedoIcon size={18} /></button>
+            <div className="lrStatus" role="alert">
+              <p className="wrError">{data.error ?? 'Learning could not be loaded.'}</p>
+              <button type="button" className="lrRowAction" aria-label="Try loading again" title="Try loading again" onClick={() => { void loadLearning(true) }}><RedoIcon size={18} /></button>
             </div>
           )
-          : <p className="wrMuted trStatus" role="status">Loading training…</p>}
+          : <p className="wrMuted lrStatus" role="status">Loading courses…</p>}
       </LevelPanel>
     </div>
   )
 }
 
-function ReadyLevels({ training, actionError, startAt }: { training: TrainingData; actionError: string | null; startAt?: TrainingPath }) {
-  const t = useTrainingState(training, startAt)
+function ReadyLevels({ training, actionError, startAt }: { training: TrainingState; actionError: string | null; startAt?: LearningPath }) {
+  const t = useLearningState(training, startAt)
   const { path, content } = t
   const shown = levelsOf(path)
   const sizes = sizesFor(path, t.overrides)
@@ -71,19 +71,19 @@ function ReadyLevels({ training, actionError, startAt }: { training: TrainingDat
     else for (const [name, value] of Object.entries(sideVars(width))) style.setProperty(name, value)
   }
 
-  const desk = useTrainingTabs('desk', deskTabs(t), sizes.desk ?? 'min')
-  const courseTab = useTrainingTabs('course', course ? courseTabs(t, course) : null, sizes.course ?? 'min')
-  const moduleTab = useTrainingTabs('module', mod ? moduleTabs(t, mod) : null, sizes.module ?? 'min')
-  const lessonTab = useTrainingTabs('lesson', lesson ? lessonTabs(t, lesson) : null, sizes.lesson ?? 'min')
+  const desk = useLearningTabs('desk', deskTabs(t), sizes.desk ?? 'min')
+  const courseTab = useLearningTabs('course', course ? courseTabs(t, course) : null, sizes.course ?? 'min')
+  const moduleTab = useLearningTabs('module', mod ? moduleTabs(t, mod) : null, sizes.module ?? 'min')
+  const lessonTab = useLearningTabs('lesson', lesson ? lessonTabs(t, lesson) : null, sizes.lesson ?? 'min')
 
-  const sizeOf = (level: TrainingLevel) => sizes[level] ?? 'min'
+  const sizeOf = (level: LearningLevel) => sizes[level] ?? 'min'
 
-  function panel(level: TrainingLevel): ReactNode {
+  function panel(level: LearningLevel): ReactNode {
     const size = sizeOf(level)
     switch (level) {
       case 'desk':
         return (
-          <LevelPanel key={level} level={level} size={size} title="Training Desk" headerExtras={desk.headerExtras} onPromote={t.showDesk} onSetSize={t.setSize(level)}
+          <LevelPanel key={level} level={level} size={size} title="Learning Desk" headerExtras={desk.headerExtras} onPromote={t.showDesk} onSetSize={t.setSize(level)}
             minBody={<MinBody level="desk" line={deskLine(t)} />}>
             {actionError && <p className="wrError" role="alert">{actionError}</p>}
             {desk.body}
@@ -118,18 +118,18 @@ function ReadyLevels({ training, actionError, startAt }: { training: TrainingDat
         const allExercises = course ? course.modules.flatMap(m => m.lessons.flatMap(l => l.exercises)) : []
         const exercisesOfProject = project ? project.exerciseIds.flatMap(id => allExercises.filter(e => e.id === id)) : []
         return (
-          <LevelPanel key={level} level={level} size="max" title={item?.title ?? TRAINING_PAGES[kind].label} hue={hue} onPromote={() => t.promote(level)} onSetSize={t.setSize(level)}>
-            <TrainingPage page={kind} done={item ? doneAction(t, item.id, item.title) : undefined}>
-              {item && <TrainingAbout text={item.description} />}
+          <LevelPanel key={level} level={level} size="max" title={item?.title ?? LEARNING_PAGES[kind].label} hue={hue} onPromote={() => t.promote(level)} onSetSize={t.setSize(level)}>
+            <LearningPage page={kind} done={item ? doneAction(t, item.id, item.title) : undefined}>
+              {item && <LearningAbout text={item.description} />}
               {project && (exercisesOfProject.length === 0
-                ? <TrainingEmpty>No exercises in it yet.</TrainingEmpty>
+                ? <LearningEmpty>No exercises in it yet.</LearningEmpty>
                 : (
-                  <ul className="trList" aria-label={`Exercises of ${project.title}`}>
-                    {exercisesOfProject.map(e => <li key={e.id} className="trRow trRow--static"><span className="trRowText trRowText--static"><span className="trRowTitle">{e.title}</span><RowDetail about={e.description} /></span></li>)}
+                  <ul className="lrList" aria-label={`Exercises of ${project.title}`}>
+                    {exercisesOfProject.map(e => <li key={e.id} className="lrRow lrRow--static"><span className="lrRowText lrRowText--static"><span className="lrRowTitle">{e.title}</span><RowDetail about={e.description} /></span></li>)}
                   </ul>
                 ))}
-              {exercise && <TrainingEmpty>Nothing to practise yet.</TrainingEmpty>}
-            </TrainingPage>
+              {exercise && <LearningEmpty>Nothing to practise yet.</LearningEmpty>}
+            </LearningPage>
           </LevelPanel>
         )
       }
@@ -137,13 +137,13 @@ function ReadyLevels({ training, actionError, startAt }: { training: TrainingDat
   }
 
   // Every level below the Desk is re-tinted with its course's colour (the Desk is the app theme itself).
-  const scoped = (level: TrainingLevel, node: ReactNode) => (level === 'desk' ? node : <BookScope key={level} code={hue} flow>{node}</BookScope>)
+  const scoped = (level: LearningLevel, node: ReactNode) => (level === 'desk' ? node : <BookScope key={level} code={hue} flow>{node}</BookScope>)
 
   const above = shown.filter(l => l !== focus)
   const sideVarStyle = side.width !== null && above.length > 0 ? sideVars(side.width) : undefined
 
   return (
-    <div ref={levelsRef} className={`wrLevels trLevels trLevels--focus-${focus}`} data-focus={focus} style={sideVarStyle}>
+    <div ref={levelsRef} className={`wrLevels lrLevels lrLevels--focus-${focus}`} data-focus={focus} style={sideVarStyle}>
       {above.length > 0
         ? (
           <>
@@ -159,4 +159,4 @@ function ReadyLevels({ training, actionError, startAt }: { training: TrainingDat
   )
 }
 
-export default TrainingLevels
+export default LearningLevels

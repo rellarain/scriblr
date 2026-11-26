@@ -12,7 +12,8 @@ export const HELP_TARGETS = {
   writerProject: { id: 'writer/project', aliases: ['project', 'shelf', 'project console'] },
   writerBook: { id: 'writer/book', aliases: ['outline', 'book'] },
   writerDraft: { id: 'writer/draft', aliases: ['draft', 'chapter'] },
-  training: { id: 'training/desk', aliases: ['training', 'desk'] },
+  // Learning's channel nodes keep its old name (the ids are saved with the guides, feedback and queues filed under them).
+  learningDesk: { id: 'training/desk', aliases: ['training', 'desk'] },
   readerNook: { id: 'reader/nook', aliases: [] },
   readerLibrary: { id: 'reader/library', aliases: [] },
   readerBook: { id: 'reader/book', aliases: [] },
