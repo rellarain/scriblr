@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 import type { Handedness, HuiPanel } from '../../interfaceShellTypes'
 import type { HelperChats } from './helper/useHelperChats'
 import ChatsSection from './helper/ChatsSection'
-import InboxSection from './helper/inbox/InboxSection'
 import SettingsSection from './helper/SettingsSection'
 import QueueSection from './helper/QueueSection'
-import { ChatBubblesIcon, GearIcon, HelpIcon, InboxIcon, QueueIcon } from '../icons'
+import { ChatBubblesIcon, GearIcon, HelpIcon, QueueIcon } from '../icons'
 import HelpTile from '../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../channels/helpTargets'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -16,20 +15,20 @@ interface HUIProps {
   panel: HuiPanel
 }
 
-// The Helper panel (400px wide) as tiles, each a console of its own: Inbox, Queue, the selected chat's conversation
-// while one is open, Help, and Settings last (the global tile, components/tiles/TileArea.tsx). The sidebar divider's buttons choose
-// which tile is open (a selected chat head always wins); the tab bar opens the others.
+// The Helper panel (400px wide) as tiles, each a console of its own: Queue, the selected chat's conversation while one is
+// open, Help, and Settings last (the global tile, components/tiles/TileArea.tsx). HUI's buttons in the band under the header
+// (HuiMini.tsx) choose which tile is open (a selected chat head always wins); the tab bar opens the others. The Inbox is in
+// AUI's Office (its Desk tile).
 function HUI({ side, helper, panel }: HUIProps) {
   const chatOpen = helper.selectedChatId != null
   const wanted: string = chatOpen ? 'chat' : panel
-  const ids = chatOpen ? ['inbox', 'queue', 'chat', 'help', 'settings'] : ['inbox', 'queue', 'help', 'settings']
-  // What the user opened or minimized inside the panel; it gives way whenever the sidebar buttons change the choice.
+  const ids = chatOpen ? ['queue', 'chat', 'help', 'settings'] : ['queue', 'help', 'settings']
+  // What the user opened or minimized inside the panel; it gives way whenever the band's buttons change the choice.
   const [minimized, setMinimized] = useState<string[] | null>(null)
   useEffect(() => { setMinimized(null) }, [wanted])
   const hidden = minimized ?? ids.filter(id => id !== wanted)
 
   const tiles: AreaTile[] = [
-    { id: 'inbox', title: 'Inbox', Icon: InboxIcon, children: <InboxSection /> },
     { id: 'queue', title: 'Queue', Icon: QueueIcon, children: <QueueSection /> },
   ]
   if (chatOpen) tiles.push({ id: 'chat', title: 'Conversation', Icon: ChatBubblesIcon, children: <ChatsSection helper={helper} /> })

@@ -1,8 +1,8 @@
 # Feedback: from the Help tile to voting
 
-How a writer's feedback reaches the people who decide on it, in as few steps as possible. A writer writes it as a **statement** (a subject in the [channel list](../Channels/README.md) and a verb, such as *Fix Writer > Draft > Draft*) in the Help tile of the console they are in. A helper **checks** it in the Inbox. In the Office it is **voted on** (advice only) and **corrected** by Channel Management. The Project Plan's planner then accepts or vetoes it. Messages with the same subject and verb are **one statement**: they share its votes and are listed under it.
+How a writer's feedback reaches the people who decide on it, in as few steps as possible. A writer writes it as a **statement** (a subject in the [channel list](../Channels/README.md) and a verb, such as *Fix Writer > Draft > Draft*) in the Help tile of the console they are in. A checker **checks** it in the Inbox, a tab of the Office's Desk (AUI). In the Office it is then **voted on** (advice only) and **corrected** by Channel Management. The Project Plan's planner then accepts or vetoes it. Messages with the same subject and verb are **one statement**: they share its votes and are listed under it.
 
-Code: `support/` (the chat stores and API: `supportStores.ts`, `supportApi.ts`, `supportTypes.ts`); `feedback/` (the shared pieces: `StatementCard`, `MessageCard`, `VoteControl`, `ChannelPicker`, `ToneFaces`, `ActingAs`, `MyFeedback`, the stores `staffStore.ts` and `mineStore.ts`, `feedbackApi.ts`, `feedbackLogic.ts`, `feedback.scss`); the Help tile `components/help/HelpTile.tsx`; the Inbox `helper/inbox/` (`InboxSection`, `CheckView`, `ConfigurationView`); the Office pages `admin/office/StatementPages.tsx`; Assignment `admin/RoleAssignment.tsx`; the user's dashboard `user/UserNotifications.tsx`. Storage: `feedback.json` and `support.json` in the app's data folder (backend `storage/feedback.py` and `storage/support.py`, API `api/feedback.py` and `api/support.py`).
+Code: `support/` (the chat stores and API: `supportStores.ts`, `supportApi.ts`, `supportTypes.ts`); `feedback/` (the shared pieces: `StatementCard`, `MessageCard`, `VoteControl`, `ChannelPicker`, `ToneFaces`, `ActingAs`, `MyFeedback`, the stores `staffStore.ts` and `mineStore.ts`, `feedbackApi.ts`, `feedbackLogic.ts`, `feedback.scss`); the Help tile `components/help/HelpTile.tsx`; the Inbox `admin/office/inbox/` (`InboxSection`, `CheckView`, `ConfigurationView`); the Office pages `admin/office/StatementPages.tsx`; Assignment `admin/RoleAssignment.tsx`; the user's dashboard `user/UserNotifications.tsx`. Storage: `feedback.json` and `support.json` in the app's data folder (backend `storage/feedback.py` and `storage/support.py`, API `api/feedback.py` and `api/support.py`).
 
 ## The Help tile (every console)
 
@@ -33,9 +33,9 @@ Four icon tabs (`role="tablist"`), each with an `aria-label` and a title:
 
 The Writer's levels, the Draft, Learning, every Reader page and the Admin, User and Helper panels each have one.
 
-## The Inbox (Helper)
+## The Inbox (Office > Desk)
 
-**Check** (`CheckboxIcon`, with the count) lists the messages nobody has checked yet, oldest first. For each one the helper:
+The first tab of the Office's **Desk** tile, before Voting. **Check** (`CheckboxIcon`, with the count) lists the messages nobody has checked yet, oldest first. For each one the checker:
 
 - confirms or corrects its subject and verb;
 - sets its tone (Pleasant, Unpleasant, Mixed, Neutral);

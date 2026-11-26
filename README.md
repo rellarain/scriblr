@@ -828,9 +828,9 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   edge (`Sidebar.tsx`'s `AuiResize`, between it and HUI or the page; the drag direction flips with handedness), snapping to
   400px columns and remembered as `scriblr.admin.width`; `min()` in the CSS (`--aui-w`, `App.tsx`) keeps it from exceeding
   the rest of the screen. Below 400px of its own width every tile is a row.
-- **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings consoles (plus the open chat's Conversation; Settings stays last) in the 400px panel.
+- **Helper panel** (`HUI.tsx`): Queue and Settings consoles (plus the open chat's Conversation and Help; Settings stays last) in the 400px panel.
   The Helper button of the header's interface container turns HUI on: its mini form (`HuiMini.tsx`: the queue meter, the
-  chat heads, New chat, Inbox and Settings) sits in the band under the header (`ShellBand.tsx`, 40px, shown while a side
+  chat heads, New chat and Settings) sits in the band under the header (`ShellBand.tsx`, 40px, shown while a side
   interface is on; the page and the sidebar start below it, `--shell-top`). Its buttons open the panel on that tile (the
   grid's `minimized` list is controlled here), and pressing the open one folds the panel back into the band; the tab bar
   opens the others until the buttons change the choice again. There is no sidebar divider.
@@ -1066,7 +1066,8 @@ mounted it; it remains in git history.
   admins each queue's people, chats in progress and waiting users, with the levels
   its channel support set), **Settings** (next week's helper hours; this week's are
   fixed; admins set theirs on Admin > Dashboard > Schedule, and the Office's Department
-  and Team tiles show everyone's), Help, and the **Inbox**, which is backed by the API. Writers send
+  and Team tiles show everyone's) and Help. The **Inbox**, backed by the API, is the first tab of
+  Admin > Office > Desk. Writers send
   feedback from any console's **Help tile** (`components/help/HelpTile.tsx`) as a
   statement: a subject in the channel list, a verb, their words and how they feel
   (a smile, a frown, both or neither). The Inbox's **Check** confirms or corrects

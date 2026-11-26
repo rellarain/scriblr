@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { CloseIcon, PlusIcon, TrashIcon } from '../../../icons'
-import type { StaffBundle, VerbCategory } from '../../../../feedback/feedbackTypes'
+import { CloseIcon, PlusIcon, TrashIcon } from '../../../../icons'
+import type { StaffBundle, VerbCategory } from '../../../../../feedback/feedbackTypes'
 
 // Inbox configuration: the verb categories and their keywords (shared; managed with the Channel manager role on
 // Helper > Inbox). A message's words that match a keyword are highlighted as suggested verbs.

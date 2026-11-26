@@ -1,6 +1,4 @@
-import { GearIcon, InboxIcon, PlusIcon } from './assets/icons'
-import { useStaff } from './feedback/staffStore'
-import { toCheck } from './feedback/feedbackLogic'
+import { GearIcon, PlusIcon } from './assets/icons'
 import type { HuiPanel } from './interfaceShellTypes'
 import type { HelperConversation } from './assets/Interfaces/helper/helperTypes'
 
@@ -25,8 +23,7 @@ interface HuiMiniProps {
 const USER_UNIT_WIDTH = 5
 const MAX_FIXED_USERS = 30
 
-// HUI's mini form, in the band under the header while HUI is on: the queue meter, the chats, New chat, the Inbox and
-// Settings. A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
+// HUI's mini form, in the band under the header while HUI is on: the queue meter, the chats, New chat and Settings. A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
 function HuiMini({
   conversations, selectedChatId, onActivateChats, onCreateChat, panel, onSelectPanel, expanded,
   activeAdminCount, activeStandardCount, pendingAdminCount, pendingStandardCount,
@@ -35,10 +32,6 @@ function HuiMini({
   const usesFixedWidth = totalChatCount < MAX_FIXED_USERS
   const isSettingsActive = expanded && panel === 'settings' && selectedChatId == null
   const isQueueActive = expanded && panel === 'queue' && selectedChatId == null
-  const isInboxActive = expanded && panel === 'inbox' && selectedChatId == null
-  // Feedback waiting to be checked, for a staff member who checks it.
-  const feedback = useStaff()
-  const needsVote = feedback.bundle?.can.check ? toCheck(feedback.bundle).length : 0
 
   function segmentStyle(count: number) {
     return usesFixedWidth
@@ -101,16 +94,6 @@ function HuiMini({
         onClick={onCreateChat}
       >
         <PlusIcon size={21} />
-      </button>
-
-      <button
-        type="button"
-        className={isInboxActive ? 'bandToggle bandToggle--active' : 'bandToggle'}
-        aria-pressed={isInboxActive} aria-label={needsVote > 0 ? `Inbox, ${needsVote} to check` : 'Inbox'} title={needsVote > 0 ? `Inbox: ${needsVote} to check` : 'Inbox'}
-        onClick={() => onSelectPanel('inbox')}
-      >
-        <InboxIcon size={21} />
-        {needsVote > 0 && <span className="bandBadge" aria-hidden="true">{needsVote > 99 ? '99+' : needsVote}</span>}
       </button>
 
       <button

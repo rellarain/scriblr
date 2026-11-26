@@ -1,7 +1,7 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
 import {
   BarChartIcon, BriefcaseIcon, BuildingIcon, CalendarIcon, ChevronDownIcon, ChevronUpIcon, ClockIcon, CloseIcon, EnvelopeIcon, ExplicatingIcon,
-  FlagIcon, GraduationCapIcon, HistoryIcon, InfoIcon, LibraryIcon, LineChartIcon, PeopleIcon, PlusIcon, QueueIcon, HeartIcon, RestoreIcon,
+  FlagIcon, GraduationCapIcon, HistoryIcon, InboxIcon, InfoIcon, LibraryIcon, LineChartIcon, PeopleIcon, PlusIcon, QueueIcon, HeartIcon, RestoreIcon,
   ShieldIcon, SortingIcon, TeamIcon, ToningIcon, TrashIcon, VotingIcon, type IconProps,
 } from '../../../icons'
 import { useChannels } from '../../../../channels/channelStore'
@@ -15,6 +15,7 @@ import WeekTable from '../../../../support/WeekTable'
 import { CURRENT_USER } from '../../../../userSeed'
 import RoleAssignment from '../RoleAssignment'
 import { ChannelManagementPage, ExplicationPage, TonePage, VotingPage } from './StatementPages'
+import InboxSection from './inbox/InboxSection'
 import {
   AddDepartment, AllotmentTable, DepartmentRow, Frame, HireForm, KIND_LABEL, LeaderSelect, RosterTables, TIER_LABEL, TeamList, TrainingPage, placeOf,
 } from './StaffPages'
@@ -177,6 +178,8 @@ export function ChannelTile({ host }: Host) {
 export function DeskTile({ host }: Host) {
   return (
     <TabbedTile id="desk" label="Desk" host={host} tabs={[
+      // Feedback arrives here first (from writers' Help tiles and helpers' Outboxes) to be checked, then goes on to Voting.
+      tab('inbox', 'Inbox', InboxIcon, () => <InboxSection />),
       tab('voting', 'Voting', VotingIcon, () => <VotingPage />),
       tab('toning', 'Toning', ToningIcon, () => <TonePage />),
       tab('explication', 'Explication', ExplicatingIcon, () => <ExplicationPage />),

@@ -26,7 +26,7 @@ const helper = { conversations: [], selectedChatId: null } as unknown as HelperC
 
 const baseProps = {
   helper,
-  panel: 'inbox' as const,
+  panel: 'queue' as const,
   auiOpen: true,
   isAdmin: true,
 }

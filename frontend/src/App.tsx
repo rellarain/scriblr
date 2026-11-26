@@ -61,12 +61,12 @@ function App() {
   // Dragged from AUI's own outer edge (Sidebar.tsx's AuiResize), snapped to
   // AUI_COLUMN_W-wide columns; remembered like the Writer sidebar's own width.
   const [auiWidth, setAuiWidth] = useStoredState<number>('scriblr.admin.width', 2 * AUI_COLUMN_W)
-  const [huiPanel, setHuiPanel] = useState<HuiPanel>('inbox')
+  const [huiPanel, setHuiPanel] = useState<HuiPanel>('queue')
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false)
   const helper = useHelperChats()
 
-  // Re-clicking whatever's already open collapses the sidebar instead of
-  // re-selecting it -- applies uniformly to Settings/Queue/Inbox and every
+  // Re-clicking whatever's already open folds HUI's panel instead of
+  // re-selecting it -- applies uniformly to Settings/Queue and every
   // individual chat head, so no separate expand/collapse button is needed.
   function handleActivateChats(chatId: string) {
     if (huiExpanded && helper.selectedChatId === chatId) {
@@ -74,9 +74,9 @@ function App() {
       return
     }
     setHuiExpanded(true)
-    // Reset to Inbox so backing out of the chat later lands on the
-    // default panel rather than resuming a stale Settings/Queue view.
-    setHuiPanel('inbox')
+    // Reset to Queue so backing out of the chat later lands on the
+    // default panel rather than resuming a stale Settings view.
+    setHuiPanel('queue')
     helper.selectChat(chatId)
   }
 
@@ -87,7 +87,7 @@ function App() {
     }
     setHuiExpanded(true)
     setHuiPanel(panel)
-    // Settings/Queue/Inbox replace the chat view, so close whatever's open
+    // Settings/Queue replace the chat view, so close whatever's open
     // -- otherwise the selected-chat view would keep taking priority over them.
     helper.selectChat(null)
   }
@@ -97,7 +97,7 @@ function App() {
   function handleCreateChat() {
     helper.createConversation()
     setHuiExpanded(true)
-    setHuiPanel('inbox')
+    setHuiPanel('queue')
   }
 
   // The header's HUI toggle: on shows its mini form in the band (its panel stays folded until a console is chosen there);

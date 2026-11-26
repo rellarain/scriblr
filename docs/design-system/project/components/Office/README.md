@@ -12,7 +12,7 @@ Code: `admin/office/OfficeTiles.tsx` (one component per tile), `admin/office/Tab
 | Department | `BuildingIcon` | department | Details (name, director, counts) · Roster · Schedule (everyone's helper time) · Analytics · Teams (add, rename, set the manager, delete an empty one) |
 | Team | `PeopleIcon` | team | Assignment (the roles of its admins) · Allotment (its people's helper hours) · Schedule (everyone's helper time) · Performance · Members (add, take off, the manager) · Applications |
 | Channel | `FilterIcon` | console | Queue analytics · Resource analytics · Helper-checked feedback (Channel Management for that console) |
-| Desk | `DeskIcon` | none | Voting · Toning (each message's tone) · Explication (what each message is about and what should happen) |
+| Desk | `DeskIcon` | none | Inbox (feedback to check, and the verbs; see [Feedback](../Feedback/README.md)) · Voting · Toning (each message's tone) · Explication (what each message is about and what should happen) |
 | Admin/Helper | `ClipboardIcon` | staff member | Training · Performance · Activity · Flags · Promote · Demote · Term · Allot hours |
 | User | `UserIcon` | user (the writer and whoever asked for support) | Engagement · Learning · Hire |
 

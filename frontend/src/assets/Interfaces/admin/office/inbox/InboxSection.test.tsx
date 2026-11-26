@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { __resetStaffForTests, getStaffState } from '../../../../feedback/staffStore'
-import { feedbackBackend } from '../../../../test/feedbackBackend'
+import { __resetStaffForTests, getStaffState } from '../../../../../feedback/staffStore'
+import { feedbackBackend } from '../../../../../test/feedbackBackend'
 import InboxSection from './InboxSection'
 
 let backend: ReturnType<typeof feedbackBackend>

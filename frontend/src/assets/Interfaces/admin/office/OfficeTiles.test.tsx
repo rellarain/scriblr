@@ -25,8 +25,8 @@ const statements = () => screen.getAllByRole('region').map(r => r.getAttribute('
 describe('the Office tiles', () => {
   it('puts the tabs in the title bar, opens one by click or arrow keys, and remembers the open one', async () => {
     const { unmount } = render(<DeskTile host={host} />)
-    expect(within(tabs()).getAllByRole('tab').map(t => t.getAttribute('aria-label'))).toEqual(['Voting', 'Toning', 'Explication'])
-    expect(within(tabs()).getByRole('tab', { name: 'Voting' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(tabs()).getAllByRole('tab').map(t => t.getAttribute('aria-label'))).toEqual(['Inbox', 'Voting', 'Toning', 'Explication'])
+    expect(within(tabs()).getByRole('tab', { name: 'Inbox' })).toHaveAttribute('aria-selected', 'true')
     // the tabs are not in the body
     expect(screen.getByRole('tabpanel').contains(tabs())).toBe(false)
     openTab('Toning')
@@ -38,6 +38,12 @@ describe('the Office tiles', () => {
     unmount()
     render(<DeskTile host={host} />)
     expect(within(tabs()).getByRole('tab', { name: 'Explication' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it("Desk's Inbox is where feedback is checked before it goes to Voting", async () => {
+    render(<DeskTile host={host} />)
+    expect(await screen.findByRole('navigation', { name: 'Inbox sections' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Inbox sections' })).getAllByRole('button').map(b => b.getAttribute('title'))).toEqual(['Check', 'Verbs'])
   })
 
   it("Desk's Toning sets a message's tone and its Explication what it is about and what should happen", async () => {

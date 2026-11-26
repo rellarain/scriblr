@@ -25,7 +25,7 @@ import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConso
 import MapsConfigConsole from '../assets/Interfaces/admin/maps/MapsConfigConsole'
 import ChannelsConsole from '../assets/Interfaces/admin/channels/ChannelsConsole'
 import { ChannelManagementPage, VotingPage } from '../assets/Interfaces/admin/office/StatementPages'
-import InboxSection from '../assets/Interfaces/helper/inbox/InboxSection'
+import InboxSection from '../assets/Interfaces/admin/office/inbox/InboxSection'
 import ChatsSection from '../assets/Interfaces/helper/ChatsSection'
 import QueueSection from '../assets/Interfaces/helper/QueueSection'
 import SettingsSection from '../assets/Interfaces/helper/SettingsSection'
@@ -329,7 +329,7 @@ function FeedbackCard({ view }: { view: string }) {
   if (view === 'conversation') return <HelperChatCard />
   if (view === 'queue') return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex' }}><QueueSection /></div></div>
   if (view === 'schedule') return <ScheduleCard />
-  if (view === 'inbox') return <div className="hUI" style={{ position: 'relative', width: 'min(400px, 100%)', height: '100%' }}><div className="hUIMain" style={{ height: '100%', display: 'flex' }}><InboxSection /></div></div>
+  if (view === 'inbox') return pane('aUI', 'min(520px, 100%)', <InboxSection />)
   if (view === 'voting') return pane('aUI', '100%', <VotingPage />)
   if (view === 'channels') return pane('aUI', '100%', <ChannelManagementPage />)
   return pane('aUI', 'min(520px, 100%)', <UserNotifications />)

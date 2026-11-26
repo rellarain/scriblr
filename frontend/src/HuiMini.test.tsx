@@ -2,15 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import HuiMini from './HuiMini'
 
-// The Inbox's count comes from the staff store; it is covered by InboxSection's own tests.
-vi.mock('./feedback/staffStore', () => ({ useStaff: () => ({ bundle: null, status: 'ready', error: null }) }))
-
 const props = {
   conversations: [{ id: 'c1', label: 'Ada' }, { id: 'c2', label: 'Ben' }],
   selectedChatId: null,
   onActivateChats: vi.fn(),
   onCreateChat: vi.fn(),
-  panel: 'inbox' as const,
+  panel: 'settings' as const,
   onSelectPanel: vi.fn(),
   expanded: false,
   activeAdminCount: 1,
@@ -20,10 +17,10 @@ const props = {
 }
 
 describe("HuiMini, HUI's part of the band", () => {
-  it('lays out the queue meter, the chats, New chat, the Inbox and Settings, in that order', () => {
+  it('lays out the queue meter, the chats, New chat and Settings, in that order (the Inbox is in the Office)', () => {
     render(<HuiMini {...props} />)
     expect(screen.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual([
-      'Queue console: 3 chats in progress (1 escalated), 3 waiting for you (0 escalated)', 'Ada', 'Ben', 'New chat', 'Inbox', 'Settings',
+      'Queue console: 3 chats in progress (1 escalated), 3 waiting for you (0 escalated)', 'Ada', 'Ben', 'New chat', 'Settings',
     ])
   })
 
@@ -46,7 +43,7 @@ describe("HuiMini, HUI's part of the band", () => {
     expect(screen.getByRole('button', { name: /^Queue console/ })).toHaveAttribute('aria-pressed', 'true')
     rerender(<HuiMini {...props} expanded selectedChatId="c1" />)
     expect(screen.getByRole('button', { name: 'Ada' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Inbox' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('gives each chat a 5px block of the meter below 30 chats, and shares the width out from 30 on', () => {

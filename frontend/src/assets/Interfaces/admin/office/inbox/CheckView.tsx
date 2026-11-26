@@ -1,10 +1,10 @@
 import { useRef, type KeyboardEvent } from 'react'
-import { CheckIcon } from '../../../icons'
-import ChannelPicker from '../../../../feedback/ChannelPicker'
-import { MessageCard, type MessageActions } from '../../../../feedback/MessageCard'
-import { TonePicker } from '../../../../feedback/ToneFaces'
-import { toCheck } from '../../../../feedback/feedbackLogic'
-import type { MessageEdit, StaffBundle, StaffMessage, Tone } from '../../../../feedback/feedbackTypes'
+import { CheckIcon } from '../../../../icons'
+import ChannelPicker from '../../../../../feedback/ChannelPicker'
+import { MessageCard, type MessageActions } from '../../../../../feedback/MessageCard'
+import { TonePicker } from '../../../../../feedback/ToneFaces'
+import { toCheck } from '../../../../../feedback/feedbackLogic'
+import type { MessageEdit, StaffBundle, StaffMessage, Tone } from '../../../../../feedback/feedbackTypes'
 
 // The Inbox's Check: every message no helper has checked yet, oldest first. The writer already said what it is about and what
 // should happen; the helper confirms or corrects both, reads its tone, may ask the writer a question or leave staff a comment,
