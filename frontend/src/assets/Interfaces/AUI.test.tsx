@@ -143,3 +143,31 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(tile('office')).toBeNull()
   })
 })
+
+describe("AUI's modes (lib/auiSize.ts)", () => {
+  it('small shows one console with one of its tiles; max shows every console and tile', () => {
+    const { unmount } = render(<AUI mode="small" />)
+    expect(SECTIONS.filter(id => tile(id))).toEqual(['dashboard'])
+    expect(tile('notifications')).toBeTruthy()
+    expect(tile('dashboardSchedule')).toBeNull()
+    unmount()
+    render(<AUI mode="max" />)
+    expect(SECTIONS.filter(id => tile(id))).toEqual(SECTIONS)
+    expect(tile('dashboardSchedule')).toBeTruthy()
+  })
+
+  it('medium holds each console to one tile while several are open, and shows a lone console with all its tiles', async () => {
+    const user = userEvent.setup()
+    render(<AUI mode="medium" />)
+    expect(SECTIONS.filter(id => tile(id))).toEqual(SECTIONS)
+    expect(tile('officeSite')).toBeTruthy()
+    expect(tile('officeDesk')).toBeNull()
+    // Turn every console but the Office off in AUI's rail.
+    const rail = screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' })
+    for (const name of ['Dashboard', 'Project Plan', 'Organizer', 'Configuration', 'Designer', 'Resources', 'Instructor', 'Help']) {
+      await user.click(within(rail).getByRole('button', { name }))
+    }
+    expect(SECTIONS.filter(id => tile(id))).toEqual(['office'])
+    for (const id of ['officeSite', 'officeDepartment', 'officeTeam', 'officeChannel', 'officeDesk', 'officeStaff', 'officeUser']) expect(tile(id)).toBeTruthy()
+  })
+})

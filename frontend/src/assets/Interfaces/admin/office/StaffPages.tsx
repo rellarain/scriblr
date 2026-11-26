@@ -7,6 +7,7 @@ import '../../../../feedback/feedback.scss'
 import { staffApi } from '../../../../staff/staffApi'
 import type { Person, PersonKind, Priority, StaffView } from '../../../../staff/staffTypes'
 import { changeRoster, clearRosterError, loadRoster, useRoster } from '../../../../staff/rosterStore'
+import { setBreakRate, useQueues } from '../../../../support/supportStores'
 import './staff.scss'
 
 // Admin > Office's staff pages (Department Roster, Department Details, Allotment, Hire/Term Admin, Monitor Training) and
@@ -271,10 +272,31 @@ const step = (h: number, dir: -1 | 1, big: boolean) => {
   return Math.min(24 * 90, Math.max(1, h + dir * by))
 }
 
+// The break allowance: minutes of break a staff member earns for each hour of helper time worked (AUI's break meter; backend
+// storage/queues.py). 0 to 30, a minute a click, 5 with Shift.
+function BreakAllowance() {
+  const { view, error } = useQueues()
+  const rate = view?.me.work?.breakRate
+  if (rate === undefined) return error ? <p className="fbError" role="alert">{error}</p> : null
+  const to = (by: number) => Math.max(0, Math.min(30, rate + by))
+  return (
+    <div className="stBreaks">
+      <h3 className="stSubhead">Breaks</h3>
+      <div className="stStep" role="group" aria-label="Break earned for each hour worked">
+        <button type="button" className="fbIconBtn" aria-label="Less break an hour" title="Less (Shift: by 5)" disabled={rate <= 0} onClick={e => void setBreakRate(to(e.shiftKey ? -5 : -1))}><ChevronLeftIcon size={12} /></button>
+        <span className="stStepValue" aria-live="polite">{rate} min an hour worked</span>
+        <button type="button" className="fbIconBtn" aria-label="More break an hour" title="More (Shift: by 5)" disabled={rate >= 30} onClick={e => void setBreakRate(to(e.shiftKey ? 5 : 1))}><ChevronRightIcon size={12} /></button>
+      </div>
+      {error && <p className="fbError" role="alert">{error}</p>}
+    </div>
+  )
+}
+
 export function SlaPage() {
   return (
     <Frame label="SLA">
       {view => (
+        <>
         <table className="stTable">
           <thead><tr><th scope="col">Priority</th><th scope="col">Time to do it, from when it is assigned</th></tr></thead>
           <tbody>
@@ -292,6 +314,8 @@ export function SlaPage() {
             ))}
           </tbody>
         </table>
+        <BreakAllowance />
+        </>
       )}
     </Frame>
   )

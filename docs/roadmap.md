@@ -43,11 +43,11 @@ WUI, UUI, VUI, HUI and AUI completely built out with their version 1 functionali
 
 Tasks:
 - [ ] Version 1 interview, one interface at a time: WUI, UUI, VUI, HUI, AUI.
-- [ ] Header: one container for the interface toggles (AUI, HUI | WUI, RUI, LUI) beside the sky toggle.
-- [ ] The band under the header for the side interfaces' mini forms, in place of the 40px side divider: HUI's Queue, chats, New chat, Outbox and Settings; AUI's work and break meters.
-- [ ] AUI: the Inbox (Check and Verbs) as a tab of the Office's Desk.
-- [ ] HUI: the Outbox, where feedback confirmed in a chat is completed and sent to the Office Inbox.
-- [ ] AUI: four modes by resizing (mini, small, medium, max), and the work and break meters.
+- [x] Header: one container for the interface toggles (AUI, HUI | WUI, RUI, LUI) beside the sky toggle.
+- [x] The band under the header for the side interfaces' mini forms, in place of the 40px side divider: HUI's Queue, chats, New chat, Outbox and Settings; AUI's work and break meters.
+- [x] AUI: the Inbox (Check and Verbs) as a tab of the Office's Desk.
+- [x] HUI: the Outbox, where feedback confirmed in a chat is completed and sent to the Office Inbox.
+- [x] AUI: four modes by resizing (mini, small, medium, max), and the work and break meters, with the break allowance on Configuration > SLA.
 
 Follow-ups:
 - [ ] The help channel is still named "Training". Its id comes from its name, so renaming it needs an explicit id plus a migration that renames the node by id.
@@ -78,3 +78,4 @@ More items will be added.
 ## Changelog
 
 - 2026-11-26: First version: the five phases, the version rule, and the phase 1 tasks for the header and the side interfaces.
+- 2026-11-26: The header container, the band, the Office Inbox, the HUI Outbox, and AUI's modes and meters are done.

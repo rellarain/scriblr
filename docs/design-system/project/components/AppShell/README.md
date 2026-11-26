@@ -20,9 +20,22 @@ A 40px row under the header, across the whole width, shown while a side interfac
 
 - **HUI** (`HuiMini.tsx`): the **queue meter** (150 x 30, no icon: one segment per slice of chats, escalated and first-tier, in progress and waiting; below 30 chats each is a 5px block from the left edge, from 30 on they share the width), the **chat heads**, **New chat**, the **Outbox** (with the count to send) and **Settings**. (The Inbox is a tab of AUI's Office > Desk.) A button opens HUI's panel on that console; pressing the open one again folds the panel back into the band.
 
+- **AUI** (`AuiMini.tsx`, administrators): today's **work** meter (done against what remains of the helper time scheduled) and **break** meter (used against earned; past it, the fill is the alert), each 150px with its words above it, and **Start a break** / **End the break** (`PauseIcon` / `PlayIcon`, pressed while on one; off shift there is no break). With no helper time today it says so. The fills are the fitted tone marks (`--tone-yes-mark`, `--tone-no-mark`), audited at 3:1 on the sidebar surface.
+
+## AUI's modes
+
+AUI is resized like tiles and consoles: dragging its inner edge (an 8px handle beside the sidebar, kept on the screen at both ends) snaps through four modes (`lib/auiSize.ts`). The arrow keys step a column; a double-click goes back to small.
+
+| Mode | Panel | Shows |
+|---|---|---|
+| **Mini** | none | only its part of the band (the meters) |
+| **Small** | one 400px column | one console, one tile (the one opened last, else the one last used, else the first) |
+| **Medium** | two columns or more | one console with all its tiles, or, once several consoles are open, each with one tile |
+| **Max** | all the width HUI leaves | every console and tile as laid out |
+
 ## Sidebar
 
-On the left or the right, as the user prefers (handedness), below the header and the band: HUI's 400px panel, opened from the band, and for administrators AUI's panel, outermost, in multiples of 400px, dragged from its inner edge. When a panel opens the page narrows; nothing covers the header. There is no divider: the side interfaces' buttons are in the header and the band.
+On the left or the right, as the user prefers (handedness), below the header and the band: HUI's 400px panel, opened from the band, and for administrators AUI's panel, outermost, at its mode's width (above). When a panel opens the page narrows; nothing covers the header. There is no divider: the side interfaces' buttons are in the header and the band.
 
 ## Tokens
 

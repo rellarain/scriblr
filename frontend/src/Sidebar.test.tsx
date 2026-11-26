@@ -1,16 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import Sidebar from './Sidebar'
+import Sidebar, { AuiResize } from './Sidebar'
 import { __resetSettingsForTests } from './settings/settingsStore'
 import type { HelperChats } from './assets/Interfaces/helper/useHelperChats'
 import { mockFetch } from './test/mockFetch'
+import { snapAui, auiWidth, type AuiSize } from './lib/auiSize'
 
-// This file exercises Sidebar's own layout (AUI mounted only for admins, the resize
-// handle's placement and drag direction) -- the panels' own content is covered by
-// AUI.test.tsx/HUI.test.tsx, and mocking it out here keeps this file from also
-// needing their data dependencies (feedback store, chats, etc.) set up.
-vi.mock('./assets/Interfaces/AUI', () => ({ default: () => <div>AUI</div> }))
+// This file exercises Sidebar's own layout (AUI mounted only for admins, given its mode) and AUI's resize handle (its drag
+// direction, snapping through the modes, its keys) -- the panels' own content is covered by AUI.test.tsx/HUI.test.tsx, and
+// mocking it out here keeps this file from also needing their data dependencies (feedback store, chats, etc.) set up.
+vi.mock('./assets/Interfaces/AUI', () => ({ default: ({ mode }: { mode: string }) => <div>AUI {mode}</div> }))
 vi.mock('./assets/Interfaces/HUI', () => ({ default: () => <div>HUI</div> }))
 
 beforeEach(() => {
@@ -23,85 +23,70 @@ beforeEach(() => {
 })
 
 const helper = { conversations: [], selectedChatId: null } as unknown as HelperChats
-
-const baseProps = {
-  helper,
-  panel: 'queue' as const,
-  auiOpen: true,
-  isAdmin: true,
-}
+const handle = () => screen.getByRole('separator', { name: 'Resize Admin panel' })
+const move = (dx: number) => fireEvent(handle(), Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: dx }))
 
 describe('Sidebar', () => {
-  it('holds the panels only: their console buttons are in the band under the header', () => {
-    render(<Sidebar side="right" {...baseProps} auiWidth={800} onSetAuiWidth={vi.fn()} />)
-    expect(screen.getByText('AUI')).toBeTruthy()
+  it('holds the panels only (their console buttons are in the band under the header), AUI for admins, in its mode', () => {
+    const { rerender } = render(<Sidebar side="right" helper={helper} panel="queue" auiMode="small" isAdmin />)
+    expect(screen.getByText('AUI small')).toBeTruthy()
     expect(screen.getByText('HUI')).toBeTruthy()
     expect(screen.queryByRole('navigation', { name: 'Sidebar controls' })).toBeNull()
+    rerender(<Sidebar side="right" helper={helper} panel="queue" auiMode="small" isAdmin={false} />)
+    expect(screen.queryByText(/^AUI/)).toBeNull()
   })
+})
 
-  it('offers no Admin resize handle unless the panel is both admin and open', () => {
-    const { rerender } = render(<Sidebar side="right" {...baseProps} auiOpen={false} auiWidth={800} onSetAuiWidth={vi.fn()} />)
-    expect(screen.queryByRole('separator', { name: 'Resize Admin panel' })).toBeNull()
-    rerender(<Sidebar side="right" {...baseProps} isAdmin={false} auiWidth={800} onSetAuiWidth={vi.fn()} />)
-    expect(screen.queryByRole('separator', { name: 'Resize Admin panel' })).toBeNull()
-    rerender(<Sidebar side="right" {...baseProps} auiWidth={800} onSetAuiWidth={vi.fn()} />)
-    expect(screen.getByRole('separator', { name: 'Resize Admin panel' })).toBeTruthy()
-  })
+const handleProps = { width: 800, label: 'Medium, 2 columns', onWidthChange: vi.fn(), onStep: vi.fn(), onReset: vi.fn() }
 
+describe("AUI's resize handle", () => {
   it('drags wider toward the left for a right-handed layout (AUI sits on the outer, right edge)', () => {
-    const onSetAuiWidth = vi.fn()
-    render(<Sidebar side="right" {...baseProps} auiWidth={800} onSetAuiWidth={onSetAuiWidth} />)
-    const handle = screen.getByRole('separator', { name: 'Resize Admin panel' })
-    fireEvent.pointerDown(handle, { pointerId: 1 })
-    fireEvent(handle, Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: -30 }))
-    expect(onSetAuiWidth).toHaveBeenCalledWith(830)
+    const onWidthChange = vi.fn()
+    render(<AuiResize side="right" {...handleProps} onWidthChange={onWidthChange} />)
+    fireEvent.pointerDown(handle(), { pointerId: 1 })
+    move(-30)
+    expect(onWidthChange).toHaveBeenCalledWith(830)
+    expect(handle()).toHaveAttribute('aria-valuetext', 'Medium, 2 columns')
   })
 
   it('drags wider toward the right for a left-handed layout (AUI sits on the outer, left edge)', () => {
-    const onSetAuiWidth = vi.fn()
-    render(<Sidebar side="left" {...baseProps} auiWidth={800} onSetAuiWidth={onSetAuiWidth} />)
-    const handle = screen.getByRole('separator', { name: 'Resize Admin panel' })
-    fireEvent.pointerDown(handle, { pointerId: 1 })
-    fireEvent(handle, Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: 30 }))
-    expect(onSetAuiWidth).toHaveBeenCalledWith(830)
+    const onWidthChange = vi.fn()
+    render(<AuiResize side="left" {...handleProps} onWidthChange={onWidthChange} />)
+    fireEvent.pointerDown(handle(), { pointerId: 1 })
+    move(30)
+    expect(onWidthChange).toHaveBeenCalledWith(830)
   })
 
-  it('a real slow drag -- many small movements, none crossing a column alone -- still adds up to a resize', () => {
-    // A bare mocked onSetAuiWidth (like the two tests above) can't catch a bug
-    // where each event's delta gets measured against an already-snapped width
-    // and rounds right back to it -- this wraps Sidebar in real state and
-    // mirrors App.tsx's actual snapping formula (AUI_COLUMN_W=400), so the
-    // handle's own committed width really does feed back into the next event,
-    // the way it does in the live app. The current width is surfaced via a
-    // data attribute so the test can watch it change.
+  it('a real slow drag snaps through the modes: medium, max, then all the way in to mini', () => {
+    // Wraps the handle in real state with App.tsx's snapping (lib/auiSize.ts), so each committed size feeds back into the next event,
+    // the way it does in the live app; no single small movement crosses a column alone.
     function Harness() {
-      const [width, setWidth] = useState(800)
-      const onSetAuiWidth = (w: number) => setWidth(Math.max(400, Math.round(w / 400) * 400))
+      const [size, setSize] = useState<AuiSize>({ mode: 'medium', columns: 2 })
       return (
-        <div data-testid="width" data-width={width}>
-          <Sidebar side="right" {...baseProps} auiWidth={width} onSetAuiWidth={onSetAuiWidth} />
+        <div data-testid="size" data-mode={size.mode} data-columns={size.columns}>
+          <AuiResize side="right" {...handleProps} width={auiWidth(size, 1700)} onWidthChange={raw => setSize(snapAui(raw, 1700))} />
         </div>
       )
     }
     render(<Harness />)
-    const handle = screen.getByRole('separator', { name: 'Resize Admin panel' })
-    fireEvent.pointerDown(handle, { pointerId: 1 })
-    // Eight events of -30px each (240px total) -- no single event is anywhere
-    // near the ~200px one event alone would need to cross a column boundary.
-    for (let i = 0; i < 8; i++) {
-      fireEvent(handle, Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: -30 }))
-    }
-    expect(screen.getByTestId('width').dataset.width).toBe('1200')
+    const at = () => [screen.getByTestId('size').dataset.mode, screen.getByTestId('size').dataset.columns]
+    fireEvent.pointerDown(handle(), { pointerId: 1 })
+    for (let i = 0; i < 8; i++) move(-30)
+    expect(at()).toEqual(['medium', '3'])
+    for (let i = 0; i < 20; i++) move(-30)
+    expect(at()).toEqual(['max', '4'])
+    for (let i = 0; i < 60; i++) move(30)
+    expect(at()).toEqual(['mini', '0'])
   })
 
-  it('nudges the width with the arrow keys, direction following handedness', () => {
-    const onSetAuiWidth = vi.fn()
-    render(<Sidebar side="right" {...baseProps} auiWidth={800} onSetAuiWidth={onSetAuiWidth} />)
-    const handle = screen.getByRole('separator', { name: 'Resize Admin panel' })
-    handle.focus()
-    fireEvent.keyDown(handle, { key: 'ArrowRight' })
-    expect(onSetAuiWidth).toHaveBeenCalledWith(760)
-    fireEvent.keyDown(handle, { key: 'ArrowLeft', shiftKey: true })
-    expect(onSetAuiWidth).toHaveBeenCalledWith(1200)
+  it('steps with the arrow keys, wider toward the panel side, and goes back to small on a double-click', () => {
+    const onStep = vi.fn(), onReset = vi.fn()
+    render(<AuiResize side="right" {...handleProps} onStep={onStep} onReset={onReset} />)
+    handle().focus()
+    fireEvent.keyDown(handle(), { key: 'ArrowLeft' })
+    fireEvent.keyDown(handle(), { key: 'ArrowRight' })
+    expect(onStep.mock.calls).toEqual([[1], [-1]])
+    fireEvent.doubleClick(handle())
+    expect(onReset).toHaveBeenCalledTimes(1)
   })
 })

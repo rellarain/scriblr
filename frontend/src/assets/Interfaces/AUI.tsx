@@ -11,7 +11,8 @@ import {
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
-import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
+import { consoleTile, useOneTile, useRailSlots } from '../../components/tiles/consoleTiles'
+import { oneTileEach, type AuiMode } from '../../lib/auiSize'
 
 // The article and quiz builder (and the Markdown renderer behind it) is loaded when its console is opened.
 const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole'))
@@ -208,13 +209,20 @@ function officeTile(key: AuiSubSectionKey, host: HTMLElement | null) {
 // The space between the tiles of an Admin console and round them, to the console's edge (the user, 2026-11-15).
 const AUI_GUTTER = 10
 
-function AUI() {
+// The consoles in AUI's rail, in order (the tiles below).
+const CONSOLE_IDS = [...SECTIONS.map(s => s.key), 'resources', 'instructor', 'help']
+
+// `mode` is AUI's size (lib/auiSize.ts): small shows one console with one tile; medium one console with its tiles, or, once
+// several consoles are open, each with one tile; max (the default, as in the design system's previews) everything as laid out.
+function AUI({ mode = 'max' }: { mode?: AuiMode }) {
   const slots = useRailSlots()
   const [rail, setRail] = useState<HTMLElement | null>(null)
+  const consoles = useOneTile('aui', CONSOLE_IDS)
+  const single = oneTileEach(mode, consoles.open.length)
   // Each section is a console holding its pages as tiles (their rail is in its title bar). Help is a console of its own, last in the panel's rail,
   // with each section's help under its name (the sections' own Help sub-pages).
   const tiles: AreaTile[] = SECTIONS.map(section => section.key === 'designer' ? designerTile(slots) : consoleTile(slots, {
-    panel: 'aui', id: section.key, title: section.label, Icon: section.Icon, gutter: AUI_GUTTER,
+    panel: 'aui', id: section.key, title: section.label, Icon: section.Icon, gutter: AUI_GUTTER, single,
     pages: section.subSections.filter(s => s.label !== 'Help').map(page => ({
       id: page.key, label: page.label, Icon: page.Icon,
       // an Office tile's tabs go in its title bar
@@ -270,7 +278,10 @@ function AUI() {
             <h1 className="aUIConsoleTitle">Admin</h1>
             <span ref={setRail} className="gtRailSlot" />
           </div>
-          <TileArea gridId="aui" label="Admin panel consoles" bar barHost={rail} tiles={tiles} />
+          <TileArea
+            gridId="aui" label="Admin panel consoles" bar barHost={rail} tiles={tiles}
+            maximized={mode === 'small' ? consoles.shown : undefined} onFocusTile={consoles.focus}
+          />
         </div>
       </div>
     </section>

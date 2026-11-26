@@ -24,3 +24,7 @@
 .ofPanel > .stPage, .ofPanel > .fbPage { height: auto; overflow: visible; }
 .ofSoon { margin: 0; }
 .ofTile > .tileTabBar { flex: 0 0 auto; }
+
+// Configuration > SLA: the break allowance under the SLA table.
+.stBreaks { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.stSubhead { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-muted); }

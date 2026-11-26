@@ -191,6 +191,8 @@ export const saveSchedule = (blocks: Parameters<typeof queueApi.schedule>[1]) =>
 export const setQueueSwitch = (queue: string, on: boolean) => queueChange(a => queueApi.setSwitch(a, queue, on))
 export const setQueueRanges = (queue: string | null, ranges: Parameters<typeof queueApi.setRanges>[2]) => queueChange(a => queueApi.setRanges(a, queue, ranges))
 export const setQueueOverride = (queue: string, level: Parameters<typeof queueApi.setOverride>[2], hours: number) => queueChange(a => queueApi.setOverride(a, queue, level, hours))
+export const setOnBreak = (on: boolean) => queueChange(a => queueApi.setBreak(a, on))
+export const setBreakRate = (minutes: number) => queueChange(a => queueApi.setBreakRate(a, minutes))
 export const clearQueueError = () => queueStore.set({ error: null })
 
 export function useQueues() {

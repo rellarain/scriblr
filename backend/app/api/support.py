@@ -218,6 +218,26 @@ def put_switch(body: SwitchBody, admin_id: str = Depends(feedback_api.current_ad
     return _queues(root, admin_id, lambda f, sf, c, now: queues.set_switch(f, f.queues, sf, admin_id, body.queue, body.on, c, now))
 
 
+class BreakBody(BaseModel):
+    on: bool
+
+
+class BreakRateBody(BaseModel):
+    minutes: int = Field(ge=0, le=queues.BREAK_RATE_MAX)
+
+
+# The staff member's break (AUI's work and break meters): start it (on shift only) or end it.
+@router.put("/break")
+def put_break(body: BreakBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _queues(root, admin_id, lambda f, sf, c, now: queues.set_break(f.queues, sf, admin_id, body.on, now))
+
+
+# The break allowance, minutes earned per hour worked (an admin; Admin > Configuration > SLA).
+@router.put("/break-rate")
+def put_break_rate(body: BreakRateBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
+    return _queues(root, admin_id, lambda f, sf, c, now: queues.set_break_rate(f.queues, sf, admin_id, body.minutes))
+
+
 @router.put("/levels")
 def put_levels(body: LevelsBody, admin_id: str = Depends(feedback_api.current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
     ranges = body.ranges.model_dump() if body.ranges else None

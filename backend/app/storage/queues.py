@@ -9,6 +9,9 @@ How the pieces fit:
   - The switchboard: on a console where a person has a tier (staff.tier_for), the queue is required up to a tier set by
     its level (low: tier 1; medium: tiers 1-2; high: tiers 1-3; urgent: every tier) and optional above it (the person turns
     it on or off). Without helper time every queue is off. A console where they have no tier is not on their switchboard.
+  - Breaks: a person on shift earns break time as they work (the allowance, minutes per hour worked, set by an admin) and
+    takes it with Start and End break; while on a break no queue is on for them, so no new chat comes to them. Work done
+    today is today's scheduled helper time that has gone by, less the breaks; what remains is the scheduled time ahead.
   - The next chat for a person: from the queues that are on for them, a chat at their own tier first (an escalation from the
     tier below); a chat of a lower tier only when its queue is high or urgent or nobody of the tiers between is covering
     it; then by level (urgent first) and the oldest.
@@ -65,6 +68,14 @@ class Override(BaseModel):
     until: datetime
 
 
+class BreakSpan(BaseModel):
+    start: datetime
+    end: Optional[datetime] = None
+
+
+BREAK_RATE_MAX = 30
+
+
 class QueueSettings(BaseModel):
     """What support.json keeps about the queues and helper time."""
 
@@ -75,6 +86,10 @@ class QueueSettings(BaseModel):
     levels: Ranges = Field(default_factory=Ranges)
     queueLevels: dict[str, Ranges] = Field(default_factory=dict)
     overrides: dict[str, Override] = Field(default_factory=dict)
+    # person id -> day (YYYY-MM-DD, local) -> breaks taken
+    breaks: dict[str, dict[str, list[BreakSpan]]] = Field(default_factory=dict)
+    # minutes of break earned for each hour worked
+    breakRate: int = Field(default=10, ge=0, le=BREAK_RATE_MAX)
 
 
 # --------------------------------------------------------------------------
@@ -101,6 +116,73 @@ def on_shift(q: QueueSettings, p: staff.Person, now: datetime) -> bool:
     hour = now.hour + now.minute / 60
     blocks, _ = schedule_for(q, p.id, week_of(now))
     return any(b.day == now.weekday() and b.start <= hour < b.start + b.hours for b in blocks)
+
+
+# --------------------------------------------------------------------------
+# Work and breaks
+# --------------------------------------------------------------------------
+
+
+def _breaks_today(q: QueueSettings, pid: str, now: datetime) -> list[BreakSpan]:
+    return q.breaks.get(pid, {}).get(now.date().isoformat(), [])
+
+
+def on_break(q: QueueSettings, pid: str, now: datetime) -> bool:
+    spans = _breaks_today(q, pid, now)
+    return bool(spans) and spans[-1].end is None
+
+
+def available(q: QueueSettings, p: staff.Person, now: datetime) -> bool:
+    """On shift and not on a break: the queues can be on for them."""
+    return on_shift(q, p, now) and not on_break(q, p.id, now)
+
+
+def work_today(q: QueueSettings, p: staff.Person, now: datetime) -> dict:
+    """Today's helper time in minutes: scheduled, worked (gone by, less breaks), still ahead; break earned and used."""
+    blocks, _ = schedule_for(q, p.id, week_of(now)) if p.active and p.allotment else ([], False)
+    today = [b for b in blocks if b.day == now.weekday()]
+    minute = now.hour * 60 + now.minute
+    scheduled = sum(b.hours * 60 for b in today)
+    passed = sum(max(0, min(minute, (b.start + b.hours) * 60) - b.start * 60) for b in today)
+    used = 0
+    for span in _breaks_today(q, p.id, now):
+        end = span.end or now
+        used += max(0, int((end - span.start).total_seconds() // 60))
+    complete = max(0, passed - used)
+    return {
+        "scheduled": scheduled, "complete": complete, "remaining": max(0, scheduled - passed),
+        "breakEarned": complete * q.breakRate // 60, "breakUsed": used, "breakRate": q.breakRate,
+        "onBreak": on_break(q, p.id, now),
+    }
+
+
+def set_break(q: QueueSettings, sf: staff.StaffFile, me: str, start: bool, now: datetime) -> None:
+    """Starts or ends the person's break. A break starts only on shift; chats already open stay theirs."""
+    p = staff.person(sf, me)
+    spans = q.breaks.setdefault(me, {}).setdefault(now.date().isoformat(), [])
+    if start:
+        if not on_shift(q, p, now):
+            raise SupportError("You have no helper time now.")
+        if spans and spans[-1].end is None:
+            raise SupportError("You are on a break already.")
+        spans.append(BreakSpan(start=now))
+    else:
+        if not spans or spans[-1].end is not None:
+            raise SupportError("You are not on a break.")
+        spans[-1].end = now
+    # Only today's and yesterday's breaks are kept.
+    keep = {now.date().isoformat(), (now.date() - timedelta(days=1)).isoformat()}
+    q.breaks[me] = {d: v for d, v in q.breaks[me].items() if d in keep}
+
+
+def set_break_rate(q: QueueSettings, sf: staff.StaffFile, me: str, minutes: int) -> None:
+    """The break allowance, minutes earned per hour worked (an admin)."""
+    p = staff.person(sf, me)
+    if p.kind != "admin" and p.id != feedback.OWNER_ID:
+        raise SupportError("Only an admin sets the break allowance.")
+    if not 0 <= minutes <= BREAK_RATE_MAX:
+        raise SupportError(f"The break allowance is 0 to {BREAK_RATE_MAX} minutes an hour.")
+    q.breakRate = minutes
 
 
 def set_schedule(q: QueueSettings, sf: staff.StaffFile, me: str, blocks: list[dict], now: datetime) -> None:
@@ -262,8 +344,8 @@ def set_override(q: QueueSettings, sf: staff.StaffFile, me: str, queue: str, lev
 
 
 def _on_for(q: QueueSettings, p: staff.Person, levels: dict[str, str], now: datetime) -> dict[str, int]:
-    """The queues that are on for a person now, with their tier there."""
-    shift = on_shift(q, p, now)
+    """The queues that are on for a person now, with their tier there (none on a break)."""
+    shift = available(q, p, now)
     out: dict[str, int] = {}
     for queue, level in levels.items():
         if state(q, p, queue, level, shift) in ("required", "on"):
@@ -319,7 +401,8 @@ def view(file: SupportFile, q: QueueSettings, sf: staff.StaffFile, me: str, cons
     names = {x.id: x.name for x in sf.people}
     pending = _pending(file)
     levels = levels_now(file, q, consoles, now)
-    shifts = {x.id: on_shift(q, x, now) for x in sf.people}
+    # who the queues can be on for now (on shift and not on a break)
+    shifts = {x.id: available(q, x, now) for x in sf.people}
     active = [c for c in file.chats if c.status == "active"]
     chatting = {c.staffId for c in active}
     admin = p.kind == "admin"
@@ -348,9 +431,10 @@ def view(file: SupportFile, q: QueueSettings, sf: staff.StaffFile, me: str, cons
                     continue
                 st = state(q, x, queue, level, shifts[x.id])
                 busy = any(c.staffId == x.id and c.queue == queue for c in active)
-                status = "active" if busy else "idle" if st in ("required", "on") and x.id not in chatting else "inactive"
+                status = ("active" if busy else "break" if on_break(q, x.id, now)
+                          else "idle" if st in ("required", "on") and x.id not in chatting else "inactive")
                 row["staff"].append({"id": x.id, "name": x.name, "tier": tier, "state": status})
-            row["staff"].sort(key=lambda s: (("active", "idle", "inactive").index(s["state"]), s["tier"], s["name"].lower()))
+            row["staff"].sort(key=lambda s: (("active", "idle", "break", "inactive").index(s["state"]), s["tier"], s["name"].lower()))
             row["chats"] = [{
                 "id": c.id, "staffId": c.staffId, "staffName": names.get(c.staffId, c.staffId), "userName": c.userName,
                 "focal": c.focal, "stage": c.stage, "tier": c.tier, "createdAt": c.createdAt.isoformat(),
@@ -360,7 +444,8 @@ def view(file: SupportFile, q: QueueSettings, sf: staff.StaffFile, me: str, cons
         queues.append(row)
     return {
         "me": {
-            "id": p.id, "name": p.name, "kind": p.kind, "allotment": p.allotment, "onShift": shifts.get(p.id, False),
+            "id": p.id, "name": p.name, "kind": p.kind, "allotment": p.allotment, "onShift": on_shift(q, p, now),
+            "work": work_today(q, p, now),
             "thisWeek": _week(q, p.id, week_of(now)), "nextWeek": _week(q, p.id, week_of(now + timedelta(days=7))),
             "managesAny": _manages(p, None),
         },

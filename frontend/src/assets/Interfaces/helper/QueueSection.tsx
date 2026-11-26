@@ -66,7 +66,7 @@ function QueueDetails({ row, label }: { row: QueueRow; label: string }) {
       </summary>
       <h4 className="fbLabel">People</h4>
       <ul className="qPeople" aria-label={`People on ${label}`}>
-        {row.staff.map(s => <li key={s.id}><span>{s.name}</span><span className="fbMuted">Tier {s.tier}</span><span className={`qState qState--${s.state}`}>{s.state === 'active' ? 'Active' : s.state === 'idle' ? 'Idle' : 'Inactive'}</span></li>)}
+        {row.staff.map(s => <li key={s.id}><span>{s.name}</span><span className="fbMuted">Tier {s.tier}</span><span className={`qState qState--${s.state}`}>{s.state === 'active' ? 'Active' : s.state === 'idle' ? 'Idle' : s.state === 'break' ? 'On break' : 'Inactive'}</span></li>)}
       </ul>
       {row.chats.length > 0 && (
         <>

@@ -29,4 +29,7 @@ export const queueApi = {
   setSwitch: (a: string, queue: string, on: boolean) => api.put<QueueView>('/support/switchboard', { queue, on }, as(a)),
   setRanges: (a: string, queue: string | null, ranges: LevelRanges | null) => api.put<QueueView>('/support/levels', { queue, ranges }, as(a)),
   setOverride: (a: string, queue: string, level: QueueLevel | null, hours: number) => api.put<QueueView>('/support/overrides', { queue, level, hours }, as(a)),
+  // Start or end the staff member's break; the break allowance (an admin), minutes earned per hour worked.
+  setBreak: (a: string, on: boolean) => api.put<QueueView>('/support/break', { on }, as(a)),
+  setBreakRate: (a: string, minutes: number) => api.put<QueueView>('/support/break-rate', { minutes }, as(a)),
 }

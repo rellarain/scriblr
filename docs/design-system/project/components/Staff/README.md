@@ -34,7 +34,7 @@ Code: `admin/office/StaffPages.tsx` (`RosterPage`, `DepartmentsPage`, `Allotment
   - **Remove** (`TrashIcon`): not finished after all; it takes back the promotion too.
   - **Training finished on…**: a select of the interfaces and consoles, with a plus to record it.
 - **Assignment**: on a console, a **Supports** column makes a person its channel support.
-- **Configuration > SLA**: a stepper per priority. It steps by an hour up to a day, then by days; Shift steps a day.
+- **Configuration > SLA**: a stepper per priority. It steps by an hour up to a day, then by days; Shift steps a day. Under it, **Breaks**: the break a staff member earns for each hour of helper time worked (0 to 30 minutes, default 10; Shift steps 5), which AUI's break meter counts.
 
 ## What the SLA does
 

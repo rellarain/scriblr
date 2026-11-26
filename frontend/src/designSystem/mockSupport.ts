@@ -136,6 +136,9 @@ export function createMockSupport(opts: {
   let levels: LevelRanges = { medium: 3, high: 6, urgent: 10 }
   const queueLevels: Record<string, LevelRanges> = {}
   const overrides: Record<string, { level: QueueLevel; until: string }> = {}
+  // person id -> today's breaks (start and end, ISO); the allowance in minutes earned per hour worked
+  const breaks: Record<string, Array<{ start: string; end: string | null }>> = {}
+  let breakRate = 10
   {
     const t = clock()
     for (const pp of people()) {
@@ -157,6 +160,17 @@ export function createMockSupport(opts: {
     const hour = now.getHours() + now.getMinutes() / 60
     return scheduleFor(pp.id, weekOf(now)).blocks.some(b => b.day === weekday(now) && b.start <= hour && hour < b.start + b.hours)
   }
+  const onBreak = (pid: string) => { const b = breaks[pid] ?? []; return b.length > 0 && b[b.length - 1].end === null }
+  const available = (pp: Omit<Person, 'tier'>, now: Date) => onShift(pp, now) && !onBreak(pp.id)
+  const workToday = (pp: Omit<Person, 'tier'>, now: Date) => {
+    const today = pp.active && pp.allotment ? scheduleFor(pp.id, weekOf(now)).blocks.filter(b => b.day === weekday(now)) : []
+    const minute = now.getHours() * 60 + now.getMinutes()
+    const scheduled = today.reduce((n, b) => n + b.hours * 60, 0)
+    const passed = today.reduce((n, b) => n + Math.max(0, Math.min(minute, (b.start + b.hours) * 60) - b.start * 60), 0)
+    const used = (breaks[pp.id] ?? []).reduce((n, b) => n + Math.max(0, Math.floor(((b.end ? new Date(b.end) : now).getTime() - new Date(b.start).getTime()) / 60000)), 0)
+    const complete = Math.max(0, passed - used)
+    return { scheduled, complete, remaining: Math.max(0, scheduled - passed), breakEarned: Math.floor(complete * breakRate / 60), breakUsed: used, breakRate, onBreak: onBreak(pp.id) }
+  }
   const rangesOf = (q: string) => queueLevels[q] ?? levels
   const autoLevel = (r: LevelRanges, n: number): QueueLevel => (n >= r.urgent ? 'urgent' : n >= r.high ? 'high' : n >= r.medium ? 'medium' : 'low')
   const activeOverride = (q: string, now: Date) => { const o = overrides[q]; return o && new Date(o.until) > now ? o : null }
@@ -174,7 +188,7 @@ export function createMockSupport(opts: {
     return (switchboard[pp.id] ?? []).includes(q) ? 'on' : 'off'
   }
   const onFor = (pp: Omit<Person, 'tier'>, now: Date) => {
-    const shift = onShift(pp, now)
+    const shift = available(pp, now)
     const out = new Map<string, number>()
     for (const q of consoles()) { const st = stateOf(pp, q, levelOf(q, now), shift); if (st === 'required' || st === 'on') out.set(q, tierFor(pp.id, q) ?? 0) }
     return out
@@ -210,7 +224,7 @@ export function createMockSupport(opts: {
     const names = new Map(all.map(x => [x.id, x.name]))
     const active = chats.filter(c => c.status === 'active')
     const chatting = new Set(active.map(c => c.staffId))
-    const shifts = new Map(all.map(x => [x.id, onShift(x, now)]))
+    const shifts = new Map(all.map(x => [x.id, available(x, now)]))
     const queues: QueueRow[] = consoles().map(q => {
       const level = levelOf(q, now)
       const waiting = pendingIn(q)
@@ -226,9 +240,9 @@ export function createMockSupport(opts: {
           if (tier === null) continue
           const st = stateOf(x, q, level, shifts.get(x.id) ?? false)
           const busy = active.some(c => c.staffId === x.id && c.queue === q)
-          row.staff.push({ id: x.id, name: x.name, tier, state: busy ? 'active' : (st === 'required' || st === 'on') && !chatting.has(x.id) ? 'idle' : 'inactive' })
+          row.staff.push({ id: x.id, name: x.name, tier, state: busy ? 'active' : onBreak(x.id) ? 'break' : (st === 'required' || st === 'on') && !chatting.has(x.id) ? 'idle' : 'inactive' })
         }
-        const at = { active: 0, idle: 1, inactive: 2 }
+        const at = { active: 0, idle: 1, break: 2, inactive: 3 }
         row.staff.sort((a, b) => at[a.state] - at[b.state] || a.tier - b.tier || a.name.localeCompare(b.name))
         row.chats = active.filter(c => c.queue === q).map(c => ({ id: c.id, staffId: c.staffId, staffName: names.get(c.staffId) ?? c.staffId, userName: c.userName, focal: c.focal, stage: c.stage, tier: c.tier, createdAt: c.createdAt, actions: c.events.filter(e => e.by !== 'user').map(e => e.kind) }))
         row.waiting = waiting.map(c => ({ id: c.id, userName: c.userName, focal: c.focal, tier: c.tier, waitingSince: c.waitingSince }))
@@ -236,7 +250,7 @@ export function createMockSupport(opts: {
       return row
     })
     return {
-      me: { id: pp.id, name: pp.name, kind: pp.kind, allotment: pp.allotment, onShift: shifts.get(me) ?? false, thisWeek: week(me, weekOf(now)), nextWeek: week(me, weekOf(plusDays(now, 7))), managesAny: manages(pp, null) },
+      me: { id: pp.id, name: pp.name, kind: pp.kind, allotment: pp.allotment, onShift: onShift(pp, now), work: workToday(pp, now), thisWeek: week(me, weekOf(now)), nextWeek: week(me, weekOf(plusDays(now, 7))), managesAny: manages(pp, null) },
       today: weekday(now), levels: { ...levels }, queues, next: nextFor(me),
       weeks: pp.kind === 'admin' ? all.filter(x => x.active && x.allotment).map(x => ({ id: x.id, thisWeek: week(x.id, weekOf(now)), nextWeek: week(x.id, weekOf(plusDays(now, 7))) })) : [],
     }
@@ -255,6 +269,28 @@ export function createMockSupport(opts: {
       const total = blocks.reduce((n, b) => n + b.hours, 0)
       if (total > pp.allotment) throw new Refused(400, `That is ${total} hours; you have ${pp.allotment} a week.`)
       schedules[me] = { ...(schedules[me] ?? {}), [weekOf(plusDays(now, 7))]: blocks }
+      return queueView(me)
+    }
+    if (what === 'break' && method === 'PUT') {
+      const pp = person(me)
+      const list = breaks[me] ?? (breaks[me] = [])
+      const open = list.length > 0 && list[list.length - 1].end === null
+      if (body.on) {
+        if (!onShift(pp, clock())) throw new Refused(400, 'You have no helper time now.')
+        if (open) throw new Refused(400, 'You are on a break already.')
+        list.push({ start: clock().toISOString(), end: null })
+      } else {
+        if (!open) throw new Refused(400, 'You are not on a break.')
+        list[list.length - 1].end = clock().toISOString()
+      }
+      return queueView(me)
+    }
+    if (what === 'break-rate' && method === 'PUT') {
+      const pp = person(me)
+      if (pp.kind !== 'admin' && pp.id !== 'owner') throw new Refused(400, 'Only an admin sets the break allowance.')
+      const n = Number(body.minutes)
+      if (!Number.isInteger(n) || n < 0 || n > 30) throw new Refused(400, 'The break allowance is 0 to 30 minutes an hour.')
+      breakRate = n
       return queueView(me)
     }
     if (what === 'switchboard' && method === 'PUT') {
@@ -297,7 +333,7 @@ export function createMockSupport(opts: {
       const b = (body ?? {}) as Record<string, unknown>
       const userSide = parts[0] === 'mine' || (parts[0] === 'chats' && method === 'POST' && parts.length === 1) || ['user-messages', 'user-close', 'drafts'].includes(parts[2] ?? '')
       const me = opts.actingAs ? opts.actingAs(adminId) : adminId
-      if (['queues', 'schedule', 'switchboard', 'levels', 'overrides'].includes(parts[0] ?? '')) return wrap(() => queueRoute(method, parts[0], b, me))
+      if (['queues', 'schedule', 'switchboard', 'levels', 'overrides', 'break', 'break-rate'].includes(parts[0] ?? '')) return wrap(() => queueRoute(method, parts[0], b, me))
       return wrap(() => (userSide ? user(method, parts, b, query) : staff(method, parts, b, me)))
     },
   }

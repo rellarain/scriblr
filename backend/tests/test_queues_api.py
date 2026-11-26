@@ -149,3 +149,36 @@ def test_admins_see_everyones_weeks_and_set_their_own(client: TestClient, wednes
     assert v["me"]["nextWeek"]["hours"] == 8
     owner = next(w for w in v["weeks"] if w["id"] == "owner")
     assert (owner["nextWeek"]["own"], owner["nextWeek"]["blocks"]) == (True, [{"day": 4, "start": 9, "hours": 8}])
+
+
+def test_work_and_breaks_earned_and_used(client: TestClient, wednesday: datetime, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Ari works 9-13 today; at 10:30, 90 minutes are done, 150 ahead, and 10 minutes an hour earns 15 of break.
+    w = queues(client)["me"]["work"]
+    assert w == {"scheduled": 240, "complete": 90, "remaining": 150, "breakEarned": 15, "breakUsed": 0, "breakRate": 10, "onBreak": False}
+    assert client.put("/api/support/break", headers=ARI, json={"on": False}).status_code == 400  # not on a break
+    v = client.put("/api/support/break", headers=ARI, json={"on": True}).json()
+    assert v["me"]["work"]["onBreak"] is True and v["me"]["onShift"] is True
+    assert client.put("/api/support/break", headers=ARI, json={"on": True}).status_code == 400  # on one already
+    # On a break no queue is on for Ari, so no new chat comes; an admin sees Ari on a break.
+    client.put("/api/support/switchboard", headers=ARI, json={"queue": DRAFT, "on": True})
+    start(client, 1)
+    v = queues(client)
+    assert row(v)["myState"] == "unavailable" and v["next"] is None
+    assert next(s for s in row(queues(client, SAM))["staff"] if s["id"] == "hlp-ari")["state"] == "break"
+    # Fifteen minutes later the break ends: it counts as used, not worked.
+    later = wednesday + timedelta(minutes=15)
+    monkeypatch.setattr(support_api, "_now", lambda: later)
+    w = client.put("/api/support/break", headers=ARI, json={"on": False}).json()["me"]["work"]
+    assert (w["complete"], w["remaining"], w["breakUsed"], w["breakEarned"], w["onBreak"]) == (90, 135, 15, 15, False)
+    assert queues(client)["next"] is not None
+    # Dana has no helper time, so no break.
+    assert client.put("/api/support/break", headers=DANA, json={"on": True}).status_code == 400
+
+
+def test_the_break_allowance_is_set_by_an_admin(client: TestClient, wednesday: datetime) -> None:
+    queues(client)
+    assert client.put("/api/support/break-rate", headers=ARI, json={"minutes": 20}).status_code == 400
+    assert client.put("/api/support/break-rate", headers=SAM, json={"minutes": 31}).status_code == 422
+    v = client.put("/api/support/break-rate", headers=SAM, json={"minutes": 20}).json()
+    assert v["me"]["work"]["breakRate"] == 20
+    assert queues(client)["me"]["work"]["breakEarned"] == 30  # Ari's 90 minutes at 20 an hour

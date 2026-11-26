@@ -82,7 +82,10 @@ export interface ScheduleBlock { day: number; start: number; hours: number }
 export interface ScheduleWeek { start: string; blocks: ScheduleBlock[]; hours: number; own: boolean }
 export interface LevelRanges { medium: number; high: number; urgent: number }
 
-export interface QueueStaff { id: string; name: string; tier: number; state: 'active' | 'idle' | 'inactive' }
+export interface QueueStaff { id: string; name: string; tier: number; state: 'active' | 'idle' | 'break' | 'inactive' }
+// Today's helper time in minutes (AUI's work and break meters): scheduled, worked (gone by, less breaks), still ahead; break
+// earned (the allowance, minutes per hour worked, times the work done) and used.
+export interface WorkToday { scheduled: number; complete: number; remaining: number; breakEarned: number; breakUsed: number; breakRate: number; onBreak: boolean }
 export interface QueueChat { id: string; staffId: string; staffName: string; userName: string; focal: string; stage: ChatStage; tier: number; createdAt: string; actions: EventKind[] }
 export interface QueueWaiting { id: string; userName: string; focal: string; tier: number; waitingSince: string }
 
@@ -108,7 +111,7 @@ export interface QueueRow {
 export interface PersonWeeks { id: string; thisWeek: ScheduleWeek; nextWeek: ScheduleWeek }
 
 export interface QueueView {
-  me: { id: string; name: string; kind: 'helper' | 'admin'; allotment: number | null; onShift: boolean; thisWeek: ScheduleWeek; nextWeek: ScheduleWeek; managesAny: boolean }
+  me: { id: string; name: string; kind: 'helper' | 'admin'; allotment: number | null; onShift: boolean; work?: WorkToday; thisWeek: ScheduleWeek; nextWeek: ScheduleWeek; managesAny: boolean }
   // Today, Monday 0.
   today: number
   // Everyone's helper time this week and next (each active person with helper hours; admins only: the Office's Schedule tabs).

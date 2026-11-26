@@ -4,9 +4,11 @@ import './App.scss'
 import WUI from './assets/Interfaces/WUI'
 import VUI from './assets/Interfaces/VUI'
 import Header from './Header'
-import Sidebar from './Sidebar'
+import Sidebar, { AuiResize } from './Sidebar'
 import ShellBand from './ShellBand'
 import HuiMini from './HuiMini'
+import AuiMini from './AuiMini'
+import { auiSizeOf, auiWidth, snapAui, stepAui, type AuiSize } from './lib/auiSize'
 import type { MainInterface, HuiPanel } from './interfaceShellTypes'
 import { useHelperChats } from './assets/Interfaces/helper/useHelperChats'
 import { useQueueMeter } from './support/supportStores'
@@ -22,8 +24,19 @@ const LUI = lazy(() => import('./assets/Interfaces/LUI'))
 const SIDEBAR_PANEL_W = 400
 // The band under the header, shown while a side interface's mini form is in it.
 const BAND_H = 40
-// AUI's own width snaps to multiples of this (a "column"), at any container size.
-const AUI_COLUMN_W = 400
+// What a size is called, for the resize handle (aria-valuetext).
+const AUI_SIZE_LABEL = (s: AuiSize) => s.mode === 'medium' ? `Medium, ${s.columns} columns` : s.mode === 'mini' ? 'Mini' : s.mode === 'small' ? 'Small' : 'Max'
+
+// The window's width, kept up to date (AUI's sizes are in the room the screen leaves).
+function useWindowWidth(): number {
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth))
+  useEffect(() => {
+    const on = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  return width
+}
 
 // The page the URL names: /read is the Reader, /learn Learning, anything else (/, /write) the Writer.
 const MAIN_PATH: Record<MainInterface, string> = { reader: '/read', learning: '/learn', writer: '/write' }
@@ -58,9 +71,12 @@ function App() {
   const [huiOn, setHuiOn] = useState<boolean>(false)
   const [huiExpanded, setHuiExpanded] = useState<boolean>(false)
   const [auiOpen, setAuiOpen] = useState<boolean>(false)
-  // Dragged from AUI's own outer edge (Sidebar.tsx's AuiResize), snapped to
-  // AUI_COLUMN_W-wide columns; remembered like the Writer sidebar's own width.
-  const [auiWidth, setAuiWidth] = useStoredState<number>('scriblr.admin.width', 2 * AUI_COLUMN_W)
+  // AUI's size (lib/auiSize.ts: mini, small, medium, max), set by dragging its edge (Sidebar.tsx's AuiResize) and remembered;
+  // before AUI had modes its width was kept as `scriblr.admin.width`, which the first read takes over.
+  const [storedAuiSize, setAuiSize] = useStoredState<AuiSize | null>('scriblr.admin.size', null)
+  const [oldAuiWidth] = useStoredState<number | null>('scriblr.admin.width', null)
+  const auiSize = auiSizeOf(storedAuiSize, oldAuiWidth)
+  const windowWidth = useWindowWidth()
   const [huiPanel, setHuiPanel] = useState<HuiPanel>('queue')
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false)
   const helper = useHelperChats()
@@ -114,10 +130,6 @@ function App() {
     setAuiOpen(open => !open)
   }
 
-  // Snaps to the nearest column width (a multiple of AUI_COLUMN_W), never below one.
-  function handleSetAuiWidth(width: number) {
-    setAuiWidth(Math.max(AUI_COLUMN_W, Math.round(width / AUI_COLUMN_W) * AUI_COLUMN_W))
-  }
 
   // The queue button's meter, from the real queues (support/supportStores.ts useQueueMeter): the chats the staff member is in and
   // the ones waiting in the queues that are on for them, each split into escalated and first-tier chats.
@@ -150,16 +162,17 @@ function App() {
   }
 
   // The sidebar, below the header and the band, has up to two columns: AUI's panel (outermost) and HUI's own panel
-  // (innermost, Mainscreen edge); their console buttons are in the band. AUI's own width is dragged from its edge
-  // (Sidebar.tsx's AuiResize) and snapped to AUI_COLUMN_W columns; `min()` keeps it from ever exceeding the rest of the
-  // screen (minus whatever width HUI's own panel currently occupies) even if the window shrinks -- wide enough to cover the
-  // whole screen is effectively an admin takeover (Mainscreen's own width collapses to 0 via --sidebar-w below).
+  // (innermost, Mainscreen edge); their console buttons are in the band. AUI's width follows its mode in the room HUI's panel
+  // leaves: mini is no panel, max all of it (an admin takeover: Mainscreen's own width collapses to 0 via --sidebar-w below).
   const huiPanelOpen = huiOn && huiExpanded
-  const huiWidthExpr = huiPanelOpen ? `${SIDEBAR_PANEL_W}px` : '0px'
-  const auiOpenWidthExpr = `min(${auiWidth}px, calc(100vw - ${huiWidthExpr}))`
-  const auiWidthExpr = auiOpen && isAdmin ? auiOpenWidthExpr : '0px'
+  const huiPx = huiPanelOpen ? SIDEBAR_PANEL_W : 0
+  const auiRoom = Math.max(0, windowWidth - huiPx)
+  const auiOn = auiOpen && isAdmin
+  const auiPx = auiOn ? auiWidth(auiSize, auiRoom) : 0
+  const huiWidthExpr = `${huiPx}px`
+  const auiWidthExpr = `${auiPx}px`
   const sidebarWidthExpr = `calc(${auiWidthExpr} + ${huiWidthExpr})`
-  const bandOpen = huiOn
+  const bandOpen = huiOn || auiOn
 
   const shellVars = {
     '--sidebar-w': sidebarWidthExpr,
@@ -187,6 +200,7 @@ function App() {
 
       {bandOpen && (
         <ShellBand>
+          {auiOn && <AuiMini />}
           {huiOn && (
             <HuiMini
               conversations={helper.conversations}
@@ -211,11 +225,17 @@ function App() {
         side={handedness}
         helper={helper}
         panel={huiPanel}
-        auiOpen={auiOpen && isAdmin}
-        auiWidth={auiWidth}
-        onSetAuiWidth={handleSetAuiWidth}
+        auiMode={auiSize.mode}
         isAdmin={isAdmin}
       />
+      {auiOn && (
+        <AuiResize
+          side={handedness} width={auiPx} label={AUI_SIZE_LABEL(auiSize)}
+          onWidthChange={raw => setAuiSize(snapAui(raw, auiRoom))}
+          onStep={by => setAuiSize(stepAui(auiSize, by, auiRoom))}
+          onReset={() => setAuiSize({ mode: 'small', columns: 1 })}
+        />
+      )}
 
       <div className="base">
         <VUI />

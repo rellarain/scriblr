@@ -538,6 +538,18 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   &::-webkit-scrollbar { display: none; }
 }
 
+// AUI's mini form (AuiMini.tsx): today's work and break meters and the Break button. The fills are the admin accent and the
+// alert fitted to read on the sidebar's surface (the tone marks, 3:1, audited); the labels are the ink on it.
+.auiMini { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+.auiMiniNote { font-size: var(--text-small); color: var(--ink); }
+.auiMeter { display: flex; flex-direction: column; gap: 3px; width: 150px; }
+.auiMeterText { font-size: 11px; line-height: 1.2; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auiMeterBar { display: block; height: 6px; background: var(--ov-sink-2); }
+.auiMeterFill {
+  display: block; height: 100%; background: var(--tone-yes-mark); transition: width 0.4s;
+  &--over { background: var(--tone-no-mark); }
+}
+
 // HUI's mini form (HuiMini.tsx): the queue meter, the chats, New chat, the Inbox and Settings, in a row.
 .huiMini { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
 
@@ -651,12 +663,13 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   }
 }
 
-// Dragged to set AUI's own width (--aui-w), snapping to 400px columns. A child of
-// .sidebar itself (not .aUI), positioned off the live --aui-w var so it always sits
-// exactly on AUI's inner edge, between it and HUI (or the page).
+// Dragged to resize AUI through its modes (--aui-w; Sidebar.tsx's AuiResize). Beside the
+// sidebar, not in it (the sidebar clips), positioned off the live --aui-w var so it always
+// sits on AUI's inner edge, between it and HUI (or the page) -- and, with AUI mini (no
+// panel), fully on the screen at its edge, where it can still be grabbed.
 .aUIResize {
   position: absolute;
-  top: 0;
+  top: var(--shell-top);
   bottom: 0;
   width: 8px;
   z-index: 7;
@@ -665,8 +678,9 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   &:hover::after, &:focus-visible::after { background: color-mix(in srgb, var(--ink) 35%, transparent); }
   &:focus-visible { outline: none; }
 }
-.hand-left .aUIResize { left: calc(var(--aui-w) - 4px); }
-.hand-right .aUIResize { right: calc(var(--aui-w) - 4px); }
+// Kept fully on the screen at both ends: at its edge when AUI is mini, at the far edge when it is max.
+.hand-left .aUIResize { left: clamp(0px, calc(var(--aui-w) - 4px), calc(100% - 8px)); transition: left 1s; }
+.hand-right .aUIResize { right: clamp(0px, calc(var(--aui-w) - 4px), calc(100% - 8px)); transition: right 1s; }
 
 .uUIPanel {
   position: relative;
