@@ -68,7 +68,16 @@ WUI (mockup first):
 - [x] Outline templates, the writer's own: save a book's or a chapter's outline shape and start a new one from it.
 - [x] The Scratchpad converts a note into an outline node, a plotpoint, draft text or a revision flag.
 - [x] Project > History as one timeline (activity, outline and plot snapshots, chapter revisions) with restore where allowed.
-- [ ] Finish Characters: the writers' own designer and the mannequin's step-by-step editor back on.
+- [ ] Rebuild the character designer and finish Characters (`wui-v1.md`, The character designer), mockup first:
+  - [ ] 9a Start from a body: a body template on a proportion guide, body-part templates.
+  - [ ] 9b Drawing: smooth and simplify outlines, trace a picture, merge, cut out and split.
+  - [ ] 9c Joins: one outline round parts that touch, joint caps.
+  - [ ] 9d Rig and posing: bones, smooth bends (skin weights), drag a hand or a foot to pose.
+  - [ ] 9e Eight angles.
+  - [ ] 9f Variation: body sliders, forms, colour palettes, clothes in layers.
+  - [ ] 9g Faces: expressions.
+  - [ ] 9h The writers' designer back on: copies of published models only, everything within the admin's limits.
+  - [ ] 9i A starter model drawn in the shape editor, published on a fresh install; the mannequin's step-by-step editor on it.
 - [ ] Finish Maps: shapes only with biome hues; lock the environment layer; places over time; routes and travel; story links; generated maps.
 
 UUI (mockup first):
@@ -154,3 +163,4 @@ More items will be added.
 - 2026-11-27: WUI slice 6: outline templates. Save a book's or a chapter's outline shape (titles and summaries if wanted, never the draft) as a template of your own, start a new book or chapter from one, and keep them in the Project level's new Templates tab.
 - 2026-11-27: WUI slice 7: Scratchpad conversions. A note becomes an outline node, a plotpoint, draft text or a revision flag in any project, and is kept marked with what it became or goes; draft text for a chapter open in the Draft goes into that draft as typed text.
 - 2026-11-27: WUI slice 8: History. The Project level's History tab is the project's history as one timeline by day (the writing in sittings, the outline's and the plot's snapshots, every chapter's revisions, the flags added and resolved), kept by kind, by book and by words searched for; a revision compares with the chapter now, and the outline, the plot or a chapter can be put back as it was (a chapter open in the Draft saves first and reads it again after).
+- 2026-11-27: Character designer interview. WUI slice 9 becomes a rebuild of the character designer, before Maps, in nine sub-slices with a mockup first: start from a body on a proportion guide, better drawing, one outline and joint caps, smooth bends and drag to pose, eight angles, variation, faces, the writers' designer (copies only) and a new starter model. The Designer's switched-off tools come back with it instead of in AUI v1.

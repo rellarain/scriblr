@@ -27,8 +27,8 @@ The plan's levels map onto the roles that exist, and AUI names them so. Only the
 | Organizer › Bookclub Management | filler text | **Phase 2**, with RUI. The Organizer console is hidden in phase 1, since that is its only tile |
 | Configuration › Overview | filler text | **Site-wide settings** (the app name, the default theme, the switches for later-version features) and a **summary** of each Configuration page |
 | Configuration › Plot, Maps, Channels, SLA | built | as built |
-| Configuration › Writers' designer | switched off | on, with WUI's Characters |
-| Designer | built, some tools switched off | the switched-off tools come back: weights, skin weights, taper, pose mode, mirror editing, previews, Roll, Lock, Reset |
+| Configuration › Writers' designer | switched off | on, with WUI's slice 9 (the character designer rebuild, `wui-v1.md`): the limits on what a writer may make of a copy of a published model |
+| Designer | built, some tools switched off | **rebuilt in WUI's slice 9**, before Maps (the interview of 2026-11-27, `wui-v1.md`, The character designer): start from a body on a proportion guide, body-part templates, smoothing, tracing, merge and cut, one outline and joint caps, smooth bends, drag to pose, eight angles, faces, body sliders, forms, palettes, layered clothes, and a new starter model. The switched-off tools come back as part of it |
 | Resources, Instructor, Help | built | as built |
 
 ## Open questions (AUI round)

@@ -27,7 +27,7 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 | Schedule (goals, routines, checklists) | built; revisions are only chapter snapshots and the Preview's flags | plus **revision passes** (below) |
 | Project (the plan) | built | as built |
 | Maps | built | **finished in v1, with new tools** (see Maps v1, below) |
-| Characters | built; the writers' own designer and the mannequin's step-by-step editor are switched off | **finished in v1**: the writers' own designer (My models, Edit this model, held to the admin's limits) and the mannequin's step-by-step editor come back on. The admin Designer's switched-off tools (weights, skin weights, taper, pose mode, mirror editing, previews, Roll, Lock, Reset) come back in **AUI v1** |
+| Characters | built; the writers' own designer and the mannequin's step-by-step editor are switched off | **finished in v1, with a rebuilt character designer** (see The character designer, below): the writers' own designer comes back on (My models, Edit this model, held to the admin's limits) and the mannequin's step-by-step editor works on the new models. A new character starts as a portrait; the writer makes it a mannequin from a published model or one of their copies |
 | Items | built | **Moved to WUI v2**; left out of v1 |
 | History | a placeholder | **One timeline** of the project by day: its activity, outline and plot snapshots, and chapter revisions, with restore wherever the app already allows it. Built (slice 8): the writing in sittings (a day older than the activity kept, its total), the flags added and resolved, chips by kind, a book choice and a search; a day shows four changes and the rest behind a button, fourteen days then Older days; a revision compares with the chapter now, word by word; Restore puts the outline or the plot back through the workspace (an edit Undo takes back and Save keeps) or a chapter back on the backend, which keeps the chapter as it was first (a chapter open in the Draft saves first and reads it again after) |
 | Settings (the project editor; Delete project), Help | built | as built |
@@ -43,6 +43,21 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 - **Routes and travel**: a route between places, and how long it takes to travel.
 - **Story links**: places linked to plotlines, plotpoints and moments, on the existing world links (`backend/app/storage/world_links.py`).
 - **Generated maps**: a starting map made for the writer to edit.
+
+## The character designer (interview, 2026-11-27)
+
+Slice 9 is a rebuild of the character designer (the admin's Designer, and the writers' own designer, which is the same console held to limits), before Maps, in sub-slices, each with a mockup first. Today the Designer is a shape editor (since 2026-11-14), its other tools switched off and the old model catalog retired. The trouble with it: it is **hard to learn**, and the **figures look off** (joins, proportions, outlines, bending). Where a tool is already built (the rig, sliders, forms, presets, colour slots, angles, clothes worn under clothes), the sub-slice brings it back into the shape editor and improves it, rather than starting again.
+
+- **Who designs**: admins and writers. A writer works only on **copies of published models** (My models, from Edit this model; never a blank model), and may change everything in a copy (shapes, rig, sliders, forms, colours, clothes) within the limits the admin sets in Configuration › Writers' designer.
+- **Starting**: a new model starts from a **body**: a body template on a **proportion guide** (so many heads tall, with lines at the chin, chest, waist and knees) that templates and shapes snap to.
+- **Drawing**: **body-part templates** to place and reshape (a head, a torso, an arm, a hand, an eye, a lock of hair); **smoother curves** (smooth a point or a whole outline, simplify one with too many points); **trace a picture** (a reference image under the canvas, faded and locked); **merge, cut out and split** shapes.
+- **Joins**: parts that touch are drawn as **one outline** round the figure, so overlaps show no line, and **joint caps** cover the seam where a limb turns a long way.
+- **Proportions**: the guide while drawing, then **sliders** afterwards to vary the figure.
+- **Rig and posing**: limbs **bend smoothly** at the joints (skin weights); **drag a hand or a foot** to pose and the arm or leg follows; the figure is drawn from **eight angles** (every 45 degrees); **faces** have expressions (brows, eyes and mouth moving together into named looks).
+- **Variation**: **body sliders** (height, build, age, proportions), **forms** (eye shapes, noses, mouths, hairstyles), **colour palettes** (slots with ranges per genre, rolled or chosen) and **clothes in layers** that follow the body as it bends.
+- **A starter model**: a new one drawn in the shape editor and published on a fresh install: one adult body that sliders make slim to heavy and more masculine or feminine, an age slider from child to elder, faces (several forms of eyes, noses and mouths, and a handful of expressions), and starter hairstyles and outfits in layers.
+
+**Sub-slices** (mockup first, approved before any code): 9a start from a body (the template and the proportion guide, body-part templates); 9b drawing (smoothing, simplifying, tracing, merge and cut); 9c joins (one outline, joint caps); 9d rig and posing (bones, smooth bends, drag to pose); 9e eight angles; 9f variation (body sliders, forms, palettes, layered clothes); 9g faces; 9h the writers' designer back on (copies only, within limits); 9i the starter model, and the mannequin's step-by-step editor on it.
 
 ## Outline (Book console)
 
