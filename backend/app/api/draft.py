@@ -58,7 +58,10 @@ def put_draft(
                 label=next((n.title for n in outline_nodes if n.id == moment_id), None),
                 amount=draft.wordCount - previous_word_count, book_id=facet_activity.book_of(outline_nodes, moment_id),
             )
-            if revision_flags.reanchor(store.load_project(root, project_id).revisionFlags, moment_id, previous_body, body.body):
+            pf = store.load_project(root, project_id)
+            # Follow the edit, then find again any passage whose text moved as a whole (a paragraph moved by the Draft's tools).
+            followed = revision_flags.reanchor(pf.revisionFlags, moment_id, previous_body, body.body)
+            if revision_flags.rescue(pf, chapter_id, moment_id) or followed:
                 store.mutate(root, project_id, lambda _pf: None)
         draft_sessions.record_session(root, project_id, chapter_id, before)
         return draft

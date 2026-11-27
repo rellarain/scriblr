@@ -18,7 +18,7 @@ import {
   addOption, chooseOption, moveOption, removeAnswer, removeOption, renameOption, setFieldKind, setTextAnswer, toggleOption,
 } from './plotAnswers'
 import { linkNodes, syncLinks, unlinkNodes } from './plotLinks'
-import { cycleAwareness, isPlaced, movePlacement, placeValue, retargetPlacements, unplace } from './plotPlacement'
+import { cycleAwareness, followParagraphs, isPlaced, movePlacement, pinPlacement, placeValue, retargetPlacements, unplace } from './plotPlacement'
 import { nodesFromPreset } from './plotPreset'
 import {
   addField, addFieldset, addValue, deleteField, deleteFieldset, deleteValue, migratePlot, moveField, moveFieldset, moveValue, renameField,
@@ -1061,6 +1061,17 @@ export function useWriterWorkspace() {
     if (next !== plotNodesRef.current) commitPlot(next, true)
   }
 
+  // A placement on a moment pinned to one of its paragraphs (or unpinned, null), from the Draft; and the pins following paragraphs that the
+  // Draft's paragraph tools moved, split or joined (`follow` from paragraphs.ts).
+  function pinPlotpointParagraph(pointId: string, placementId: string, paragraph: number | null) {
+    const next = pinPlacement(plotNodesRef.current, pointId, placementId, paragraph, outlineMap())
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+  function followPlotParagraphs(follow: Parameters<typeof followParagraphs>[1]) {
+    const next = followParagraphs(plotNodesRef.current, follow)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+
   // Point the Draft level at a plotpoint for a few seconds (a click in the plot outline).
   function highlightPlotpoint(id: string | null) {
     setHighlightedPointId(id)
@@ -1176,7 +1187,7 @@ export function useWriterWorkspace() {
     setPlotFieldKind, addPlotOption, renamePlotOption, movePlotOption, removePlotOption, togglePlotOption, choosePlotOption, setPlotTextAnswer, removePlotAnswer,
     addPlotFieldset, renamePlotFieldset, movePlotFieldset, removePlotFieldset, setPlotFieldSet,
     addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,
-    placePlotpoint, movePlotpointPlacement, unplacePlotpoint, highlightedPointId, highlightPlotpoint, plotDragId: plotDrag?.pointId ?? null, plotDragPlacementId: plotDrag?.placementId ?? null, setPlotDragId,
+    placePlotpoint, movePlotpointPlacement, unplacePlotpoint, pinPlotpointParagraph, followPlotParagraphs, highlightedPointId, highlightPlotpoint, plotDragId: plotDrag?.pointId ?? null, plotDragPlacementId: plotDrag?.placementId ?? null, setPlotDragId,
   }
 }
 

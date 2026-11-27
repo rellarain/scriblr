@@ -2,7 +2,7 @@
 
 from difflib import SequenceMatcher
 
-from .schema import FlagPassage, RevisionFlag
+from .schema import FlagPassage, ProjectFile, RevisionFlag
 
 SNIPPET_MAX = 2000
 
@@ -46,4 +46,103 @@ def reanchor(flags: list[RevisionFlag], moment_id: str, old_body: str, new_body:
     changed = False
     for passage in passages:
         changed = _follow(opcodes, passage, new_body) or changed
+    return changed
+
+
+# A passage whose text is found again somewhere else only when it is long enough to be that text and not a common phrase.
+FIND_ELSEWHERE_MIN = 12
+
+
+def _occurrences(body: str, snippet: str) -> list[int]:
+    out: list[int] = []
+    at = body.find(snippet)
+    while at >= 0:
+        out.append(at)
+        at = body.find(snippet, at + 1)
+    return out
+
+
+def _nearest(occurrences: list[int], near: int) -> int:
+    return min(occurrences, key=lambda at: abs(at - near))
+
+
+def rescue(pf: ProjectFile, chapter_id: str, moment_id: str) -> bool:
+    """Keep the open passage flags on their text when it moves as a whole (a paragraph moved up or down, or to another moment, by the Draft's
+    paragraph tools). After a save of `moment_id`:
+    - a flag of this moment whose text left the place it was followed to is put where the text now is in the moment (the nearest copy), or else
+      where it alone appears in another moment of the chapter, or else of the project (the text at least FIND_ELSEWHERE_MIN characters long);
+      a merge's second passage looks only in its own chapter, as a merge is within one chapter;
+    - a flag marked gone anywhere in the project whose text now appears once in this moment comes back, here.
+    True if any changed."""
+    bodies = {(cid, mid): m.body for cid, chapter in pf.drafts.items() for mid, m in chapter.moments.items()}
+    here = bodies.get((chapter_id, moment_id), "")
+    changed = False
+
+    def place(passage: RevisionFlag | FlagPassage, at: int) -> None:
+        passage.start, passage.end, passage.stale = at, at + len(passage.snippet), False
+
+    def elsewhere(snippet: str, same_chapter_only: bool) -> tuple[str, str, int] | None:
+        if len(snippet) < FIND_ELSEWHERE_MIN:
+            return None
+        tiers = [[k for k in bodies if k[0] == chapter_id and k[1] != moment_id]]
+        if not same_chapter_only:
+            tiers.append([k for k in bodies if k[0] != chapter_id])
+        for keys in tiers:
+            found = [(k, at) for k in keys for at in _occurrences(bodies[k], snippet)]
+            if len(found) == 1:
+                (cid, mid), at = found[0]
+                return cid, mid, at
+            if found:
+                return None  # more than one copy: no way to tell which is the flag's
+        return None
+
+    for flag in pf.revisionFlags:
+        if flag.scope != "passage" or flag.resolvedAt is not None:
+            continue
+        passages: list[tuple[RevisionFlag | FlagPassage, bool]] = []
+        if flag.momentId == moment_id and flag.chapterId == chapter_id:
+            passages.append((flag, False))
+        if flag.mergeWith is not None and flag.mergeWith.momentId == moment_id and flag.chapterId == chapter_id:
+            passages.append((flag.mergeWith, True))
+        for passage, is_second in passages:
+            if not passage.snippet or here[passage.start:passage.start + len(passage.snippet)] == passage.snippet:
+                continue
+            copies = _occurrences(here, passage.snippet)
+            if copies:
+                place(passage, _nearest(copies, passage.start))
+                changed = True
+                continue
+            found = elsewhere(passage.snippet, same_chapter_only=is_second)
+            if found is None:
+                if not passage.stale:
+                    passage.stale = True
+                    changed = True
+                continue
+            cid, mid, at = found
+            if is_second:
+                passage.momentId = mid
+            else:
+                flag.chapterId, flag.momentId = cid, mid
+            place(passage, at)
+            changed = True
+
+    # Passages marked gone whose text turns up, once, in the moment just saved (a merge's second passage only within its chapter).
+    for flag in pf.revisionFlags:
+        if flag.scope != "passage" or flag.resolvedAt is not None:
+            continue
+        if flag.stale and flag.snippet:
+            if (flag.chapterId, flag.momentId) == (chapter_id, moment_id) or len(flag.snippet) >= FIND_ELSEWHERE_MIN:
+                copies = _occurrences(here, flag.snippet)
+                if len(copies) == 1:
+                    flag.chapterId, flag.momentId = chapter_id, moment_id
+                    place(flag, copies[0])
+                    changed = True
+        second = flag.mergeWith
+        if second is not None and second.stale and second.snippet and flag.chapterId == chapter_id:
+            if second.momentId == moment_id or len(second.snippet) >= FIND_ELSEWHERE_MIN:
+                copies = _occurrences(here, second.snippet)
+                if len(copies) == 1:
+                    second.momentId = moment_id
+                    place(second, copies[0])
+                    changed = True
     return changed

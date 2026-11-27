@@ -318,7 +318,10 @@ described, now stale, in `docs/data-model.md`).
   Trees are compared with the ones they replace (`facet_activity.tree_changes`).
 - **Revision flags** — `RevisionFlag`: a flag (one of the seven kinds, a note)
   on a passage of a moment's draft (it follows the text as it is edited,
-  `storage/revision_flags.py`, and goes `stale` if the text is cut) or on the
+  `storage/revision_flags.py`, and goes `stale` if the text is cut; text moved as a
+  whole, such as a paragraph moved by the Draft's tools, is found again in its moment,
+  then the chapter, then the project, and a `stale` flag comes back when its text
+  turns up once in a saved moment: `rescue`) or on the
   project; a `merge` flag on a passage may hold `mergeWith`, a second passage
   of the same chapter that follows its own text the same way (dropped when
   the flag becomes another kind); resolving one (with an outcome note) is
@@ -1052,7 +1055,12 @@ mounted it; it remains in git history.
   chapter tile (the series/book/arc above it, its title and synopsis edited in place, dates, draft stats, and the
   Save, Publish and Draft | Preview tools), the chapter's plotpoints (read-only footnote cards), and the draft:
   its acts, scenes and moments as read-only cards (fold up, remembered) each around an
-  auto-growing draft input with a live word count, or, from the toggle, the preview with
+  auto-growing draft input with a live word count (with the **paragraph tools**, `draft/MomentDraft.tsx`,
+  `draft/useParagraphTools.ts`, `paragraphs.ts`: a number beside each paragraph, and beside the paragraph the caret is in its tools,
+  up, down, to another moment of the book, split at the caret, join with the next; a plotpoint's placement pinned to a paragraph
+  (`paragraphIndex`, pinned from the line under the text), the chapter's footnotes and the Preview's reactions go with it; and the
+  **style aids**, `styleAids.ts`, switched in the Draft's Settings and kept on this machine: long sentences underlined, words used
+  again close together marked, each moment's reading level), or, from the toggle, the preview with
   its Reaction / Flag / Export tools (the Export tool, `draft/ExportTool.tsx`: the project, this book or this chapter as a PDF, an EPUB or
   JSON, with that format's options, saved under a name made from the titles; the choices are remembered). A sentence's reaction bars show one heart per level, not a stack
   (`ReactionHeartIcon`): like is an outline, two concentric outlines, a filled heart; dislike is an outline with a

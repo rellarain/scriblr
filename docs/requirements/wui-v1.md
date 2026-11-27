@@ -74,7 +74,7 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 **Flag kinds**: Review, Add, Remove, Merge, Change, Simplify, Expand. A migration renames existing flags: Edit becomes Change, Delete becomes Remove.
 
 **Paragraph and Sentence tools**, both:
-- **Structure**: move a paragraph up or down, or to another moment; split a paragraph and join two. A plotpoint pinned to a paragraph (`assignedParagraphIndex`) follows it.
+- **Structure**: move a paragraph up or down, or to another moment; split a paragraph and join two. A plotpoint pinned to a paragraph (`assignedParagraphIndex`) follows it. Built (slice 3): another moment can be in another chapter of the book; a placement is pinned from the line under the paragraph; footnotes, reactions and revision flags follow too.
 - **Style aids**: long sentences, repeated words and readability, each turned on or off in the Draft's settings.
 
 ## Moved to a later version

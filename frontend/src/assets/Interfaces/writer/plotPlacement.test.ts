@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, PlotNode, PlotPlacement } from '../../../api/types'
 import {
-  MAX_PLACEMENTS, allPlacements, cycleAwareness, isPlaced, livePlacements, movePlacement, placedCount, placeValue, placementNumber, pointsByTarget,
-  repairPlacements, retargetPlacements, unplace,
+  MAX_PLACEMENTS, allPlacements, cycleAwareness, followParagraphs, isPlaced, livePlacements, movePlacement, pinPlacement, placedCount, placeValue,
+  placementNumber, pointsByTarget, repairPlacements, retargetPlacements, unplace,
 } from './plotPlacement'
+import { moveToMoment, splitParagraph } from './paragraphs'
 import { outlinePositions } from './plotTree'
 
 const out = (id: string, kind: OutlineNode['kind'], parentId: string | null, order = 0): OutlineNode =>
@@ -156,5 +157,45 @@ describe('repairPlacements', () => {
     expect(fixed.placements).toEqual([{ id: expect.any(String), targetId: 'm1', paragraphIndex: 2, awareness: 'off' }])
     expect([fixed.assignedMomentId, fixed.assignedParagraphIndex, fixed.awareness]).toEqual([null, null, null])
     expect(repairPlacements(fixed, outlineById, makeId)).toBe(fixed)
+  })
+})
+
+describe('a placement pinned to a paragraph', () => {
+  const pinned = (targetId: string, paragraphIndex: number | null, id = `at-${targetId}`): PlotPlacement => ({ ...at(targetId, 'front', id), paragraphIndex })
+  const paragraphOf = (nodes: PlotNode[], id: string, placementId: string) => find(nodes, id).placements?.find(p => p.id === placementId)
+
+  it('is pinned and unpinned on a moment only', () => {
+    const nodes = [point('p', [at('m1', 'front'), at('ch1')])]
+    const one = pinPlacement(nodes, 'p', 'at-m1', 2, outlineById)
+    expect(paragraphOf(one, 'p', 'at-m1')?.paragraphIndex).toBe(2)
+    expect(paragraphOf(pinPlacement(one, 'p', 'at-m1', null, outlineById), 'p', 'at-m1')?.paragraphIndex).toBeNull()
+    expect(pinPlacement(nodes, 'p', 'at-ch1', 0, outlineById)).toBe(nodes) // a chapter has no paragraphs of its own
+    expect(pinPlacement(one, 'p', 'at-m1', 2, outlineById)).toBe(one)
+  })
+
+  it('follows its paragraph when the paragraph tools move it, and an unpinned placement stays', () => {
+    const body = 'One.\n\nTwo. Three.\n\nFour.'
+    const nodes = [point('p', [pinned('m1', 2)]), point('q', [pinned('m1', 1)]), point('r', [at('m1', 'front')])]
+    const split = splitParagraph(body, 'm1', body.indexOf('Three'))!
+    const after = followParagraphs(nodes, split.follow)
+    expect(paragraphOf(after, 'p', 'at-m1')?.paragraphIndex).toBe(3)
+    expect(paragraphOf(after, 'q', 'at-m1')?.paragraphIndex).toBe(1)
+    expect(find(after, 'r')).toBe(find(nodes, 'r'))
+    const moved = moveToMoment(body, 'm1', 1, 'Else.', 'm2', 'end')!
+    const there = followParagraphs(nodes, moved.follow)
+    expect(paragraphOf(there, 'q', 'at-m1')).toMatchObject({ targetId: 'm2', paragraphIndex: 1 })
+    expect(paragraphOf(there, 'p', 'at-m1')).toMatchObject({ targetId: 'm1', paragraphIndex: 1 })
+  })
+
+  it("becomes one with the plotpoint's placement on the moment it lands on", () => {
+    const nodes = [point('p', [pinned('m1', 0), at('m2', 'back')])]
+    const moved = moveToMoment('One.\n\nTwo.', 'm1', 0, 'Else.', 'm2', 'start')!
+    const after = followParagraphs(nodes, moved.follow)
+    expect(find(after, 'p').placements).toEqual([{ ...at('m2', 'back'), paragraphIndex: 0 }])
+  })
+
+  it('changes nothing when no pinned paragraph moves', () => {
+    const nodes = [point('p', [pinned('m1', 0)])]
+    expect(followParagraphs(nodes, a => a)).toBe(nodes)
   })
 })

@@ -3,13 +3,20 @@ import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
-import { buildChildIndex, nearestOfKind, rollUpWordCounts } from '../outlineTree'
+import { buildChildIndex, descendantsOf, nearestOfKind, rollUpWordCounts } from '../outlineTree'
 import { structureOfBook } from '../outline/outlineModel'
 import { AutoTextarea } from '../shared'
 import { useStoredState } from '../storage'
 import { systemForBook } from '../timeSystem'
 import { countWords, formatWords } from '../wordCount'
+import { nodeLabel } from '../plotTree'
+import { textOf } from '../plotFields'
+import { placementsOf } from '../plotPlacement'
+import { gradeLabel, readingGrade } from '../styleAids'
 import { SceneChips } from './SceneChips'
+import { MomentDraft, type ChapterDestination, type MomentPin, type MomentTools } from './MomentDraft'
+import { useParagraphTools } from './useParagraphTools'
+import { useStyleAids } from './useStyleAids'
 
 export interface ChapterDraft {
   bodies: Record<string, string>
@@ -30,6 +37,65 @@ export function DraftCards({ w, chapter, draft }: { w: WriterWorkspace; chapter:
   const system = useMemo(() => systemForBook(w.activeProject?.settings.timeSystems ?? [], book), [w.activeProject, book])
   const [openMap, setOpenMap] = useStoredState<Record<string, boolean>>('scriblr.writer.draftOpen', {})
   const isOpen = (id: string) => openMap[id] ?? true
+  const [aids] = useStyleAids()
+  const paragraphTools = useParagraphTools(w, chapter.id, draft)
+
+  // Where a paragraph can be moved: the moments of each chapter of the book (this chapter first), named as the Draft names them.
+  const destinations = useMemo<ChapterDestination[]>(() => {
+    const chapters = book ? descendantsOf(index, book.id).filter(n => n.kind === 'chapter') : [chapter]
+    const ordered = [chapter, ...chapters.filter(c => c.id !== chapter.id)]
+    const sceneOf = (m: OutlineNode) => nearestOfKind(w.outlineNodes, m.id, 'scene')
+    return ordered.map(c => {
+      const number = numbers.chapter.get(c.id)
+      return {
+        id: c.id,
+        label: number ? `Chapter ${number} · ${nodeLabel(c)}` : nodeLabel(c),
+        moments: descendantsOf(index, c.id).filter(m => m.kind === 'moment' && !m.freeDraft).map(m => {
+          const scene = sceneOf(m)
+          const where = `Moment ${numbers.moment.get(m.id) ?? ''}`
+          return {
+            id: m.id,
+            label: scene ? `Scene ${numbers.scene.get(scene.id) ?? ''} · ${where}` : where,
+            detail: m.title.trim() || m.synopsis.trim() || 'No synopsis',
+          }
+        }),
+      }
+    })
+  }, [index, book, chapter, numbers, w.outlineNodes])
+
+  // Each moment's own placements, for the pins.
+  const pinsByMoment = useMemo(() => {
+    const map = new Map<string, MomentPin[]>()
+    for (const point of w.plotNodes) {
+      if (point.kind !== 'plotpoint') continue
+      for (const placement of placementsOf(point)) {
+        const list = map.get(placement.targetId) ?? []
+        list.push({ pointId: point.id, placementId: placement.id, title: textOf(point, w.plotNodeById).title, paragraph: placement.paragraphIndex ?? null })
+        map.set(placement.targetId, list)
+      }
+    }
+    return map
+  }, [w.plotNodes, w.plotNodeById])
+
+  const toolsFor = (momentId: string): MomentTools => ({
+    move: (paragraph, by) => paragraphTools.move(momentId, paragraph, by),
+    split: offset => paragraphTools.split(momentId, offset),
+    join: paragraph => paragraphTools.join(momentId, paragraph),
+    moveTo: (paragraph, toChapter, toMoment, where) => paragraphTools.moveTo(momentId, paragraph, toChapter, toMoment, where),
+    busy: paragraphTools.busy,
+  })
+  const momentDraft = (momentId: string, label: string, placeholder: string, value: string, onChange: (text: string) => void) => (
+    <MomentDraft
+      momentId={momentId} label={label} placeholder={placeholder} value={value} onChange={onChange} aids={aids} keyField="draft"
+      tools={toolsFor(momentId)} destinations={destinations} chapterId={chapter.id}
+      pins={pinsByMoment.get(momentId) ?? []} onPin={w.pinPlotpointParagraph}
+    />
+  )
+  const grade = (momentId: string) => {
+    if (!aids.read) return null
+    const g = readingGrade(draft.bodies[momentId] ?? '')
+    return g === null ? null : <span className="wrReadingLevel">Reading level: {gradeLabel(g)}</span>
+  }
 
   const wordCounts = useMemo(() => {
     const perMoment: Record<string, number> = {}
@@ -89,11 +155,9 @@ export function DraftCards({ w, chapter, draft }: { w: WriterWorkspace; chapter:
           <div className="wrMomentRow">
             <span className="wrNodeHandle"><span className="wrNodeLabel wrNodeLabel--num">{n}</span></span>
             <span className={node.synopsis ? 'wrNodeDescription' : 'wrNodeDescription wrNodeDescription--empty'}>{node.synopsis || 'No synopsis'}</span>
+            {grade(node.id)}
           </div>
-          <AutoTextarea
-            className="wrDraftText" placeholder="Start drafting this moment…" aria-label={`Moment ${n} draft`}
-            value={draft.bodies[node.id] ?? ''} onChange={text => draft.setBody(node.id, text)} keyField="draft"
-          />
+          {momentDraft(node.id, `Moment ${n} draft`, 'Start drafting this moment…', draft.bodies[node.id] ?? '', text => draft.setBody(node.id, text))}
           <span className="wrWordCount">{formatWords(words(node.id))}</span>
         </div>
       )
@@ -136,14 +200,16 @@ export function DraftCards({ w, chapter, draft }: { w: WriterWorkspace; chapter:
       <div className="wrMomentRow">
         <span className="wrNodeHandle"><span className="wrNodeLabel wrNodeLabel--num">Free draft</span></span>
         <span className="wrNodeDescription wrNodeDescription--empty">Not part of the outline</span>
+        {grade(freeNode.id)}
       </div>
-      <AutoTextarea className="wrDraftText" placeholder="Free draft…" aria-label="Free draft" value={freeBody} onChange={typeFree} keyField="draft" />
+      {momentDraft(freeNode.id, 'Free draft', 'Free draft…', freeBody, typeFree)}
       <span className="wrWordCount">{formatWords(words(freeNode.id))}</span>
     </div>
   ) : null
 
   return (
     <div className="wrDraftCards" onKeyDown={keys.onKeyDown} data-knode={chapter.id}>
+      {paragraphTools.error && <p className="wrPageError" role="alert">{paragraphTools.error}</p>}
       {children.length === 0 && (
         <>
           <p className="wrPageMuted">Nothing outlined yet. Draft freely below, or add acts, scenes and moments in the Outline.</p>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AwarenessEye } from './AwarenessEye'
+import { PinIcon } from '../../icons'
 import { textOf, valueHeader } from './plotFields'
 import type { PlacedPoint } from './plotTree'
 import { plotColors, plotColorVars } from './plotColors'
@@ -11,7 +12,8 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 // only the plotpoint's title (and its awareness eye on a moment); clicking it opens the card
 // in place, headed like the plotpoint's tile (PlotValueHead.tsx: category › subcategory › cluster, then the plotline, fieldset and field), to show the
 // title and description.
-export function DraftPlotNotes({ w, points, momentIds }: { w: WriterWorkspace; points: PlacedPoint[]; momentIds: Set<string> }) {
+// `pinnedAt` names where a placement pinned to a paragraph is ("Moment 1, paragraph 3"), shown under its title.
+export function DraftPlotNotes({ w, points, momentIds, pinnedAt }: { w: WriterWorkspace; points: PlacedPoint[]; momentIds: Set<string>; pinnedAt?: (placementId: string) => string | null }) {
   const [openId, setOpenId] = useState<string | null>(null)
   if (points.length === 0) return null
   return (
@@ -20,6 +22,7 @@ export function DraftPlotNotes({ w, points, momentIds }: { w: WriterWorkspace; p
         const text = textOf(p, w.plotNodeById)
         const head = valueHeader(p, w.plotNodeById)
         const open = openId === placement.id
+        const pinned = pinnedAt?.(placement.id) ?? null
         return (
           <div key={placement.id} className={`wrPlotNote${open ? ' wrPlotNote--open' : ''}`} data-point={p.id} style={plotColorVars(plotColors(p, w.plotNodeById, w.projectHue))}>
             <button type="button" className="wrPlotNoteHead" aria-expanded={open} onClick={() => setOpenId(open ? null : placement.id)}>
@@ -33,6 +36,7 @@ export function DraftPlotNotes({ w, points, momentIds }: { w: WriterWorkspace; p
               ) : (
                 <span className="wrPlotNoteTitle">{text.title || 'Untitled'}</span>
               )}
+              {pinned && <span className="wrPlotNotePin" title="Pinned: it moves with its paragraph"><PinIcon size={12} />{pinned}</span>}
               {momentIds.has(placement.targetId) && placement.awareness && <AwarenessEye state={placement.awareness} size={14} />}
             </button>
           </div>

@@ -72,7 +72,7 @@ const fitHeight = (el: HTMLTextAreaElement | null) => {
 }
 
 // A textarea that grows with its content, and again when its width changes (a tile resized).
-export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField, maxLength, 'aria-label': ariaLabel }: {
+export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField, maxLength, 'aria-label': ariaLabel, inputRef, onCaret }: {
   value: string
   maxLength?: number
   onChange: (next: string) => void
@@ -83,8 +83,11 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   // Marks it for the node keyboard shortcuts (lib/nodeKeys.ts); 'draft' for writing text.
   keyField?: boolean | 'draft'
   'aria-label'?: string
+  // The text box itself, for a caller that sets the caret; and where the caret is whenever it moves (the Draft's paragraph tools).
+  inputRef?: React.MutableRefObject<HTMLTextAreaElement | null>
+  onCaret?: (offset: number) => void
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null)
+  const ref = useRef<HTMLTextAreaElement | null>(null)
   useEffect(() => fitHeight(ref.current), [value])
   useEffect(() => {
     const el = ref.current
@@ -96,9 +99,10 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   }, [])
   return (
     <textarea
-      ref={ref} rows={rows} className={className} placeholder={placeholder} value={value} aria-label={ariaLabel} maxLength={maxLength}
+      ref={el => { ref.current = el; if (inputRef) inputRef.current = el }} rows={rows} className={className} placeholder={placeholder} value={value} aria-label={ariaLabel} maxLength={maxLength}
       data-kf={keyField === 'draft' ? 'draft' : keyField ? '' : undefined}
       onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}
+      onSelect={onCaret && (e => onCaret(e.currentTarget.selectionStart))} onFocus={onCaret && (e => onCaret(e.currentTarget.selectionStart))}
     />
   )
 }

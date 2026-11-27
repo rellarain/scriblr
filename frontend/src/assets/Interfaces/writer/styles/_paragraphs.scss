@@ -1,0 +1,86 @@
+// The Draft's paragraph tools and style aids (draft/MomentDraft.tsx): a gutter of paragraph numbers beside each moment's text, the tools of
+// the paragraph the caret is in, the line under the text for that paragraph, the dialog that moves a paragraph to another moment, and the
+// marks of the style aids. On the paper: its ink, its line, its frame and the chapter's accent.
+.wr {
+  .wrMomentDraft { position: relative; display: grid; align-content: start; grid-template-columns: 30px minmax(0, 1fr); column-gap: var(--space-3); row-gap: var(--space-3); }
+  .wrParaGutter { position: relative; min-height: 100%; }
+  .wrParaNum {
+    position: absolute; right: 0; display: inline-flex; align-items: center; gap: 1px; font: 700 var(--text-small) system-ui, sans-serif;
+    line-height: calc(var(--text-draft) * 1.6); color: var(--wr-page-muted); white-space: nowrap;
+  }
+  .wrParaTools { position: absolute; right: 0; z-index: 2; display: flex; flex-direction: column; gap: var(--space-1); }
+  .wrParaTool {
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: var(--radius-none);
+    background: var(--wr-frame-5); color: var(--wr-ink); box-shadow: inset 0 0 0 1px var(--wr-page-line);
+    &:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--wr-ink); }
+    &--on, &--on:hover:not(:disabled) { background: var(--wr-ink); color: var(--wr-frame-5); }
+    &:disabled { opacity: 0.6; cursor: default; }
+  }
+
+  // The text box over its mirror: the mirror is the same box (border, padding, type, line height as .wrDraftText) with the text transparent,
+  // so only the aids' marks show, under the text the box draws. Its font is inherited, as the text box's is (the app's form reset,
+  // `textarea { font-family: inherit }`, outranks .wrDraftText's serif: see known-drift.md), so the lines always wrap alike.
+  .wrDraftField { grid-column: 2; align-self: start; position: relative; min-width: 0; background: var(--wr-input-bg, var(--paper-field)); }
+  .wrDraftMirror {
+    position: absolute; inset: 0; box-sizing: border-box; border: 1px solid transparent; padding: var(--space-5) var(--space-6); overflow: hidden;
+    font-family: inherit; font-size: var(--text-draft); line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word;
+    color: transparent; pointer-events: none;
+    span { font: inherit; }
+  }
+  .wrDraftText.wrDraftText--mirrored { position: relative; display: block; background: transparent; }
+  .wrAidLong { text-decoration: underline wavy var(--wr-accent); text-decoration-thickness: 1.5px; text-underline-offset: 5px; text-decoration-skip-ink: none; }
+  .wrAidRepeat { box-shadow: inset 0 -2px 0 var(--wr-accent); }
+  .wrReadingLevel {
+    flex: 0 0 auto; margin-left: auto; padding: 1px var(--space-3); font-size: var(--text-small); font-weight: 700; color: var(--wr-ink);
+    box-shadow: inset 0 0 0 1px var(--wr-page-line);
+  }
+
+  // The line under the text for the paragraph the caret is in.
+  .wrParaLine { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); font-size: var(--text-small); color: var(--wr-ink); }
+  .wrParaLineNum, .wrParaLong { font-weight: 700; }
+  .wrParaPin { display: inline-flex; align-items: center; gap: var(--space-2); padding: 1px var(--space-2) 1px var(--space-3); font-weight: 700; box-shadow: inset 0 0 0 1px var(--wr-page-line); }
+  .wrParaUnpin { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; color: var(--wr-ink); opacity: 0.7; &:hover { opacity: 1; } }
+  .wrParaPinSelect {
+    max-width: 100%; padding: var(--space-1) var(--space-3); font-size: var(--text-small); color: var(--wr-ink); background: var(--wr-frame-5);
+    border: 0; box-shadow: inset 0 0 0 1px var(--wr-page-line); border-radius: var(--radius-none);
+    option { color: var(--wr-ink); background: var(--wr-frame-5); }
+  }
+
+  // Moving a paragraph to another moment: a dialog over the text, beside the paragraph's tools.
+  .wrParaMove {
+    position: absolute; left: 34px; z-index: 3; width: min(340px, calc(100% - 34px)); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-4);
+    padding: var(--space-5); background: var(--wr-frame-5); color: var(--wr-ink); box-shadow: inset 0 0 0 1px var(--wr-page-line), var(--shadow-save-bubble);
+  }
+  .wrParaMoveHead { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .wrParaMoveHint { font-size: var(--text-small); }
+  .wrParaDests { display: flex; flex-direction: column; gap: var(--space-2); max-height: 220px; overflow-y: auto; }
+  .wrParaWhere { display: flex; gap: var(--space-2); .wrParaDest { flex: 1 1 0; justify-content: center; } }
+  .wrParaDest {
+    display: flex; align-items: baseline; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4); text-align: left; font-size: var(--text-small);
+    color: var(--wr-ink); background: transparent; box-shadow: inset 0 0 0 1px var(--wr-page-line); border-radius: var(--radius-none);
+    &:hover { box-shadow: inset 0 0 0 1px var(--wr-ink); }
+    &--on, &--on:hover { box-shadow: inset 0 0 0 1px var(--wr-ink), inset 3px 0 0 var(--wr-ink); font-weight: 700; }
+  }
+  .wrParaDestName { font-weight: 700; white-space: nowrap; }
+  .wrParaDestDetail { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrParaMoveActions { display: flex; justify-content: flex-end; gap: var(--space-3); }
+  .wrParaBtn {
+    padding: var(--space-2) var(--space-5); font-size: var(--text-small); font-weight: 700; color: var(--wr-ink); background: transparent;
+    box-shadow: inset 0 0 0 1px var(--wr-page-line); border-radius: var(--radius-none);
+    &--main { color: var(--wr-frame-5); background: var(--wr-ink); box-shadow: none; }
+    &:disabled { opacity: 0.6; cursor: default; }
+  }
+
+  // A plotpoint's note in the Plotpoints tile, pinned to a paragraph: where.
+  .wrPlotNotePin { display: inline-flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; font-size: var(--text-small); white-space: nowrap; }
+
+  // The style aids in the Draft's settings.
+  .wrStyleAids { display: flex; flex-direction: column; gap: var(--space-5); padding-top: var(--space-5); box-shadow: inset 0 1px 0 var(--wr-page-line); }
+  .wrAid { display: flex; flex-direction: column; gap: var(--space-2); }
+  .wrAidName { font-weight: 700; }
+  .wrAidHint { font-size: var(--text-small); line-height: 1.6; }
+  .wrAidCount {
+    width: 48px; padding: 1px var(--space-2); font-size: var(--text-small); color: var(--wr-ink); background: var(--wr-input-bg, var(--paper-field));
+    border: 0; box-shadow: inset 0 0 0 1px var(--wr-page-line); border-radius: var(--radius-none);
+  }
+}

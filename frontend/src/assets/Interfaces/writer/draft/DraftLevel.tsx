@@ -23,6 +23,7 @@ import { countWords } from '../wordCount'
 import ChapterPoints from './ChapterPoints'
 import ChapterTile from './ChapterTile'
 import DraftCards from './DraftCards'
+import StyleAidsSettings from './StyleAidsSettings'
 import PreviewPane from './PreviewPane'
 import { chapterHasDraft } from './draftModel'
 
@@ -166,6 +167,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                   children: (
                     <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
                       <HueSlider label="Chapter colour" className="wrNodeHue" {...w.hueSliderOf(chapter)} />
+                      <StyleAidsSettings />
                     </div>
                   ),
                 },

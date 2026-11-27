@@ -113,6 +113,43 @@ export function cycleAwareness(nodes: PlotNode[], pointId: string, placementId: 
   })
 }
 
+// Pin one placement on a moment to one of its paragraphs (counted from 0, as the Preview counts them), or unpin it (null). A placement that is
+// not on a moment has no paragraph.
+export function pinPlacement(nodes: PlotNode[], pointId: string, placementId: string, paragraph: number | null, outlineById: Map<string, OutlineNode>): PlotNode[] {
+  return changePoint(nodes, pointId, point => {
+    const placement = placementsOf(point).find(p => p.id === placementId)
+    if (!placement || placement.paragraphIndex === paragraph) return point
+    if (paragraph !== null && outlineById.get(placement.targetId)?.kind !== 'moment') return point
+    return { ...point, placements: placementsOf(point).map(p => (p.id === placementId ? { ...p, paragraphIndex: paragraph } : p)) }
+  })
+}
+
+// The Draft's paragraph tools moved, split or joined paragraphs: every placement pinned to a paragraph goes where `follow` says its paragraph
+// went (`follow` is paragraphs.ts's: a moment and a paragraph before, the same after). A pinned placement that lands on a moment its plotpoint
+// is already on is one with the one there (which takes its paragraph if it had none). Placements not pinned stay on their moments.
+export function followParagraphs(nodes: PlotNode[], follow: (at: { momentId: string; paragraph: number; sentence: number }) => { momentId: string; paragraph: number; sentence: number }): PlotNode[] {
+  let changed = false
+  const next = nodes.map(point => {
+    if (point.kind !== 'plotpoint') return point
+    const have = placementsOf(point)
+    if (!have.some(p => p.paragraphIndex != null)) return point
+    let placements = have
+    for (const placement of have) {
+      if (placement.paragraphIndex == null) continue
+      const to = follow({ momentId: placement.targetId, paragraph: placement.paragraphIndex, sentence: 0 })
+      if (to.momentId === placement.targetId && to.paragraph === placement.paragraphIndex) continue
+      const there = placements.find(p => p.targetId === to.momentId && p.id !== placement.id)
+      placements = there
+        ? placements.filter(p => p.id !== placement.id).map(p => (p.id === there.id && p.paragraphIndex == null ? { ...p, paragraphIndex: to.paragraph } : p))
+        : placements.map(p => (p.id === placement.id ? { ...p, targetId: to.momentId, paragraphIndex: to.paragraph } : p))
+    }
+    if (placements === have) return point
+    changed = true
+    return { ...point, placements }
+  })
+  return changed ? next : nodes
+}
+
 // Outline nodes are going: a placement on one of them falls back to `fallbackId` (the chapter around it) when it has one and the plotpoint is
 // not already there, and goes otherwise.
 export function retargetPlacements(nodes: PlotNode[], removed: Set<string>, fallbackId: string | null, outlineById: Map<string, OutlineNode>): PlotNode[] {

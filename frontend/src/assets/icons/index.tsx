@@ -1162,3 +1162,29 @@ export function BridgeIcon(props: IconProps) {
     <path d="M4.5 9C8 15.5 16 15.5 19.5 9" />
   </IconBase>
 }
+
+// A pushpin: a plotpoint pinned to a paragraph, which moves with it.
+export function PinIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 21v-6" />
+    <path d="M8 3h8l-1 6 3 3H6l3-3z" />
+  </IconBase>
+}
+
+// Two paragraphs with a dotted cut between them: split a paragraph in two at the caret.
+export function SplitParagraphIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 5h16M4 9h10" />
+    <path d="M4 15h16M4 19h10" />
+    <path d="M17 12h3" strokeDasharray="1 2" />
+  </IconBase>
+}
+
+// An arrow up to a line: move a paragraph to another moment.
+export function MoveToIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 12h11" />
+    <path d="M11 7l5 5-5 5" />
+    <path d="M20 4v16" />
+  </IconBase>
+}

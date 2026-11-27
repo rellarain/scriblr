@@ -46,6 +46,7 @@ The app is described as it is; where a screen differs from the rules it is here 
 | What the code does | What the rule says | Fix |
 |---|---|---|
 | Page margins and indents are numbers (20, 22, 24, 26, 34, 56px: the page's padding, a nested card's indent, the Preview's paragraph indent), 1px adjustments and the sizes 14, 20 and 24px are not on a scale, and a few radii are not tokens (`50%`, 2px, a spine's 3px corner) | one scale, used by name | an indent step token that nested rows are a multiple of, and a page-margin token; the tests in `scripts/design-system/cssTokens.test.ts` show how |
+| The Draft's text box (`.wrDraftText`) is set in the inherited UI font: the app's form reset (`.wUI.wr textarea { font-family: inherit }`) outranks its `Georgia` serif. The paragraph tools' mirror (`.wrDraftMirror`) inherits the same font, so the two always wrap alike | the draft is serif, 16px, line 1.6 ([Draft page](components/DraftPage/README.md)) | give the serif a selector that outranks the reset, on the text box and the mirror together |
 | Text under the 11px floor outside the Writer, the helper and the admin screens: the sky toggle's date (9px, in a fixed-size widget), the Reader's footnote markers, badges and small print (10px), the Theme panel's timeline ticks and chip labels (9 to 10px), the autosave toggle's label | readable text, audited | raise them with the widgets that hold them, and add the test's files |
 
 ## Not covered by the audit

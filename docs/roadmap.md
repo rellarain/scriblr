@@ -62,7 +62,7 @@ WUI (mockup first):
 - [x] Take Dash > Readers, Project > Items and Outline > Publish out of v1 behind the `V2_FEATURES` switch (they return in WUI v2), with what only works with them: the chapter's Publish and published versions, For readers, the Footnote tool's content flags, item links and carried items.
 - [x] Seven flag kinds: Review, Add, Remove, Merge, Change, Simplify, Expand; Edit becomes Change and Delete becomes Remove. A Merge can name the second passage, picked on the page.
 - [x] Export: PDF with full Unicode, EPUB and JSON, for a project, a book or a chapter.
-- [ ] Paragraph and Sentence tools: move, split and join paragraphs (pinned plotpoints follow); style aids for long sentences, repeated words and readability, each on or off.
+- [x] Paragraph and Sentence tools: move, split and join paragraphs (pinned plotpoints follow); style aids for long sentences, repeated words and readability, each on or off.
 - [ ] Revision passes in the project's schedule, each with its own goals, across all the project's books and chapters; their open flags in the backlog.
 - [ ] Book goals with or without dates, and estimates from the writer's activity of how long the rest will take; the timeline follows them where there are no dates.
 - [ ] Outline templates, the writer's own: save a book's or a chapter's outline shape and start a new one from it.
@@ -148,3 +148,4 @@ More items will be added.
 - 2026-11-26: The phase 1 plan: requirements for UUI, VUI, HUI and AUI; build order (interface by interface, a mockup before each one's code); local accounts; admin levels; items moved to phases 2, 3 and 4.
 - 2026-11-26: The WUI v1 mockup is approved; every tile takes its own scope's hue. WUI slice 1: the `V2_FEATURES` switch and the seven flag kinds.
 - 2026-11-26: WUI slice 2: export. A project, a book or a chapter as a PDF (any script, in bundled Noto fonts; open revision flags in the margin when asked), an EPUB or JSON, from the Preview's new Export tool. The Preview's buttons and selects now read on the day and the night page.
+- 2026-11-26: WUI slice 3: paragraph tools (up, down, to another moment of the book, split, join; a plotpoint can be pinned to a paragraph, and pins, footnotes, reactions and revision flags go with it) and style aids (long sentences, repeated words, reading level).
