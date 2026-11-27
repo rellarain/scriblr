@@ -10,6 +10,8 @@ export const getFacetActivity = (projectId: string) => api.get<FacetActivityData
 export const getPlanner = (projectId: string) => api.get<Planner>(`/projects/${p(projectId)}/planner`)
 export const putPlanner = (projectId: string, planner: Planner) => api.put<Planner>(`/projects/${p(projectId)}/planner`, planner)
 export const getRibbon = () => api.get<RibbonData>('/activity/ribbon')
+// A chapter read in the Preview, for a revision pass's reading goal.
+export const recordRead = (projectId: string, chapterId: string) => api.post<void>(`/projects/${p(projectId)}/activity/read`, { chapterId })
 export const getTicks = (projectId: string, date: string) => api.get<string[]>(`/projects/${p(projectId)}/schedule/${date}`)
 export const putTicks = (projectId: string, date: string, ids: string[]) => api.put<string[]>(`/projects/${p(projectId)}/schedule/${date}`, { completedItemIds: ids })
 

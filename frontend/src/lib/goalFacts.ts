@@ -3,7 +3,7 @@
 
 import type { FacetActivityData, Goal } from './facets'
 
-export interface TreeNodeFact { id: string; kind: string; parentId: string | null; title: string }
+export interface TreeNodeFact { id: string; kind: string; parentId: string | null; title: string; order?: number }
 export interface ProjectFacts {
   projectId: string
   words: number

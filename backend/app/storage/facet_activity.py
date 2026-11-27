@@ -27,6 +27,9 @@ from .schema import (
 
 # A safety cap on the detail kept, whatever the days: the oldest events go first.
 MAX_EVENTS = 20000
+# Events kept only as events: a chapter read in the Preview (for a revision pass's reading goal) is not revision work done, so it is in no
+# day's totals and no slot's count.
+UNCOUNTED_ACTIONS = {"read"}
 SLOT_MINUTES = 10
 
 
@@ -100,6 +103,8 @@ def apply_event(
     )
     if len(fa.events) > MAX_EVENTS:
         del fa.events[: len(fa.events) - MAX_EVENTS]
+    if action in UNCOUNTED_ACTIONS:
+        return
     _add_to_totals(fa.daily.setdefault(day, DayTotals()), facet, action, amount, kind, book_id)
     counts = fa.slots.setdefault(day, {}).setdefault(facet, [0] * SLOTS_PER_DAY)
     counts[slot] += 1

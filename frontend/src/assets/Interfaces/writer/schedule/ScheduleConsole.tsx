@@ -12,11 +12,15 @@ import { slotOfDate } from '../../../../lib/ribbon'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
 import { SplitArea, type SplitTile } from '../SplitArea'
-import { BarChartIcon, CalendarIcon, GoalIcon, ListIcon } from '../../../icons'
+import { BarChartIcon, CalendarIcon, GoalIcon, ListIcon, RevisionIcon } from '../../../icons'
+import { chapterPlaces, passFlags, passState, type PassFacts } from '../../../../lib/revisionPasses'
+import { useRevisionFlags } from '../useRevisionFlags'
 import { useStoredState } from '../shared'
 import { ActivityControls, useActivityState, type FacetGoalFacts } from './ActivityCard'
 import { AnalyticsPanel } from './AnalyticsPanel'
 import { Backlog } from './Backlog'
+import { PassBacklog } from './PassBacklog'
+import { PassesCard } from './PassesCard'
 import { GoalsCard, type OwnedProgress } from './GoalsCard'
 import { ScheduleCard, type ScheduleOwner, type TicksApi } from './ScheduleCard'
 import { ICON_PX } from './IconBtn'
@@ -29,16 +33,18 @@ import { requestReminderPermission, useShiftEndReminders, useShiftReminders } fr
 import { localToday, useSchedule } from './useSchedule'
 import type { SplitNode } from '../../../../components/tiles/splitTree'
 
-// The Schedule console: Goals, the Agenda, the Backlog beside it and Analytics (the activity chart, with the review and the charts folded under it), each its own tile on a split
+// The Schedule console: Goals, the Agenda, the Backlog beside it, Analytics (the activity chart, with the review and the charts folded under it) and, for a
+// project, its Revision passes (whose running passes' open flags are groups in the Backlog), each its own tile on a split
 // grid (drag a title bar to move one, a divider to resize). At the Project level it is that project's; at the Dash it is every project's added
 // together, with the account's own goals, shifts and routines too.
 
 export { ACCOUNT_OWNER }
-// Where the tiles sit before any is moved: the goals beside the analytics on top, then the agenda with the backlog beside it.
+// Where the tiles sit before any is moved: the goals beside the analytics on top, then the agenda, a project's revision passes and the backlog.
+// (At the Dash there are no passes, and the agenda and the backlog share the row.)
 export const DEFAULT_TREE: SplitNode = {
   dir: 'col', ratio: 0.5,
   a: { dir: 'row', ratio: 0.34, a: { id: 'goals' }, b: { id: 'analytics' } },
-  b: { dir: 'row', ratio: 0.6, a: { id: 'schedule' }, b: { id: 'backlog' } },
+  b: { dir: 'row', ratio: 0.6, a: { id: 'schedule' }, b: { dir: 'row', ratio: 0.55, a: { id: 'passes' }, b: { id: 'backlog' } } },
 }
 
 // A project's colour: its hue at the facet colours' own saturation and lightness (so it reads on the tile for every hue, as they do).
@@ -174,6 +180,17 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
   const nodeTitles = useMemo(() => new Map(nodes.map(n => [n.id, n.title])), [nodes])
   const bookTitles = useMemo(() => Object.fromEntries(facts.flatMap(f => f.outline.filter(n => n.kind === 'book').map(n => [n.id, n.title]))), [facts])
 
+  // ---- a project's revision passes: its flags (open and resolved), its chapters, and what the passes' progress is read from ----
+  const passProject = scope === 'project' ? projectIds[0] ?? null : null
+  const revision = useRevisionFlags(passProject, passProject !== null)
+  const places = useMemo(() => chapterPlaces(single?.outline ?? []), [single])
+  const passFacts: PassFacts = useMemo(
+    () => ({ flags: revision.flags, daily: schedule.facets.daily, events: schedule.facets.events, chapterIds: places.chapterIds, today }),
+    [revision.flags, schedule.facets.daily, schedule.facets.events, places, today],
+  )
+  const passes = passProject ? planner.passes ?? [] : []
+  const passOpen = passes.filter(p => passState(p, today) === 'running' && p.kinds.length > 0).reduce((n, p) => n + passFlags(p, revision.flags, today).open.length, 0)
+
   // ---- reminders, export, print ----
   const upcoming = useMemo(() => owners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, today, today)), [owners, today])
   useShiftReminders(upcoming, planner.reminderLeadMinutes, today)
@@ -226,6 +243,13 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
           onPlanner={(id, next) => owners.find(o => o.id === id)?.setPlanner(next)} onTick={(id, item, on) => ticks.set(id, today, item, on)}
           events={schedule.facets.events} targets={targets} nodes={nodes} onOpenNode={onOpenNode}
           project={shownProject} onProject={setShown} addTo={addTo} onAddTo={setAddTo} colors={colors}
+          passCount={passOpen}
+          passGroups={passProject ? search => (
+            <PassBacklog
+              passes={passes} flags={revision.flags} today={today} whereOf={places.whereOf} search={search}
+              onOpenChapter={onOpenNode ? id => onOpenNode('outline', id) : undefined}
+            />
+          ) : undefined}
         />
       ),
     },
@@ -239,6 +263,15 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
         />
       ),
     },
+    ...(passProject ? [{
+      id: 'passes', title: 'Revision passes', Icon: RevisionIcon,
+      children: (
+        <PassesCard
+          planner={planner} onPlanner={goalOwner.setPlanner} facts={passFacts} projectTitle={titles[passProject] ?? ''}
+          bookCount={(single?.outline ?? []).filter(n => n.kind === 'book').length}
+        />
+      ),
+    }] : []),
   ]
   return (
     <div className="wrSchedConsole" style={facetHueVars(hues) as CSSProperties}>

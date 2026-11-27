@@ -34,7 +34,7 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 
 **Outline templates** (book templates here, chapter templates on the Outline level): the writer's own only. A template is a saved outline shape: a book's or a chapter's arcs, chapters, acts, scenes and moments, with titles and summaries but no draft; a new book or chapter can start from one. No templates published by admins in v1.
 
-**Revision passes**: a pass is planned in the project's schedule, with **goals of its own** (set per pass), and applies **across all the books and chapters of the project**. Its open revision flags show in the backlog as its tasks.
+**Revision passes**: a pass is planned in the project's schedule, with **goals of its own** (set per pass), and applies **across all the books and chapters of the project**. Its open revision flags show in the backlog as its tasks. Built (slice 4): a pass has a name, a first day and an optional last day, and the kinds of flag it works through; its goals are to resolve those flags, to cut or add a number of words, or to read every chapter once (a chapter opened in the Preview while the pass runs); its open flags are a group in the Backlog, due on its last day.
 
 **Maps v1**:
 - **Shapes only, no pens.** Biomes are the shapes' fill and outline hues.

@@ -336,8 +336,13 @@ described, now stale, in `docs/data-model.md`).
   facet and node with an `aim` counted from `addedOn`, the shift it is on and
   the day it was done; `carried` marks one that came back from a shift that
   ended with it undone; `phaseId` tags the phase it builds to and `processId`
-  the process it is a step of, `afterId` the step it follows in an ordered group), shift templates, rest days and the project's
-  timeline. A project is also made of **phases** (`Phase`: a title, the
+  the process it is a step of, `afterId` the step it follows in an ordered group), shift templates, rest days, the project's
+  timeline and its **revision passes** (`RevisionPass`, up to 50: a name, a first day and an optional last day, the kinds of
+  flag it works through across the whole project, and up to 12 goals (`PassGoal`: resolve its flags, change the word count by
+  `words`, negative to cut, or read every chapter once); a pass is upcoming, running or done by its days, its flags are the
+  open ones of its kinds and those resolved while it runs, its words the net draft change on its days, its reads the chapters
+  opened in the Preview while it runs (`lib/revisionPasses.ts`); the project Schedule console's **Revision passes** tile,
+  `schedule/PassesCard.tsx`, edits them, and a running pass's open flags are a group in the Backlog, `schedule/PassBacklog.tsx`). A project is also made of **phases** (`Phase`: a title, the
   `result` it builds to, a status of planned, active or done, and dates; it is
   on one row of the plan: the project's, or a book's or chapter's, as `level`
   and `nodeId`, in the sequence `order`, with its start pinned when `fixed`, and
@@ -697,7 +702,7 @@ the one project-independent router).
 | `activity` | `/api/projects/{id}/activity` | `GET ""` daily aggregate + unified log |
 | `analytics` | `/api/projects/{id}/analytics` | `GET ""` totals/goals/rollups/flagged nodes |
 | `schedule` | `/api/projects/{id}/schedule` | `GET "/{date}"` · `PUT "/{date}"` replace completed ids (a new tick is project activity) |
-| `facets` | `/api/projects/{id}` · `/api/activity` | `GET "/activity/facets"` events, daily and monthly totals (compacts first) · `GET "/planner"` · `PUT "/planner"` (dates and shapes checked) · `GET /api/activity/ribbon` today's events per 10-minute slot across every project, and the 28-day average |
+| `facets` | `/api/projects/{id}` · `/api/activity` | `GET "/activity/facets"` events, daily and monthly totals (compacts first) · `GET "/planner"` · `PUT "/planner"` (dates and shapes checked; a pass's last day not before its first, its kinds once each, a word goal with its words) · `POST "/activity/read"` `{chapterId}` (204; a chapter opened in the Preview while a revision pass with a reading goal runs: an event, facet `revision`, action `read`, kept out of the day's totals; 404 for a node that is not a chapter) · `GET /api/activity/ribbon` today's events per 10-minute slot across every project, and the 28-day average |
 | `revision-flags` | `/api/projects/{id}/revision-flags` | `GET ""` (`includeResolved`) · `POST ""` · `PATCH "/{flagId}"` · `POST "/{flagId}/resolve"` · `DELETE "/{flagId}"` (204) (the Preview's Flag tool, `draft/FlagTool.tsx` and `useRevisionFlags.ts`, is their UI: flag a clicked sentence, `sentenceRanges`, or the project; edit, resolve with an outcome, delete) |
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET ""` `scope` (`project`, `book`, `chapter`), `id` (the book or chapter), `format` (`pdf`, `epub`, `json`) and the format's options: a PDF `pageSize` (`6x9`, `a5`, `letter`, `a4`), `titlePage`, `contents`, `footnotes` and `marginFlags` (the open revision flags beside their lines, in the book's hue); an EPUB `cover` (the book's title and colour), `contents` and `footnotes` (at each chapter's end); JSON `plot`, `flags` and `revisions` (always the outline and the drafts). `split` makes a project of several books a zip with a file per book. The text is laid out in the book's preview formatting and split as the Preview splits it (`storage/export_content.py`); a PDF prints any script in the bundled Noto fonts (`app/fonts/`), embedding only the fallback fonts the text needs. 404 for an unknown book or chapter, 422 for a book or chapter export without its id. The download name carries the real title in `filename*`. The first routes, `GET "/book/{bookId}"` and `GET "/chapter/{chapterId}"`, are the PDF with the defaults |
@@ -813,7 +818,7 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   minimizing (`minimized` / `onMinimizedChange`) and maximizing (`maximized` / `onMaximizedChange`) itself: the Writer's
   tabs do the first, the Reader the second. Pure logic in `tileLayout.ts` (`applyLayout`) and `tileNav.ts` (`nextFocus`).
 - **Writer:** the level tabs (`useTabbedLevel`) are console tabs, a tile each; a closed tab is a minimized tile, and Settings and
-  Help are last. The Schedule console's four tiles (Goals, Agenda, Backlog, Analytics; Analytics holds the activity chart with the review and the charts folded under it) have their rail in
+  Help are last. The Schedule console's four tiles (Goals, Agenda, Backlog, Analytics; Analytics holds the activity chart with the review and the charts folded under it), and a project's fifth, Revision passes, have their rail in
   the console tile's title bar. Draft's three tiles have a rail above them; its Settings and Help are `railless` tiles that the
   two console buttons in the chapter tile turn on and off. The Shelves and Shelf screens, the
   Book screen (`writer/tiles/`) and the sidebar's Project, Book and Chapter panels are their own thing; the sidebar is

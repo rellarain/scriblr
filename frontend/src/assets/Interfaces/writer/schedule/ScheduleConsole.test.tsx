@@ -59,9 +59,9 @@ const open = async () => {
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 
 describe('the Schedule console', () => {
-  it('lays out goals, the agenda, the backlog and analytics as tiles of their own', async () => {
+  it("lays out goals, the agenda, the backlog, analytics and the project's revision passes as tiles of their own", async () => {
     await open()
-    expect(Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).sort()).toEqual(['analytics', 'backlog', 'goals', 'schedule'])
+    expect(Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).sort()).toEqual(['analytics', 'backlog', 'goals', 'passes', 'schedule'])
     expect(tile('schedule').contains(tile('backlog'))).toBe(false)
     expect(within(tile('backlog')).getByText('Reread Ch. 8')).toBeTruthy()
   })
@@ -71,7 +71,7 @@ describe('the Schedule console', () => {
     expect(screen.queryByRole('button', { name: /^Minimize/ })).toBeNull()
     expect(within(tile('schedule').querySelector('.wrTabTileTitle') as HTMLElement).getByText('Agenda')).toBeTruthy()
     const rail = screen.getByRole('toolbar', { name: 'Schedule tiles tabs' })
-    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Goals', 'Agenda', 'Backlog', 'Analytics'])
+    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Goals', 'Agenda', 'Backlog', 'Analytics', 'Revision passes'])
   })
 
   it('holds the activity chart in the Analytics tile with the review and the charts folded under it', async () => {

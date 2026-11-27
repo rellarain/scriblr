@@ -4,9 +4,9 @@ import type { ProjectFacts, TreeNodeFact } from '../../../../lib/goalFacts'
 
 // What a goal's progress is read from: each project's word counts and the nodes of its outline and plot.
 
-interface RawTree { nodes: Array<{ id: string; kind: string; parentId: string | null; title: string }> }
+interface RawTree { nodes: Array<{ id: string; kind: string; parentId: string | null; title: string; order?: number }> }
 interface RawAnalytics { totals: { totalWordCount: number }; nodeWordCounts: Record<string, number> }
-const facts = (n: RawTree['nodes']): TreeNodeFact[] => n.map(x => ({ id: x.id, kind: x.kind, parentId: x.parentId, title: x.title }))
+const facts = (n: RawTree['nodes']): TreeNodeFact[] => n.map(x => ({ id: x.id, kind: x.kind, parentId: x.parentId, title: x.title, order: x.order }))
 
 export function useProjectFacts(projectIds: string[]): ProjectFacts[] {
   const key = projectIds.join(',')

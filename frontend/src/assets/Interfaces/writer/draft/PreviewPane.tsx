@@ -18,6 +18,7 @@ import { ExportTool } from './ExportTool'
 import { useRevisionFlags } from '../useRevisionFlags'
 import type { FlagType } from '../../../../api/types'
 import { V2_FEATURES } from '../../../../features'
+import { useRecordRead } from '../schedule/useRecordRead'
 
 // Reactions are kept per sentence in this browser (no backend model for them
 // yet), keyed by the sentence's position in its moment. Flags are the
@@ -131,6 +132,8 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
   onComponent: (key: string) => void
 }) {
   const [marks, setMarks] = useStoredState<Marks>(`scriblr.writer.marks.${w.activeProjectId}.${chapter.id}`, {})
+  // Opened, the chapter counts as read for a revision pass that has a reading goal and is running.
+  useRecordRead(w.activeProjectId, chapter.id)
   const [selected, setSelected] = useState<string | null>(null)
   const authorNotes = useAuthorNotes(w.activeProjectId, chapter.id, w.activeBook?.id ?? null)
   // Day: a white page with black text; night: a dark page with light text.

@@ -3665,7 +3665,7 @@ SLOTS_PER_DAY = 144
 FACET_EVENT_DAYS = 14
 SLOT_PROFILE_DAYS = 28
 DAILY_KEEP_DAYS = 372
-EventAction = Literal["create", "edit", "delete", "words", "flag", "resolve", "tick", "setting"]
+EventAction = Literal["create", "edit", "delete", "words", "flag", "resolve", "tick", "setting", "read"]
 
 
 class ActivityEvent(BaseModel):
@@ -4024,6 +4024,30 @@ class Exercise(BaseModel):
     lastDone: Optional[str] = None
 
 
+PassGoalKind = Literal["flags", "words", "read"]
+
+
+class PassGoal(BaseModel):
+    """A goal of a revision pass: resolve the flags of its kinds, change the project's word count (`words`: negative to cut that many, positive
+    to add them), or read every chapter once (in the Preview, while it runs)."""
+
+    id: str
+    kind: PassGoalKind
+    words: Optional[int] = Field(default=None, ge=-10_000_000, le=10_000_000)
+
+
+class RevisionPass(BaseModel):
+    """A stretch of revision across the whole project: a name, a first day and an optional last one, the kinds of flag it works through and
+    goals of its own. Its open flags are tasks in the Backlog; its progress is worked out from the flags, the daily totals and the reads."""
+
+    id: str
+    name: str = Field(default="", max_length=100)
+    start: str
+    end: Optional[str] = None
+    kinds: list[FlagType] = Field(default_factory=list, max_length=7)
+    goals: list[PassGoal] = Field(default_factory=list, max_length=12)
+
+
 class Planner(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     timelineStart: Optional[str] = None
@@ -4042,6 +4066,8 @@ class Planner(BaseModel):
     exercises: list[Exercise] = Field(default_factory=list)
     # The recipes for phases that come round.
     phaseKinds: list[PhaseKind] = Field(default_factory=list)
+    # The revision passes (WUI v1): each across every book and chapter of the project.
+    passes: list[RevisionPass] = Field(default_factory=list, max_length=50)
 
 
 # ---------------------------------------------------------------------------

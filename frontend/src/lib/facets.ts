@@ -1,4 +1,5 @@
 // The project facets the Schedule console tracks, and the shapes the backend sends for them (backend/app/storage/schema.py: FacetActivity, Planner).
+import type { RevisionPass } from './revisionPasses'
 
 export type Facet = 'outline' | 'plot' | 'draft' | 'revision' | 'project'
 export const FACETS: Facet[] = ['outline', 'plot', 'draft', 'revision', 'project']
@@ -32,7 +33,7 @@ export interface ActivityEvent {
   date: string
   slot: number
   facet: Facet
-  action: 'create' | 'edit' | 'delete' | 'words' | 'flag' | 'resolve' | 'tick' | 'setting'
+  action: 'create' | 'edit' | 'delete' | 'words' | 'flag' | 'resolve' | 'tick' | 'setting' | 'read'
   nodeId: string | null
   kind: string | null
   label: string | null
@@ -248,10 +249,12 @@ export interface Planner {
   exercises: Exercise[]
   // The recipes for phases that come round.
   phaseKinds: PhaseKind[]
+  // The revision passes (lib/revisionPasses.ts); a planner saved before them has none.
+  passes?: RevisionPass[]
 }
 export const emptyPlanner = (): Planner => ({
   timelineStart: null, timelineEnd: null, goals: [], shifts: [], routines: [], items: [], templates: [], restDays: [], reminderLeadMinutes: null,
-  phases: [], milestones: [], processes: [], exercises: [], phaseKinds: [],
+  phases: [], milestones: [], processes: [], exercises: [], phaseKinds: [], passes: [],
 })
 export const newPhase = (id: string, title: string, patch: Partial<Phase> = {}): Phase => ({
   id, title, result: '', description: '', status: 'planned', start: null, end: null, offsetDays: null, lengthDays: null, level: 'project', nodeId: null, kindId: null, order: 0, fixed: false, overrides: [], ...patch,

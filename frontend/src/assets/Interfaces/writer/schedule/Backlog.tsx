@@ -43,6 +43,7 @@ const NO_MILESTONES: never[] = []
 
 export function Backlog({
   owners, today, nowSlot, todayTicks, onPlanner, onTick, events, targets, nodes, onOpenNode, project = null, onProject = () => {}, addTo, onAddTo = () => {}, colors = {},
+  passGroups, passCount = 0,
 }: {
   owners: BacklogOwner[]
   today: string
@@ -61,6 +62,9 @@ export function Backlog({
   addTo?: string
   onAddTo?: (id: string) => void
   colors?: Record<string, string>
+  // The running revision passes' open flags, as groups after the overdue tasks (drawn with the search), and how many there are.
+  passGroups?: (search: string) => ReactNode
+  passCount?: number
 }) {
   const [remembered, setRemembered] = useStoredState<Remembered>('scriblr.writer.backlog.view', { facet: DEFAULT_FILTER.facet, sort: DEFAULT_FILTER.sort, done: DEFAULT_FILTER.done })
   const [search, setSearch] = useState('')
@@ -174,6 +178,7 @@ export function Backlog({
       <BacklogToolbar filter={filter} owners={owners} onChange={next => { setSearch(next.search); onProject(next.project); setRemembered({ facet: next.facet, sort: next.sort, done: next.done }) }} />
       {group(`Today · ${todayRows.length}`, todayRows, 'today')}
       {group(`Overdue · ${sections.overdue.length}`, sections.overdue.map(entryRow), 'overdue')}
+      {passGroups?.(search)}
       {filter.sort === 'priority' ? (
         <>
           {group(flagged(`High · ${sections.groups.high.length}`, 'high'), sections.groups.high.map(e => taskRow(e)), 'high', `High · ${sections.groups.high.length}`)}
@@ -201,7 +206,7 @@ export function Backlog({
         </section>
       )}
       {sections.done.length > 0 && group(`Done · ${sections.done.length}`, sections.done.map(e => taskRow(e)), 'done')}
-      {sections.empty && <p className="wrMuted">{search || filter.facet || filter.project ? 'Nothing matches.' : 'Nothing waiting. Add a task, or a routine that comes round on its own.'}</p>}
+      {sections.empty && passCount === 0 && <p className="wrMuted">{search || filter.facet || filter.project ? 'Nothing matches.' : 'Nothing waiting. Add a task, or a routine that comes round on its own.'}</p>}
 
       <div className="wrSchedBacklogAdd">
         {multi && (
