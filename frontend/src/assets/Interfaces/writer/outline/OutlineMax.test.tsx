@@ -548,7 +548,7 @@ describe('Outline Max: the book editor and the draft stats', () => {
     expect(within(editor).getByText('Cold Harbor')).toBeTruthy()
     expect(within(editor).queryByLabelText('Book title')).toBeNull()
     const names = within(within(editor).getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Book outline', 'Book details', 'Publish', 'Settings', 'Help'])
+    expect(names).toEqual(['Book outline', 'Book details', 'Settings', 'Help']) // Publish is WUI v2
     await user.click(within(editor).getByRole('button', { name: 'Settings' }))
     const title = within(editor).getByLabelText('Book title')
     await user.type(title, '!')

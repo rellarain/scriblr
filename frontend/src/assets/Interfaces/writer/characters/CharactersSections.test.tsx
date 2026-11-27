@@ -30,6 +30,15 @@ const puts = (b: Backend) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit
 const lastPut = (b: Backend) => JSON.parse((puts(b).at(-1)![1] as RequestInit).body as string) as CharacterDoc
 const goto = (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name }))
 
+describe('the sections', () => {
+  it('leave out For readers until WUI v2, with publishing', async () => {
+    await open()
+    const names = within(screen.getByRole('toolbar', { name: 'What to work on' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
+    expect(names).toContain('Story')
+    expect(names).not.toContain('For readers')
+  })
+})
+
 describe('the profile', () => {
   it('is edited in place, and typing in a field is one undo step', async () => {
     const { backend, user } = await open()

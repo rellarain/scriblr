@@ -80,7 +80,7 @@ def test_analytics_collects_flagged_nodes_from_outline_and_plot(client: TestClie
             "parentId": None,
             "order": 0,
             "title": "Themes",
-            "flag": {"type": "edit", "note": "expand"},
+            "flag": {"type": "change", "note": "expand"},
         }
     )
     client.put(f"/api/projects/{project_id}/plot", json=plot)
@@ -93,7 +93,7 @@ def test_analytics_collects_flagged_nodes_from_outline_and_plot(client: TestClie
     assert outline_flag["flag"]["type"] == "review"
     plot_flag = next(f for f in flagged if f["nodeId"] == "cat_1")
     assert plot_flag["treeType"] == "plot"
-    assert plot_flag["flag"]["type"] == "edit"
+    assert plot_flag["flag"]["type"] == "change"
 
 
 def test_analytics_reports_a_word_count_for_every_node_above_a_drafted_moment(client: TestClient) -> None:

@@ -15,6 +15,7 @@ import { useCast } from './castStore'
 import { useFigureModels } from './figure/figureModelStore'
 import { OpenMyModelContext } from './figure/ownModel'
 import { WRITER_DESIGNER } from '../../admin/characters/designerFeatures'
+import { V2_FEATURES } from '../../../../features'
 import { exportSheet } from './sheet'
 import { PortraitSection } from './PortraitSection'
 import { ProfileSection } from './ProfileSection'
@@ -36,7 +37,8 @@ const SECTIONS: Array<{ section: Section; label: string; Icon: typeof FaceIcon }
   { section: 'relationships', label: 'Relationships', Icon: LinkIcon },
   { section: 'story', label: 'Story', Icon: ClockIcon },
   { section: 'cast', label: 'The cast', Icon: TeamIcon },
-  { section: 'readers', label: 'For readers', Icon: ExportIcon },
+  // What readers see comes with publishing, in a later version (features.ts).
+  ...(V2_FEATURES ? [{ section: 'readers' as const, label: 'For readers', Icon: ExportIcon }] : []),
 ]
 // Not about the open character, nor about this project: the writer's own models, kept for every project (a character is drawn from a published one).
 const MODELS = { section: 'models' as const, label: 'My models', Icon: MannequinIcon }
@@ -127,8 +129,8 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
           {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
           {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
           {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
-          {doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
-          {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<><CarriedItems projectId={projectId} characterId={doc.id} outline={outline} /><WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} /></>} />}
+          {V2_FEATURES && doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
+          {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<>{V2_FEATURES && <CarriedItems projectId={projectId} characterId={doc.id} outline={outline} />}<WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} /></>} />}
           {doc ? null : (
             <p className="charNote charEmpty">{c.cast.length === 0 ? 'Make a character to start: a name, a portrait and the words about them.' : 'Pick a character in the list to open it.'}</p>
           )}

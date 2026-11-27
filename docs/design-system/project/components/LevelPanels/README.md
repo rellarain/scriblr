@@ -30,6 +30,8 @@ At Mid one tab shows at a time; at Max each tab opens or closes a tile on the sp
 
 ## Publishing a book, and what readers did
 
+**Held back for WUI v2** (`features.ts`, with RUI in phase 2): the Publish tab and the Dash's Readers tab below are off the screen in version 1; their code is kept.
+
 The **Book level** (Outline) has a **Publish** tab, between Book details and Settings (at Mid a tab; at Max a section of the book's cover). It puts the book in the Reader's library:
 
 - **Publish the book**: a button that asks first ("Publish edition 2?"). An edition is a frozen copy of the chapters published so far with their published footnotes and flagged passages. Publishing again makes the next edition; **Unpublish** takes the book off sale and loan and keeps copies readers own and loans already made.

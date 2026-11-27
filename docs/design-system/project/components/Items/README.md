@@ -1,5 +1,7 @@
 # Items (the library of things that change hands)
 
+**Held back for WUI v2** (`features.ts`): the Items tab, items in the *Link to…* picker and a character's carried items are off the screen in version 1; the code and any saved items are kept.
+
 The **Items** console keeps the things of the story that pass from hand to hand: a sword, a letter, a ring. It is a tab of the Writer's **Project** level (after Characters, before History), with the bag icon. An item is a name, a kind, a description, notes and a tag colour, plus its **holdings**: who has it from which chapter or scene on. It reuses the Characters console's page, list and panels (`characters.scss`); only what is its own is in `items.scss`.
 
 Code: `writer/items/` (`ItemsConsole.tsx`, `CarriedItems.tsx`, `itemModel.ts`, `itemStore.ts`, `useItems.ts`, `items.scss`). Storage: the project's `items` section (`project.json`), one entry per item; the API is `/api/projects/{id}/items` (`GET ""` the list, `GET /all` every item whole, `POST ""`, `GET/PUT/DELETE /{id}`). The preview runs against the pretend API in `designSystem/mockItems.ts`.

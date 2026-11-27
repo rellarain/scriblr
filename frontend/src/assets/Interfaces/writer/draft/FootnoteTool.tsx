@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { BookFlagMeta, ChapterAuthorNotes } from '../../../../api/bookPublishing'
+import { V2_FEATURES } from '../../../../features'
 import { PlusIcon, TrashIcon } from '../../../icons'
 
 // The Preview's Footnote tool: the author's footnotes and flagged passages on a chapter's sentences. A published footnote goes into the next
@@ -35,7 +36,8 @@ export function FootnoteTool({ at, notes, flags, error, onSave }: {
         <input className="wrField" aria-label="Footnote text" placeholder="What the reader should know" maxLength={2000} value={text} disabled={!at} onChange={e => setText(e.target.value)} />
         <button type="button" className="wrSmallBtn wrSmallBtn--accent" disabled={!at || !title.trim()} onClick={add}><PlusIcon size={14} /> Add footnote</button>
       </div>
-      <div className="wrToolGroup">
+      {/* Content flags and publishing a footnote are for readers, in a later version (features.ts). */}
+      {V2_FEATURES && <div className="wrToolGroup">
         <span className="wrLabel">Flag this passage</span>
         {flags.length === 0 ? <span className="wrHint">The book has no content flags yet. Add them in the Book level&rsquo;s Publish tab.</span> : (
           <select className="wrPreviewSelect" aria-label="Flag this passage" disabled={!at} value="" onChange={e => {
@@ -48,17 +50,17 @@ export function FootnoteTool({ at, notes, flags, error, onSave }: {
             {flags.map(f => <option key={f.key} value={f.key}>{at && flagged(at).some(x => x.flagKey === f.key) ? '✓ ' : ''}{f.name}</option>)}
           </select>
         )}
-      </div>
-      {(notes.footnotes.length > 0 || notes.flags.length > 0) && (
+      </div>}
+      {(notes.footnotes.length > 0 || (V2_FEATURES && notes.flags.length > 0)) && (
         <ul className="wrFootnoteList" aria-label="Footnotes and flagged passages">
           {notes.footnotes.map(f => (
             <li key={f.id}>
               <span>{where(f)}: <b>{f.title}</b></span>
-              <label className="wrCheckRow"><input type="checkbox" checked={f.published} onChange={e => onSave({ ...notes, footnotes: notes.footnotes.map(x => (x.id === f.id ? { ...x, published: e.target.checked } : x)) })} />Published</label>
+              {V2_FEATURES && <label className="wrCheckRow"><input type="checkbox" checked={f.published} onChange={e => onSave({ ...notes, footnotes: notes.footnotes.map(x => (x.id === f.id ? { ...x, published: e.target.checked } : x)) })} />Published</label>}
               <button type="button" className="wrTrashBtn wrTrashBtn--dark" aria-label={`Delete footnote ${f.title}`} onClick={() => onSave({ ...notes, footnotes: notes.footnotes.filter(x => x.id !== f.id) })}><TrashIcon size={14} /></button>
             </li>
           ))}
-          {notes.flags.map(f => (
+          {V2_FEATURES && notes.flags.map(f => (
             <li key={f.id}>
               <span>{where(f)}: flag <b>{flags.find(x => x.key === f.flagKey)?.name ?? f.flagKey}</b></span>
               <button type="button" className="wrTrashBtn wrTrashBtn--dark" aria-label="Remove flagged passage" onClick={() => onSave({ ...notes, flags: notes.flags.filter(x => x.id !== f.id) })}><TrashIcon size={14} /></button>

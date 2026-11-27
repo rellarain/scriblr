@@ -14,6 +14,7 @@ import HueSlider from '../HueSlider'
 import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { PublishControl } from '../PublishControl'
+import { V2_FEATURES } from '../../../../features'
 import { Placeholder } from '../shared'
 import SplitArea from '../SplitArea'
 import { useChapterDraft } from '../useChapterDraft'
@@ -135,12 +136,14 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                             status={status} onSave={saveAll} buttonClassName="wrSmallBtn wrSaveBtn" history={history}
                             autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: countdown.nextSaveAt, wait: countdown.wait }}
                           />
-                          <PublishControl
-                            disabled={!hasDraft} busy={pubs.publishing}
-                            title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
-                            // Publish what is saved: let any waiting edit land first.
-                            onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
-                          />
+                          {V2_FEATURES && (
+                            <PublishControl
+                              disabled={!hasDraft} busy={pubs.publishing}
+                              title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
+                              // Publish what is saved: let any waiting edit land first.
+                              onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
+                            />
+                          )}
                           <DraftPreviewToggle preview={preview} hasDraft={hasDraft} onDraft={w.showDraft} onPreview={w.showPreview} />
                           <DraftPanelButtons closed={closed} onToggle={id => setClosedTile(id, !closed.includes(id))} />
                         </>

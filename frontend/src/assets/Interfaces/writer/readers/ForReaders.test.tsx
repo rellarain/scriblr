@@ -13,6 +13,9 @@ import { setShare, draftOf } from '../maps/mapModel'
 import { CharacterCard, MapView } from './WorldViews'
 import { RevealSelect } from './ReaderControls'
 
+// What readers see comes with publishing, held back until WUI v2: these tests turn it on.
+vi.mock('../../../../features', () => ({ V2_FEATURES: true }))
+
 beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
 
 const INFO: BookExtrasInfo[] = [{

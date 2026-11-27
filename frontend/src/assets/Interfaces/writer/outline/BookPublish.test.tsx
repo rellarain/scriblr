@@ -8,6 +8,9 @@ import type { WriterWorkspace } from '../useWriterWorkspace'
 import BookPublish from './BookPublish'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
+// Publishing, the readers' panel and the Footnote tool's content flags come with publishing, held back until WUI v2: these tests turn it on.
+vi.mock('../../../../features', () => ({ V2_FEATURES: true }))
+
 const META = { type: 'novel', blurb: '', genres: [], tags: [], tropes: [], flags: [], buyPriceCents: 900, coverHue: null } as BookListing['meta']
 const FEEDBACK: BookFeedback = {
   bookId: 'local-p1-b1', listed: true, editions: 1, loans: 2, activeLoans: 1, sales: 1, loanShareCents: 500, saleShareCents: 630, readers: 1, rating: 9, ratings: 1,

@@ -11,7 +11,10 @@ export function childKindOptions(parentKind: OutlineNodeKind): OutlineNodeKind[]
   return OUTLINE_KIND_ORDER.slice(OUTLINE_KIND_ORDER.indexOf(parentKind) + 1)
 }
 
-export type FlagType = 'review' | 'edit' | 'add' | 'delete'
+// The kinds of flag (backend schema.FlagType): on a draft passage, the project, or an outline or plot node. Before WUI v1, Edit was Change
+// and Delete was Remove; the backend reads the old names as the new ones.
+export const FLAG_KINDS = ['review', 'add', 'remove', 'merge', 'change', 'simplify', 'expand'] as const
+export type FlagType = typeof FLAG_KINDS[number]
 export interface NodeFlag {
   type: FlagType
   note: string

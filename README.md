@@ -206,8 +206,9 @@ described, now stale, in `docs/data-model.md`).
   is configurable via `ProjectSettings.outlineLevels`. **The moment is the
   writing unit** — only `moment` nodes carry a `draftRef`, pointing at the
   id used to look up its draft content; draft shard creation is lazy (first
-  save). Nodes also carry `flag` (`NodeFlag`: `review|edit|add|delete` +
-  note), `color`, `chapterCountTarget`, `plotlineIds`, `wordCountGoal`.
+  save). Nodes also carry `flag` (`NodeFlag`: one of the seven kinds,
+  `review|add|remove|merge|change|simplify|expand`, + note; the old `edit`
+  and `delete` are read as `change` and `remove`), `color`, `chapterCountTarget`, `plotlineIds`, `wordCountGoal`.
 - **Plot tree** (`PlotNode`/`PlotTree`) — the same flat-list-with-`parentId`
   shape, five kinds: `category < subcategory < cluster < plotline < plotpoint`
   (`PlotNodeKind`/`PLOT_KIND_ORDER`; a cluster is an optional grouping under a
@@ -311,10 +312,13 @@ described, now stale, in `docs/data-model.md`).
   and a 28-day per-slot profile feeds the header ribbon. Opening a project
   compacts it (no scheduler) and folds the older per-day saves in once.
   Trees are compared with the ones they replace (`facet_activity.tree_changes`).
-- **Revision flags** — `RevisionFlag`: a flag (review/edit/add/delete, a note)
+- **Revision flags** — `RevisionFlag`: a flag (one of the seven kinds, a note)
   on a passage of a moment's draft (it follows the text as it is edited,
   `storage/revision_flags.py`, and goes `stale` if the text is cut) or on the
-  project; resolving one (with an outcome note) is activity too.
+  project; a `merge` flag on a passage may hold `mergeWith`, a second passage
+  of the same chapter that follows its own text the same way (dropped when
+  the flag becomes another kind); resolving one (with an outcome note) is
+  activity too.
 - **Planner** — `Planner`: goals (per facet; a project, a book or a chapter;
   daily, weekly and total targets; a deadline), shifts (a day and 10-minute
   slots, repeating, paused, skipped, overridden a day at a time, with an

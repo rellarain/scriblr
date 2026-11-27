@@ -16,6 +16,7 @@ import ScheduleConsole from '../schedule/ScheduleConsole'
 import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
+import { V2_FEATURES } from '../../../../features'
 
 const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series, books, arcs and chapters, schedule, its project plan (phases, goals, processes, exercises, routines and tasks), history and analytics, and its own settings.'
 
@@ -91,14 +92,15 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
         return <CharactersConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} onOpenScene={sceneId => openNode(w, 'outline', sceneId)} />
       },
     },
-    {
+    // Items come in a later version (features.ts).
+    ...(V2_FEATURES ? [{
       id: 'items', label: 'Items', Icon: BagIcon, fill: true, console: true,
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to keep its items.</p>
         return <ItemsConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} onOpenScene={sceneId => openNode(w, 'outline', sceneId)} />
       },
-    },
+    }] : []),
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ProjectEditor w={w} /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={HELP_TARGETS.writerProject} fallback={PROJECT_HELP_FALLBACK} /> },

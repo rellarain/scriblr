@@ -52,14 +52,15 @@ WUI, UUI, VUI, HUI and AUI completely built out with their version 1 functionali
 - **Accounts are local.** Welcome, Registration, Login, Account and Subscription work on this machine: a local account with a password or a passkey; plans shown, not charged. Phase 4 connects real accounts and payment.
 - **UUI before VUI.** UUI adds the local account record its Profile and Subscription need; VUI builds Registration and Login on it.
 - **Admin levels map onto the roles that exist**: Site/System is the owner and admins with site rights, Department is director, Team is manager, Support is channel support.
+- **Every tile and console takes the hue of what it belongs to**: the project's on the Project level, the book's in the Outline, the chapter's in the Draft (a series', an arc's or a plot category's where it applies), from the level-scoped tokens, never one fixed colour (the user, approving the WUI mockup).
 
 Tasks:
 - [x] Version 1 interviews: WUI (four rounds) and the phase 1 round for UUI, VUI, HUI and AUI.
 - [ ] Each interface's own round, before its mockup: UUI, VUI, HUI, AUI (their open questions are in their requirements).
 
 WUI (mockup first):
-- [ ] Take Dash > Readers, Project > Items and Outline > Publish out of v1 behind the `V2_FEATURES` switch (they return in WUI v2).
-- [ ] Seven flag kinds: Review, Add, Remove, Merge, Change, Simplify, Expand; Edit becomes Change and Delete becomes Remove.
+- [x] Take Dash > Readers, Project > Items and Outline > Publish out of v1 behind the `V2_FEATURES` switch (they return in WUI v2), with what only works with them: the chapter's Publish and published versions, For readers, the Footnote tool's content flags, item links and carried items.
+- [x] Seven flag kinds: Review, Add, Remove, Merge, Change, Simplify, Expand; Edit becomes Change and Delete becomes Remove. A Merge can name the second passage, picked on the page.
 - [ ] Export: PDF with full Unicode, EPUB and JSON, for a project, a book or a chapter.
 - [ ] Paragraph and Sentence tools: move, split and join paragraphs (pinned plotpoints follow); style aids for long sentences, repeated words and readability, each on or off.
 - [ ] Revision passes in the project's schedule, each with its own goals, across all the project's books and chapters; their open flags in the backlog.
@@ -145,3 +146,4 @@ More items will be added.
 - 2026-11-26: WUI v1 interview round 3: what finishing Characters means, book goals with or without dates and estimates, Publish to v2.
 - 2026-11-26: WUI v1 interview round 4: Maps tools, seven flag kinds, export formats, paragraph and sentence tools. The WUI interview is done.
 - 2026-11-26: The phase 1 plan: requirements for UUI, VUI, HUI and AUI; build order (interface by interface, a mockup before each one's code); local accounts; admin levels; items moved to phases 2, 3 and 4.
+- 2026-11-27: The WUI v1 mockup is approved; every tile takes its own scope's hue. WUI slice 1: the `V2_FEATURES` switch and the seven flag kinds.

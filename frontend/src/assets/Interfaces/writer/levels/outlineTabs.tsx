@@ -10,6 +10,7 @@ import { useWordCounts } from '../useWordCounts'
 import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
+import { V2_FEATURES } from '../../../../features'
 
 export const OUTLINE_HELP_FALLBACK = 'The Outline level is the open book: its arcs and chapters to move around in, the open chapter’s acts, scenes and moments as cards, the book’s draft stats and its own settings. Plotpoints still to place are in the Project’s Plot tab, in its Plotpoints tile: drag one onto a card.'
 
@@ -81,7 +82,8 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
       render: () => <BookOutlineList w={w} />,
     },
     { id: 'details', label: 'Book details', Icon: InfoIcon, render: () => <BookDetails w={w} /> },
-    { id: 'publish', label: 'Publish', Icon: ExportIcon, render: () => <BookPublish w={w} /> },
+    // Publishing to readers comes in a later version (features.ts).
+    ...(V2_FEATURES ? [{ id: 'publish', label: 'Publish', Icon: ExportIcon, render: () => <BookPublish w={w} /> }] : []),
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, render: () => <SettingsPane w={w} /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={HELP_TARGETS.writerBook} fallback={OUTLINE_HELP_FALLBACK} /> },
   ]

@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
 import colorsys
 import math
 import re
 
-from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, ValidationError, field_validator, model_validator
 
 SCHEMA_VERSION = 2
 # The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
@@ -184,7 +184,13 @@ class ProjectIndex(BaseModel):
     manifest: ProjectManifest = Field(default_factory=ProjectManifest)
 
 
-FlagType = Literal["review", "edit", "add", "delete"]
+# The kinds of flag, on a draft passage, on the project, or on an outline or plot node (WUI v1). Before it there were four kinds: "edit" is
+# now "change" and "delete" is "remove", so a file or a request in the old names still reads, and is written back in the new ones.
+LEGACY_FLAG_TYPES = {"edit": "change", "delete": "remove"}
+FlagType = Annotated[
+    Literal["review", "add", "remove", "merge", "change", "simplify", "expand"],
+    BeforeValidator(lambda v: LEGACY_FLAG_TYPES.get(v, v) if isinstance(v, str) else v),
+]
 
 
 class NodeFlag(BaseModel):
@@ -3706,6 +3712,16 @@ class FacetActivity(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class FlagPassage(BaseModel):
+    """A second passage of a flag: the one a merge flag joins its own passage with, in the same chapter. It follows its text like the first."""
+
+    momentId: str
+    start: int = Field(default=0, ge=0)
+    end: int = Field(default=0, ge=0)
+    snippet: str = Field(default="", max_length=2000)
+    stale: bool = False
+
+
 class RevisionFlag(BaseModel):
     id: str
     scope: Literal["passage", "project"]
@@ -3719,6 +3735,8 @@ class RevisionFlag(BaseModel):
     end: int = Field(default=0, ge=0)
     snippet: str = Field(default="", max_length=2000)
     stale: bool = False
+    # A merge flag on a passage may name the passage to merge it with (optional; dropped when the flag becomes another kind).
+    mergeWith: Optional[FlagPassage] = None
     createdAt: datetime = Field(default_factory=utcnow)
     resolvedAt: Optional[datetime] = None
     outcome: str = ""

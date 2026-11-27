@@ -52,7 +52,8 @@ export interface ProjectIndex {
 export type OutlineNodeKind = 'series' | 'book' | 'arc' | 'chapter' | 'act' | 'scene' | 'moment'
 export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['series', 'book', 'arc', 'chapter', 'act', 'scene', 'moment']
 
-export type FlagType = 'review' | 'edit' | 'add' | 'delete'
+export type { FlagType } from '../api/types'
+import type { FlagType } from '../api/types'
 
 export interface NodeFlag {
   type: FlagType

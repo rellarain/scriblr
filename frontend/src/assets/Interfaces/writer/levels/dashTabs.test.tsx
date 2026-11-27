@@ -23,10 +23,10 @@ function Harness({ size }: { size: 'mid' | 'max' }) {
 }
 
 describe('the Dash tabs', () => {
-  it('are schedule (the agenda and analytics are in it), readers, scratchpad and the project, ending with Settings and Help', () => {
+  it('are schedule (the agenda and analytics are in it), scratchpad and the project, ending with Settings and Help (Readers is WUI v2)', () => {
     render(<Harness size="max" />)
     const names = within(screen.getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Schedule', 'Readers', 'Scratchpad', 'Project', 'Settings', 'Help'])
+    expect(names).toEqual(['Schedule', 'Scratchpad', 'Project', 'Settings', 'Help'])
   })
 
   it('open the schedule alone at Max, with the full width for its tiles, and the scratchpad beside it from its tab', async () => {

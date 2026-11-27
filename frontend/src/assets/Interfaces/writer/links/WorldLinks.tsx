@@ -5,6 +5,7 @@ import { usePlaces } from '../maps/placesStore'
 import { useCast } from '../characters/castStore'
 import { storyPoints } from '../characters/story'
 import { useItemStore } from '../items/itemStore'
+import { V2_FEATURES } from '../../../../features'
 import { pathLabel } from '../plotLinks'
 import { KIND_HEADING, KIND_NAME, LINK_KINDS, idOf, kindOf, linkedTo, refOf, useWorldLinks, type LinkKind } from './linkStore'
 import { requestOpen } from './worldNav'
@@ -24,7 +25,8 @@ export function useLinkTargets(projectId: string | null, plotNodes: PlotNode[], 
       ...plotNodes.map(n => ({ ref: refOf('plot', n.id), kind: 'plot' as const, label: pathLabel(n, byId) })),
       ...cast.map(c => ({ ref: refOf('char', c.id), kind: 'char' as const, label: c.name })),
       ...places.map((p: MapPlace) => ({ ref: refOf('place', p.key), kind: 'place' as const, label: p.path || p.name })),
-      ...items.map(i => ({ ref: refOf('item', i.id), kind: 'item' as const, label: i.name })),
+      // Items come in a later version (features.ts): until then they are neither offered nor shown.
+      ...(V2_FEATURES ? items.map(i => ({ ref: refOf('item', i.id), kind: 'item' as const, label: i.name })) : []),
       ...storyPoints(outline).map(p => ({ ref: refOf('scene', p.id), kind: 'scene' as const, label: p.label })),
     ]
   }, [plotNodes, cast, places, items, outline])

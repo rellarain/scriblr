@@ -61,7 +61,7 @@ def _node(node_id: str, **kw) -> dict:
 
 
 def test_tree_changes_name_creates_edits_deletes_and_flags() -> None:
-    old = [_node("a"), _node("b"), _node("c", flag={"type": "edit", "note": ""}), _node("d"), _node("m", kind="plotpoint", sourceFieldId="f")]
+    old = [_node("a"), _node("b"), _node("c", flag={"type": "change", "note": ""}), _node("d"), _node("m", kind="plotpoint", sourceFieldId="f")]
     new = [
         _node("a"),  # untouched
         _node("b", title="renamed"),  # edited
@@ -154,7 +154,7 @@ def test_book_of_walks_up_to_the_book() -> None:
 
 
 def _flag(start: int, end: int, snippet: str) -> RevisionFlag:
-    return RevisionFlag(id="f1", scope="passage", type="edit", momentId="m1", chapterId="c1", start=start, end=end, snippet=snippet)
+    return RevisionFlag(id="f1", scope="passage", type="change", momentId="m1", chapterId="c1", start=start, end=end, snippet=snippet)
 
 
 def test_a_flag_follows_its_text_when_words_are_added_before_it() -> None:
@@ -175,7 +175,7 @@ def test_a_flag_follows_an_edit_inside_it_and_goes_stale_when_its_text_is_cut() 
 
 
 def test_resolved_flags_and_other_moments_stay_put() -> None:
-    other = RevisionFlag(id="f2", scope="passage", type="edit", momentId="m2", start=0, end=3, snippet="One")
+    other = RevisionFlag(id="f2", scope="passage", type="change", momentId="m2", start=0, end=3, snippet="One")
     done = _flag(0, 3, "One")
     done.id = "f3"
     done.resolvedAt = NOW
@@ -252,7 +252,7 @@ def test_revision_flags_on_the_project_and_on_a_passage(client: TestClient) -> N
     client.put(f"/api/projects/{pid}/draft/chapter/c1/moment/m1", json={"outlineNodeId": "m1", "body": "The rain fell on the old road."})
     made = client.post(
         f"/api/projects/{pid}/revision-flags",
-        json={"scope": "passage", "type": "edit", "note": "tighten", "chapterId": "c1", "momentId": "m1", "start": 21, "end": 29},
+        json={"scope": "passage", "type": "change", "note": "tighten", "chapterId": "c1", "momentId": "m1", "start": 21, "end": 29},
     )
     assert made.status_code == 200 and made.json()["snippet"] == "old road"
     flag_id = made.json()["id"]
@@ -278,7 +278,7 @@ def test_revision_flags_on_the_project_and_on_a_passage(client: TestClient) -> N
 def test_revision_flag_requests_are_checked(client: TestClient) -> None:
     pid = _project(client)
     client.put(f"/api/projects/{pid}/draft/chapter/c1/moment/m1", json={"outlineNodeId": "m1", "body": "Short."})
-    bad = {"scope": "passage", "type": "edit", "chapterId": "c1", "momentId": "m1"}
+    bad = {"scope": "passage", "type": "change", "chapterId": "c1", "momentId": "m1"}
     assert client.post(f"/api/projects/{pid}/revision-flags", json={**bad, "start": 2, "end": 2}).status_code == 422
     assert client.post(f"/api/projects/{pid}/revision-flags", json={**bad, "start": 0, "end": 99}).status_code == 422
     assert client.post(f"/api/projects/{pid}/revision-flags", json={"scope": "passage", "type": "nope"}).status_code == 422

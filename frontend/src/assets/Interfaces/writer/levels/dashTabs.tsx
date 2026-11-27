@@ -10,6 +10,7 @@ import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
+import { V2_FEATURES } from '../../../../features'
 
 const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, the agenda, the backlog and analytics), the project (its phases, goals and work, and the template) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
 
@@ -22,7 +23,8 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
         return <ScheduleConsole scope="dash" titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} hues={Object.fromEntries(w.projects.map(p => [p.projectId, w.projectHueOf(p)]))} />
       },
     },
-    { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
+    // Readers' loans, sales and reviews come with publishing, in a later version (features.ts).
+    ...(V2_FEATURES ? [{ id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> }] : []),
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
     {
       id: 'project', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,

@@ -6,9 +6,15 @@ from pydantic import BaseModel, Field
 
 from ..deps import get_storage_root
 from ..storage import facet_activity, project_store as store
-from ..storage.schema import FlagType, ProjectFile, RevisionFlag, utcnow
+from ..storage.schema import FlagPassage, FlagType, ProjectFile, RevisionFlag, utcnow
 
 router = APIRouter(prefix="/api/projects/{project_id}/revision-flags", tags=["revision-flags"])
+
+
+class PassageRange(BaseModel):
+    momentId: str
+    start: int = Field(default=0, ge=0)
+    end: int = Field(default=0, ge=0)
 
 
 class CreateRevisionFlagRequest(BaseModel):
@@ -19,6 +25,8 @@ class CreateRevisionFlagRequest(BaseModel):
     momentId: Optional[str] = None
     start: int = Field(default=0, ge=0)
     end: int = Field(default=0, ge=0)
+    # For a merge flag on a passage: the passage to merge it with, in the same chapter.
+    mergeWith: Optional[PassageRange] = None
 
 
 class UpdateRevisionFlagRequest(BaseModel):
@@ -28,6 +36,14 @@ class UpdateRevisionFlagRequest(BaseModel):
 
 class ResolveRevisionFlagRequest(BaseModel):
     outcome: str = Field(default="", max_length=1000)
+
+
+def _snippet(root: Path, project_id: str, chapter_id: str, moment_id: str, start: int, end: int) -> str:
+    """The text [start, end) of a moment's draft, refused when the range is past its end."""
+    text = store.load_draft(root, project_id, chapter_id, moment_id).body
+    if end > len(text):
+        raise HTTPException(status_code=422, detail="the range is past the end of the text")
+    return text[start:end][:2000]
 
 
 def _find(flags: list[RevisionFlag], flag_id: str) -> RevisionFlag:
@@ -50,16 +66,28 @@ def create_revision_flag(
     project_id: str, body: CreateRevisionFlagRequest, root: Path = Depends(get_storage_root)
 ) -> RevisionFlag:
     snippet = ""
+    merge_with: Optional[FlagPassage] = None
     if body.scope == "passage":
         if not body.chapterId or not body.momentId or body.end <= body.start:
             raise HTTPException(status_code=422, detail="a passage flag needs chapterId, momentId and a range")
-        text = store.load_draft(root, project_id, body.chapterId, body.momentId).body
-        if body.end > len(text):
-            raise HTTPException(status_code=422, detail="the range is past the end of the text")
-        snippet = text[body.start : body.end][:2000]
+        snippet = _snippet(root, project_id, body.chapterId, body.momentId, body.start, body.end)
+        if body.mergeWith is not None:
+            if body.type != "merge":
+                raise HTTPException(status_code=422, detail="only a merge flag has a passage to merge with")
+            other = body.mergeWith
+            if other.end <= other.start:
+                raise HTTPException(status_code=422, detail="the passage to merge with needs a range")
+            if other.momentId == body.momentId and other.start < body.end and other.end > body.start:
+                raise HTTPException(status_code=422, detail="the passage to merge with overlaps the flagged one")
+            merge_with = FlagPassage(
+                momentId=other.momentId, start=other.start, end=other.end,
+                snippet=_snippet(root, project_id, body.chapterId, other.momentId, other.start, other.end),
+            )
+    elif body.mergeWith is not None:
+        raise HTTPException(status_code=422, detail="a project flag has no passage to merge with")
     flag = RevisionFlag(
         id=store.new_id("flag"), scope=body.scope, type=body.type, note=body.note, chapterId=body.chapterId,
-        momentId=body.momentId, start=body.start, end=body.end, snippet=snippet,
+        momentId=body.momentId, start=body.start, end=body.end, snippet=snippet, mergeWith=merge_with,
     )
     with store.transaction(root, project_id):
         def _do(pf: ProjectFile) -> None:
@@ -82,6 +110,8 @@ def update_revision_flag(
         flag = _find(pf.revisionFlags, flag_id)
         if body.type is not None:
             flag.type = body.type
+            if body.type != "merge":
+                flag.mergeWith = None
         if body.note is not None:
             flag.note = body.note
         result.append(flag)

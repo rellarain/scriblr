@@ -28,7 +28,7 @@
     --wr-hl: var(--page-night-highlight); --wr-hl-selected: var(--page-night-highlight-selected);
   }
   .wrPreviewSelect { background: var(--ov-sink-2); color: var(--ink); border: 0; border-radius: var(--radius-button); padding: var(--space-2) 8px; font-size: var(--text-small); font-weight: 700; option { color: black; } }
-  .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: var(--wr-hl); } &--selected { background: var(--wr-hl-selected); } &--flagged { border-bottom: 2px solid var(--wr-accent); } }
+  .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: var(--wr-hl); } &--selected { background: var(--wr-hl-selected); } &--flagged { border-bottom: 2px solid var(--wr-accent); } &--merge { background: var(--wr-hl); outline: 1px dashed var(--wr-accent); outline-offset: 1px; } }
   .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
   .wrReactBar {
     position: absolute; width: 20px; border-radius: var(--radius-button); display: flex; flex-direction: column; align-items: center; padding-top: var(--space-2); box-sizing: border-box; overflow: hidden;

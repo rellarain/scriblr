@@ -157,9 +157,9 @@ describe('Draft level: the chapter tile', () => {
     expect(within(stats).getByText('2 scenes')).toBeTruthy()
   })
 
-  it('keeps the tools (save, publish, Draft | Preview) in the tile', () => {
+  it('keeps the tools (save, Draft | Preview) in the tile, and no Publish until WUI v2', () => {
     setup()
-    expect(within(tile()).getByRole('button', { name: 'Publish chapter' })).toBeTruthy()
+    expect(within(tile()).queryByRole('button', { name: 'Publish chapter' })).toBeNull()
     expect(within(tile()).getByRole('group', { name: 'Chapter view' })).toBeTruthy()
   })
 })
@@ -292,6 +292,7 @@ describe('Draft level: Draft | Preview', () => {
     const pane = document.querySelector<HTMLElement>('.wrPreviewPane')!
     expect(within(pane).getByText('The ice gave way beneath the pier.')).toBeTruthy()
     expect(within(pane).getByRole('button', { name: 'Reaction' })).toBeTruthy()
+    expect(within(pane).queryByLabelText('Version')).toBeNull() // published copies come with publishing, in WUI v2
     // The tile stays.
     expect(within(tile()).getByLabelText('Chapter 1').textContent).toBe('1') // the number badge
     await user.click(within(screen.getByRole('group', { name: 'Chapter view' })).getByRole('button', { name: 'Draft' }))

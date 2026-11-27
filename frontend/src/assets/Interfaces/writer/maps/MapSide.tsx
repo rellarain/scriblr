@@ -28,6 +28,7 @@ import {
 } from './mapModel'
 import type { Maps } from './useMaps'
 import { ForReadersPanel } from './ForReadersPanel'
+import { V2_FEATURES } from '../../../../features'
 import { JourneysPanel, type JourneyState } from './JourneysPanel'
 import type { StoryPoint } from '../characters/story'
 import { WorldLinks } from '../links/WorldLinks'
@@ -116,7 +117,7 @@ export function MapSide(p: MapSideProps) {
       <JourneysPanel m={m} draft={draft} points={points} cast={cast} state={journey} onState={onJourney} onTool={onJourneyTool} />
       <MapFieldsPanel m={m} draft={draft} points={points} />
       <ExportPanel draft={draft} biomes={p.biomes} />
-      <ForReadersPanel projectId={projectId} m={m} draft={draft} selected={selected} />
+      {V2_FEATURES && <ForReadersPanel projectId={projectId} m={m} draft={draft} selected={selected} />}
     </aside>
   )
 }

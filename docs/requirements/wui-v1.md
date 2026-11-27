@@ -79,5 +79,7 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 
 ## Moved to a later version
 
-- **WUI v2**: Dash > Readers; Project > Items; Outline > Publish.
+- **WUI v2**: Dash > Readers; Project > Items; Outline > Publish. They are held back by one switch, `V2_FEATURES` in `frontend/src/features.ts` (code and saved data kept), which also covers what only means something with them:
+  - with publishing: a chapter's Publish button and published date, the Preview's published versions, the For readers sections of Characters and Maps, and the Footnote tool's content flags and Published switch;
+  - with Items: items in the *Link to…* picker and a character's carried items.
 - **AUI v1** (from this interview): the admin Designer's switched-off tools, which finishing Characters needs.

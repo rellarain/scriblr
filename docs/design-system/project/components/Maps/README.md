@@ -106,6 +106,8 @@ A plot node, a character and a place can be linked to each other (not to their o
 
 ## For readers
 
+**Held back for WUI v2** (`features.ts`, with publishing to readers): the panel is off the screen in version 1; its code and the maps' sharing settings are kept.
+
 What readers see of the setting and the cast is the author's choice, and it is only ever what the author has published. The shared pieces live in `writer/readers/` (`ReaderControls.tsx`, `WorldViews.tsx`, `readers.scss`); the Reader's two consoles in `reader/WorldConsoles.tsx`.
 
 - **Publish switch** (a checkbox, "Show this map to readers" or "Show Ada to readers"): nothing is shown until it is ticked, and nothing leaves the project until the **book is published**: publishing a book copies the published maps and the public side of the published characters into the new edition, as it copies the chapters, so a later change waits for the next edition. (Backend: `ReaderShare` on the map and the character, `EditionMap` and `EditionCharacter` on `BookEdition`, `world_publishing.py`.)

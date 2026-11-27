@@ -14,8 +14,10 @@ import { fullDate, shortDate } from '../chapterDates'
 import { formatOf, formatVars } from '../previewFormat'
 import { useAuthorNotes } from '../useAuthorNotes'
 import { FootnoteTool } from './FootnoteTool'
-import { FlagTool } from './FlagTool'
+import { FlagTool, flagLabel } from './FlagTool'
 import { useRevisionFlags } from '../useRevisionFlags'
+import type { FlagType } from '../../../../api/types'
+import { V2_FEATURES } from '../../../../features'
 
 // Reactions are kept per sentence in this browser (no backend model for them
 // yet), keyed by the sentence's position in its moment. Flags are the
@@ -27,7 +29,7 @@ const cycle = (level: number) => (level + 1) % 4
 
 interface Rect { top: number; height: number }
 
-function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle, markers, flagged }: {
+function Paragraph({ paragraphKey, sentences, marks, selected, mergeKey, onSelect, onCycle, markers, flagged }: {
   paragraphKey: string
   sentences: string[]
   // The author's footnotes and flagged passages by sentence key, shown as small markers.
@@ -36,6 +38,8 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
   flagged: Record<string, string>
   marks: Marks
   selected: string | null
+  // The sentence picked to merge the selected one with (a Merge flag being made).
+  mergeKey: string | null
   onSelect: (key: string) => void
   onCycle: (key: string, kind: 'like' | 'dislike') => void
 }) {
@@ -101,7 +105,7 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
             <span
               key={key} data-sentence={key}
               ref={el => { if (el) spanRefs.current.set(key, el); else spanRefs.current.delete(key) }}
-              className={`wrSentence${selected === key ? ' wrSentence--selected' : ''}${flagged[key] ? ' wrSentence--flagged' : ''}`}
+              className={`wrSentence${selected === key ? ' wrSentence--selected' : ''}${mergeKey === key ? ' wrSentence--merge' : ''}${flagged[key] ? ' wrSentence--flagged' : ''}`}
               title={flagged[key]}
               onClick={() => onSelect(key)}
             >
@@ -132,9 +136,9 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   // Day: a white page with black text; night: a dark page with light text.
   const [tone, setTone] = useStoredState<'day' | 'night'>('scriblr.writer.previewTone', 'day')
-  // The current draft, or one of the chapter's kept publications (read-only).
+  // The current draft, or one of the chapter's kept publications (read-only; publishing is held back for a later version, V2_FEATURES).
   const [version, setVersion] = useState<string>('current')
-  const published = version === 'current' ? undefined : pubs.publications.find(p => p.id === version)
+  const published = !V2_FEATURES || version === 'current' ? undefined : pubs.publications.find(p => p.id === version)
 
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const moments = useMemo(() => descendantsOf(index, chapter.id).filter(n => n.kind === 'moment'), [index, chapter.id])
@@ -195,18 +199,45 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
     return range ? { momentId, ...range } : null
   }
   const flagged: Record<string, string> = {}
-  if (component === 'flag') {
-    for (const f of chapterFlags) {
-      if (f.scope !== 'passage' || f.resolvedAt !== null || f.stale || !f.momentId) continue
-      for (const r of sentenceRanges(draft.bodies[f.momentId] ?? '')) {
-        if (r.start < f.end && r.end > f.start) flagged[keyOfRange(f.momentId, r)] = `Flagged to ${f.type}${f.note ? `: ${f.note}` : ''}`
-      }
+  const markRange = (momentId: string, start: number, end: number, what: string) => {
+    for (const r of sentenceRanges(draft.bodies[momentId] ?? '')) {
+      if (r.start < end && r.end > start) flagged[keyOfRange(momentId, r)] = what
     }
   }
+  if (component === 'flag') {
+    for (const f of chapterFlags) {
+      if (f.scope !== 'passage' || f.resolvedAt !== null) continue
+      const what = `${flagLabel(f.type)}${f.note ? `: ${f.note}` : ''}`
+      if (!f.stale && f.momentId) markRange(f.momentId, f.start, f.end, what)
+      if (f.mergeWith && !f.mergeWith.stale) markRange(f.mergeWith.momentId, f.mergeWith.start, f.mergeWith.end, `${what} (the passage to merge with)`)
+    }
+  }
+  // The kind being flagged, and for a Merge the second sentence: `picking` makes the next click on the page pick it instead of selecting.
+  const [flagType, setFlagType] = useState<FlagType>('review')
+  const [mergeKey, setMergeKey] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
+  const chooseType = (type: FlagType) => {
+    setFlagType(type)
+    if (type !== 'merge') { setMergeKey(null); setPicking(false) }
+  }
+  const clickSentence = (key: string) => {
+    if (component === 'flag' && picking) {
+      if (key !== selected) setMergeKey(key)
+      setPicking(false)
+      return
+    }
+    setSelected(key)
+    if (key === mergeKey) setMergeKey(null)
+  }
   const flagTarget = sentenceAt(selected)
-  function addFlag(scope: 'passage' | 'project', type: 'review' | 'edit' | 'add' | 'delete', note: string) {
+  const mergeTarget = flagType === 'merge' ? sentenceAt(mergeKey) : null
+  function addFlag(scope: 'passage' | 'project', type: FlagType, note: string) {
     if (scope === 'project') { void revision.add({ scope, type, note }); return }
-    if (flagTarget) void revision.add({ scope, type, note, chapterId: chapter.id, momentId: flagTarget.momentId, start: flagTarget.start, end: flagTarget.end })
+    if (!flagTarget) return
+    const mergeWith = type === 'merge' && mergeTarget ? { momentId: mergeTarget.momentId, start: mergeTarget.start, end: mergeTarget.end } : undefined
+    void revision.add({ scope, type, note, chapterId: chapter.id, momentId: flagTarget.momentId, start: flagTarget.start, end: flagTarget.end, mergeWith })
+    setMergeKey(null)
+    setPicking(false)
   }
   function showFlag(f: { momentId: string | null; start: number }) {
     if (!f.momentId) return
@@ -222,7 +253,7 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
   const at = selected && paragraphAt(selected) >= 0 ? { paragraph: paragraphAt(selected), sentence: Number(selected.slice(selected.lastIndexOf(':') + 1)) } : null
   const markers: Record<string, string> = {}
   authorNotes.notes.footnotes.forEach((f, i) => { const p = paragraphs[f.paragraph]; if (p) markers[`${p.key}:${f.sentence}`] = String(i + 1) })
-  authorNotes.notes.flags.forEach(f => { const p = paragraphs[f.paragraph]; if (p) markers[`${p.key}:${f.sentence}`] = markers[`${p.key}:${f.sentence}`] ?? '⚑' })
+  if (V2_FEATURES) authorNotes.notes.flags.forEach(f => { const p = paragraphs[f.paragraph]; if (p) markers[`${p.key}:${f.sentence}`] = markers[`${p.key}:${f.sentence}`] ?? '⚑' })
 
   return (
     <div className={`wrPreviewPane wrPage--${tone}`} style={formatVars(formatOf(w.activeBook))}>
@@ -238,15 +269,17 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
             </button>
           ))}
         </div>
-        <div className="wrToolGroup">
-          <span className="wrLabel">Version</span>
-          <select className="wrPreviewSelect" aria-label="Version" value={published ? version : 'current'} onChange={e => setVersion(e.target.value)}>
-            <option value="current">Current draft</option>
-            {pubs.publications.map(p => (
-              <option key={p.id} value={p.id}>Published {fullDate(p.publishedAt)} · {p.wordCount.toLocaleString()} words</option>
-            ))}
-          </select>
-        </div>
+        {V2_FEATURES && (
+          <div className="wrToolGroup">
+            <span className="wrLabel">Version</span>
+            <select className="wrPreviewSelect" aria-label="Version" value={published ? version : 'current'} onChange={e => setVersion(e.target.value)}>
+              <option value="current">Current draft</option>
+              {pubs.publications.map(p => (
+                <option key={p.id} value={p.id}>Published {fullDate(p.publishedAt)} · {p.wordCount.toLocaleString()} words</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="wrToolGroup" role="group" aria-label="Page tone">
           {(['day', 'night'] as const).map(t => (
             <button
@@ -259,7 +292,10 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
         </div>
         {component === 'flag' && (
           <FlagTool
-            hasSentence={flagTarget !== null} flags={chapterFlags} error={revision.error}
+            type={flagType} onType={chooseType} hasSentence={flagTarget !== null}
+            mergeWith={mergeTarget ? (draft.bodies[mergeTarget.momentId] ?? '').slice(mergeTarget.start, mergeTarget.end) : null}
+            picking={picking} onPicking={setPicking} onClearMerge={() => setMergeKey(null)}
+            flags={chapterFlags} error={revision.error}
             onAdd={addFlag} onUpdate={(id, body) => void revision.update(id, body)} onResolve={(id, outcome) => void revision.resolve(id, outcome)}
             onRemove={id => void revision.remove(id)} onShow={showFlag}
           />
@@ -297,7 +333,7 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
         {!published && paragraphs.map(p => (
           <Paragraph
             key={p.key} paragraphKey={p.key} sentences={p.sentences} marks={marks} markers={markers}
-            selected={selected} onSelect={setSelected} onCycle={cycleMark} flagged={flagged}
+            selected={selected} mergeKey={component === 'flag' ? mergeKey : null} onSelect={clickSentence} onCycle={cycleMark} flagged={flagged}
           />
         ))}
       </div>
