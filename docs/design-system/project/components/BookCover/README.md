@@ -12,6 +12,10 @@ Code: `writer/outline/OutlineMax.tsx`, `OutlineNav.tsx`, `BookEditor.tsx`, `Book
 - **Page edges** `.wrEdgeLeaves i`: ten or more, each 4px further out and a little deeper than the one before, on the book's back-cover colour (`--wr-cover`). The rail is 15px wider than the last edge.
 - **Tabs** `.wrEdgeTab` (30 wide, vertical text, 46 tall) and arc tabs `.wrEdgeArc` ("A1", "A2"); each arc's cluster starts at its own edge, the first at the second. A tab's stripe is its colour; the **focused** tab is wider (38) with its colour as its background, fitted so its ink reads (`tabColors`). `+` adds a chapter (without focusing it).
 
+## Chapter templates
+
+The contents' head has **From a template** beside **+ Arc** and **+ Chapter**: the writer's chapter templates (what each holds: "2 scenes · 6 moments") and **An empty chapter**; a chapter from one comes last among the book's own, with the template's acts, scenes and moments. An open chapter's tools (at the right of its footer, before the trash) have **Save as a template** (the stamp icon), which opens the save panel under its footer, on the cover in the cover's ink (see the [level panels](../LevelPanels/README.md) for the panel and the menu; on the cover the menu's page is the book's own).
+
 ## Book details and goals
 
 The **Book details** tab opens the draft stats and the book's **goals** (`.wrBookGoals`): under the stats on the cover at Max; at Mid beside the book's facts (`.wrBookDetailsFacts`: a cover block on the book's fill with its title and "Book 1 of Harbour Lights", the Title and the Synopsis to edit, and its counts, "14 chapters · 38 scenes · 112 moments · 41,200 words"). The goals are on the level's own colour (a panel on `--wr-fill-4` at Mid, the cover's recess on the cover) in the level's ink:

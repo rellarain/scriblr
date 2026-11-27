@@ -33,6 +33,7 @@ import { effectiveRange, fillColorCss, hueOfCode, outlineSat } from '../../../th
 import { useThemeState } from '../../../theme/useTheme'
 import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, hueSiblings, levelHue, levelRange, levelTint, ownHue, rangeCapOf, reconcileHues } from './levelHues'
 import type { HueSliderValue } from './HueSlider'
+import { nodesFromTemplate, type OutlineTemplate } from '../../../lib/outlineTemplates'
 import { plotHueSiblings, plotParentOf, plotRange, plotRangeCap, reconcilePlotHues, shownPlotHue } from './plotHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
@@ -638,11 +639,12 @@ export function useWriterWorkspace() {
   // --- outline node mutators ---
   // `afterId` places the new node right after that sibling (keyboard shortcuts);
   // otherwise it goes last. Returns the new node's id.
-  function addOutlineNode(parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}, afterId?: string): string {
-    const prev = outlineNodesRef.current
+  // A new node with nothing in it yet (no title: the input shows a placeholder until something is typed), and its colour: a new book starts at
+  // the hue it is measured from (its series', else the project's); a new series, arc or chapter takes a hue in its range, spread away from its
+  // siblings' in `list` (the outline it joins).
+  function freshNode(list: OutlineNode[], parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}): OutlineNode {
     const node: OutlineNode = {
-      id: newId('node'), kind, parentId, order: nextOrderAmong(prev, parentId),
-      // New nodes have no title: the input shows a placeholder until something is typed.
+      id: newId('node'), kind, parentId, order: nextOrderAmong(list, parentId),
       title: '',
       synopsis: '', draftRef: null, flag: null,
       color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
@@ -650,21 +652,41 @@ export function useWriterWorkspace() {
       createdAt: new Date().toISOString(),
       ...patch,
     }
-    // A new book starts at the hue it is measured from (its series', else the project's); a new series, arc or chapter takes a hue in its
-    // range, spread away from its siblings'.
     if (HUED_KINDS.has(kind) && node.themeHue == null) {
-      const map = new Map(prev.map(n => [n.id, n]))
+      const map = new Map([...list, node].map(n => [n.id, n]))
       const centre = hueCentre(node, map, projectHueRef.current)
       if (kind === 'book') node.themeHue = centre
       else {
-        const siblingHues = prev
+        const siblingHues = list
           .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null)
           .map(n => hueOfCode(n.themeHue as number))
         node.themeHue = autoPickHue(centre, siblingHues, effectiveRange(null, kind, rangeCapOf(node, map, projectRangeRef.current)))
       }
     }
+    return node
+  }
+
+  function addOutlineNode(parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}, afterId?: string): string {
+    const prev = outlineNodesRef.current
+    const node = freshNode(prev, parentId, kind, patch)
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
     return node.id
+  }
+
+  // A new book (under a series, or none) or chapter (under a book or an arc) from one of the writer's outline templates: the book or chapter,
+  // last among its siblings, and the template's shape under it (its titles and summaries if the template kept them), each arc and chapter
+  // with a colour of its own as if it had been added by hand. One change, undone at once. Returns the new book's or chapter's id.
+  function addFromTemplate(parentId: string | null, template: OutlineTemplate): string {
+    let list = outlineNodesRef.current
+    const root = freshNode(list, parentId, template.kind)
+    list = [...list, root]
+    for (const made of nodesFromTemplate(template, root.id, () => newId('node'))) {
+      const { id, kind, parentId: under, order, ...fields } = made
+      const node = { ...freshNode(list, under, kind, fields), id, order }
+      list = [...list, node]
+    }
+    commitOutline(list, true)
+    return root.id
   }
 
   function updateOutlineNode(nodeId: string, patch: Partial<OutlineNode>) {
@@ -1176,7 +1198,7 @@ export function useWriterWorkspace() {
     setProjectHue, setProjectHueRange, setProjectInherit, setPlotHueRange, setPlotInherit,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
-    addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
+    addOutlineNode, addFromTemplate, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
 
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,

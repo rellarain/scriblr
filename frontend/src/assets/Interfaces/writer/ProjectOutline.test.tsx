@@ -166,3 +166,33 @@ describe('the cards', () => {
     held.cancel()
   })
 })
+
+describe('outline templates', () => {
+  it("saves a book's shape as a template from its card, and starts a new book from it", async () => {
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Save book 1 as a template' }))
+    const dialog = screen.getByRole('dialog', { name: 'Save Book 1 as a template' })
+    expect(within(dialog).getByText('Arc 1 · Setting out')).toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText('Template name'), { target: { value: 'Saga book' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save template' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    const head = document.querySelector('.wrProjHead') as HTMLElement
+    fireEvent.click(within(head).getByRole('button', { name: /From a template/ }))
+    fireEvent.click(within(head).getByRole('menuitem', { name: /Saga book/ }))
+    const books = latest.outlineNodes.filter(n => n.kind === 'book' && n.parentId === null)
+    const made = books[books.length - 1]
+    expect(made.id).not.toBe('b2')
+    const kids = latest.outlineNodes.filter(n => n.parentId === made.id).sort((a, b) => a.order - b.order)
+    expect(kids.map(k => [k.kind, k.title])).toEqual([['arc', 'Setting out'], ['chapter', 'Loose']])
+    // It opens, so its shape is on view.
+    expect(screen.getByRole('textbox', { name: 'Book 3, Arc 1 title' })).toHaveValue('Setting out')
+  })
+
+  it('starts a book in a series from a template, or an empty one', async () => {
+    await open()
+    fireEvent.click(within(footOf('s1')).getByRole('button', { name: /From a template/ }))
+    fireEvent.click(within(footOf('s1')).getByRole('menuitem', { name: 'An empty book' }))
+    expect(latest.outlineNodes.filter(n => n.kind === 'book' && n.parentId === 's1')).toHaveLength(2)
+  })
+})

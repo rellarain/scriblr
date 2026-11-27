@@ -3,10 +3,11 @@ import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { outlineSat, stripeColorCss } from '../../../../theme/bookColors'
-import { GripIcon, PlusIcon } from '../../../icons'
+import { GripIcon, PlusIcon, StampIcon } from '../../../icons'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex } from '../outlineTree'
 import { DeleteControl } from '../shared'
+import { FromTemplate, SaveTemplate } from './OutlineTemplates'
 import { useNodeDnd } from '../useNodeDnd'
 import { useOutlineOpen } from './useOutlineOpen'
 import { formatWords } from '../wordCount'
@@ -65,6 +66,8 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
     onAdded?.()
     return id
   }
+  // The chapter whose shape is being saved as a template (its card shows the save panel under its tools).
+  const [saving, setSaving] = useState<string | null>(null)
   const addArc = (parentId: string | null, afterId?: string) => {
     const id = w.addOutlineNode(parentId, 'arc', {}, afterId)
     onAdded?.()
@@ -173,9 +176,18 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
                 {body && <button type="button" className="wrSmallBtn wrSmallBtn--light" onClick={() => addAct(node.id)}><PlusIcon size={13} /> Act</button>}
                 {hue(node, `Chapter ${n}`)}
               </span>
-              <DeleteControl message={`Delete Chapter ${n}${inside ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(node.id)} />
+              <span className="wrCardFootRight">
+                <button
+                  type="button" className="wrIconBtn" title="Save as a template" aria-label={`Save chapter ${n} as a template`} aria-expanded={saving === node.id}
+                  onClick={() => setSaving(s => (s === node.id ? null : node.id))}
+                >
+                  <StampIcon size={15} />
+                </button>
+                <DeleteControl message={`Delete Chapter ${n}${inside ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(node.id)} />
+              </span>
             </div>
           )}
+          {open && saving === node.id && <SaveTemplate w={w} rootId={node.id} kind="chapter" label={`Chapter ${n}`} onClose={() => setSaving(null)} />}
         </div>
       )
     }
@@ -221,6 +233,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
         <span className="wrCtAdd">
           <button type="button" className="wrSmallBtn" onClick={() => addArc(book.id)}><PlusIcon size={13} /> Arc</button>
           <button type="button" className="wrSmallBtn" onClick={() => addChapter(book.id)}><PlusIcon size={13} /> Chapter</button>
+          <FromTemplate kind="chapter" onPick={t => { w.addFromTemplate(book.id, t); onAdded?.() }} onEmpty={() => addChapter(book.id)} />
         </span>
       </div>
       {!focused && top.length === 0 && <p className="wrMuted">Nothing outlined yet. Add an arc or a chapter to begin.</p>}

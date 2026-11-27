@@ -1,7 +1,9 @@
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { BookFaceIcon, ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon } from '../../icons'
+import { BookFaceIcon, ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon, StampIcon } from '../../icons'
+import type { OutlineTemplate } from '../../../lib/outlineTemplates'
+import { FromTemplate, SaveTemplate } from './outline/OutlineTemplates'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
 import { AutoTextarea, DeleteControl } from './shared'
 import { useNodeDnd } from './useNodeDnd'
@@ -45,6 +47,8 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
   })
   const counts = useWordCounts(w.activeProjectId)
   const fold = useProjectOutlineOpen()
+  // The book whose shape is being saved as a template (its card shows the save panel).
+  const [saving, setSaving] = useState<string | null>(null)
   const kidsOf = (parent: OutlineNode | undefined) => (index.get(parent ? parent.id : null) ?? []).filter(n => listedUnder(parent).includes(n.kind))
   const rootItems = kidsOf(undefined)
 
@@ -62,6 +66,13 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
   const add = (parentId: string | null, kind: Kind, afterId?: string) => {
     if (parentId) fold.setOpen(parentId, true)
     return w.addOutlineNode(parentId, kind, {}, afterId)
+  }
+  // A new book from a template goes last in its series (or at the top level) and opens, so its shape is on view.
+  const addFromTemplate = (parentId: string | null, template: OutlineTemplate) => {
+    if (parentId) fold.setOpen(parentId, true)
+    const id = w.addFromTemplate(parentId, template)
+    fold.setOpen(id, true)
+    return id
   }
 
   // Keyboard shortcuts (lib/nodeKeys.ts): series and loose books form the top-level list, then each card's own list under it.
@@ -216,10 +227,17 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
           <BookFaceIcon size={15} />
         </button>
         {foldButton(book, `book ${n}`, open)}
+        <button
+          type="button" className="wrIconBtn" title="Save as a template" aria-label={`Save book ${n} as a template`} aria-expanded={saving === book.id}
+          onClick={() => setSaving(s => (s === book.id ? null : book.id))}
+        >
+          <StampIcon size={15} />
+        </button>
         <DeleteControl tone="dark" message={`Delete ${name}${chapters ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(book.id)} />
       </>
     ), (
       <>
+        {saving === book.id && <SaveTemplate w={w} rootId={book.id} kind="book" label={name} onClose={() => setSaving(null)} />}
         {stats([stat(chapters, 'chapter'), formatWords(words)])}
         {open && (
           <>
@@ -248,7 +266,10 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
         {summary(series, name, 'Series summary')}
         {hue(series, name)}
         {dnd.children(series.id, books, bookCard)}
-        <div className="wrProjFoot">{addButton(series.id, 'book', 'Book')}</div>
+        <div className="wrProjFoot">
+          {addButton(series.id, 'book', 'Book')}
+          <FromTemplate kind="book" onPick={t => addFromTemplate(series.id, t)} onEmpty={() => add(series.id, 'book')} />
+        </div>
       </>
     ))
   }
@@ -269,6 +290,7 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
         <span className="wrProjHeadActions">
           <button type="button" className="wrSmallBtn" onClick={() => add(null, 'series')}><PlusIcon size={13} /> Series</button>
           <button type="button" className="wrSmallBtn" onClick={() => add(null, 'book')}><PlusIcon size={13} /> Book</button>
+          <FromTemplate kind="book" onPick={t => addFromTemplate(null, t)} onEmpty={() => add(null, 'book')} />
         </span>
       </div>
       {rootItems.length === 0 && <p className="wrMuted">No books yet. Add a book or a series to begin.</p>}

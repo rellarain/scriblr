@@ -1,10 +1,11 @@
-import { BagIcon, CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PeopleIcon, PlotIcon } from '../../../icons'
+import { BagIcon, CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PeopleIcon, PlotIcon, StampIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
 import PlotView from '../PlotView'
 import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
+import { TemplatesTile } from '../outline/OutlineTemplates'
 import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows } from '../tiles/tileData'
@@ -60,6 +61,8 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true, render: c => <PlotView w={w} titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} /> },
     { id: 'outline', label: 'Outline', Icon: OutlineIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
+    // The writer's own outline templates (for every project), beside the outline their book templates are saved from and used in.
+    { id: 'templates', label: 'Templates', Icon: StampIcon, fill: true, render: () => <TemplatesTile /> },
     {
       id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {

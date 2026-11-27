@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
+import { nodesFromTemplate, type OutlineTemplate } from '../../../../lib/outlineTemplates'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { descendantsOf, buildChildIndex } from '../outlineTree'
 import { cycleAwareness, movePlacement, placeValue, unplace } from '../plotPlacement'
@@ -73,6 +74,15 @@ function Harness({ activeChapterId = 'c1', outline = OUTLINE, actions }: {
       const after = afterId ? outlineRef.current.find(n => n.id === afterId) : undefined
       const order = after ? after.order + 0.5 : outlineRef.current.filter(n => n.parentId === parentId).length
       const next = [...outlineRef.current, outlineNode(id, kind, parentId, { title: '', order, ...patch })]
+      outlineRef.current = next
+      setOutline(next)
+      return id
+    },
+    addFromTemplate: (parentId: string | null, template: OutlineTemplate) => {
+      const id = `new${++counter.current}`
+      const root = outlineNode(id, template.kind, parentId, { title: '', order: outlineRef.current.filter(n => n.parentId === parentId).length })
+      const made = nodesFromTemplate(template, id, () => `new${++counter.current}`).map(m => outlineNode(m.id, m.kind, m.parentId, m))
+      const next = [...outlineRef.current, root, ...made]
       outlineRef.current = next
       setOutline(next)
       return id
@@ -691,5 +701,25 @@ describe('Outline Max: the arc and chapter cards', () => {
     drag(trayTile('pp2'), card('c2'))
     expect(card('c2').querySelector(PLACED + ' [data-point="pp2"]')).not.toBeNull()
     expect(within(trayTile('pp2')).getByLabelText('Placed once')).toBeTruthy()
+  })
+})
+
+describe('OutlineMax: chapter templates', () => {
+  it("saves an open chapter's shape from its tools, and starts a new chapter from it under + Chapter", async () => {
+    const { user } = setup('c1')
+    await user.click(within(openCard()).getByRole('button', { name: 'Save chapter 1 as a template' }))
+    const dialog = screen.getByRole('dialog', { name: 'Save Chapter 1 as a template' })
+    expect(within(dialog).getByRole('checkbox', { name: 'Acts, scenes and moments' })).toBeTruthy()
+    expect(within(dialog).getByText('Act 1 · Act title · 1 scene')).toBeTruthy()
+    await user.clear(within(dialog).getByLabelText('Template name'))
+    await user.type(within(dialog).getByLabelText('Template name'), 'One act{Enter}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    const contents = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
+    const head = contents.querySelector('.wrCtHead') as HTMLElement
+    await user.click(within(head).getByRole('button', { name: /From a template/ }))
+    await user.click(within(head).getByRole('menuitem', { name: /One act/ }))
+    // The new chapter is the book's own, last of its chapters: Chapter 3.
+    expect(screen.getByRole('textbox', { name: 'Chapter 3 title' })).toBeTruthy()
   })
 })

@@ -13,7 +13,7 @@ const ids = (tabs: Array<{ id: string }>) => tabs.map(t => t.id)
 describe('the tabs held back for WUI v2', () => {
   it('come back when V2_FEATURES is on: Readers, Items and Publish', () => {
     expect(ids(dashTabs(w))).toEqual(['schedule', 'readers', 'scratchpad', 'project', 'settings', 'help'])
-    expect(ids(projectTabs(w))).toEqual(['plot', 'outline', 'schedule', 'plan', 'maps', 'characters', 'items', 'history', 'settings', 'help'])
+    expect(ids(projectTabs(w))).toEqual(['plot', 'outline', 'templates', 'schedule', 'plan', 'maps', 'characters', 'items', 'history', 'settings', 'help'])
     expect(ids(outlineTabs(w))).toEqual(['outline', 'details', 'publish', 'settings', 'help'])
   })
 })
