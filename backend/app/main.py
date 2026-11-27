@@ -38,6 +38,7 @@ from .api import (
     reader_social,
     resources,
     revision_flags,
+    project_history,
     revisions,
     schedule,
     scrap,
@@ -165,6 +166,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(world_links.router)
     app.include_router(draft.router)
     app.include_router(revisions.router)
+    app.include_router(project_history.router)
     app.include_router(publications.router)
     app.include_router(activity.router)
     app.include_router(analytics.router)

@@ -750,6 +750,11 @@ class RevisionSummary(BaseModel):
     wordCount: int
 
 
+# A revision summary with the chapter it is of (the project's history lists every chapter's together).
+class ChapterRevisionSummary(RevisionSummary):
+    chapterId: str
+
+
 # ---------------------------------------------------------------------------
 # Outline/Plot tree history: an automatic, git-like snapshot/diff/revert
 # system for whole-tree structure, parallel to (but separate from) the

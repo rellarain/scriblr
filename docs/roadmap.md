@@ -67,7 +67,7 @@ WUI (mockup first):
 - [x] Book goals with or without dates, and estimates from the writer's activity of how long the rest will take; the timeline follows them where there are no dates.
 - [x] Outline templates, the writer's own: save a book's or a chapter's outline shape and start a new one from it.
 - [x] The Scratchpad converts a note into an outline node, a plotpoint, draft text or a revision flag.
-- [ ] Project > History as one timeline (activity, outline and plot snapshots, chapter revisions) with restore where allowed.
+- [x] Project > History as one timeline (activity, outline and plot snapshots, chapter revisions) with restore where allowed.
 - [ ] Finish Characters: the writers' own designer and the mannequin's step-by-step editor back on.
 - [ ] Finish Maps: shapes only with biome hues; lock the environment layer; places over time; routes and travel; story links; generated maps.
 
@@ -153,3 +153,4 @@ More items will be added.
 - 2026-11-27: WUI slice 5: book goals. Book details has a book's goals for its words, chapters, scenes and moments, without dates (how long the rest would take at the writer's usual pace, from their last eight weeks) or with deadlines for the book and each arc (the pace each needs, whether it is within reach), and a timeline of the arcs at that pace.
 - 2026-11-27: WUI slice 6: outline templates. Save a book's or a chapter's outline shape (titles and summaries if wanted, never the draft) as a template of your own, start a new book or chapter from one, and keep them in the Project level's new Templates tab.
 - 2026-11-27: WUI slice 7: Scratchpad conversions. A note becomes an outline node, a plotpoint, draft text or a revision flag in any project, and is kept marked with what it became or goes; draft text for a chapter open in the Draft goes into that draft as typed text.
+- 2026-11-27: WUI slice 8: History. The Project level's History tab is the project's history as one timeline by day (the writing in sittings, the outline's and the plot's snapshots, every chapter's revisions, the flags added and resolved), kept by kind, by book and by words searched for; a revision compares with the chapter now, and the outline, the plot or a chapter can be put back as it was (a chapter open in the Draft saves first and reads it again after).

@@ -27,6 +27,8 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
   const unsaved = useRef<Record<string, string>>({})
   // The chapter's text has come (a change from elsewhere, draftInserts.ts, waits for it: before, there is nothing to add to).
   const [ready, setReady] = useState(false)
+  // Bumped to read the chapter again (History's Restore changed it on the backend).
+  const [reloads, setReloads] = useState(0)
 
   const autosave = useAutosave<DraftChanges>({
     save: async ({ projectId: pid, chapterId: cid, changes }) => {
@@ -86,13 +88,17 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
       // this chapter's ids).
       void flushRef.current()
     }
-  }, [projectId, chapterId])
+  }, [projectId, chapterId, reloads])
 
   // Loaded, this draft takes the changes made to its chapter from elsewhere (a Scratchpad note made into draft text) as typed text.
   const setBodyRef = useRef<(momentId: string, body: string) => void>(() => {})
   useEffect(() => {
     if (!projectId || !chapterId || !ready) return undefined
-    return registerOpenDraft(projectId, chapterId, (momentId, change) => setBodyRef.current(momentId, change(latest.current[momentId] ?? '')))
+    return registerOpenDraft(projectId, chapterId, {
+      take: (momentId, change) => setBodyRef.current(momentId, change(latest.current[momentId] ?? '')),
+      save: () => flushRef.current(),
+      reload: () => setReloads(n => n + 1),
+    })
   }, [projectId, chapterId, ready])
 
   function setBody(momentId: string, body: string) {

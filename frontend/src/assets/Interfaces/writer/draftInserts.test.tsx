@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import { mockFetchBy } from '../../../test/mockFetch'
-import { changeMomentDraft, registerOpenDraft } from './draftInserts'
+import { changeChapterOnBackend, changeMomentDraft, registerOpenDraft } from './draftInserts'
 import { withParagraph } from './scratchpad/noteConversion'
 import { useChapterDraft } from './useChapterDraft'
 
@@ -39,7 +39,7 @@ describe('changeMomentDraft', () => {
   it('gives the change to an open chapter instead, and to the backend again once it has closed', async () => {
     const fetch = backend()
     const taker = vi.fn()
-    const close = registerOpenDraft('p1', 'c1', taker)
+    const close = registerOpenDraft('p1', 'c1', { take: taker, save: async () => {}, reload: () => {} })
     expect(await changeMomentDraft('p1', 'c1', 'm1', body => `${body}!`)).toBe('open')
     expect(taker).toHaveBeenCalledWith('m1', expect.any(Function))
     expect(fetch).not.toHaveBeenCalled()
@@ -62,5 +62,29 @@ describe('the open chapter draft', () => {
     unmount()
     await waitFor(() => expect(puts(fetch).length).toBeGreaterThan(0)) // closing saves what was typed
     expect(await changeMomentDraft('p1', 'c1', 'm1', b => b)).toBe('saved')
+  })
+})
+
+describe('changeChapterOnBackend', () => {
+  it('has an open draft save first and read the chapter again after the change, even when it fails', async () => {
+    backend()
+    const order: string[] = []
+    const close = registerOpenDraft('p1', 'c1', { take: () => {}, save: async () => { order.push('save') }, reload: () => { order.push('reload') } })
+    expect(await changeChapterOnBackend('p1', 'c1', async () => { order.push('write'); return 7 })).toBe(7)
+    await expect(changeChapterOnBackend('p1', 'c1', async () => { throw new Error('no') })).rejects.toThrow('no')
+    expect(order).toEqual(['save', 'write', 'reload', 'save', 'reload'])
+    close()
+  })
+
+  it('reads the open chapter again in its draft', async () => {
+    let body = 'One.'
+    mockFetchBy((url, init) => {
+      if (url.endsWith('/draft/chapter/c1') && !init?.method) return { moments: { m1: { body, updatedAt: 'x' } } }
+      return url.includes('/revisions/') ? [] : {}
+    })
+    const { result } = renderHook(() => useChapterDraft('p1', 'c1'))
+    await waitFor(() => expect(result.current.bodies.m1).toBe('One.'))
+    await act(async () => { await changeChapterOnBackend('p1', 'c1', async () => { body = 'Restored.' }) })
+    await waitFor(() => expect(result.current.bodies.m1).toBe('Restored.'))
   })
 })

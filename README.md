@@ -702,6 +702,7 @@ the one project-independent router).
 | `plot` | `/api/projects/{id}/plot` | same shape as outline (`GET`/`PUT ""`, `/history`, `/history/diff`, `/history/{id}`, `/history/{id}/revert`) |
 | `draft` | `/api/projects/{id}/draft/chapter/{chapterId}` | `GET ""` whole chapter · `GET "/moment/{momentId}"` · `PUT "/moment/{momentId}"` upsert (computes word count, records activity delta) · `DELETE "/moment/{momentId}"` (204) |
 | `revisions` | `/api/projects/{id}/revisions/{chapterId}` | `GET ""` list (runs a one-time legacy migration first) · `GET "/diff"` (`momentId`,`from`,`to=current`) · `GET "/{snapshotId}"` · `POST ""` manual snapshot · `POST "/auto"` rolling auto-snapshot · `POST "/{snapshotId}/revert"` (safety-snapshots first) · `POST "/{snapshotId}/notes"` · `PATCH "/{snapshotId}/notes/{noteId}"` · `DELETE "/{snapshotId}/notes/{noteId}"` (204) |
+| `history` | `/api/projects/{id}` | `GET "/revision-summaries"` every chapter's revisions in one list, oldest first, each with its `chapterId` (the History tab's timeline) |
 | `activity` | `/api/projects/{id}/activity` | `GET ""` daily aggregate + unified log |
 | `analytics` | `/api/projects/{id}/analytics` | `GET ""` totals/goals/rollups/flagged nodes |
 | `schedule` | `/api/projects/{id}/schedule` | `GET "/{date}"` · `PUT "/{date}"` replace completed ids (a new tick is project activity) |
@@ -1000,7 +1001,12 @@ mounted it; it remains in git history.
   Chapters, Compare and Plotpoints, on a split grid with its rail of tile tabs in the tab's title bar, Compare and Plotpoints off until wanted, the layout
   and what is off kept per user as `scriblr.writer.plot.tiles` and `scriblr.writer.plot.minimized`; Compare turns itself on when a second plotline is ticked;
   in the Editor the parents above a title are chips by level with three states: minimized (title and keywords), expanded (title, keywords and the whole description) and, from expanded only, the editor (its own title, description, colour and keywords to change in place)),
-  Schedule (the same console over the project), History, Settings (the project editor and its colour) and Help. The
+  Schedule (the same console over the project), **History** (`history/HistoryTab.tsx` over `lib/historyTimeline.ts`: the project's history as one
+  timeline by day, newest first, from the facets' events and daily totals, the outline's and the plot's snapshots and `GET /revision-summaries`: the
+  writing in sittings, the snapshots, every chapter's revisions and the flags added and resolved, kept by kind, by book and by words searched for; a
+  revision compares with the chapter now (the backend's word diff for each moment); Restore puts the outline or the plot back through the workspace,
+  `restoreOutline`/`restorePlot`, one undo step that waits for Save, or a chapter back through the revert route, `changeChapterOnBackend` in
+  `draftInserts.ts` having a chapter open in the Draft save before and read it again after), Settings (the project editor and its colour) and Help. The
   **Templates** tab (`outline/OutlineTemplates.tsx`, `TemplatesTile`): the writer's own **outline templates**, for every project (kept in the settings
   store, `scriblr.writer.outlineTemplates`; `lib/outlineTemplates.ts`): a book's or a chapter's shape (its arcs, chapters, acts, scenes and moments,
   their titles and summaries when kept, a scene's place and what happens counting as its title and summary; never the draft, a colour or a

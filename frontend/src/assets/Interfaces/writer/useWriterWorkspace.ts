@@ -689,6 +689,11 @@ export function useWriterWorkspace() {
     return root.id
   }
 
+  // History's Restore: the outline or the plot as it was in one of its snapshots, as one change (undone at once, saved like any other edit,
+  // and so kept in the history itself).
+  function restoreOutline(nodes: OutlineNode[]) { commitOutline(nodes, true) }
+  function restorePlot(nodes: PlotNode[]) { commitPlot(nodes, true) }
+
   function updateOutlineNode(nodeId: string, patch: Partial<OutlineNode>) {
     commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
   }
@@ -1198,7 +1203,7 @@ export function useWriterWorkspace() {
     setProjectHue, setProjectHueRange, setProjectInherit, setPlotHueRange, setPlotInherit,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
-    addOutlineNode, addFromTemplate, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
+    addOutlineNode, addFromTemplate, restoreOutline, restorePlot, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
 
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,

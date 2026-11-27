@@ -307,3 +307,28 @@ describe('useWriterWorkspace: undo into today\'s log', () => {
     expect(result.current.projects.map(p => p.title)).toEqual(['Older name'])
   })
 })
+
+describe('useWriterWorkspace: restoring the outline or the plot from the History tab', () => {
+  it('puts the outline back as one step, an unsaved edit that Undo takes back and Save sends', async () => {
+    const { result, backend, title } = await opened()
+    const then = [outlineNode('b1', 'book', null, 'Book'), outlineNode('c1', 'chapter', 'b1', 'Chapter one, as it was')]
+    act(() => { result.current.restoreOutline(then) })
+    expect(result.current.outlineNodes.map(n => n.id)).toEqual(['b1', 'c1'])
+    expect(title('c1')).toBe('Chapter one, as it was')
+    expect(result.current.saveStatus.state).toBe('unsaved')
+    act(() => { result.current.history.undo('outline') })
+    expect(result.current.outlineNodes.map(n => n.id)).toEqual(['b1', 'c1', 'c2'])
+    act(() => { result.current.history.redo('outline') })
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.outline.at(-1)?.map(n => n.id)).toEqual(['b1', 'c1'])
+  })
+
+  it('puts the plot back as one step of its own', async () => {
+    const { result } = await opened()
+    act(() => { result.current.restorePlot([plotNode('cat', 'category', null, 'Category')]) })
+    expect(result.current.plotNodes.map(n => n.title)).toEqual(['Category'])
+    expect(result.current.history.canUndo('outline')).toBe(false)
+    act(() => { result.current.history.undo('plot') })
+    expect(result.current.plotNodes.map(n => n.title)).toEqual(['Category', 'Plotline'])
+  })
+})

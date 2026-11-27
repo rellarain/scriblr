@@ -55,6 +55,8 @@ export function previewTheme(): ThemeSettings {
 export const FIXTURE_IDS = { series: 's1', book: 'b1', otherBook: 'b2', chapter: 'c1', secondChapter: 'c2' } as const
 
 const NOW = '2026-01-15T09:00:00.000Z'
+// A local time some days back, for the History tab's timeline (today's and yesterday's changes, whenever the preview is opened).
+const atLocal = (daysBack: number, hm: string): string => { const d = new Date(`${localDay()}T${hm}:00`); d.setDate(d.getDate() - daysBack); return d.toISOString() }
 
 function node(id: string, kind: OutlineNode['kind'], parentId: string | null, order: number, over: Partial<OutlineNode> = {}): OutlineNode {
   return {
@@ -304,6 +306,39 @@ export function createMockBackend() {
         return json(project.index)
       }
       return notFound()
+    }
+    // The History tab: the outline's and the plot's snapshots (each holding the tree as it is now, so a Restore changes nothing), and three
+    // revisions of the first chapter, the last compared with the chapter now as one sentence rewritten.
+    if ((rest[0] === 'outline' || rest[0] === 'plot') && rest[1] === 'history') {
+      const nodes = rest[0] === 'outline' ? project.outline.nodes : project.plot.nodes
+      const list = rest[0] === 'outline'
+        ? [{ snapshotId: 'o3', at: atLocal(0, '09:58'), summary: '+1 added, 2 modified' }, { snapshotId: 'o2', at: atLocal(1, '20:31'), summary: '4 modified' }, { snapshotId: 'o1', at: atLocal(3, '19:10'), summary: `+${nodes.length} added` }]
+        : [{ snapshotId: 'p2', at: atLocal(1, '15:02'), summary: '+1 added' }, { snapshotId: 'p1', at: atLocal(3, '19:12'), summary: `+${nodes.length} added` }]
+      if (rest[2]) return json({ snapshotId: rest[2], treeType: rest[0], createdAt: NOW, trigger: 'auto', nodes })
+      return json(list.map(s => ({ snapshotId: s.snapshotId, treeType: rest[0], createdAt: s.at, trigger: 'auto', nodeCount: nodes.length, summary: s.summary })))
+    }
+    if (rest[0] === 'revision-summaries') {
+      const chapter = project.outline.nodes.find(n => n.kind === 'chapter')
+      if (!chapter) return json([])
+      return json([
+        { snapshotId: 'r1', chapterId: chapter.id, createdAt: atLocal(1, '16:20'), label: 'Before the ferry rewrite', trigger: 'manual', wordCount: 1120 },
+        { snapshotId: 'r2', chapterId: chapter.id, createdAt: atLocal(0, '10:02'), label: 'Before this session', trigger: 'session', wordCount: 1186 },
+        { snapshotId: 'r3', chapterId: chapter.id, createdAt: atLocal(0, '10:15'), label: 'Auto', trigger: 'auto', wordCount: 1302 },
+      ])
+    }
+    if (rest[0] === 'revisions') {
+      const chapterId = rest[1]
+      if (rest[2] === 'diff') {
+        const byId = new Map(project.outline.nodes.map(n => [n.id, n]))
+        const inChapter = (id: string | null | undefined): boolean => !!id && (id === chapterId || inChapter(byId.get(id)?.parentId))
+        const first = project.outline.nodes.find(n => n.kind === 'moment' && inChapter(n.parentId))
+        const changed = new URLSearchParams(search).get('momentId') === first?.id
+        return json({ ops: changed
+          ? [{ op: 'equal', text: 'Lorem ipsum dolor sit amet. ' }, { op: 'delete', text: 'Consectetur adipiscing elit.' }, { op: 'insert', text: 'Sed do eiusmod tempor, ut labore et dolore.' }, { op: 'equal', text: ' Ut enim ad minim veniam.' }]
+          : [{ op: 'equal', text: 'Lorem ipsum dolor sit amet.' }] })
+      }
+      if (rest[3] === 'revert' && method === 'POST') return json({ snapshotId: 'kept', chapterId, createdAt: NOW, label: 'Before revert', trigger: 'manual', moments: {} })
+      return json({ snapshotId: rest[2], chapterId, createdAt: NOW, label: '', trigger: 'manual', moments: {} })
     }
     if (rest[0] === 'outline') {
       if (method === 'PUT') project.outline = body as OutlineTree

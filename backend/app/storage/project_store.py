@@ -1130,6 +1130,14 @@ def list_revisions(root: Path, project_id: str, chapter_id: str) -> list[Revisio
     return _read(root, project_id, lambda pf, _errors: sorted(pf.revisions.get(chapter_id, []), key=lambda s: s.createdAt))
 
 
+def list_all_revisions(root: Path, project_id: str) -> list[tuple[str, RevisionSnapshot]]:
+    """Every chapter's revisions, as (chapter id, snapshot), oldest first."""
+    return _read(
+        root, project_id,
+        lambda pf, _errors: sorted(((cid, s) for cid, snaps in pf.revisions.items() for s in snaps), key=lambda pair: pair[1].createdAt),
+    )
+
+
 def load_revision(root: Path, project_id: str, chapter_id: str, snapshot_id: str) -> RevisionSnapshot:
     def pick(pf: ProjectFile, _errors: dict[str, ShardCorruptError]) -> Optional[RevisionSnapshot]:
         return next((s for s in pf.revisions.get(chapter_id, []) if s.snapshotId == snapshot_id), None)

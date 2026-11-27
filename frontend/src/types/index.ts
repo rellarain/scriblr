@@ -204,6 +204,11 @@ export interface RevisionSummary {
   wordCount: number
 }
 
+// A revision summary with the chapter it is of (GET /projects/{id}/revision-summaries: every chapter's, oldest first).
+export interface ChapterRevisionSummary extends RevisionSummary {
+  chapterId: string
+}
+
 export interface ProjectSummary {
   index: ProjectIndex
   outline: OutlineTree | null

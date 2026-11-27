@@ -1,10 +1,9 @@
 import { BagIcon, CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PeopleIcon, PlotIcon, StampIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
-import { SHELF_COMPONENTS } from '../consoleDefs'
-import { Placeholder } from '../shared'
 import PlotView from '../PlotView'
 import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
+import HistoryTab from '../history/HistoryTab'
 import { TemplatesTile } from '../outline/OutlineTemplates'
 import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
@@ -20,10 +19,6 @@ import { useTabbedLevel, type LevelTab } from './LevelTabs'
 import { V2_FEATURES } from '../../../../features'
 
 const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series, books, arcs and chapters, schedule, its project plan (phases, goals, processes, exercises, routines and tasks), history and analytics, and its own settings.'
-
-const body = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.body
-const label = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.label ?? ''
-const placeholder = (key: string) => <Placeholder title={label(key)} body={body(key)} />
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
@@ -104,7 +99,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
         return <ItemsConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} onOpenScene={sceneId => openNode(w, 'outline', sceneId)} />
       },
     }] : []),
-    { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
+    { id: 'history', label: 'History', Icon: ClockIcon, fill: true, surface: false, render: () => <HistoryTab w={w} /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ProjectEditor w={w} /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpTile target={HELP_TARGETS.writerProject} fallback={PROJECT_HELP_FALLBACK} /> },
   ]
