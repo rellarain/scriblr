@@ -5,6 +5,7 @@ import { newestFirst, nextSnapshot, type LogEntry } from '../../../lib/logUndo'
 import { useAutosave } from '../../../lib/useAutosave'
 import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { latestOf } from './chapterDates'
+import { registerOpenDraft } from './draftInserts'
 
 // What one save sends: the moments whose text changed since they were last
 // saved (with the ids they belong to, so a save that runs after switching
@@ -24,6 +25,8 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
   const latest = useRef<Record<string, string>>({})
   // Text changed since the last successful save.
   const unsaved = useRef<Record<string, string>>({})
+  // The chapter's text has come (a change from elsewhere, draftInserts.ts, waits for it: before, there is nothing to add to).
+  const [ready, setReady] = useState(false)
 
   const autosave = useAutosave<DraftChanges>({
     save: async ({ projectId: pid, chapterId: cid, changes }) => {
@@ -56,6 +59,7 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
     unsaved.current = {}
     setBodies({})
     setLoadedAt(null)
+    setReady(false)
     latest.current = {}
     if (!projectId || !chapterId) { setStatus('idle'); return }
     setStatus('loading')
@@ -69,6 +73,7 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
         setBodies(next)
         setLoadedAt(latestOf(Object.values(draft.moments).map(m => m.updatedAt)))
         setStatus('idle')
+        setReady(true)
       })
       .catch(err => {
         if (cancelled) return
@@ -83,6 +88,13 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
     }
   }, [projectId, chapterId])
 
+  // Loaded, this draft takes the changes made to its chapter from elsewhere (a Scratchpad note made into draft text) as typed text.
+  const setBodyRef = useRef<(momentId: string, body: string) => void>(() => {})
+  useEffect(() => {
+    if (!projectId || !chapterId || !ready) return undefined
+    return registerOpenDraft(projectId, chapterId, (momentId, change) => setBodyRef.current(momentId, change(latest.current[momentId] ?? '')))
+  }, [projectId, chapterId, ready])
+
   function setBody(momentId: string, body: string) {
     if (!projectId || !chapterId) return
     latest.current = { ...latest.current, [momentId]: body }
@@ -91,6 +103,7 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
     history.record(latest.current, { text: true })
     autosave.schedule({ projectId, chapterId, changes: { ...unsaved.current } })
   }
+  setBodyRef.current = setBody
 
   // Show an earlier or later text as an unsaved change: the moments that differ are saved like typed text.
   function show(target: Record<string, string> | undefined) {

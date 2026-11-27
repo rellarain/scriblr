@@ -25,7 +25,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
     },
     // Readers' loans, sales and reviews come with publishing, in a later version (features.ts).
     ...(V2_FEATURES ? [{ id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> }] : []),
-    { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
+    { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} w={w} /> },
     {
       id: 'project', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {

@@ -13,7 +13,7 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 | Tile | Today | Version 1 |
 |---|---|---|
 | Schedule (goals, agenda, backlog, analytics) | built | as built |
-| Scratchpad | a plain list of notes | **Convert a note** into an outline node, a plotpoint, draft text or a revision flag, in a project the writer chooses |
+| Scratchpad | a plain list of notes | **Convert a note** into an outline node, a plotpoint, draft text or a revision flag, in a project the writer chooses. Built (slice 7): from the note being edited; a revision flag goes on the project or on a chapter (the chapter's own flag); the note stays marked with what it became, or goes |
 | Readers | every published book's loans, sales, earnings and rating, all simulated | **Moved to WUI v2** (phase 2, when RUI gives it real readers); left out of v1 |
 | Project (the plan, and the template a new project's plan starts from) | built | as built |
 | Settings, Help | built | as built |

@@ -1,0 +1,36 @@
+// A Scratchpad note made into part of a project (scratchpad/ConvertNote.tsx): Convert beside the note's trash while it is edited, the panel under
+// the note, and the mark a kept note carries ("Became a plotpoint in Harbour Lights"). On the Dash's own colour: the panel one step deeper than the
+// note (--wr-fill-4 on a note on --wr-fill-3, the level's ink), the mark inverted like a chosen button.
+.wr {
+  .wrNoteFoot { align-items: center; gap: var(--space-2); }
+  .wrNote--editing.wrNote--convertible .wrNoteTitle { padding-right: 116px; }
+  .wrNoteBecame {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-2); padding: 1px var(--space-3);
+    font-size: var(--text-small); font-weight: 700; background: var(--level-ink); color: var(--wr-fill-4);
+  }
+
+  .wrConvert {
+    display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-3); padding: var(--space-5);
+    background: var(--wr-fill-4); color: var(--level-ink); container-type: inline-size;
+  }
+  .wrConvertTitle { font-size: var(--text-title); font-weight: 700; }
+  .wrConvertBlock, .wrConvertField { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; .wrLabel { margin: 0; } }
+  // Light fields on the level's colour, as the Schedule console's are.
+  .wrConvertField .wrField {
+    width: 100%; min-width: 0; box-sizing: border-box; background: var(--level-input); color: var(--level-input-ink); border-radius: var(--radius-input);
+    font-size: var(--text-field); &::placeholder { color: var(--level-input-hint); } &:disabled { opacity: 0.7; }
+  }
+  .wrConvertGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+  .wrConvertField--wide { grid-column: 1 / -1; }
+  .wrConvertNote { margin: 0; font-size: var(--text-ui); color: var(--level-ink-soft); }
+  .wrConvertFoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-4); }
+  .wrConvertKeep {
+    display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--text-ui); font-weight: 700; cursor: pointer;
+    // The app sets every input's appearance to none: a native checkbox again, in the level's ink.
+    input { flex: 0 0 auto; appearance: auto; -webkit-appearance: checkbox; width: 16px; height: 16px; margin: 0; accent-color: var(--level-ink); cursor: pointer; }
+  }
+
+  @container (max-width: 420px) {
+    .wrConvertGrid { grid-template-columns: minmax(0, 1fr); }
+  }
+}

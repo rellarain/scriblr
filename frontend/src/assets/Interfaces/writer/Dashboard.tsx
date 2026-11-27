@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { PlusIcon, TrashIcon } from '../../icons'
+import { PlusIcon, SwapIcon, TrashIcon } from '../../icons'
 import { AutoTextarea, useStoredState } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
+import type { WriterWorkspace } from './useWriterWorkspace'
+import ConvertNote from './scratchpad/ConvertNote'
+import { becameLine, type NoteConversion } from './scratchpad/noteConversion'
 
 // The Dash's scratchpad, a tab of the Dash level (levels/dashTabs.tsx). Notes have no backend of their own, so they persist in the
 // user's settings store. (The tasks, routines and analytics that used to be here are the Schedule console, schedule/.)
@@ -13,15 +16,19 @@ export function newId(): string {
 }
 
 export interface PanelContext { query?: string; newTick?: number }
-export interface Note { id: string; title: string; body: string }
+// `became`: what the note was made into, when it was kept after converting (scratchpad/ConvertNote.tsx).
+export interface Note { id: string; title: string; body: string; became?: NoteConversion }
 
 // Notes are cards with a title and description. Click one to edit it. The
 // shared node shortcuts apply (lib/nodeKeys.ts): Enter adds a note after this
 // one, Shift+Enter is a new line, Tab moves between fields and notes, and
-// Enter, Backspace or Delete in an empty note removes it.
-export function Scratchpad({ query = '', newTick = 0, bare = false }: PanelContext & { bare?: boolean } = {}) {
+// Enter, Backspace or Delete in an empty note removes it. With the workspace, a note being edited can be converted into part of a project
+// (an outline node, a plotpoint, draft text or a revision flag): Convert opens the panel under it.
+export function Scratchpad({ query = '', newTick = 0, bare = false, w }: PanelContext & { bare?: boolean; w?: WriterWorkspace } = {}) {
   const [notes, setNotes] = useStoredState<Note[]>(NOTES_KEY, [])
   const [editingId, setEditingId] = useState<string | null>(null)
+  // The note whose Convert panel is open.
+  const [converting, setConverting] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const shown = query ? notes.filter(n => `${n.title} ${n.body}`.toLowerCase().includes(query)) : notes
 
@@ -72,7 +79,7 @@ export function Scratchpad({ query = '', newTick = 0, bare = false }: PanelConte
         {shown.map(n => (
           <div
             key={n.id} data-note={n.id} data-knode={n.id}
-            className={editingId === n.id ? 'wrNote wrNote--editing' : 'wrNote'}
+            className={editingId === n.id ? `wrNote wrNote--editing${w ? ' wrNote--convertible' : ''}` : 'wrNote'}
             onFocus={() => setEditingId(n.id)}
             onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEditingId(null) }}
           >
@@ -84,8 +91,17 @@ export function Scratchpad({ query = '', newTick = 0, bare = false }: PanelConte
               className="wrNoteBody" rows={1} placeholder="Description" value={n.body} keyField
               onChange={body => patch(n.id, { body })}
             />
+            {n.became && <span className="wrNoteBecame">{becameLine(n.became)}</span>}
             {editingId === n.id && (
               <div className="wrNoteFoot">
+                {w && (
+                  <button
+                    type="button" className="wrSmallBtn" aria-expanded={converting === n.id}
+                    onMouseDown={e => e.preventDefault()} onClick={() => setConverting(c => (c === n.id ? null : n.id))}
+                  >
+                    <SwapIcon size={13} /> Convert
+                  </button>
+                )}
                 <button
                   type="button" className="wrTrashBtn wrTrashBtn--dark" aria-label="Delete note"
                   onMouseDown={e => e.preventDefault()} onClick={() => setNotes(prev => prev.filter(x => x.id !== n.id))}
@@ -93,6 +109,16 @@ export function Scratchpad({ query = '', newTick = 0, bare = false }: PanelConte
                   <TrashIcon size={14} />
                 </button>
               </div>
+            )}
+            {w && converting === n.id && (
+              <ConvertNote
+                w={w} note={n}
+                onDone={(conversion, keep) => {
+                  setConverting(null)
+                  if (keep) patch(n.id, { became: conversion })
+                  else setNotes(prev => prev.filter(x => x.id !== n.id))
+                }}
+              />
             )}
           </div>
         ))}

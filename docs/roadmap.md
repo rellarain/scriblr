@@ -66,7 +66,7 @@ WUI (mockup first):
 - [x] Revision passes in the project's schedule, each with its own goals, across all the project's books and chapters; their open flags in the backlog.
 - [x] Book goals with or without dates, and estimates from the writer's activity of how long the rest will take; the timeline follows them where there are no dates.
 - [x] Outline templates, the writer's own: save a book's or a chapter's outline shape and start a new one from it.
-- [ ] The Scratchpad converts a note into an outline node, a plotpoint, draft text or a revision flag.
+- [x] The Scratchpad converts a note into an outline node, a plotpoint, draft text or a revision flag.
 - [ ] Project > History as one timeline (activity, outline and plot snapshots, chapter revisions) with restore where allowed.
 - [ ] Finish Characters: the writers' own designer and the mannequin's step-by-step editor back on.
 - [ ] Finish Maps: shapes only with biome hues; lock the environment layer; places over time; routes and travel; story links; generated maps.
@@ -152,3 +152,4 @@ More items will be added.
 - 2026-11-27: WUI slice 4: revision passes. The project's Schedule console has a Revision passes tile (each pass's kinds of flag, dates and goals: resolve its flags, cut or add words, read every chapter in the Preview), and a running pass's open flags are a group in the Backlog.
 - 2026-11-27: WUI slice 5: book goals. Book details has a book's goals for its words, chapters, scenes and moments, without dates (how long the rest would take at the writer's usual pace, from their last eight weeks) or with deadlines for the book and each arc (the pace each needs, whether it is within reach), and a timeline of the arcs at that pace.
 - 2026-11-27: WUI slice 6: outline templates. Save a book's or a chapter's outline shape (titles and summaries if wanted, never the draft) as a template of your own, start a new book or chapter from one, and keep them in the Project level's new Templates tab.
+- 2026-11-27: WUI slice 7: Scratchpad conversions. A note becomes an outline node, a plotpoint, draft text or a revision flag in any project, and is kept marked with what it became or goes; draft text for a chapter open in the Draft goes into that draft as typed text.
