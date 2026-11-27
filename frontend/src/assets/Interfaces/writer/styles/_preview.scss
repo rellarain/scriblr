@@ -27,7 +27,12 @@
     --wr-page: var(--page-night); --wr-ink: var(--page-night-ink); --wr-page-line: var(--page-night-line); --wr-page-muted: var(--page-night-muted);
     --wr-hl: var(--page-night-highlight); --wr-hl-selected: var(--page-night-highlight-selected);
   }
-  .wrPreviewSelect { background: var(--ov-sink-2); color: var(--ink); border: 0; border-radius: var(--radius-button); padding: var(--space-2) 8px; font-size: var(--text-small); font-weight: 700; option { color: black; } }
+  // The page's own small buttons. A tile body gives its buttons the level's wash and white text (_level-tabs.scss), which the light page
+  // cannot carry: on the page a button is the page ink on the chapter's highlight, and a pressed or main one the accent with its own ink.
+  .wrPreviewPane > .wrPreviewToolbar .wrSmallBtn:not(.wrSmallBtn--accent) { color: var(--wr-ink); background: var(--wr-hl); &:hover:not(:disabled) { background: var(--wr-hl-selected); } }
+  .wrPreviewPane > .wrPreviewToolbar .wrSmallBtn.wrSmallBtn--accent { color: var(--on-accent); background: var(--wr-accent); &:hover:not(:disabled) { background: var(--wr-accent); box-shadow: inset 0 0 0 2px var(--on-accent); } }
+  // A select on the page: the page ink on the chapter's highlight, so it reads on the day and the night page alike.
+  .wrPreviewSelect { background: var(--wr-hl); color: var(--wr-ink); border: 0; border-radius: var(--radius-button); padding: var(--space-2) 8px; font-size: var(--text-small); font-weight: 700; option { color: var(--wr-ink); background: var(--wr-page); } }
   .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: var(--wr-hl); } &--selected { background: var(--wr-hl-selected); } &--flagged { border-bottom: 2px solid var(--wr-accent); } &--merge { background: var(--wr-hl); outline: 1px dashed var(--wr-accent); outline-offset: 1px; } }
   .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
   .wrReactBar {

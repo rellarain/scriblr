@@ -68,7 +68,7 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 | Reaction (three levels each way, in the margin) | built; kept in this browser only | as built |
 | Footnote | built | as built |
 | Flag | four kinds: Review, Edit, Add, Delete | **seven kinds** (below) |
-| Export | a chapter or a book as PDF, a chapter as JSON | **PDF with full Unicode, EPUB and JSON**, for a project, a book or a chapter. No DOC |
+| Export | a chapter or a book as PDF, a chapter as JSON | **PDF with full Unicode, EPUB and JSON**, for a project, a book or a chapter. No DOC. Built (slice 2): a project of several books can be a file per book (a zip) or one file |
 | Settings, Help | built | plus the style aids' switches |
 
 **Flag kinds**: Review, Add, Remove, Merge, Change, Simplify, Expand. A migration renames existing flags: Edit becomes Change, Delete becomes Remove.

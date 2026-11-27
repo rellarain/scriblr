@@ -34,6 +34,7 @@ backend/
 │   ├── deps.py               # get_storage_root / get_app_data_storage_root (FastAPI Depends)
 │   ├── api/                  # one router module per feature — see API surface below
 │   ├── models/                # request/response DTOs that aren't part of the persisted schema
+│   ├── fonts/                 # Noto fonts for the PDF export (SIL OFL; sources, licences and the CJK conversion in its README.md)
 │   └── storage/
 │       ├── paths.py            # OS app-data dir resolution, SCRIBLR_DATA_DIR override
 │       ├── schema.py            # every persisted Pydantic model (SCHEMA_VERSION = 2)
@@ -47,8 +48,11 @@ backend/
 │       │                               #   + the basic adult (app/seed/basic_model.json, built by frontend/scripts/seed-model: the old portrait's head, face and hair on a realistic body 7.5 heads tall, phase O4b)
 │       ├── user_settings_store.py      # global user settings: time-of-day theme, UI prefs, Writer UI state (kv)
 │       ├── training_schema.py / training_store.py   # Learning (LUI; stored under its old name): the courses (training.json) and one learner's progress (training-progress.json)
-│       └── pdf_export.py               # fpdf2 book/chapter PDF export
-├── tests/                    # 38 pytest modules, one per feature area (+ conftest.py fixtures)
+│       ├── export_content.py           # what an export holds: books, chapters, paragraphs and sentences as the Preview splits them, footnotes, open flags
+│       ├── pdf_export.py               # a project, book or chapter as a PDF (fpdf2, HarfBuzz shaping, the bundled Noto fonts)
+│       ├── epub_export.py              # ... as an EPUB 3 (a zip of XHTML, CSS and an SVG cover, put together by hand)
+│       └── json_export.py              # ... as JSON (the outline and drafts; the plot, flags and chapter revisions as chosen)
+├── tests/                    # pytest modules, one per feature area (+ conftest.py fixtures)
 ├── server_main.py            # entrypoint used by Electron / PyInstaller
 ├── requirements.lock          # exact dependency versions (what CI installs)
 └── scriblr.spec               # PyInstaller build spec
@@ -125,7 +129,7 @@ described, now stale, in `docs/data-model.md`).
 - **Transactions** (`project_store.transaction(root, project_id)`): holds the project's lock, loads the file once, lets every store call made inside
   on that thread work on the one in-memory `ProjectFile` (later calls see earlier changes) and writes it once at the end if anything changed;
   nothing is written if the block raises. The handlers that did several things per request (`PUT` draft, outline, plot, the reverts, a manual
-  revision, `PATCH` project) and the read-heavy ones (analytics, activity, PDF export) use it, so a draft save is one load and one write, not eight
+  revision, `PATCH` project) and the read-heavy ones (analytics, activity, export) use it, so a draft save is one load and one write, not eight
   and three.
 - **The parsed project is kept in memory** (`project_store._cache`, the last 3 projects used): parsing and validating a 5 MB `project.json` costs about
   130 ms, so a read or a save starts from the kept `ProjectFile` instead of the file. An entry is good while the file has the size and modification
@@ -693,7 +697,7 @@ the one project-independent router).
 | `facets` | `/api/projects/{id}` · `/api/activity` | `GET "/activity/facets"` events, daily and monthly totals (compacts first) · `GET "/planner"` · `PUT "/planner"` (dates and shapes checked) · `GET /api/activity/ribbon` today's events per 10-minute slot across every project, and the 28-day average |
 | `revision-flags` | `/api/projects/{id}/revision-flags` | `GET ""` (`includeResolved`) · `POST ""` · `PATCH "/{flagId}"` · `POST "/{flagId}/resolve"` · `DELETE "/{flagId}"` (204) (the Preview's Flag tool, `draft/FlagTool.tsx` and `useRevisionFlags.ts`, is their UI: flag a clicked sentence, `sentenceRanges`, or the project; edit, resolve with an outcome, delete) |
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
-| `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF (set in a built-in font: typographic punctuation is made plain and anything outside Latin-1 becomes `?` until a Unicode font is bundled; the download name carries the real title in `filename*`) |
+| `export` | `/api/projects/{id}/export` | `GET ""` `scope` (`project`, `book`, `chapter`), `id` (the book or chapter), `format` (`pdf`, `epub`, `json`) and the format's options: a PDF `pageSize` (`6x9`, `a5`, `letter`, `a4`), `titlePage`, `contents`, `footnotes` and `marginFlags` (the open revision flags beside their lines, in the book's hue); an EPUB `cover` (the book's title and colour), `contents` and `footnotes` (at each chapter's end); JSON `plot`, `flags` and `revisions` (always the outline and the drafts). `split` makes a project of several books a zip with a file per book. The text is laid out in the book's preview formatting and split as the Preview splits it (`storage/export_content.py`); a PDF prints any script in the bundled Noto fonts (`app/fonts/`), embedding only the fallback fonts the text needs. 404 for an unknown book or chapter, 422 for a book or chapter export without its id. The download name carries the real title in `filename*`. The first routes, `GET "/book/{bookId}"` and `GET "/chapter/{chapterId}"`, are the PDF with the defaults |
 | `maps` | `/api/projects/{id}/maps` | `GET ""` summaries without shapes (tree order, with `level` and `floor`) · `POST ""` `{title, level, units, width, height, cellSize, unit, parentId, base}` -> a new map of levels and biome shapes (201; 422 for a side past 512 or a missing parent; a client that sends only `kind` gets the level its kind becomes) · `GET "/places/all"` the places of every map: named markers, regions and biome shapes (`kind` the marker's kind, such as `castle`, or `area`) · `GET "/{mapId}"` the whole map (409 if it was quarantined) · `PUT "/{mapId}"` replace it (the id must match, 422; a `parentId` that is itself or inside it is refused, 422; repaired, not refused) · `DELETE "/{mapId}"` (204; the maps inside move up). Unknown id 404 |
 | `map biomes` | `/api/map-biomes`, `/api/projects/{id}/map-biomes` | The admin's biome list (app data, `map-biomes.json`): `GET ""` the catalog (`draft`, `published` `{version, publishedAt, biomes}`, `history` of up to 20, `nextVersion`; a new install starts with the starter list of 29 published as v1) · `PUT ""` `{biomes}` the draft · `GET "/published"` what projects draw with (retired ones included) · `POST "/publish"` (422 with the faults: a biome with no name, two of one name; a published biome left out stays as retired) · `POST "/discard"` · `POST "/restore/{version}"` (404 unknown). A biome is `{id, name, color, group: land/water/material/space/star/planet, levels, retired}`. A list from an earlier build (`seedVersion`) gets the starter biomes added later (the kinds of star and planet, seed version 2) once, after its own. A project's own: `GET` / `PUT ""` `{biomes}` (only `own_` ids; 422 past 64; one a map uses and is left out is kept as retired). Publishing a book and the extras preview read the published list from the app data folder. |
 | `world publishing` | `/api/projects/{id}`, `/api/reader` | Maps and characters for readers. A map and a character carry a `reader` share (`published`, `revealAt` = a chapter number of the published edition or none, `reveals` per label or shape id or per character field key, and for a character the public `fields`); it is saved with the document. Publishing a book freezes the published maps and the public side of the published characters into the new `BookEdition` (`maps`, `characters`), as it freezes the chapters. `GET "/reader-extras"` for each book of the project: the chapters of the next edition (the numbers a reveal uses) and the spoiler warnings (a scene whose `location` is a place of a published map, or that a published character is tagged on, in a chapter before the reveal) · `GET "/books/{bookId}/extras-preview?chapter=n"` the saved maps and characters as a reader who has reached chapter n sees them · reader: `GET "/books/{bookId}/extras"` the same for the reader, up to the chapter they last stopped at (all once finished); what is still hidden is only counted (`lockedMaps`, `lockedCharacters`) |
@@ -744,7 +748,7 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
   plot and settings through `api/` and keeps them in React state with its own autosave and undo history; other interfaces use small stores
   (`settings/settingsStore.ts`, `reader/readerStore.ts`, the feedback pipeline's `feedback/staffStore.ts` and `feedback/mineStore.ts`). `api/client.ts`
   is a thin JSON `get/post/put/patch/delete` wrapper (same-origin `/api`, throwing `ApiError`, with optional extra headers such as the feedback's
-  `X-Admin-Id`); `api/export.ts` is the one raw `fetch` + Blob download, since PDF isn't JSON.
+  `X-Admin-Id`); `api/export.ts` is the one raw `fetch` + Blob download, since an export (PDF, EPUB, JSON file or zip) is a file to save, not data to read.
 - **Styles** — the Writer's stylesheet, `writer/writer.scss`, is an index of one partial per area in `writer/styles/` (shared, shelves, levels,
   plot, draft level, preview, level tabs, ...), loaded in the order the rules were written in (a later rule overrides an earlier one at equal
   specificity); tests that scan the stylesheet read the partials too (`src/test/readStyles.ts`). The space, radius and type-size scale is a set of CSS custom
@@ -1049,7 +1053,8 @@ mounted it; it remains in git history.
   Save, Publish and Draft | Preview tools), the chapter's plotpoints (read-only footnote cards), and the draft:
   its acts, scenes and moments as read-only cards (fold up, remembered) each around an
   auto-growing draft input with a live word count, or, from the toggle, the preview with
-  its Reaction / Flag / Export tools. A sentence's reaction bars show one heart per level, not a stack
+  its Reaction / Flag / Export tools (the Export tool, `draft/ExportTool.tsx`: the project, this book or this chapter as a PDF, an EPUB or
+  JSON, with that format's options, saved under a name made from the titles; the choices are remembered). A sentence's reaction bars show one heart per level, not a stack
   (`ReactionHeartIcon`): like is an outline, two concentric outlines, a filled heart; dislike is an outline with a
   line down its middle, two separate outlined halves, two separate filled halves. A chapter with no outline is one free draft.
 - **`AUI.tsx`** (`admin/` subfolder) — the Admin panel: one console per section

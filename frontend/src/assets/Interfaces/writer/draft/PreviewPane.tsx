@@ -7,7 +7,6 @@ import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { nodeLabel } from '../plotTree'
 import { sentenceRanges, splitParagraphs, splitSentences } from '../sentences'
 import type { useChapterDraft } from '../useChapterDraft'
-import { exportChapterPdf } from '../../../../api/export'
 import { MoonIcon, ReactionHeartIcon, SunIcon } from '../../../icons'
 import type { usePublications } from '../usePublications'
 import { fullDate, shortDate } from '../chapterDates'
@@ -15,6 +14,7 @@ import { formatOf, formatVars } from '../previewFormat'
 import { useAuthorNotes } from '../useAuthorNotes'
 import { FootnoteTool } from './FootnoteTool'
 import { FlagTool, flagLabel } from './FlagTool'
+import { ExportTool } from './ExportTool'
 import { useRevisionFlags } from '../useRevisionFlags'
 import type { FlagType } from '../../../../api/types'
 import { V2_FEATURES } from '../../../../features'
@@ -133,7 +133,6 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
   const [marks, setMarks] = useStoredState<Marks>(`scriblr.writer.marks.${w.activeProjectId}.${chapter.id}`, {})
   const [selected, setSelected] = useState<string | null>(null)
   const authorNotes = useAuthorNotes(w.activeProjectId, chapter.id, w.activeBook?.id ?? null)
-  const [exportMessage, setExportMessage] = useState<string | null>(null)
   // Day: a white page with black text; night: a dark page with light text.
   const [tone, setTone] = useStoredState<'day' | 'night'>('scriblr.writer.previewTone', 'day')
   // The current draft, or one of the chapter's kept publications (read-only; publishing is held back for a later version, V2_FEATURES).
@@ -153,31 +152,6 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
       const current = prev[key] ?? { like: 0, dislike: 0 }
       return { ...prev, [key]: { ...current, [kind]: cycle(current[kind]) } }
     })
-  }
-
-  function exportJson() {
-    const payload = {
-      chapter: { id: chapter.id, number: chapterNumber, title: chapter.title },
-      moments: moments.map(m => ({ id: m.id, synopsis: m.synopsis, body: draft.bodies[m.id] ?? '' })),
-    }
-    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `chapter-${chapterNumber}.json`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  async function exportPdf() {
-    if (!w.activeProjectId) return
-    setExportMessage(null)
-    try {
-      await exportChapterPdf(w.activeProjectId, chapter.id, `chapter-${chapterNumber}.pdf`)
-    } catch (err) {
-      setExportMessage(err instanceof Error ? err.message : 'PDF export failed')
-    }
   }
 
   const publishedParagraphs = published
@@ -300,15 +274,15 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
             onRemove={id => void revision.remove(id)} onShow={showFlag}
           />
         )}
-        {component === 'export' && (
-          <div className="wrToolGroup">
-            <span className="wrLabel">Export</span>
-            <button type="button" className="wrSmallBtn" onClick={exportJson}>JSON</button>
-            <button type="button" className="wrSmallBtn" disabled title="Not available yet">EPUB</button>
-            <button type="button" className="wrSmallBtn" onClick={() => void exportPdf()}>PDF</button>
-            <button type="button" className="wrSmallBtn" disabled title="Not available yet">DOC</button>
-            {exportMessage && <span className="wrError">{exportMessage}</span>}
-          </div>
+        {component === 'export' && w.activeProjectId && (
+          <ExportTool
+            projectId={w.activeProjectId} projectTitle={w.activeProject?.title ?? ''} bookCount={w.books.length}
+            book={w.activeBook ? {
+              id: w.activeBook.id, title: nodeLabel(w.activeBook), number: w.books.findIndex(b => b.id === w.activeBook?.id) + 1,
+              chapterCount: w.activeBookChapters.length,
+            } : null}
+            chapter={{ id: chapter.id, title: nodeLabel(chapter), number: chapterNumber }}
+          />
         )}
         {component === 'footnote' && (
           <FootnoteTool at={at} notes={authorNotes.notes} flags={authorNotes.flags} error={authorNotes.error} onSave={next => void authorNotes.save(next)} />

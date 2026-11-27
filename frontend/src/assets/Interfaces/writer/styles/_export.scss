@@ -1,0 +1,35 @@
+// The Preview's Export tool (draft/ExportTool.tsx): cards for what to export and the format, that format's options, the file name and
+// Export. It sits on the page, so it takes the page's inks: the page ink for text, rings and tick boxes, and the chapter's highlight
+// (--wr-hl, --wr-hl-selected: the chapter's hue, fitted so the page ink reads on it) for a hovered and the chosen card.
+.wr {
+  .wrExportTool { display: flex; flex-direction: column; gap: var(--space-5); flex: 1 1 100%; min-width: 0; .wrHint { white-space: normal; } }
+  .wrExportSection { display: flex; flex-direction: column; gap: var(--space-3); .wrLabel { margin: 0; } }
+  .wrExportCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); }
+  .wrExportCard {
+    display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; text-align: left;
+    padding: var(--space-4) var(--space-5); border-radius: var(--radius-button); background: transparent; color: var(--wr-ink);
+    box-shadow: inset 0 0 0 1px var(--wr-page-line);
+    &:hover { background: var(--wr-hl); }
+    &--chosen, &--chosen:hover { background: var(--wr-hl-selected); box-shadow: inset 0 0 0 2px var(--wr-ink); }
+  }
+  .wrExportCardName { font-size: var(--text-ui); font-weight: 700; }
+  .wrExportCardDetail { font-size: var(--text-small); line-height: 1.4; overflow-wrap: anywhere; }
+  .wrExportOptions {
+    display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-button);
+    box-shadow: inset 0 0 0 1px var(--wr-page-line); .wrLabel { margin: 0; } .wrToolGroup { flex-wrap: wrap; }
+  }
+  .wrExportChecks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); }
+  .wrExportCheck { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--text-ui); cursor: pointer; }
+  .wrExportOptName { font-size: var(--text-ui); font-weight: 700; }
+  // The app resets native controls, so the box is drawn: a ring in the page ink; ticked, filled with the ink and the tick in the page's colour.
+  .wrExportBox {
+    appearance: none; position: relative; flex: 0 0 auto; width: 14px; height: 14px; margin: 0; border-radius: var(--radius-button); cursor: pointer;
+    background: transparent; box-shadow: inset 0 0 0 1.5px var(--wr-ink);
+    &:checked { background: var(--wr-ink); }
+    &:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--wr-page); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    &:focus-visible { outline: 2px solid var(--wr-ink); outline-offset: 2px; }
+  }
+  .wrExportGo { flex-wrap: wrap; .wrLabel { margin: 0; } }
+  .wrExportFile { font: 700 var(--text-ui) ui-monospace, Consolas, monospace; overflow-wrap: anywhere; min-width: 0; }
+  .wrExportBtn { margin-left: auto; }
+}
