@@ -50,6 +50,12 @@ export interface OutlineNode {
   chapterCountTarget: number | null
   plotlineIds: string[]
   wordCountGoal: number | null
+  // Book-only: the outline to fill besides the chapters, and whether the book's goals have dates (Book details: "Deadlines").
+  sceneCountTarget?: number | null
+  momentCountTarget?: number | null
+  goalsDated?: boolean
+  // Book and arc: the day it is to be done by (YYYY-MM-DD), for a book whose goals have dates.
+  dueDate?: string | null
   // Book-only: which of the project's time systems its scenes use.
   timeSystemId?: string | null
   // Book-only: the preview's layout (none = the defaults).

@@ -2,6 +2,7 @@ import { ExportIcon, GearIcon, HelpIcon, InfoIcon, OutlineIcon } from '../../../
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf } from '../outlineTree'
+import BookGoals from '../outline/BookGoals'
 import BookPublish from '../outline/BookPublish'
 import BookSettings from '../outline/BookSettings'
 import { nodeLabel } from '../plotTree'
@@ -13,10 +14,6 @@ import { useTabbedLevel, type LevelTab } from './LevelTabs'
 import { V2_FEATURES } from '../../../../features'
 
 export const OUTLINE_HELP_FALLBACK = 'The Outline level is the open book: its arcs and chapters to move around in, the open chapter’s acts, scenes and moments as cards, the book’s draft stats and its own settings. Plotpoints still to place are in the Project’s Plot tab, in its Plotpoints tile: drag one onto a card.'
-
-const kv = (k: string, v: React.ReactNode) => (
-  <div className="wrKv"><span>{k}</span><span>{v}</span></div>
-)
 
 // The Outline level's tabs, at Mid: the book's arcs and chapters as navigation rows, and the book's facts.
 export function BookOutlineList({ w }: { w: WriterWorkspace }) {
@@ -50,17 +47,41 @@ export function BookOutlineList({ w }: { w: WriterWorkspace }) {
   )
 }
 
+const counted = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`
+
+// The book's details at Mid: what the book has today (its cover, title and synopsis to edit, and its counts) beside its goals.
 export function BookDetails({ w }: { w: WriterWorkspace }) {
+  const counts = useWordCounts(w.activeProjectId)
   const book = w.activeBook
   if (!book) return null
-  const bookChapters = w.activeBookChapters
+  const all = descendantsOf(buildChildIndex(w.outlineNodes), book.id)
+  const count = (kind: string) => all.filter(n => n.kind === kind).length
+  const words = counts.nodes[book.id] ?? counts.books[book.id] ?? 0
+  const number = (w.books ?? []).findIndex(b => b.id === book.id) + 1
+  const project = w.activeProject?.title
   return (
-    <div className="wrOutlineMid">
+    <div className="wrOutlineMid wrBookDetails">
       <div className="wrPanelHead">Book details</div>
-      {kv('Title', nodeLabel(book))}
-      {kv('Chapters', book.chapterCountTarget ? `${bookChapters.length} of ${book.chapterCountTarget} target` : bookChapters.length)}
-      {book.wordCountGoal != null && kv('Word goal', book.wordCountGoal.toLocaleString())}
-      {book.synopsis && <div className="wrPanelText">{book.synopsis}</div>}
+      <div className="wrBookDetailsBody">
+        <div className="wrBookDetailsFacts">
+          <div className="wrBookDetailsCover">
+            <span className="wrBookDetailsTitle">{nodeLabel(book)}</span>
+            {number > 0 && <span>Book {number}{project ? ` of ${project}` : ''}</span>}
+          </div>
+          <label className="wrBookEdField">
+            <span className="wrLabel">Title</span>
+            <input className="wrField" aria-label="Book title" value={book.title} onChange={e => w.updateOutlineNode(book.id, { title: e.target.value })} />
+          </label>
+          <label className="wrBookEdField">
+            <span className="wrLabel">Synopsis</span>
+            <textarea className="wrField wrBookDetailsSynopsis" aria-label="Synopsis" rows={4} value={book.synopsis} onChange={e => w.updateOutlineNode(book.id, { synopsis: e.target.value })} />
+          </label>
+          <span className="wrBookDetailsCounts">
+            {counted(count('chapter'), 'chapter')} · {counted(count('scene'), 'scene')} · {counted(count('moment'), 'moment')} · {counted(words, 'word')}
+          </span>
+        </div>
+        <BookGoals w={w} book={book} nodeWords={counts.nodes} />
+      </div>
     </div>
   )
 }

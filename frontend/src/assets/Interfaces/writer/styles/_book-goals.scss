@@ -1,0 +1,69 @@
+// A book's details and goals: at Mid the Book details tab (levels/outlineTabs.tsx, BookDetails: the book's facts beside its goals), at Max
+// the goals under the draft stats on the book's cover (outline/BookGoals.tsx). On the level's own colour in both: the goals on a panel one step
+// deeper (--wr-fill-4; the cover's recess on the cover), the level's ink, rules in its line, the pace on its wash. Narrow (the cover, a
+// narrow tab), the dates and the timeline's labels take less room.
+.wr {
+  .wrBookDetailsBody { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-5); }
+  .wrBookDetailsFacts { flex: 1 1 240px; max-width: 320px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+  .wrBookDetailsCover {
+    min-height: 120px; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-1); padding: var(--space-5);
+    background: var(--wr-fill); color: var(--on-accent); font-size: var(--text-ui);
+  }
+  .wrBookDetailsTitle { font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-heading); font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .wrBookDetailsSynopsis { font-family: Georgia, 'Times New Roman', serif; resize: vertical; }
+  .wrBookDetailsCounts { font-size: var(--text-ui); color: var(--level-ink-soft); }
+
+  .wrBookGoals {
+    container-type: inline-size; flex: 999 1 360px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5);
+    padding: var(--space-5); background: var(--wr-fill-4); color: var(--level-ink);
+  }
+  .wrBookCover .wrBookGoals { flex: 0 0 auto; padding: var(--space-4) var(--space-5); background: var(--ov-sink-2); }
+  .wrBookGoalsHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); .wrChoice { margin-left: auto; } }
+  .wrBookGoalsTitle { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-heading); }
+  .wrBookGoalsFields { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--space-4); }
+  .wrBookGoalsPace { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); background: var(--level-wash); font-size: var(--text-ui); line-height: 1.45; }
+  .wrBookGoalsEstimate { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-ui); }
+  .wrBookGoalsBig { font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-chapter); line-height: 1.25; }
+  .wrBookGoalsNote { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--text-ui); color: var(--level-ink-soft); }
+  // A row for the book and one for each arc: its name, its date and what the date asks.
+  .wrBookGoalsDates { display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 150px) minmax(0, 1fr); align-items: center; gap: var(--space-3) var(--space-4); }
+  .wrBookGoalsPart { font-size: var(--text-ui); font-weight: 700; overflow-wrap: anywhere; }
+  // Within reach and done: inverted, like a chosen button. Above the pace and past the date: ringed in the ink.
+  .wrBookGoalsTag { padding: 1px var(--space-3); font-size: var(--text-small); font-weight: 700; white-space: nowrap; }
+  .wrBookGoalsTag--reach, .wrBookGoalsTag--done { background: var(--level-ink); color: var(--wr-fill-4); }
+  .wrBookGoalsTag--above, .wrBookGoalsTag--past { color: var(--level-ink); box-shadow: inset 0 0 0 1px var(--level-ink); }
+
+  // The timeline: a month scale, then a row for each part (or the book): done up to today, solid at the faster pace, hatched up to the
+  // slower, a tall mark at a date, a dashed line at today.
+  .wrBookTimeline { display: flex; flex-direction: column; gap: var(--space-3); .wrLabel { margin: 0; } }
+  .wrBookTimelineGrid { display: grid; grid-template-columns: minmax(0, 120px) minmax(0, 1fr); align-items: center; gap: var(--space-3) var(--space-4); }
+  // The months, the year under the first and under each January.
+  .wrBookTimelineMonths { position: relative; height: 28px; overflow: hidden; font-size: var(--text-small); font-weight: 700; }
+  .wrBookTimelineMonth {
+    position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; padding-left: var(--space-2); border-left: 1px solid var(--level-line); white-space: nowrap;
+  }
+  .wrBookTimelineYear { font-size: var(--text-small); font-weight: 400; }
+  .wrBookTimelineYear--narrow { display: none; }
+  .wrBookTimelineLabel { font-size: var(--text-ui); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrBookTimelineTrack { position: relative; height: 22px; background: var(--ov-sink-3); > span { position: absolute; top: 4px; bottom: 4px; } }
+  .wrBookTimelineTrack > .wrBookTimelineDone { background: var(--level-ink-soft); }
+  .wrBookTimelineTrack > .wrBookTimelineLikely { background: var(--level-ink); }
+  .wrBookTimelineTrack > .wrBookTimelineRange { background: repeating-linear-gradient(135deg, var(--level-ink) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1px var(--level-ink); }
+  .wrBookTimelineTrack > .wrBookTimelineDue { top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--level-ink); }
+  .wrBookTimelineTrack > .wrBookTimelineToday { top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--level-ink-soft); }
+  .wrBookTimelineLegend { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); font-size: var(--text-ui); > span { display: inline-flex; align-items: center; gap: var(--space-3); } }
+  .wrBookTimelineKey {
+    display: inline-block; width: 18px; height: 10px;
+    &--likely { background: var(--level-ink); }
+    &--range { background: repeating-linear-gradient(135deg, var(--level-ink) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1px var(--level-ink); }
+    &--today { width: 0; height: 12px; border-left: 2px dashed var(--level-ink-soft); }
+    &--due { width: 2px; height: 14px; background: var(--level-ink); }
+  }
+
+  @container (max-width: 440px) {
+    .wrBookGoalsDates { grid-template-columns: minmax(0, 1fr) minmax(0, 150px); .wrBookGoalsNote { grid-column: 1 / -1; } }
+    .wrBookTimelineGrid { grid-template-columns: minmax(0, 76px) minmax(0, 1fr); }
+    .wrBookTimelineMonth--odd, .wrBookTimelineYear:not(.wrBookTimelineYear--narrow) { display: none; }
+    .wrBookTimelineYear--narrow { display: inline; }
+  }
+}

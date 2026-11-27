@@ -51,9 +51,12 @@ describe('OutlineMid', () => {
     expect(document.querySelector('.wrPlotTray [data-point="placed"]')).toBeTruthy() // a placed plotpoint stays in the tray...
     expect(within(document.querySelector<HTMLElement>('.wrPlotTray [data-point="placed"]')!).getByLabelText('Placed once')).toBeTruthy() // ...with its counter
     expect(document.querySelector('[data-placed="placed"]')).toBeTruthy() // and is in the placed list
-    expect(screen.getByText('A frozen port.')).toBeTruthy()
-    expect(screen.getByText('2 of 12 target')).toBeTruthy()
-    expect(screen.getByText('80,000')).toBeTruthy()
+    // The book's details: its title and synopsis to edit, its counts, and its goals.
+    expect((screen.getByLabelText('Synopsis') as HTMLTextAreaElement).value).toBe('A frozen port.')
+    expect((screen.getByLabelText('Book title') as HTMLInputElement).value).toBe('Cold Harbor')
+    expect(screen.getByText('2 chapters · 0 scenes · 0 moments · 0 words')).toBeTruthy()
+    expect(screen.getByDisplayValue('80,000')).toBeTruthy()
+    expect(screen.getByDisplayValue('12')).toBeTruthy()
   })
 
   it('opens a chapter from its row, and marks the open one', async () => {

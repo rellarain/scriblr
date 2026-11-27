@@ -7,6 +7,7 @@ import HelpTile from '../../../../components/help/HelpTile'
 import { HELP_TARGETS } from '../../../../channels/helpTargets'
 import { OUTLINE_HELP_FALLBACK, useOutlineTabs } from '../levels/outlineTabs'
 import BookEditor from './BookEditor'
+import BookGoals from './BookGoals'
 import BookPublish from './BookPublish'
 import { V2_FEATURES } from '../../../../features'
 import BookSettings from './BookSettings'
@@ -75,6 +76,7 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
             {V2_FEATURES && tabs.isOpen('publish') && <BookPublish w={w} />}
             {tabs.isOpen('help') && <div className="wrBookEdHelp"><HelpTile target={HELP_TARGETS.writerBook} fallback={OUTLINE_HELP_FALLBACK} /></div>}
             {tabs.isOpen('details') && <DraftStats book={book} chapters={chapters} nodeWords={counts.nodes} settings={w.activeProject?.settings} />}
+            {tabs.isOpen('details') && <BookGoals w={w} book={book} nodeWords={counts.nodes} />}
             <OutlineNav
               w={w} book={book} counts={counts} focus={focus} plotDrag={plotDrag} onAdded={showWholeBook}
               chapterBody={chapter => tabs.isOpen('outline') && (

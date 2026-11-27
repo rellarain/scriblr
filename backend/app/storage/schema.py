@@ -43,6 +43,7 @@ PROJECT_TITLE_MAX = 100
 HUE_SCHEME = 4
 
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def hex_to_hue(value: Optional[str]) -> Optional[int]:
@@ -272,6 +273,25 @@ class OutlineNode(BaseModel):
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
     wordCountGoal: Optional[int] = None
+    # Set only on "book" nodes: the rest of the outline to fill (with chapterCountTarget), and whether the book's goals have dates
+    # (Book details: "Goals without dates", the default, or "Deadlines").
+    sceneCountTarget: Optional[int] = Field(default=None, ge=1)
+    momentCountTarget: Optional[int] = Field(default=None, ge=1)
+    goalsDated: bool = False
+    # Set on "book" and "arc" nodes: the day it is to be done by (YYYY-MM-DD), for a book whose goals have dates. Kept when the book
+    # goes back to goals without dates, so the dates come back with "Deadlines".
+    dueDate: Optional[str] = None
+
+    @field_validator("dueDate", mode="before")
+    @classmethod
+    def _due_date_is_a_day(cls, value: Any) -> Optional[str]:
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str) or not _DAY.match(value):
+            raise ValueError("dueDate must be a day, YYYY-MM-DD")
+        datetime.strptime(value, "%Y-%m-%d")
+        return value
+
     # Set only on "book" nodes: which of the project's time systems this
     # book's scenes use (None = the project's first system).
     timeSystemId: Optional[str] = None

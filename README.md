@@ -212,7 +212,10 @@ described, now stale, in `docs/data-model.md`).
   id used to look up its draft content; draft shard creation is lazy (first
   save). Nodes also carry `flag` (`NodeFlag`: one of the seven kinds,
   `review|add|remove|merge|change|simplify|expand`, + note; the old `edit`
-  and `delete` are read as `change` and `remove`), `color`, `chapterCountTarget`, `plotlineIds`, `wordCountGoal`.
+  and `delete` are read as `change` and `remove`), `color`, `chapterCountTarget`, `plotlineIds`, `wordCountGoal`; a book's goals
+  for the rest of its outline (`sceneCountTarget`, `momentCountTarget`, each 1 or more) and whether they have dates (`goalsDated`,
+  "Deadlines" in Book details), and on a book or an arc the day it is to be done by (`dueDate`, `YYYY-MM-DD`; kept while the book's
+  goals are without dates).
 - **Plot tree** (`PlotNode`/`PlotTree`) — the same flat-list-with-`parentId`
   shape, five kinds: `category < subcategory < cluster < plotline < plotpoint`
   (`PlotNodeKind`/`PLOT_KIND_ORDER`; a cluster is an optional grouping under a
@@ -995,9 +998,13 @@ mounted it; it remains in git history.
   and what is off kept per user as `scriblr.writer.plot.tiles` and `scriblr.writer.plot.minimized`; Compare turns itself on when a second plotline is ticked;
   in the Editor the parents above a title are chips by level with three states: minimized (title and keywords), expanded (title, keywords and the whole description) and, from expanded only, the editor (its own title, description, colour and keywords to change in place)),
   Schedule (the same console over the project), History, Settings (the project editor and its colour) and Help. The
-  Outline's (`levels/outlineTabs.tsx`): Book outline (New chapter), Book details, Settings (the
+  Outline's (`levels/outlineTabs.tsx`): Book outline (New chapter), Book details (the book's cover, title, synopsis and counts beside
+  its **goals**, `outline/BookGoals.tsx`: the words, chapters, scenes and moments to reach, without dates (how long the rest would take
+  at the writer's usual pace, "About 6 to 8 months", the pace being the slower and the faster of their last eight weeks of activity,
+  `lib/bookGoals.ts`) or with deadlines (a date for the book and each arc, the pace each needs and whether it is within reach), and a
+  timeline of the arcs one after another at that pace), Settings (the
   book's fields and colour) and Help. At Max the Outline is the book's **cover**, in one column: the book editor strip with the
-  title and the tabs, then the sections the tabs open (settings, help, draft stats) and the contents
+  title and the tabs, then the sections the tabs open (settings, help, draft stats and the goals) and the contents
   (`outline/OutlineNav.tsx`: the arcs and chapters), narrowed by the edge tabs: an arc's tab shows only
   that arc and each of its chapters' outlines, a chapter's tab only that chapter's (choosing the focused tab again goes back to the whole book, every chapter open; adding an arc or chapter, by key or button, never focuses it, a narrowed view goes back to the whole book so the new card shows, and only the tabs focus an arc or chapter), each unfolding its
   title, colour and trash and under them its acts, scenes and moments (`OutlineCards.tsx`; the acts and scenes fold up, and so does the whole chapter section, from the chevron in its tile's top right corner: the chapter's

@@ -57,6 +57,8 @@ Everything in the WUI section of the feature inventory ([`scrilbrPlan.md`](../..
 - **Goals without dates**: a word count, or an outline to fill (chapters, scenes, moments). The app **estimates** from the writer's own activity how long the rest will take ("6 to 8 months at your usual pace"), and the book's timeline follows those estimates.
 - **Deadlines**: dates for the book and its parts. The same estimates show beside them, to plan the project with (whether a date is within reach, and the pace it needs).
 
+Built (slice 5), in Book details (at Mid beside the book's cover, title, synopsis and counts; on the cover at Max): goals for the words, chapters, scenes and moments; the usual pace is the slower and the faster of the writer's last eight weeks of activity; without dates, "About 6 to 8 months at your usual pace" and when that is; with deadlines, a date for the book and for each arc (an arc's share of the word goal is its share of the chapters), each with the pace it needs and whether it is within reach; a timeline of the arcs one after another at that pace, with the dates on it.
+
 ## Draft and Preview (Page and Pages consoles)
 
 | Tile | Today | Version 1 |
