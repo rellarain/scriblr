@@ -39,10 +39,65 @@ RUI and LUI already have early builds; phase 2 completes their version 1.
 
 ### Phase 1: the core interfaces, version 1
 
-WUI, UUI, VUI, HUI and AUI completely built out with their version 1 functionality.
+WUI, UUI, VUI, HUI and AUI completely built out with their version 1 functionality. What each one includes is in its requirements: [WUI](requirements/wui-v1.md), [UUI](requirements/uui-v1.md), [VUI](requirements/vui-v1.md), [HUI](requirements/hui-v1.md), [AUI](requirements/aui-v1.md).
+
+**How it runs**: interface by interface, each finished before the next: WUI, UUI, VUI, HUI, AUI. For each one:
+1. its interview round settles the open questions in its requirements;
+2. a **mockup** (a Design artifact) of its new and changed consoles and tiles, approved before any code;
+3. the build, in slices, each committed with its tests and checked live on scratch data;
+4. the full suites, then a push.
+
+**Rules for every phase 1 interface**:
+- **No placeholders.** Every console and tile works end to end, or is moved to a later phase by name and hidden behind one `V2_FEATURES` switch (its code stays).
+- **Accounts are local.** Welcome, Registration, Login, Account and Subscription work on this machine: a local account with a password or a passkey; plans shown, not charged. Phase 4 connects real accounts and payment.
+- **UUI before VUI.** UUI adds the local account record its Profile and Subscription need; VUI builds Registration and Login on it.
+- **Admin levels map onto the roles that exist**: Site/System is the owner and admins with site rights, Department is director, Team is manager, Support is channel support.
 
 Tasks:
-- [ ] Version 1 interview, one interface at a time: WUI, UUI, VUI, HUI, AUI.
+- [x] Version 1 interviews: WUI (four rounds) and the phase 1 round for UUI, VUI, HUI and AUI.
+- [ ] Each interface's own round, before its mockup: UUI, VUI, HUI, AUI (their open questions are in their requirements).
+
+WUI (mockup first):
+- [ ] Take Dash > Readers, Project > Items and Outline > Publish out of v1 behind the `V2_FEATURES` switch (they return in WUI v2).
+- [ ] Seven flag kinds: Review, Add, Remove, Merge, Change, Simplify, Expand; Edit becomes Change and Delete becomes Remove.
+- [ ] Export: PDF with full Unicode, EPUB and JSON, for a project, a book or a chapter.
+- [ ] Paragraph and Sentence tools: move, split and join paragraphs (pinned plotpoints follow); style aids for long sentences, repeated words and readability, each on or off.
+- [ ] Revision passes in the project's schedule, each with its own goals, across all the project's books and chapters; their open flags in the backlog.
+- [ ] Book goals with or without dates, and estimates from the writer's activity of how long the rest will take; the timeline follows them where there are no dates.
+- [ ] Outline templates, the writer's own: save a book's or a chapter's outline shape and start a new one from it.
+- [ ] The Scratchpad converts a note into an outline node, a plotpoint, draft text or a revision flag.
+- [ ] Project > History as one timeline (activity, outline and plot snapshots, chapter revisions) with restore where allowed.
+- [ ] Finish Characters: the writers' own designer and the mannequin's step-by-step editor back on.
+- [ ] Finish Maps: shapes only with biome hues; lock the environment layer; places over time; routes and travel; story links; generated maps.
+
+UUI (mockup first):
+- [ ] The local account record (account details, plan) that Profile, Subscription and VUI use.
+- [ ] Dashboard > Activity Log: every role's activity by day, with a role filter.
+- [ ] Dashboard > Schedule: one calendar of every role, all editable; HUI's Workweek and Workday fold into it.
+- [ ] Account > Profile: account details and an author profile (pen name, bio, links).
+- [ ] Account > Subscription: the local plan flow, no charge.
+- [ ] Account > Portfolio: books and their progress, and learning progress.
+
+VUI (mockup first):
+- [ ] Welcome: Writer Services and Reader Services, with plans, the training curriculum and live read-only demos on sample data.
+- [ ] Registration: reader and writer registration, a plan (no charge), and the local account.
+- [ ] Login: password and passkey, and getting back in to a forgotten account or password.
+
+HUI (mockup first):
+- [ ] The work and break meters and the Break button in HUI's band, for everyone with helper time.
+- [ ] Chat > User: the user and their context (profile, current project, book and words, earlier chats, feedback).
+- [ ] The Dispatch console for leads: live helper status by department and queue, moving helpers between queues, performance.
+
+AUI (mockup first):
+- [ ] Name the admin levels in AUI (Site/System, Department, Team, Support) and add what is missing.
+- [ ] Dashboard > Notifications: requests (applications, schedule changes, promotions).
+- [ ] Office > Desk: the action items (plan items due or late, escalated chats, staff requests to act on).
+- [ ] Office: build every "soon" tab: site, department and queue and resource analytics; team and person performance; person activity and flags; user engagement and learning; team applications.
+- [ ] Configuration > Overview: site-wide settings (app name, default theme, later-version switches) and a summary of each Configuration page.
+- [ ] Hide the Organizer console in phase 1 (Bookclub Management moves to phase 2).
+- [ ] The admin Designer's switched-off tools back on.
+
+Done:
 - [x] Header: one container for the interface toggles (AUI, HUI | WUI, RUI, LUI) beside the sky toggle.
 - [x] The band under the header for the side interfaces' mini forms, in place of the 40px side divider: HUI's Queue, chats, New chat, Outbox and Settings; AUI's work and break meters.
 - [x] AUI: the Inbox (Check and Verbs) as a tab of the Office's Desk.
@@ -57,16 +112,22 @@ Follow-ups:
 
 - RUI and LUI completely built out with their version 1 functionality.
 - Version 2 of WUI, UUI, VUI, HUI and AUI.
+- WUI v2 so far: Dash > Readers, with real readers from RUI; Project > Items; Outline > Publish, with RUI.
+- LUI includes UUI's Learning console.
+- AUI v2 so far: Organizer > Bookclub Management, with RUI's bookclubs.
 
 ### Phase 3: TUI, and version 2 and 3
 
 - TUI (the Translator UI) built out with its version 1 functionality.
 - Version 2 of RUI and LUI.
 - Version 3 of WUI, UUI, VUI, HUI and AUI.
+- VUI: the Translator preview on Welcome, with TUI (to confirm in the VUI round).
 
 ### Phase 4: release
 
-Deployment and releasing Scriblr to other users, with subscriptions.
+- Deployment and releasing Scriblr to other users, with subscriptions.
+- Real accounts and payment in place of phase 1's local accounts and plans.
+- VUI: Service Reviews on Welcome, once there are real users (to confirm in the VUI round).
 
 ### Phase 5: phones and working together
 
@@ -79,3 +140,8 @@ More items will be added.
 
 - 2026-11-26: First version: the five phases, the version rule, and the phase 1 tasks for the header and the side interfaces.
 - 2026-11-26: The header container, the band, the Office Inbox, the HUI Outbox, and AUI's modes and meters are done.
+- 2026-11-26: WUI v1 interview round 1 (the bar and the Dash): requirements in `requirements/wui-v1.md`.
+- 2026-11-26: WUI v1 interview round 2 (the Project level): outline templates, revision passes, Maps and Characters finished, Items to v2.
+- 2026-11-26: WUI v1 interview round 3: what finishing Characters means, book goals with or without dates and estimates, Publish to v2.
+- 2026-11-26: WUI v1 interview round 4: Maps tools, seven flag kinds, export formats, paragraph and sentence tools. The WUI interview is done.
+- 2026-11-26: The phase 1 plan: requirements for UUI, VUI, HUI and AUI; build order (interface by interface, a mockup before each one's code); local accounts; admin levels; items moved to phases 2, 3 and 4.
