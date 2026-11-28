@@ -88,6 +88,10 @@
 .cmNewModelBody { display: flex; align-items: flex-start; gap: var(--space-3); }
 .cmNewModelPic { flex: 0 0 auto; width: 56px; height: 132px; object-fit: contain; }
 .cmNewModelFoot { display: flex; justify-content: flex-end; gap: var(--space-2); }
+// drawing (slice 9b): the Outline, Combine and Picture to trace sections, and the picture under the canvas (dragged when unlocked)
+.cmDraw { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+.cmTraceName { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--text-ui); span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+.cmTrace--free { cursor: move; }
 // the Body part menu (slice 9a)
 .cmPartMenu { width: 232px; }
 .cmPartList { display: flex; flex-direction: column; }

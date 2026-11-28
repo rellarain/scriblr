@@ -1,4 +1,4 @@
-import type { BodyPart, BodyTemplate, ModelContent, ModelEntry, PublishedModel } from '../api/types'
+import type { BodyPart, BodyTemplate, ModelContent, ModelEntry, ModelTrace, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, objectById, publishFaults, renameObject, updateShape } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addGrip, addHand, addHandPoses, apartHand, mirrorGrip, renameGrip, setPresetGrip } from '../assets/Interfaces/admin/characters/engine/hands'
@@ -64,6 +64,8 @@ export const MOCK_PARTS: BodyPart[] = [
 export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean } = {}) {
   // `basicUpdate`: a newer basic model waits (phase O4a), as when the admin had changed the basic model before an update of the app
   const state = { entries: structuredClone(initial), limits: defaultWriterLimits(), basicUpdate: false }
+  // the pictures to trace, by model id
+  const traces = new Map<string, ModelTrace>()
   const catalog = () => ({ schemaVersion: 1, models: structuredClone(state.entries) })
 
   // `parts` is the path after `/character-models`: [], ['published'], [id, 'publish'], [id, 'restore', '2'] ...
@@ -82,6 +84,14 @@ export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean
     }
     // the bodies a new model can start from (slice 9a): two small stand-ins, each a group with one shape and a proportion guide
     if (parts[0] === 'body-parts' && parts.length === 1 && method === 'GET') return ok({ parts: structuredClone(MOCK_PARTS) })
+    // a model's picture to trace (slice 9b), kept beside the draft
+    if (parts.length === 2 && parts[1] === 'trace') {
+      const key = parts[0], had = traces.get(key)
+      if (method === 'GET') return ok(had ? structuredClone(had) : null)
+      if (method === 'PUT') { traces.set(key, structuredClone(body as ModelTrace)); return ok(structuredClone(body)) }
+      if (method === 'PATCH') { if (!had) return fail(404, 'This model has no picture to trace.'); const next = { ...had, ...(body as object) }; traces.set(key, next); return ok(structuredClone(next)) }
+      if (method === 'DELETE') { traces.delete(key); return { status: 204, body: null } }
+    }
     if (parts[0] === 'body-templates' && method === 'GET') {
       if (parts.length === 1) return ok({ templates: MOCK_BODIES.map(({ content: _c, ...info }) => info) })
       const t = MOCK_BODIES.find(b => b.id === parts[1])

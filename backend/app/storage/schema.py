@@ -3629,6 +3629,58 @@ class ModelEntry(BaseModel):
     nextVersion: int = 1
 
 
+# A picture to trace (WUI slice 9b): kept beside a model's draft, never in the model, so it is never published and writers never see it.
+MODEL_TRACE_IMAGE_MAX_CHARS = 14 * 1024 * 1024      # a picture of about 10 MB, as base64 text
+_TRACE_IMAGE = re.compile(r"^data:image/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$")
+
+
+class ModelTraceSettings(BaseModel):
+    """How a picture to trace is shown: its file name, how faded, whether it is locked (not moved or picked on the canvas) and shown, and the box it fills in the model's
+    space."""
+
+    name: str = Field(default="", max_length=80)
+    opacity: float = 0.35
+    locked: bool = True
+    shown: bool = True
+    x: float = 0.0
+    y: float = 0.0
+    w: float = 200.0
+    h: float = 440.0
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> str:
+        return value.strip()[:80] if isinstance(value, str) else ""
+
+    @field_validator("opacity", mode="before")
+    @classmethod
+    def _opacity(cls, value: Any) -> float:
+        return _finite(value, 0.35, 0.05, 1.0)
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _place(cls, value: Any) -> float:
+        return _finite(value, 0.0, -2000.0, 2000.0)
+
+    @field_validator("w", "h", mode="before")
+    @classmethod
+    def _size(cls, value: Any) -> float:
+        return _finite(value, 100.0, 1.0, 4000.0)
+
+
+class ModelTrace(ModelTraceSettings):
+    """A picture to trace with its settings: the picture as a data URL (PNG, JPEG, WebP or GIF)."""
+
+    image: str = Field(max_length=MODEL_TRACE_IMAGE_MAX_CHARS)
+
+    @field_validator("image")
+    @classmethod
+    def _image(cls, value: str) -> str:
+        if not _TRACE_IMAGE.match(value):
+            raise ValueError("The picture must be a PNG, JPEG, WebP or GIF image.")
+        return value
+
+
 class BodyTemplateInfo(BaseModel):
     """A body template (WUI slice 9a) as the New model chooser lists it: its name, a note on the body, how many heads tall it stands and a small SVG picture of it."""
 

@@ -1,12 +1,17 @@
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Path as PathParam
 from pydantic import BaseModel
 
 from ..deps import get_app_data_storage_root
-from ..storage import body_templates
+from ..storage import body_templates, model_traces
 from ..storage import character_models_store as store
-from ..storage.schema import BodyPartList, BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits
+from ..storage.schema import _MODEL_ID, BodyPartList, BodyTemplate, BodyTemplateList, ModelCatalog, ModelTrace, ModelTraceSettings, ModelDraftList, PublishedModelList, WriterModelLimits
+
+
+ModelIdPath = PathParam(pattern=_MODEL_ID)
 
 
 def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
@@ -28,6 +33,26 @@ def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
     @router.get("/published", response_model=PublishedModelList, description="What the Writer's editor offers: the published copies only.")
     def get_published_models(root: Path = Depends(get_app_data_storage_root)) -> PublishedModelList:
         return store.published_models(root, library)
+
+    # A picture to trace (slice 9b): kept beside the draft, never in the model.
+    @router.get("/{model_id}/trace", response_model=Optional[ModelTrace], description="The model's picture to trace with its settings, or null.")
+    def get_trace(model_id: str = ModelIdPath, root: Path = Depends(get_app_data_storage_root)) -> Optional[ModelTrace]:
+        return model_traces.get_trace(root, library, model_id)
+
+    @router.put("/{model_id}/trace", response_model=ModelTrace, description="Choose or replace the model's picture to trace.")
+    def put_trace(body: ModelTrace, model_id: str = ModelIdPath, root: Path = Depends(get_app_data_storage_root)) -> ModelTrace:
+        return model_traces.put_trace(root, library, model_id, body)
+
+    @router.patch("/{model_id}/trace", response_model=ModelTrace, description="Change how the picture is shown. 404 when the model has no picture.")
+    def patch_trace(body: ModelTraceSettings, model_id: str = ModelIdPath, root: Path = Depends(get_app_data_storage_root)) -> ModelTrace:
+        try:
+            return model_traces.set_trace_settings(root, library, model_id, body)
+        except model_traces.NoTraceError as exc:
+            raise HTTPException(status_code=404, detail="This model has no picture to trace.") from exc
+
+    @router.delete("/{model_id}/trace", status_code=204, description="Take the picture away.")
+    def delete_trace(model_id: str = ModelIdPath, root: Path = Depends(get_app_data_storage_root)) -> None:
+        model_traces.delete_trace(root, library, model_id)
 
     @router.post("/{model_id}/publish", response_model=ModelCatalog)
     def publish_model(model_id: str, root: Path = Depends(get_app_data_storage_root)) -> ModelCatalog:

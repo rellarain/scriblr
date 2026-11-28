@@ -13,11 +13,14 @@ import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
 import { useDesignerPolicy } from './designerPolicy'
-import { DesignerCanvas, type FrameCanvas, type GripMark, type LineGrab, type LineHandles, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
+import { DesignerCanvas, type FrameCanvas, type GripMark, type LineGrab, type LineHandles, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame, type TraceCanvas } from './DesignerCanvas'
 import { ConsoleBar, PANEL_REST, ToolbarPanel, ViewBar, type PanelState } from './DesignerShell'
 import { DEFAULT_LAYERS, SHAPE_LAYERS, drawOrder, normalizeLayers, toggleLayer, type LayerState } from './layerStack'
 import type { GuideActions } from './GuideSection'
 import { BodyPartMenu, addBodyPart } from './BodyPartMenu'
+import type { CombineActions, CombineMode } from './DrawSections'
+import { useModelTrace } from './TraceSection'
+import { cutOutShape, mergeShapes, splitShape } from './engine/outlineOps'
 import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
@@ -301,6 +304,18 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [skinPick, setSkinPick] = useState(false)
   // the taper tool (phase O3): the line being laid on the canvas (in the canvas's space) and the ribbon's widths
   const [tapering, setTapering] = useState(false)
+  // Combine (slice 9b): picking the shape to merge with or cut out, or laying the line to split the selected shape along (in the canvas's space)
+  const [combineMode, setCombineMode] = useState<CombineMode | null>(null)
+  const [splitLine, setSplitLine] = useState<Array<[number, number]>>([])
+  // another selection ends the mode
+  useEffect(() => { setCombineMode(null); setSplitLine([]) }, [sel.kind, sel.id])
+  // Escape ends it wherever the focus is (the button that started it, too)
+  useEffect(() => {
+    if (!combineMode) return
+    const esc = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') { setCombineMode(null); setSplitLine([]) } }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [combineMode])
   const [taperSpine, setTaperSpine] = useState<SpinePoint[]>([])
   const [taperSpec, setTaperSpec] = useState<TaperSpec>(TAPER_DEFAULT)
   const [frameSel, setFrameSel] = useState<string | null>(null)
@@ -1587,6 +1602,32 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (!pts) { setNote('The line needs two points that are apart.'); return }
     editShape(cs.id, { ...cs, closed: true, pts, half: 0, skin: [] }, 0)
   }
+  // Split (slice 9b): the line laid on the canvas the way the taper's is, cutting the selected shape when it is done
+  function makeSplit() {
+    if (!selShape) return
+    if (splitLine.length < 2) { setNote('Lay a line of two points or more right across the shape.'); return }
+    const r = splitShape(content, solved, selShape.id, splitLine, makeId)
+    if (applyEdit(r.edit)) { setCombineMode(null); setSplitLine([]) }
+  }
+  const splitCanvas = combineMode === 'split' && selShape && !recording && !poseMode ? {
+    spine: splitLine, preview: null, onFinish: makeSplit, hint: 'Split: click to lay a line right across the shape, then press Enter or double-click to split it there; Backspace takes back a point, Escape stops',
+    onAdd: (x: number, y: number) => setSplitLine(list => (list.length >= 200 ? list : [...list, [x, y]])),
+    onBack: () => setSplitLine(list => list.slice(0, -1)),
+  } : null
+  // the picture to trace (slice 9b): kept beside the draft, drawn under the canvas (its box from the model's space into the canvas's)
+  const traceActions = useModelTrace(models.api, entry.id, content.guide, content.axis ?? 100)
+  const tr = traceActions.trace
+  const traceCanvas: TraceCanvas | null = shapesOnly && tr && tr.shown ? (() => {
+    const g = solved.global, [x0, y0] = apply(g, tr.x, tr.y), [x1, y1] = apply(g, tr.x + tr.w, tr.y + tr.h)
+    return {
+      href: tr.image, box: { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, opacity: tr.opacity, locked: tr.locked,
+      onBox: b => { const back = inverse(g), [ax, ay] = apply(back, b.x, b.y), [bx, by] = apply(back, b.x + b.w, b.y + b.h); traceActions.change({ x: Math.round(Math.min(ax, bx) * 100) / 100, y: Math.round(Math.min(ay, by) * 100) / 100 }) },
+    }
+  })() : null
+  const combineActions: CombineActions | undefined = shapesOnly ? {
+    mode: combineMode,
+    onMode: mode => { setCombineMode(mode); setSplitLine([]); setTapering(false); setLinkMode(null); setPaintPick(null) },
+  } : undefined
   const taperCanvas = tapering && !recording && !poseMode ? {
     spine: taperSpine, preview: taperPreview, onFinish: makeTaper,
     onAdd: (x: number, y: number) => setTaperSpine(list => (list.length >= 200 ? list : [...list, [x, y]])),
@@ -1624,7 +1665,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const bridgePickData = bridgeSpots ? { shapes: content.shapes.filter(s => !s.mirrorOf && !s.shade && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
   // copying skin weights: any other shape with an outline
   const skinPickShapes = skinPick && skinning && selShape ? { shapes: content.shapes.filter(s => s.id !== selShape.id && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
-  const pick = bridgePickData ?? bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? skinPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
+  // merging or cutting out (slice 9b): any other closed shape that is drawn
+  const combinePickData = (combineMode === 'merge' || combineMode === 'cut') && selShape ? { shapes: content.shapes.filter(s => s.id !== selShape.id && s.closed && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
+  const pick = combinePickData ?? bridgePickData ?? bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? skinPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
 
   // Dragging the pivot of a group: an unanchored one moves to the pointer (read back into the group's own space); an anchored one is fixed again at the
   // nearest place of the same kind on its shape.
@@ -1667,6 +1710,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     commit(stepLink(content, selShape.id, selPoint, b.kind === 'edge' ? (sideways ? 't' : 'o') : sideways ? 'dx' : 'dy', dir, big))
   }
   function onPick(shapeId: string, wx: number, wy: number) {
+    if (combinePickData && selShape) {
+      if (combineMode === 'merge') { if (applyEdit(mergeShapes(content, solved, selShape.id, shapeId))) setCombineMode(null) }
+      else { const r = cutOutShape(content, solved, selShape.id, shapeId, makeId); if (applyEdit(r.edit)) setCombineMode(null) }
+      return
+    }
     if (bridgeSpots) {
       const [x, y] = apply(inverse(solved.global), wx, wy)
       const spot = spotFromClick(content, shapeId, x, y)
@@ -2020,7 +2068,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             content={canvasContent} solved={canvasSolved} sel={sel} part={part} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} snapGuide={guideSnap !== false} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={shapesOnly ? shapePose : poseCanvas} grips={gripMarks} colouring={colouring}
-            frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
+            frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas ?? splitCanvas} trace={traceCanvas} lock={lock} onNote={setNote}
             linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} linkShown={shapesOnly && selShape ? linkShown(content, selShape.id) : undefined} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
             onSelect={choose} onSelectPoint={selectPoint} onSelectSegment={selectSegment} onSelectCentre={shapesOnly ? selectCentre : undefined} onZoom={setZoom} transform={shapesOnly} keepRatio={keepRatio} connect={connectTool} symmetry={symCanvas}
             onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -2030,7 +2078,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             pivotPoints={pivotPoints} anchorMarks={anchorMarks} poseMarks={poseMarks} sliders={sliderMarks} onStop={shapesOnly ? moveStop : undefined}
             onDrawBox={shapesOnly && !recording ? drawRectangle : undefined}
             mirrorAxis={mirrorAxis} lines={lineHandles} onLine={shapesOnly ? moveLine : undefined}
-            onEscape={() => { if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+            onEscape={() => { if (combineMode) { setCombineMode(null); setSplitLine([]) } else if (symChoosing) setSymChoose(null); else if (tapering) { if (taperSpine.length) setTaperSpine([]); else setTapering(false) } else if (bridgeSpots) setBridgeSpots(null); else if (skinPick) setSkinPick(false); else if (skinning) setSkinning(false); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
           />
 
           <div className="dzNotes">
@@ -2235,7 +2283,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

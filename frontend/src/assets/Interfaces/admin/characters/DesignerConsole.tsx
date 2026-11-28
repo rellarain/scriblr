@@ -90,6 +90,8 @@ function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null,
     const at = entries.findIndex(e => e.id === id)
     const next = entries[at + 1] ?? entries[at - 1]
     models.removeModel(id)
+    // its picture to trace (slice 9b) goes with it
+    void models.api.deleteTrace(id).catch(() => undefined)
     setSelectedId(next?.id ?? null)
   }
 

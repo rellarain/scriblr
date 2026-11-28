@@ -74,7 +74,7 @@ WUI (mockup first):
     - [x] Body templates (six bodies, from the mockup) and the New model chooser.
     - [x] The proportion guide, drawn on the canvas and snapped to.
     - [x] Body parts: head, torso, arm, hand, leg, foot, eye, ear, nose, mouth, a lock of hair.
-  - [ ] 9b Drawing: smooth and simplify outlines, trace a picture, merge, cut out and split.
+  - [x] 9b Drawing: smooth and simplify outlines, trace a picture, merge, cut out and split.
   - [ ] 9c Joins: one outline round parts that touch, joint caps.
   - [ ] 9d Rig and posing: bones, smooth bends (skin weights), drag a hand or a foot to pose.
   - [ ] 9e Eight angles.
@@ -170,3 +170,4 @@ More items will be added.
 - 2026-11-27: Character designer interview. WUI slice 9 becomes a rebuild of the character designer, before Maps, in nine sub-slices with a mockup first: start from a body on a proportion guide, better drawing, one outline and joint caps, smooth bends and drag to pose, eight angles, variation, faces, the writers' designer (copies only) and a new starter model. The Designer's switched-off tools come back with it instead of in AUI v1.
 - 2026-11-27: WUI slice 9a, outlines per edge. A shape's outline can leave out any of its edges: select an edge and turn its outline off or on in Look, or set every edge or none; a twin is outlined as its original is, and points added or joined keep their edges' outline. The character designer mockup (the human form) is approved.
 - 2026-11-27: WUI slice 9a done. New model starts from one of six bodies (the approved mockup's average man and woman, athletic man, heavier man and woman, older woman: their right side the twin of their left, their outline along the silhouette) or a blank canvas; a model has a proportion guide (a line every head, named lines) that is drawn as a layer and snapped to, set in the Overview; the Body part menu adds a head, a torso, an arm, a hand, a leg, a foot, an eye, an ear, a nose, a mouth or a lock of hair made to the guide.
+- 2026-11-28: WUI slice 9b done. The shape editor's Outline section smooths the selected point or every point and simplifies an outline to fewer points, saying how far it strays; Combine merges another shape into the selected one, cuts one out of it (a hole through the paint when it lies wholly inside) or splits it along a line laid on the canvas, each edge keeping its outline; a picture to trace lies under the canvas, faded and locked, fitted to the guide, kept beside the draft and never published.

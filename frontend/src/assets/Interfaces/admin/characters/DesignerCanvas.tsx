@@ -126,7 +126,11 @@ export interface TaperCanvas {
   onFinish: () => void
   // take back the last point (Backspace)
   onBack: () => void
+  // what the canvas says it is for (default: the taper's)
+  hint?: string
 }
+// A picture to trace (slice 9b), under everything: its box in the canvas's space; unlocked, a drag moves it (`onBox` as it moves).
+export interface TraceCanvas { href: string; box: Box; opacity: number; locked: boolean; onBox: (box: Box) => void }
 // What a Ctrl + click is on (shape types T2).
 export type RemoveTarget = { kind: 'point'; id: string; i: number } | { kind: 'segment'; id: string; e: number }
 
@@ -201,6 +205,8 @@ export interface CanvasProps {
   onPick?: (shapeId: string, x: number, y: number) => void
   onPickGroup?: (groupId: string) => void
   frames?: FrameCanvas | null
+  // the picture to trace (slice 9b)
+  trace?: TraceCanvas | null
   through?: ThroughFrame | null
   weights?: WeightTool | null
   skin?: SkinTool | null
@@ -274,6 +280,7 @@ type Drag =
   | { kind: 'stop'; shapeId: string; i: number; which: 'lo' | 'hi'; x0: number; y0: number; moved: boolean }
   | { kind: 'line'; handle: LineGrab; x0: number; y0: number; moved: boolean }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
+  | { kind: 'trace'; start: [number, number]; box: Box }
   // the box of the selected shape (shape editor S4): a resize from one of its handles, or a turn by its round handle, worked out from the shape as it was when it began
   | { kind: 'resize'; shapeId: string; handle: BoxHandle; from: ModelShape; frame: Frame; x0: number; y0: number; moved: boolean }
   | { kind: 'turn'; shapeId: string; from: ModelShape; frame: Frame; start: [number, number]; x0: number; y0: number; moved: boolean }
@@ -874,6 +881,12 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!p.pose) return
     onPoseHandleDown(e, grab)
   }
+  function onTraceDown(e: ReactPointerEvent) {
+    if (e.button !== 0 || !p.trace || p.trace.locked) return
+    e.stopPropagation()
+    dragRef.current = { kind: 'trace', start: toWorld(e), box: p.trace.box }
+    capture(e)
+  }
   function onFrameDown(e: ReactPointerEvent, f: FrameMark, handle: FrameHandle | 'move') {
     e.stopPropagation()
     if (e.button !== 0 || !p.frames) return
@@ -949,6 +962,11 @@ export function DesignerCanvas(p: CanvasProps) {
     if (d.kind === 'posePress') {
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < CLICK_SLOP) return
       if (p.pose?.onDown({ kind: 'part', shapeId: d.shapeId }, d.world, false)) { dragRef.current = { kind: 'pose' }; p.pose.onMove(toWorld(e)) } else dragRef.current = null
+      return
+    }
+    if (d.kind === 'trace') {
+      const [wx, wy] = toWorld(e)
+      p.trace?.onBox({ ...d.box, x: d.box.x + wx - d.start[0], y: d.box.y + wy - d.start[1] })
       return
     }
     if (d.kind === 'frame') {
@@ -1250,7 +1268,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const cur = built[selPoint]
   // the point the selected segment ends at (none past the last point of an open shape)
   const segEnd = part === 'segment' && shape && (shape.closed || selPoint < built.length - 1) ? built[(selPoint + 1) % built.length] : undefined
-  const nudgeHint = p.taper ? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : part === 'shape' ? 'Arrow keys move the shape' : part === 'segment' ? (p.onRemove ? 'Arrow keys move the segment; Delete removes it, joining its two points' : 'Arrow keys move the segment') : 'Arrow keys move the point; Delete removes it'
+  const nudgeHint = p.taper ? p.taper.hint ?? 'Taper: click to lay the line the ribbon runs along, then press Enter or double-click to make it; Backspace takes back a point, Escape starts over' : p.skin ? 'Skin weights: click a point to raise its weight a tenth (Shift: lower it), drag to paint, or press the arrow keys' : !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : part === 'shape' ? 'Arrow keys move the shape' : part === 'segment' ? (p.onRemove ? 'Arrow keys move the segment; Delete removes it, joining its two points' : 'Arrow keys move the segment') : 'Arrow keys move the point; Delete removes it'
   const hoverShapeId = dragOver ?? (hover ? (hover.kind === 'edge' || hover.kind === 'point' || hover.kind === 'centre' ? hover.shapeId : shape?.id ?? null) : null)
   const hoveredPoint = hover?.kind === 'point' && hover.shapeId === shape?.id ? hover.i : -1
   const edgeOnSelected = hover?.kind === 'edge' && !!shape && hover.shapeId === shape.id
@@ -1592,6 +1610,12 @@ export function DesignerCanvas(p: CanvasProps) {
       onDoubleClick={onDouble}
     >
       <rect x={vb.x - 1} y={vb.y - 1} width={vb.w + 2} height={vb.h + 2} className="cmCanvasBg" />
+      {p.trace && (
+        <image
+          href={p.trace.href} x={p.trace.box.x} y={p.trace.box.y} width={p.trace.box.w} height={p.trace.box.h} opacity={p.trace.opacity} preserveAspectRatio="none"
+          className={`cmTrace${p.trace.locked ? '' : ' cmTrace--free'}`} pointerEvents={p.trace.locked ? 'none' : 'auto'} data-trace="" aria-hidden="true" onPointerDown={onTraceDown}
+        />
+      )}
       {p.layers.map(id => <Fragment key={id}>{layerNodes[id]}</Fragment>)}
       {p.pick?.groups?.map(g => (
         <g key={g.id} className="cmPickGroup" role="button" tabIndex={0} aria-label={`Pick the pivot of ${g.name}`} onPointerDown={e => { e.stopPropagation(); if (e.button === 0) p.onPickGroup?.(g.id) }} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.onPickGroup?.(g.id) } }}>

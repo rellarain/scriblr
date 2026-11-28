@@ -4,6 +4,8 @@ import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusI
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { GuideSection, type GuideActions } from './GuideSection'
+import { CombineSection, OutlineSection, type CombineActions } from './DrawSections'
+import { TraceSection, type TraceActions } from './TraceSection'
 import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
@@ -88,6 +90,9 @@ export interface InspectorProps {
   edges?: EdgeActions
   // the proportion guide (slice 9a), in the shape editor's Overview
   guide?: GuideActions
+  // drawing (slice 9b): the Combine section's mode, and the picture to trace
+  combine?: CombineActions
+  trace?: TraceActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -153,6 +158,7 @@ function ShapeTab(p: InspectorProps) {
           <dt>Shapes</dt><dd>{content.shapes.length}</dd>
         </dl>
         {p.guide && <GuideSection content={content} actions={p.guide} />}
+        {p.trace && <TraceSection actions={p.trace} />}
       </div>
     )
   }
@@ -224,6 +230,9 @@ function ShapeTab(p: InspectorProps) {
           {p.mirrors && !shape.pivot && !shape.cloneOf && <MirrorSection content={content} kind="shape" thing={shape} actions={p.mirrors} clones={shape.mirrorOf ? undefined : p.clones} />}
           {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} selPoint={selPoint} edges={p.edges} />
+          {p.combine && !shape.mirrorOf && !shape.cloneOf && <OutlineSection content={content} shape={shape} part={p.edges?.part ?? 'shape'} selPoint={selPoint} mirror={mirror} axis={content.axis ?? 100} onEditShape={p.onEditShape} />}
+          {p.combine && !shape.mirrorOf && !shape.cloneOf && <CombineSection content={content} shape={shape} actions={p.combine} />}
+          {p.trace && <TraceSection actions={p.trace} />}
           {!shape.mirrorOf && !shape.cloneOf && <MarksSection shape={shape} onEditShape={p.onEditShape} />}
           {p.symmetry && !shape.cloneOf && <SymmetrySection shape={shape} actions={p.symmetry} />}
           {p.connections && !shape.cloneOf && <ConnectionsSection content={content} shape={shape} selPoint={selPoint} actions={p.connections} />}

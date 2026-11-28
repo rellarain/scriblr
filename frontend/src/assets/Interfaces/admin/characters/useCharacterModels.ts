@@ -170,6 +170,8 @@ export function useCharacterModels(makeId: MakeId = randomId, library: { api: Mo
     edit, setDraft, addModel, removeModel, moveModel, duplicateModel, importModels, addBasic, basicUpdate, updateBasic,
     publish, unpublish, discard, restore,
     saveStatus: combineSaveStatus(draftSave), saveCountdown: combineCountdown(draftSave), saveNow: draftSave.flush,
+    // the library's API, for what is kept beside a draft (the picture to trace)
+    api: library.api,
   }
 }
 

@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { BodyPartList, BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits } from './types'
+import type { BodyPartList, BodyTemplate, BodyTemplateList, ModelTrace, ModelTraceSettings, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits } from './types'
 
 // The character models come in two libraries that answer the same way: the admin's catalog (the models Scriblr ships and the ones the admin designs, /character-models) and the
 // writer's own (the models a writer designs for themselves, /my-models, whose ids start with "my-").
@@ -18,6 +18,11 @@ export interface ModelsApi {
   discard(modelId: string): Promise<ModelCatalog>
   // Brings an earlier published version into the draft (it is not published again until Publish).
   restore(modelId: string, version: number): Promise<ModelCatalog>
+  // The model's picture to trace (slice 9b): read (null: none), chosen or replaced, its settings changed (404 without a picture), taken away.
+  getTrace(modelId: string): Promise<ModelTrace | null>
+  putTrace(modelId: string, trace: ModelTrace): Promise<ModelTrace>
+  setTrace(modelId: string, settings: ModelTraceSettings): Promise<ModelTrace>
+  deleteTrace(modelId: string): Promise<void>
 }
 
 const id = encodeURIComponent
@@ -31,6 +36,10 @@ function modelsApi(base: string): ModelsApi {
     unpublish: modelId => api.post<ModelCatalog>(`${base}/${id(modelId)}/unpublish`),
     discard: modelId => api.post<ModelCatalog>(`${base}/${id(modelId)}/discard`),
     restore: (modelId, version) => api.post<ModelCatalog>(`${base}/${id(modelId)}/restore/${version}`),
+    getTrace: modelId => api.get<ModelTrace | null>(`${base}/${id(modelId)}/trace`),
+    putTrace: (modelId, trace) => api.put<ModelTrace>(`${base}/${id(modelId)}/trace`, trace),
+    setTrace: (modelId, settings) => api.patch<ModelTrace>(`${base}/${id(modelId)}/trace`, settings),
+    deleteTrace: modelId => api.delete<void>(`${base}/${id(modelId)}/trace`),
   }
 }
 
