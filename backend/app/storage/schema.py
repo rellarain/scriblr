@@ -1273,6 +1273,8 @@ MODEL_BIND_NAME_MAX = 40   # shape editor S5: the name of a connection, and of a
 MODEL_SYM_AXES_MAX = 6     # shape editor S6: the most axes a symmetric shape has
 MODEL_PIVOTS_MAX = 32      # shape types T3: the most pivot points a model has
 MODEL_ZONES_MAX = 24       # zones (Z2): the most zones a model has
+MODEL_GUIDE_LINES_MAX = 12  # the proportion guide (slice 9a): the most named lines it has
+MODEL_GUIDE_HEAD_RANGE = (4.0, 200.0)
 MODEL_ZONE_NAME_MAX = 40
 MODEL_TURN_LIMIT = 180.0   # shape types T3: a pivot circle turns at most this far each way
 MODEL_MARKS_MAX = 8        # shape types T4: the most marks (anchors, posable points) a shape has
@@ -1944,6 +1946,47 @@ class ModelCloneAt(BaseModel):
     @classmethod
     def _flip(cls, value: Any) -> bool:
         return value is True
+
+
+class ModelGuideLine(BaseModel):
+    """A named line of the proportion guide (the chin, the chest, the waist ...), at a height in the model's space."""
+
+    name: str = Field(default="", max_length=MODEL_ZONE_NAME_MAX)
+    y: float = 0.0
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_ZONE_NAME_MAX] if isinstance(value, str) else ""
+
+    @field_validator("y", mode="before")
+    @classmethod
+    def _y(cls, value: Any) -> float:
+        return _finite(value, 0.0, *MODEL_Y_RANGE)
+
+
+class ModelGuide(BaseModel):
+    """The proportion guide (slice 9a): where the crown is, how tall a head is (the canvas draws a line at every head down from the crown), and named lines that
+    shapes snap to. A model started from a body template has its body's; a blank model has none."""
+
+    top: float = 10.0
+    head: float = 56.0
+    lines: list[ModelGuideLine] = Field(default_factory=list, max_length=MODEL_GUIDE_LINES_MAX)
+
+    @field_validator("top", mode="before")
+    @classmethod
+    def _top(cls, value: Any) -> float:
+        return _finite(value, 10.0, *MODEL_Y_RANGE)
+
+    @field_validator("head", mode="before")
+    @classmethod
+    def _head(cls, value: Any) -> float:
+        return _finite(value, 56.0, *MODEL_GUIDE_HEAD_RANGE)
+
+    @field_validator("lines", mode="before")
+    @classmethod
+    def _lines(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelGuideLine, value if not isinstance(value, list) else value[:MODEL_GUIDE_LINES_MAX])
 
 
 class ModelZone(BaseModel):
@@ -3434,6 +3477,26 @@ class ModelContent(BaseModel):
     pivots: list[ModelPivot] = Field(default_factory=list, max_length=MODEL_PIVOTS_MAX)
     # Zones (Z2): blocks of the tree above the groups; each group is in at most one.
     zones: list[ModelZone] = Field(default_factory=list, max_length=MODEL_ZONES_MAX)
+    # The proportion guide (slice 9a), or none.
+    guide: Optional[ModelGuide] = None
+
+    @field_validator("guide", mode="before")
+    @classmethod
+    def _guide(cls, value: Any) -> Optional[ModelGuide]:
+        if value is None or isinstance(value, ModelGuide):
+            return value
+        try:
+            return ModelGuide.model_validate(value)
+        except ValueError:
+            return None
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """A model with no guide is written as before the guide existed, so its content key is unchanged."""
+        data = handler(self)
+        if data.get("guide") is None:
+            data.pop("guide", None)
+        return data
 
     @field_validator("zones", mode="before")
     @classmethod
@@ -3564,6 +3627,26 @@ class ModelEntry(BaseModel):
     history: list[PublishedModel] = Field(default_factory=list, max_length=MODEL_HISTORY_MAX)
     # The version the next publish gets; it only ever goes up, so an unpublished model keeps counting.
     nextVersion: int = 1
+
+
+class BodyTemplateInfo(BaseModel):
+    """A body template (WUI slice 9a) as the New model chooser lists it: its name, a note on the body, how many heads tall it stands and a small SVG picture of it."""
+
+    id: str
+    name: str
+    note: str = ""
+    heads: float = 7.5
+    thumb: str = ""
+
+
+class BodyTemplate(BodyTemplateInfo):
+    """A body template with the model it starts: its shapes, rig and proportion guide."""
+
+    content: ModelContent
+
+
+class BodyTemplateList(BaseModel):
+    templates: list[BodyTemplateInfo] = Field(default_factory=list)
 
 
 class ModelCatalog(BaseModel):

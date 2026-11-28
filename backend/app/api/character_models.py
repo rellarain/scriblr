@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..deps import get_app_data_storage_root
+from ..storage import body_templates
 from ..storage import character_models_store as store
-from ..storage.schema import ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits
+from ..storage.schema import BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits
 
 
 def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
@@ -92,6 +93,21 @@ def update_basic_model(root: Path = Depends(get_app_data_storage_root)) -> Model
         return store.update_basic_model(root)
     except store.UnknownModelError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/body-templates", response_model=BodyTemplateList)
+def list_body_templates() -> BodyTemplateList:
+    """The bodies a new model can start from (WUI slice 9a), without their content."""
+    return body_templates.list_templates()
+
+
+@router.get("/body-templates/{template_id}", response_model=BodyTemplate)
+def get_body_template(template_id: str) -> BodyTemplate:
+    """One body template with the model it starts: its shapes, rig and proportion guide. 404 when there is no such template."""
+    try:
+        return body_templates.get_template(template_id)
+    except body_templates.UnknownBodyTemplateError as exc:
+        raise HTTPException(status_code=404, detail=f"There is no body template {exc.args[0]!r}.") from exc
 
 
 # The models a writer designs for themselves (the Characters console's Models section): a second catalog in my-models.json, with ids that start with "my-".

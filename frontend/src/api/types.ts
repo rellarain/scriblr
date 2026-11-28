@@ -846,7 +846,15 @@ export type ModelBoneEndKind = 'group' | 'point'
 export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
 export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
 export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[]; zones?: ModelZone[] }
+// The proportion guide (slice 9a): where the crown is, how tall a head is (a line at every head down from the crown) and named lines (the chin, the chest, the waist...) that
+// shapes snap to. A model started from a body template has its body's; a blank model has none.
+export interface ModelGuideLine { name: string; y: number }
+export interface ModelGuide { top: number; head: number; lines: ModelGuideLine[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[]; zones?: ModelZone[]; guide?: ModelGuide | null }
+// A body a new model can start from (slice 9a): listed with a note on the body, how many heads tall it stands and a small SVG picture of it; read with the model it starts.
+export interface BodyTemplateInfo { id: string; name: string; note: string; heads: number; thumb: string }
+export interface BodyTemplate extends BodyTemplateInfo { content: ModelContent }
+export interface BodyTemplateList { templates: BodyTemplateInfo[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

@@ -7,6 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import { addGroup, addObject, addShape } from './modelContent'
+import { newBlankModel } from '../../../../test/designerUi'
 
 // The writer's own models (phase 7a): the Designer console on a second library, `/my-models`, whose ids start with "my-".
 
@@ -43,7 +44,7 @@ describe('the writer\'s own designer', () => {
 
   it('starts a blank model whose id starts with "my-", and saves it to the library only', async () => {
     const { backend, user } = await open()
-    await user.click(screen.getByRole('button', { name: 'New model' }))
+    await newBlankModel(user)
     await saveNow(user)
     await waitFor(() => expect(backend.ownEntries).toHaveLength(1))
     expect(backend.ownEntries[0].id).toMatch(/^my-/)

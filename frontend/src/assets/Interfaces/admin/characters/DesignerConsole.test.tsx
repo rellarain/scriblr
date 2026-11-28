@@ -7,7 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import { addGroup, addObject, addShape } from './modelContent'
-import { openDrawer, pick } from '../../../../test/designerUi'
+import { openDrawer, pick, newBlankModel } from '../../../../test/designerUi'
 
 // a model that can be published: one oval in one object in one group
 function complete(name: string, shape = newShape('s', 'Skull', 'oval', templateBox('oval', 100, 46, 40))): ModelContent {
@@ -100,7 +100,7 @@ describe('the list', () => {
   it('says it is empty and makes the first model', async () => {
     const { user, backend } = await open([])
     expect(screen.getByRole('heading', { name: 'No models yet' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'New model' }))
+    await newBlankModel(user)
     expect(screen.getByRole('textbox', { name: 'Model name' })).toBeInTheDocument()
     await save(user)
     await waitFor(() => expect(backend.entries).toHaveLength(1))

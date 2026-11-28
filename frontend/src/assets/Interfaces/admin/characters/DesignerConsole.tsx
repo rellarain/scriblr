@@ -8,9 +8,10 @@ import type { DesignerTools } from './designerFeatures'
 import { ImportIcon, PlusIcon } from '../../../icons'
 import { ModelPane } from './ModelPane'
 import { ModelFileError, exportFileName, parseModelFile, serializeModels } from './modelFile'
-import { MY_ID_PREFIX, copyName, randomId, starterContent } from './modelContent'
+import { MY_ID_PREFIX, copyName, randomId } from './modelContent'
 import { libraryFull } from './engine/writerLimits'
 import { ScriblrPicker } from './ScriblrPicker'
+import { NewModelForm } from './NewModelForm'
 import { useCharacterModels } from './useCharacterModels'
 import './characterModels.scss'
 
@@ -38,6 +39,8 @@ function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null,
   const [selectedId, setSelectedId] = useState<string | null>(openId)
   const [listOpen, setListOpen] = useState(false)
   const [notice, setNotice] = useState<ImportNotice | null>(null)
+  // New model (slice 9a): the form that starts a model from a body or a blank canvas, while it is open
+  const [making, setMaking] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const current: ModelEntry | undefined = entries.find(e => e.id === selectedId) ?? entries[0]
@@ -56,7 +59,14 @@ function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null,
 
   function create() {
     if (refuseWhenFull()) return
-    select(models.addModel(starterContent()))
+    setListOpen(false)
+    setMaking(true)
+  }
+  // the model the New model form made: named so that it does not repeat a name here
+  function made(content: ModelContent) {
+    setMaking(false)
+    if (refuseWhenFull()) return
+    select(models.addModel(content.name ? { ...content, name: copyName(content.name, entries) } : content))
   }
 
   // The basic adult that comes with the app: added and published by the server, then opened.
@@ -131,6 +141,7 @@ function DesignerConsole({ toolbarHost = null, library = 'admin', openId = null,
             <button type="button" className="cmLink" onClick={() => setNotice(null)}>Dismiss</button>
           </div>
         )}
+        {making && <NewModelForm onMake={made} onClose={() => setMaking(false)} />}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Import character models from a file" onChange={e => void onFile(e)} />
         {entries.length === 0 && shapes ? (
           <div className="cmEmpty">

@@ -25,3 +25,12 @@ export async function pick(user: UserEvent, name: string, kind?: 'group' | 'obje
   }
   await user.click(hits[0])
 }
+
+// New model (slice 9a): the New model button opens a form that starts a model from a body or a blank canvas; this makes a blank one, as the button once did at once.
+// `within` is where the New model button is (default: the whole page).
+export async function newBlankModel(user: UserEvent, scope: ReturnType<typeof within> | typeof screen = screen): Promise<void> {
+  await user.click(scope.getByRole('button', { name: 'New model' }))
+  const form = within(screen.getByRole('dialog', { name: 'New model' }))
+  await user.click(form.getByRole('button', { name: 'A blank canvas' }))
+  await user.click(form.getByRole('button', { name: 'Make the model' }))
+}

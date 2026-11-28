@@ -1,4 +1,4 @@
-import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
+import type { BodyTemplate, ModelContent, ModelEntry, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, objectById, publishFaults, renameObject, updateShape } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addGrip, addHand, addHandPoses, apartHand, mirrorGrip, renameGrip, setPresetGrip } from '../assets/Interfaces/admin/characters/engine/hands'
@@ -47,6 +47,15 @@ export const modelContent = (name: string, over: Partial<ModelContent> = {}): Mo
 
 // `writer` makes it the writer's own library (`/my-models`): it keeps the limits the admin sets for writers, holds the library to the number of models they allow and refuses to
 // publish a model over one of them.
+// Two stand-in bodies for the New model form (slice 9a), each a torso on a proportion guide of seven and a half heads.
+function mockBody(id: string, name: string, width: number): BodyTemplate {
+  let c = addGroup({ ...blankContent(name), guide: { top: 10, head: 56, lines: [{ name: 'Chin', y: 66 }, { name: 'Waist', y: 168 }, { name: 'Knees', y: 318 }] } }, newGroup('torso', 'Torso'))
+  c = addObject(c, 'torso', { id: 'o_torso', name: 'Torso', layer: 'body', shapes: [] })
+  c = addShape(c, 'o_torso', { ...newShape('chest', 'Chest', 'rectangle', { x: 100 - width / 2, y: 70, w: width, h: 100 }), outline: 1.2 })
+  return { id, name, note: `A stand-in ${name.toLowerCase()}.`, heads: 7.5, thumb: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 440"><rect x="70" y="70" width="60" height="100" fill="#999"/></svg>', content: normalizeContent(c) }
+}
+export const MOCK_BODIES: BodyTemplate[] = [mockBody('man', 'Average man', 64), mockBody('woman', 'Average woman', 56)]
+
 export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean } = {}) {
   // `basicUpdate`: a newer basic model waits (phase O4a), as when the admin had changed the basic model before an update of the app
   const state = { entries: structuredClone(initial), limits: defaultWriterLimits(), basicUpdate: false }
@@ -65,6 +74,12 @@ export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean
       const byId = new Map(state.entries.map(e => [e.id, e]))
       state.entries = drafts.map(m => ({ ...(byId.get(m.id) ?? { id: m.id, published: null, history: [], nextVersion: 1 }), draft: normalizeContent(m.draft) }))
       return ok(catalog())
+    }
+    // the bodies a new model can start from (slice 9a): two small stand-ins, each a group with one shape and a proportion guide
+    if (parts[0] === 'body-templates' && method === 'GET') {
+      if (parts.length === 1) return ok({ templates: MOCK_BODIES.map(({ content: _c, ...info }) => info) })
+      const t = MOCK_BODIES.find(b => b.id === parts[1])
+      return t ? ok(structuredClone(t)) : fail(404, `There is no body template '${parts[1]}'.`)
     }
     if (parts[0] === 'basic' && parts.length === 1 && method === 'POST') {
       if (state.entries.some(e => e.id === 'basic')) return fail(409, 'The basic model is already here.')

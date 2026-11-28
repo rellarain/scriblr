@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry, WriterModelLimits } from '../../../../api/types'
 import { draftEntry, liveEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import { openDrawer, pick } from '../../../../test/designerUi'
+import { openDrawer, pick, newBlankModel } from '../../../../test/designerUi'
 import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
@@ -129,7 +129,7 @@ describe('a full library', () => {
     const { user } = await open(two(), limited({ models: 3 }))
     await user.click(screen.getByRole('button', { name: 'Show all the models' }))
     expect(screen.getByRole('button', { name: 'New model' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'New model' }))
+    await newBlankModel(user)
     await save(user)
   })
 })

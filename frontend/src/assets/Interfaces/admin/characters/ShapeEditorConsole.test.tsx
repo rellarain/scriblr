@@ -7,7 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import { addGroup, addObject, addShape } from './modelContent'
-import { pick } from '../../../../test/designerUi'
+import { pick, newBlankModel } from '../../../../test/designerUi'
 
 // The Designer as the app shows it for now: only a shape editor (designerFeatures.ts). The other tools are off the screen; their own tests render the console with every tool.
 
@@ -32,7 +32,7 @@ describe('the shape editor', () => {
     expect(screen.getByRole('heading', { name: 'No models yet' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add the basic model' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'New model' }))
+    await newBlankModel(user)
     expect(await screen.findByRole('textbox', { name: 'Model name' })).toBeInTheDocument()
   })
 

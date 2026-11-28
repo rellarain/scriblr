@@ -8,7 +8,7 @@ import { grayHex, hexHsl, hslHex, slotById } from './engine/colour'
 import { newShape } from './engine/edit'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
-import { openDrawer, pick } from '../../../../test/designerUi'
+import { openDrawer, pick, newBlankModel } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -74,7 +74,7 @@ describe('the model starts gray', () => {
 
   it('is what a new model starts as: the six standard slots, three genres and five swatches', async () => {
     const { user } = await open([])
-    await user.click(screen.getByRole('button', { name: 'New model' }))
+    await newBlankModel(user)
     await user.click(tab('Colour'))
     const slots = region('Slots of the model')
     for (const name of ['Skin', 'Hair', 'Eye', 'Lip', 'Clothing', 'Shoes']) expect(slots.getByRole('listitem', { name: `Slot ${name}` })).toBeInTheDocument()

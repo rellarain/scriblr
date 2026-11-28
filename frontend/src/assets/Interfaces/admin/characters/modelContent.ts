@@ -3,7 +3,7 @@ import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
 import { repairMarks, repairPlace } from './engine/anchors'
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine, ModelCloneAt } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelGuide, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine, ModelCloneAt } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { DEPTH_MAX, chainOf } from './engine/rig'
@@ -45,6 +45,18 @@ const clean = (v: string, max: number): string => v.trim().slice(0, max)
 export const repairDrape = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(100, Math.max(0, v))) : 0)
 
 // What a save sends: names trimmed and cut to length, the way the server cleans them (the page keeps what was typed until then).
+// The proportion guide as the server keeps it (slice 9a): the crown and a head's height held to their ranges, at most twelve named lines; anything else is no guide.
+export const GUIDE_LINES_MAX = 12
+export const GUIDE_HEAD_RANGE = { min: 4, max: 200 } as const
+export function repairGuide(v: unknown): ModelGuide | null {
+  if (!v || typeof v !== 'object') return null
+  const g = v as Record<string, unknown>
+  const num = (x: unknown, d: number, lo: number, hi: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d)
+  const lines = Array.isArray(g.lines) ? g.lines.slice(0, GUIDE_LINES_MAX).filter((l): l is Record<string, unknown> => !!l && typeof l === 'object')
+    .map(l => ({ name: typeof l.name === 'string' ? l.name.trim().slice(0, 40) : '', y: num(l.y, 0, -50, 450) })) : []
+  return { top: num(g.top, 10, -50, 450), head: num(g.head, 56, GUIDE_HEAD_RANGE.min, GUIDE_HEAD_RANGE.max), lines }
+}
+
 export function normalizeContent(c: ModelContent): ModelContent {
   return {
     ...c,
@@ -69,6 +81,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     patterns: repairPatterns(c.patterns),
     pivots: (c.pivots ?? []).map(repairPivot),
     zones: repairZones(c.zones, c.groups),
+    guide: repairGuide(c.guide),
   }
 }
 
