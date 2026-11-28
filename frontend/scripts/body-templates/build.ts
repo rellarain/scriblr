@@ -15,8 +15,9 @@ import { NO_COLOURING } from '../../src/assets/Interfaces/admin/characters/engin
 import { OUTLINE_INK, drawable, paintShapes } from '../../src/assets/Interfaces/admin/characters/engine/paint'
 import { defaultValues, solve } from '../../src/assets/Interfaces/admin/characters/engine/rig'
 import { makeTwin } from '../../src/assets/Interfaces/admin/characters/engine/pairEdit'
-import { limitsOf } from '../../src/assets/Interfaces/admin/characters/engine/jointLimits'
+import { BLADE_AFTER, BLADE_SHARE, bladePlace, limitsOf } from '../../src/assets/Interfaces/admin/characters/engine/jointLimits'
 import { addFreeAnchor, addFreePosable, renameMark } from '../../src/assets/Interfaces/admin/characters/engine/anchors'
+import { autoSkin } from '../../src/assets/Interfaces/admin/characters/engine/skinEdit'
 import { addGroup, addObject, addShape, normalizeContent, publishFaults, starterContent } from '../../src/assets/Interfaces/admin/characters/modelContent'
 import { mirrorGap, refit } from '../seed-model/outline'
 
@@ -238,7 +239,7 @@ const CAP = 1.05
 
 // The shape editor's joints (slice 9d): each part's object joined to the one it hangs from by a pivot point that turns at the group's pivot (the link's own point stays where
 // it is drawn), the joints of the body with their measured limits for the template's body, the face's parts held fast to the head; the pelvis anchored, and the head, the
-// hands, the elbows, the knees and the feet posable. The right side takes the left side's joints and marks as twins.
+// hands, the elbows, the knees and the feet posable; the shoulder blades follow the arms. The right side takes the left side's joints and marks as twins.
 type JointSpec = [child: string, parent: string, pivot: string, name: string, kind: ModelJointKind | null, range?: [number, number]]
 const JOINTS: JointSpec[] = [
   ['o_torso', 'o_pelvis', 'chest', 'Waist', null, [-30, 30]],
@@ -273,7 +274,11 @@ function rigged(c: ModelContent, pivots: Record<string, V>, bodyId: string): Mod
     const P = a.shape.pts[a.i], Q = b.shape.pts[b.i]
     const bind: ModelBind = {
       kind: 'point', s: b.shape.id, i: b.i, d: [r2(P.x - Q.x), r2(P.y - Q.y)], e: 0, t: 0, o: 0,
-      pivot: { turn: 0, lo, hi, ...(name ? { name } : {}), ...(kind ? { kind } : {}), at: [r2(at[0]), r2(at[1])] },
+      pivot: {
+        turn: 0, lo, hi, ...(name ? { name } : {}), ...(kind ? { kind } : {}), at: [r2(at[0]), r2(at[1])],
+        // the shoulder blade follows the arm
+        ...(kind === 'shoulder' ? { follow: { at: bladePlace(c, [r2(at[0]), r2(at[1])]), after: BLADE_AFTER, share: BLADE_SHARE } } : {}),
+      },
     }
     shapes = shapes.map(s => (s.id === a.shape.id ? { ...s, pts: s.pts.map((p, k) => (k === a.i ? { ...p, bind } : p)) } : s))
   }
@@ -294,6 +299,22 @@ function rigged(c: ModelContent, pivots: Record<string, V>, bodyId: string): Mod
   mark('shinL', addFreePosable, pivots.shinL, 'Knee (left)')
   mark('plantarL', addFreePosable, middle('plantarL'), 'Foot (left)')
   return { ...c, shapes, limitsFor: f }
+}
+
+// Smooth bends (slice 9d): across the elbows the outline bends like skin. The forearm follows the upper arm near the joint and the upper arm's shapes follow the forearm,
+// the weights rising smoothly across the joint (Auto over twice the reach along the bone); the twins are skinned as their originals are. The knees keep their caps alone:
+// skinned, the bottom of a sharply bent knee came out lumpy against its cap.
+const SKIN_REACH = 9
+const SKINS: Array<[shape: string, follows: string]> = [['forearmL', 'upperarmL'], ['upperarmL', 'forearmL'], ['bicepsL', 'forearmL'], ['tricepsL', 'forearmL']]
+function skinned(c: ModelContent, bodyId: string): ModelContent {
+  let w = c
+  for (const [shape, follows] of SKINS) {
+    if (!w.shapes.some(s => s.id === shape)) continue
+    const r = autoSkin(w, shape, follows, SKIN_REACH)
+    if (!r.ok) throw new Error(`${bodyId}: skin of ${shape}: ${r.reason}`)
+    w = r.content
+  }
+  return w
 }
 
 // The join set a part is drawn in (slice 9c): the body's plain parts in one outline round the figure, the arms in one of their own (so an arm posed in front of the body
@@ -435,6 +456,7 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
   const side = (name: string) => name.replace(/ \(left\) \(twin\)$/, ' (right)').replace(/ \(twin\)$/, '')
   c = { ...c, shapes: c.shapes.map(s => (s.mirrorOf ? { ...s, name: side(s.name) } : s)), objects: c.objects.map(o => (o.mirrorOf ? { ...o, name: side(o.name) } : o)), groups: c.groups.map(g => (g.mirrorOf ? { ...g, name: side(g.name) } : g)) }
   c = rigged(c, pivots, body.id)
+  if (process.env.NO_SKIN !== '1') c = skinned(c, body.id)
   c = normalizeContent({ ...c, joins: true })
   const twins = c.shapes.filter(s => s.mirrorOf).length
   return { content: c, report: { id: body.id, shapes: c.shapes.length, twins, points, worstMirror: r2(worstMirror), kb: Math.round(copyBytes(c) / 1024), faults: publishFaults(c) } }
@@ -484,8 +506,8 @@ const PARTS: Array<[id: string, name: string, hint: string, objects: string[], l
 ]
 function partsOf(c: ModelContent): BodyPart[] {
   const byId = new Map(c.shapes.map(s => [s.id, s]))
-  // a part is drawn shapes only: the template's joints and marks join it to parts it does not have
-  const loose = (s: ModelShape): ModelShape => ({ ...s, marks: [], pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) })
+  // a part is drawn shapes only: the template's joints, marks and skin weights join it to parts it does not have
+  const loose = (s: ModelShape): ModelShape => ({ ...s, marks: [], skin: [], pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) })
   const own = (s: ModelShape): ModelShape => loose(ownShape(s))
   const ownShape = (s: ModelShape): ModelShape => {
     const orig = s.mirrorOf ? byId.get(s.mirrorOf) : undefined

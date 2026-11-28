@@ -480,9 +480,11 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     for (let cur = groupMap.get(b)?.parent ?? null; cur !== null && !seen.has(cur); cur = groupMap.get(cur)?.parent ?? null) { if (cur === a) return true; seen.add(cur) }
     return false
   }
+  // a group as posed at its pivot points (slice 9d): the pose of its first object, so skin weights follow a figure dragged into a pose as they follow its sliders
+  const groupPose = (g: string): Mat => { const oid = groupMap.get(g)?.objects[0]; return (oid ? pose.objectMats.get(oid) : undefined) ?? IDENTITY }
   const skinRig: SkinRig = {
-    mat: g => (g ? groupMat(g) : IDENTITY),
-    turn: g => { if (!g) return 0; groupMat(g); return turns[g] ?? 0 },
+    mat: g => (g ? mul(groupPose(g), groupMat(g)) : IDENTITY),
+    turn: g => { if (!g) return 0; groupMat(g); const P = groupPose(g); return (turns[g] ?? 0) + (Math.atan2(P[1], P[0]) * 180) / Math.PI },
     // where two groups meet at rest: the pivot of the lower one when one hangs from the other
     joint: (a, b) => (a === null ? null : isAbove(a, b) ? restPivotOf(b) : isAbove(b, a) ? restPivotOf(a) : null),
   }

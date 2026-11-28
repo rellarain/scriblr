@@ -710,7 +710,10 @@ export interface ModelSlide { lo: number; hi: number; at: number | null }
 export type ModelJointKind = 'neck' | 'shoulder' | 'elbow' | 'wrist' | 'hip' | 'knee' | 'ankle'
 // at: where the joint turns, in the model's space at rest, when that is not the linked point (a limb's joint inside two shapes that overlap); the linked point then keeps
 // its place on its own shape, and the link only says which two objects the joint joins
-export interface ModelJoint { turn: number; lo: number; hi: number; name?: string | null; kind?: ModelJointKind | null; at?: [number, number] | null }
+// follow: the shoulder blade following the arm (slice 9d): past `after` degrees either way, the part beyond the joint also turns about `at` (where the blade swings from,
+// near the middle) by `share` of the turn past it, so a raised arm lifts the shoulder
+export interface ModelJointFollow { at: [number, number]; after: number; share: number }
+export interface ModelJoint { turn: number; lo: number; hi: number; name?: string | null; kind?: ModelJointKind | null; at?: [number, number] | null; follow?: ModelJointFollow | null }
 // The body the joint limits are set for (slice 9d): the table's ranges for men or women, at an age, hypermobile or not
 export interface ModelLimitsFor { sex: 'men' | 'women'; age: 'child' | 'adult' | 'elder'; hyper: boolean }
 export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number; tan?: boolean; name?: string; segName?: string; slide?: ModelSlide | null; pivot?: ModelJoint | null }

@@ -76,12 +76,12 @@ WUI (mockup first):
     - [x] Body parts: head, torso, arm, hand, leg, foot, eye, ear, nose, mouth, a lock of hair.
   - [x] 9b Drawing: smooth and simplify outlines, trace a picture, merge, cut out and split.
   - [x] 9c Joins: one outline round parts that touch, joint caps.
-  - [ ] 9d Rig and posing: bones, smooth bends (skin weights), drag a hand or a foot to pose.
+  - [x] 9d Rig and posing: bones, smooth bends (skin weights), drag a hand or a foot to pose.
     - [x] Twins pose: a twin takes its original's pivot points, mirrored, with turns of its own, so the two sides pose apart.
     - [x] Joint limits: each pivot point named, the Limits section listing every joint (bends from, to), adjusted for sex, age and hypermobility.
     - [x] The body templates rigged: pivot points at the neck, shoulders, elbows, wrists, hips, knees and ankles with their limits, the pelvis anchored, the hands, feet, elbows and knees posable.
     - [x] The Pose section: drag to pose, what leads (hand or elbow) and what holds still (shoulder or nothing), reset the pose, save it as a pose and put a saved one back.
-    - [ ] Smooth bends: skin weights across a pivot point (paint, smooth, auto), and the shoulder blade following the arm.
+    - [x] Smooth bends: skin weights across a pivot point (paint, smooth, auto), and the shoulder blade following the arm.
   - [ ] 9e Eight angles.
   - [ ] 9f Variation: body sliders, forms, colour palettes, clothes in layers.
   - [ ] 9g Faces: expressions.
@@ -178,3 +178,4 @@ More items will be added.
 - 2026-11-28: WUI slice 9b done. The shape editor's Outline section smooths the selected point or every point and simplifies an outline to fewer points, saying how far it strays; Combine merges another shape into the selected one, cuts one out of it (a hole through the paint when it lies wholly inside) or splits it along a line laid on the canvas, each edge keeping its outline; a picture to trace lies under the canvas, faded and locked, fitted to the guide, kept beside the draft and never published.
 - 2026-11-28: WUI slice 9c done. Shapes can be put in join sets (and in other sets from behind); with the model's joins on, each set is drawn as one outline round its parts, so where they overlap no line shows however they are posed. A group with a pivot can have a joint cap, a circle at the joint as wide as the limb, so a limb turned a long way shows no notch. The body templates start with the joins on (the body, the head) and caps at the elbows and knees; exporting a figure now draws outlines per edge.
 - 2026-11-28: WUI slice 9d, posing. A twin takes its original's pivot points with turns of its own, so the two sides pose apart; a pivot point can be named, stand for a joint of the body and take its measured limits, set for men or women, a child, an adult or an elder, or hypermobile; the Overview lists every joint's limits and has the Pose section (drag to pose, what holds still, reset, saved poses). The body templates are rigged (pivot points at the waist, neck, head, shoulders, elbows, wrists, hips, knees and ankles, the pelvis anchored, hands, feet, elbows, knees and head posable), and their arms are a join set of their own so an arm in front of the body shows.
+- 2026-11-28: WUI slice 9d done (smooth bends). Skin weights follow a figure posed at its pivot points; the Skin weights tool is back in the shape editor, its Try the bend turning the pivot point between the two parts; joint caps are drawn where the figure is posed; a shoulder's blade can follow the arm (past 30° it takes a third of the turn, so a raised arm lifts the shoulder). The body templates' elbows are skinned and their shoulder blades follow.

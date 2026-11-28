@@ -209,6 +209,7 @@ export interface JointActions {
   onSetting: (key: 'turn' | 'lo' | 'hi', value: number) => void
   onName?: (name: string) => void
   onKind?: (kind: ModelJointKind | null) => void
+  onFollow?: (on: boolean) => void
 }
 export function JointSection({ actions }: { actions: JointActions }) {
   const p = actions.joint
@@ -235,6 +236,14 @@ export function JointSection({ actions }: { actions: JointActions }) {
         </label>
       )}
       {p.kind && <p className="cmInsText">{JOINT_LABEL[p.kind]}: {JOINT_NOTE[p.kind]}. Choosing it set the limits; they can still be changed here.</p>}
+      {actions.onFollow && p.kind === 'shoulder' && (
+        <>
+          <div className="cmInline">
+            <button type="button" className={`cmBtn cmBtn--small${p.follow ? ' cmBtn--on' : ''}`} aria-pressed={!!p.follow} onClick={() => actions.onFollow?.(!p.follow)}>The shoulder blade follows the arm</button>
+          </div>
+          <p className="cmInsText">After the first 30°, the blade does a third of the turn (1° for every 2° the arm turns at the shoulder), so a raised arm lifts the shoulder.</p>
+        </>
+      )}
       <Stepper label="Turn" value={deg(p.turn)} bigBy={15} lowerOff={p.turn <= p.lo} raiseOff={p.turn >= p.hi} onStep={(dir, big) => actions.onSetting('turn', p.turn + dir * step(big))} />
       <Stepper label="Turns at least" value={deg(p.lo)} bigBy={15} lowerOff={p.lo <= -TURN_LIMIT} raiseOff={p.lo >= 0} onStep={(dir, big) => actions.onSetting('lo', p.lo + dir * step(big))} />
       <Stepper label="Turns at most" value={deg(p.hi)} bigBy={15} lowerOff={p.hi <= 0} raiseOff={p.hi >= TURN_LIMIT} onStep={(dir, big) => actions.onSetting('hi', p.hi + dir * step(big))} />

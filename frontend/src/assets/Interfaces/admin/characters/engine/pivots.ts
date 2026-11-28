@@ -1,4 +1,4 @@
-import type { ModelBind, ModelContent, ModelJoint, ModelJointKind, ModelPivot, ModelShape, ModelShapePivot } from '../../../../../api/types'
+import type { ModelBind, ModelContent, ModelJoint, ModelJointFollow, ModelJointKind, ModelPivot, ModelShape, ModelShapePivot } from '../../../../../api/types'
 import { IDENTITY, apply, bezierAt, build, inverse, mul, nearestEdge, rotate, type Mat } from './geometry'
 import { placeMat, shapeMarks } from './anchors'
 import { treeRank } from './order'
@@ -36,11 +36,22 @@ export function repairJoint(v: unknown): ModelJoint | null {
   const name = typeof p.name === 'string' ? p.name.trim().slice(0, JOINT_NAME_MAX) : '', kind = JOINT_KINDS.includes(p.kind as ModelJointKind) ? (p.kind as ModelJointKind) : null
   const place = (q: unknown) => (typeof q === 'number' && Number.isFinite(q) ? r2(Math.min(1e5, Math.max(-1e5, q))) : null)
   const at = Array.isArray(p.at) && p.at.length === 2 ? [place(p.at[0]), place(p.at[1])] : null
+  const follow = repairFollow(p.follow)
   return {
     turn: Math.min(hi, Math.max(lo, angle(p.turn, 0))), lo, hi, ...(name ? { name } : {}), ...(kind ? { kind } : {}),
-    ...(at && at[0] !== null && at[1] !== null ? { at: [at[0], at[1]] as [number, number] } : {}),
+    ...(at && at[0] !== null && at[1] !== null ? { at: [at[0], at[1]] as [number, number] } : {}), ...(follow ? { follow } : {}),
   }
 }
+// The shoulder blade following the arm (slice 9d), as the server keeps it: its place, the turn after which it follows (0 to 180) and its share (0 to 1).
+export function repairFollow(v: unknown): ModelJointFollow | null {
+  if (!v || typeof v !== 'object') return null
+  const f = v as Record<string, unknown>, num = (q: unknown) => (typeof q === 'number' && Number.isFinite(q) ? q : null)
+  const x = Array.isArray(f.at) ? num(f.at[0]) : null, y = Array.isArray(f.at) ? num(f.at[1]) : null
+  if (x === null || y === null) return null
+  return { at: [r2(Math.min(1e5, Math.max(-1e5, x))), r2(Math.min(1e5, Math.max(-1e5, y)))], after: r2(Math.min(180, Math.max(0, num(f.after) ?? 30))), share: r2(Math.min(1, Math.max(0, num(f.share) ?? 0.5))) }
+}
+// The share of a joint's turn `by` a following blade takes: its share of the turn past `after`, the same way (the joint turns the rest).
+export const followTurn = (f: ModelJointFollow, by: number): number => Math.sign(by) * Math.max(0, Math.abs(by) - f.after) * f.share
 export const NEW_JOINT: ModelJoint = { turn: 0, lo: -TURN_LIMIT, hi: TURN_LIMIT }
 
 // ---- the old pivot circles (kept so an old model can be read and converted) ----
@@ -156,7 +167,7 @@ export function setTwinTurn(c: ModelContent, twinId: string, i: number, turn: nu
 
 // A pivot link: the point that holds it (`shape`, `i`; its id is "shape:i"), the object of that point (`from`) and of the shape it is linked to (`to`), the pivot point where it is
 // drawn at rest, and the pivot's turn (how far `from` is turned from `to`).
-export interface Joint { id: string; shape: string; i: number; from: string; to: string; at: [number, number]; turn: number; lo: number; hi: number; twin?: boolean; kind?: ModelJointKind | null }
+export interface Joint { id: string; shape: string; i: number; from: string; to: string; at: [number, number]; turn: number; lo: number; hi: number; twin?: boolean; kind?: ModelJointKind | null; follow?: ModelJointFollow | null }
 
 export interface Pose {
   // each shape that moves: the matrix it is drawn through (in the model's space); each object that moves
@@ -235,7 +246,7 @@ function work(c: ModelContent): Pose {
       const from = pose.bodyOf.get(s.id), to = pose.bodyOf.get(b.s), at = b.pivot.at ?? restPlace(byId, b)
       if (!from || !to || from === to || !at) return
       const id = `${s.id}:${i}`
-      pose.joints.set(id, { id, shape: s.id, i, from, to, at, turn: b.pivot.turn, lo: b.pivot.lo, hi: b.pivot.hi, kind: b.pivot.kind ?? null })
+      pose.joints.set(id, { id, shape: s.id, i, from, to, at, turn: b.pivot.turn, lo: b.pivot.lo, hi: b.pivot.hi, kind: b.pivot.kind ?? null, follow: b.pivot.follow ?? null })
       near.set(from, [...(near.get(from) ?? []), id])
       near.set(to, [...(near.get(to) ?? []), id])
     })
@@ -254,7 +265,8 @@ function work(c: ModelContent): Pose {
       // a twin in the object its original is in (a left shape of a part in the middle) joins nothing new: its original's joint is that joint
       if (from === pose.bodyOf.get(o.id) && to === pose.bodyOf.get(b.s)) return
       const id = `${t.id}:${i}`, own = Math.min(b.pivot.hi, Math.max(b.pivot.lo, t.twinTurns?.[String(i)] ?? 0))
-      pose.joints.set(id, { id, shape: t.id, i, from, to, at: [r2(2 * axis - at[0]), at[1]], turn: -own || 0, lo: -b.pivot.hi || 0, hi: -b.pivot.lo || 0, twin: true, kind: b.pivot.kind ?? null })
+      pose.joints.set(id, { id, shape: t.id, i, from, to, at: [r2(2 * axis - at[0]), at[1]], turn: -own || 0, lo: -b.pivot.hi || 0, hi: -b.pivot.lo || 0, twin: true, kind: b.pivot.kind ?? null,
+        follow: b.pivot.follow ? { ...b.pivot.follow, at: [r2(2 * axis - b.pivot.follow.at[0]), b.pivot.follow.at[1]] } : null })
       near.set(from, [...(near.get(from) ?? []), id])
       near.set(to, [...(near.get(to) ?? []), id])
     })
@@ -306,13 +318,27 @@ function work(c: ModelContent): Pose {
     pose.objectMats.set(root, placeOfObject(root))
     for (const o of order.slice(1)) {
       const pp = pose.parentOf.get(o)!, Mp = pose.objectMats.get(pp.parent)!, j = pose.joints.get(pp.joint)!
-      const by = pose.blocked.has(pp.joint) ? 0 : pp.sign * j.turn
-      pose.objectMats.set(o, by ? mul(Mp, rotate(by, j.at[0], j.at[1])) : Mp)
+      const by = pose.blocked.has(pp.joint) ? 0 : pp.sign * j.turn, extra = j.follow && by ? followTurn(j.follow, by) : 0
+      const turned = by ? mul(Mp, rotate(by, j.at[0], j.at[1])) : Mp
+      // a following blade takes its share of the turn, turning about its own place, and the joint the rest: the part beyond turns the joint's turn in all
+      pose.objectMats.set(o, extra ? mul(mul(Mp, rotate(extra, j.follow!.at[0], j.follow!.at[1])), rotate(by - extra, j.at[0], j.at[1])) : turned)
     }
   }
-  for (const [jid, j] of pose.joints) pose.points.set(jid, apply(pose.objectMats.get(j.to) ?? IDENTITY, j.at[0], j.at[1]))
+  // where each pivot is now: read on the side beyond it (a following blade carries it with that side)
+  for (const [jid, j] of pose.joints) {
+    const far = [j.from, j.to].find(o => pose.parentOf.get(o)?.joint === jid) ?? j.to
+    pose.points.set(jid, apply(pose.objectMats.get(far) ?? IDENTITY, j.at[0], j.at[1]))
+  }
   for (const [o, M] of pose.objectMats) if (M !== IDENTITY) for (const id of pose.bodies.get(o) ?? []) pose.mats.set(id, M)
   return pose
+}
+
+// The pivot point between a shape's object and the objects of a group: the joint a skin painted toward that group bends at (slice 9d), or null.
+export function jointAcross(c: ModelContent, shapeId: string, groupId: string): Joint | null {
+  const pose = poseOf(c), body = pose.bodyOf.get(shapeId), objects = new Set(c.groups.find(g => g.id === groupId)?.objects ?? [])
+  if (!body) return null
+  for (const j of pose.joints.values()) if ((j.from === body && objects.has(j.to)) || (j.to === body && objects.has(j.from))) return j
+  return null
 }
 
 // ---- converting old pivot circles (once, when the shape editor opens an old model) ----

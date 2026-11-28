@@ -1,5 +1,6 @@
 import type { ModelContent, ModelGroup, ModelShape } from '../../../../../api/types'
-import { apply } from './geometry'
+import { IDENTITY, apply, inPolygon } from './geometry'
+import { poseOf } from './pivots'
 import type { PaintItem } from './paint'
 import type { Solved } from './rig'
 
@@ -33,6 +34,8 @@ export function joinSets(c: ModelContent): Array<{ name: string; count: number }
 }
 
 const slug = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '_')
+// how far outside its limb a pivot may lie and still have a cap
+const OUTSIDE_MAX = 4
 const r2 = (v: number) => Math.round(v * 100) / 100
 const circle = (cx: number, cy: number, r: number) => `M${r2(cx - r)} ${r2(cy)}A${r2(r)} ${r2(r)} 0 1 0 ${r2(cx + r)} ${r2(cy)}A${r2(r)} ${r2(r)} 0 1 0 ${r2(cx - r)} ${r2(cy)}Z`
 function segDist(px: number, py: number, a: [number, number], b: [number, number]): number {
@@ -92,9 +95,14 @@ export function joinItems(c: ModelContent, solved: Solved, items: PaintItem[]): 
     if (!size || !pivot) continue
     const own = g.objects.flatMap(oid => c.objects.find(o => o.id === oid)?.shapes ?? []).filter(id => keyOf.has(id) && at.has(id)).sort((a, b) => at.get(a)! - at.get(b)!)
     if (own.length === 0) continue
-    const [px, py] = apply(solved.global, pivot[0], pivot[1])
-    const near = halfWidthAt(px, py, own.map(id => solved.shapes[id]?.poly ?? []).filter(poly => poly.length >= 3))
+    // the pivot where the figure is posed at its pivot points (slice 9d): the group's first object's pose
+    const oid = g.objects[0], P = (oid ? poseOf(c).objectMats.get(oid) : undefined) ?? IDENTITY, [mx, my] = apply(P, pivot[0], pivot[1])
+    const [px, py] = apply(solved.global, mx, my)
+    const polys = own.map(id => solved.shapes[id]?.poly ?? []).filter(poly => poly.length >= 3)
+    const near = halfWidthAt(px, py, polys)
     if (!Number.isFinite(near) || near <= 0.05) continue
+    // a pivot well outside the limb (its group moved away from it) has no cap
+    if (!polys.some(poly => inPolygon(poly, px, py)) && near > OUTSIDE_MAX) continue
     const first = items[at.get(own[0])!], key = keyOf.get(own[0])!
     const cap: PaintItem = {
       id: `cap-${slug(g.id)}`, d: circle(px, py, near * size), fill: first.fill, opacity: first.opacity, gradient: null, blend: null, clipD: null, compDs: [], cutDs: [],

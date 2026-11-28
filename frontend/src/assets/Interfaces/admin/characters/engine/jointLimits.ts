@@ -1,5 +1,5 @@
 import type { ModelContent, ModelJoint, ModelJointKind, ModelLimitsFor } from '../../../../../api/types'
-import { JOINT_KINDS, JOINT_NAME_MAX, TURN_LIMIT } from './pivots'
+import { JOINT_KINDS, JOINT_NAME_MAX, TURN_LIMIT, poseOf, twinSource, type Joint } from './pivots'
 
 // Joint limits (slice 9d). A pivot point may stand for a joint of the body (`ModelJoint.kind`); its limits then come from a table of how far that joint turns: the measured
 // means of adults of 20 to 44 (the approved mockup's numbers, not the clinical maxima), adjusted for the body the model is (`ModelContent.limitsFor`): women about 5 degrees
@@ -57,6 +57,14 @@ export function jointRows(c: ModelContent): JointRow[] {
 export const twinJointName = (name: string): string => (/\(left\)/i.test(name) ? name.replace(/\(left\)/i, '(right)') : /\(right\)/i.test(name) ? name.replace(/\(right\)/i, '(left)') : `${name} (twin)`)
 // A joint's name as shown: its own, else what it stands for, else none.
 export const jointName = (j: ModelJoint): string => j.name || (j.kind ? JOINT_LABEL[j.kind] : '')
+// The name of a joint of the pose (a twin's is its original's, for its side).
+export function jointNameAt(c: ModelContent, j: Joint): string {
+  const s = c.shapes.find(x => x.id === j.shape)
+  if (!s) return ''
+  const o = twinSource(c, s), piv = (o ?? s).pts[j.i]?.bind?.pivot
+  const name = piv ? jointName(piv) : ''
+  return o && name ? twinJointName(name) : name
+}
 
 const withJoint = (c: ModelContent, shapeId: string, i: number, f: (j: ModelJoint) => ModelJoint): ModelContent => ({
   ...c, shapes: c.shapes.map(s => (s.id === shapeId ? { ...s, pts: s.pts.map((p, k) => (k === i && p.bind?.pivot ? { ...p, bind: { ...p.bind, pivot: f(p.bind.pivot) } } : p)) } : s)),
@@ -91,4 +99,20 @@ export function applyLimitsFor(c: ModelContent, f: ModelLimitsFor): ModelContent
       }),
     } : s)),
   }
+}
+
+// The shoulder blade following the arm (slice 9d), on or off: past 30° either way the blade takes a third of the arm's turn (it turns 1° for every 2° the arm turns at the
+// shoulder), turning the arm about a place a fifth of the way out from the middle at the shoulder's height, so a raised arm lifts the shoulder.
+export const BLADE_AFTER = 30
+export const BLADE_SHARE = 0.33
+export const bladePlace = (c: ModelContent, at: [number, number]): [number, number] => {
+  const axis = c.axis ?? 100
+  return [Math.round((axis + (at[0] - axis) * 0.2) * 100) / 100, at[1]]
+}
+export function setFollow(c: ModelContent, shapeId: string, i: number, on: boolean): ModelContent {
+  const at = poseOf(c).joints.get(`${shapeId}:${i}`)?.at
+  return withJoint(c, shapeId, i, j => {
+    const { follow: _was, ...rest } = j
+    return on && at ? { ...rest, follow: { at: bladePlace(c, at), after: BLADE_AFTER, share: BLADE_SHARE } } : rest
+  })
 }

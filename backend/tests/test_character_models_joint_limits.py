@@ -47,3 +47,13 @@ def test_a_joint_may_turn_at_a_place_of_its_own():
     for bad in ([1], [1, "x"], [1, True], "1,2", [float("nan"), 1]):
         assert ModelJoint.model_validate({"at": bad}).at is None
     assert "at" not in ModelJoint.model_validate({}).model_dump(mode="json")
+
+
+def test_a_shoulder_blade_may_follow_the_arm():
+    joint = ModelJoint.model_validate({"follow": {"at": [107.84, 101.8], "after": 30, "share": 0.5}})
+    assert joint.model_dump(mode="json")["follow"] == {"at": [107.84, 101.8], "after": 30.0, "share": 0.5}
+    held = ModelJoint.model_validate({"follow": {"at": [1, 2], "after": 500, "share": 3}}).follow
+    assert (held.after, held.share) == (180.0, 1.0)
+    for bad in ({"at": [1]}, {"after": 30}, "yes", {"at": [1, "x"]}):
+        assert ModelJoint.model_validate({"follow": bad}).follow is None
+    assert "follow" not in ModelJoint.model_validate({}).model_dump(mode="json")

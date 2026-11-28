@@ -96,8 +96,8 @@ import type { CloneActions, MirrorActions } from './ShapePanels'
 import { addZone, ensureZones, moveGroupTo, moveObjectTo, moveShapeTo, moveZone, needsZones, newGroupIn, removeZone, renameZone, topZone, zoneById, zonesOf } from './engine/zones'
 import type { ArrangeActions, CentreActions, ConnectionActions, EdgeActions, JointActions, SymmetryActions } from './ShapePanels'
 import { edgeHome, setHomeEdge } from './engine/edges'
-import { jointAt, jointHolder, migrateJoints, needsJoints, poseOf, setJointSetting, toggleJoint } from './engine/pivots'
-import { applyLimitsFor, nameJoint, setJointKind } from './engine/jointLimits'
+import { addJointTurn, jointAcross, jointAt, jointHolder, migrateJoints, needsJoints, poseOf, setJointSetting, toggleJoint } from './engine/pivots'
+import { applyLimitsFor, jointNameAt, nameJoint, setFollow, setJointKind } from './engine/jointLimits'
 import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, centreAnchorOf, guardAnchors, marksOf, posableOn, shapeMarks, toggleAnchor, toggleCentreAnchor, togglePosable } from './engine/anchors'
 import { isSlider, makeSlider, nearestPlace, placeAt, setStop, stopSlider } from './engine/sliders'
 import { drawnOf } from './engine/connect'
@@ -687,6 +687,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
   } : null
   const bend = selShape && skinWith ? bendSlider(content, selShape.id, skinWith) : null
+  // in the shape editor the bend is the pivot point between the shape's object and the group's (slice 9d)
+  const bendJoint = shapesOnly && selShape && skinWith ? jointAcross(content, selShape.id, skinWith) : null
   function undo() {
     const r = undoHistory(history, content)
     if (!r) return
@@ -1993,6 +1995,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     ...(jointHold ? {
       onName: (name: string) => commit(nameJoint(content, jointHold.shapeId, jointHold.i, name), true),
       onKind: (kind: ModelJointKind | null) => commit(setJointKind(content, jointHold.shapeId, jointHold.i, kind), true),
+      onFollow: (on: boolean) => commit(setFollow(content, jointHold.shapeId, jointHold.i, on), true),
     } : {}),
   } : undefined
   // Pose mode in the shape editor (joints J3): on while a group or an object is selected (objects are the posable segments of a group). With a group selected any of its objects
@@ -2247,9 +2250,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             )}
 
             <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
+              {/* the skin weights are back in the shape editor (slice 9d): the bend follows the pivot point between the two parts */}
+              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setTapering(false); setSkinPick(false); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
               {!shapesOnly && <>
               <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setSkinning(false); setTapering(false); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${skinning ? ' cmIconBtn--on' : ''}`} aria-label="Skin weights" title="Skin weights: paint how much each point follows another group, so the outline bends like skin at a joint" aria-pressed={skinning} disabled={!!recording || poseMode} onClick={() => { setSkinning(k => !k); setWeighing(false); setTapering(false); setSkinPick(false); setBridgeSpots(null) }}><BrushIcon size={14} /></button>
               <button
                 type="button" className={`cmIconBtn${tapering ? ' cmIconBtn--on' : ''}`} aria-label="Taper" aria-pressed={tapering} disabled={!!recording || poseMode}
                 title="Taper: lay a line on the canvas and make a ribbon along it, wider in the middle and pointed at the ends (brows, lashes, folds, collarbones)"
@@ -2286,7 +2290,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 following={skinWeights.filter(w => w > 0).length}
                 strength={skinStrength} onStrength={(dir, big) => setSkinStrength(v => Math.min(1, Math.max(0, Math.round((v + dir * (big ? 0.5 : 0.1)) * 10) / 10)))}
                 radius={skinRadius} onRadius={(dir, big) => setSkinRadius(v => Math.min(60, Math.max(1, v + dir * (big ? 10 : 2))))}
-                bend={bend ? {
+                bend={bendJoint ? {
+                  name: jointNameAt(content, bendJoint) || 'the joint', value: `${Math.round(bendJoint.twin ? -bendJoint.turn : bendJoint.turn)}°`, atRest: bendJoint.turn === 0,
+                  atMin: bendJoint.twin ? bendJoint.turn >= bendJoint.hi : bendJoint.turn <= bendJoint.lo, atMax: bendJoint.twin ? bendJoint.turn <= bendJoint.lo : bendJoint.turn >= bendJoint.hi,
+                  onStep: (dir, big) => commit(addJointTurn(content, bendJoint.id, (bendJoint.twin ? -dir : dir) * (big ? 30 : 10))),
+                  onRest: () => commit(addJointTurn(content, bendJoint.id, -bendJoint.turn)),
+                } : bend ? {
                   name: bend.name.trim() || 'the joint', value: `${Math.round(valueOf(bend, values))}${bend.unit}`, atRest: valueOf(bend, values) === bend.rest,
                   atMin: valueOf(bend, values) <= bend.min, atMax: valueOf(bend, values) >= bend.max,
                   onStep: (dir, big) => setValues(v => ({ ...v, [bend.id]: Math.min(bend.max, Math.max(bend.min, valueOf(bend, v) + dir * (big ? 30 : 10))) })),

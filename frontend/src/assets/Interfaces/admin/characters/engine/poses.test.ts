@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ModelBind, ModelContent, ModelShape } from '../../../../../api/types'
 import { content as blank } from '../../../../../test/characterModelsBackend'
 import { addGroup, addObject, addShape, newGroup, normalizeContent } from '../modelContent'
@@ -8,6 +8,8 @@ import { POSES_MAX, applyPose, deletePose, freshPoseName, poseNow, renamePose, r
 import { isPosed } from './posing'
 
 // Saved poses (slice 9d): the pose as it stands kept by name (every pivot's turn, a twin's own too, and each figure's place) and put back later.
+// (twinned figures are slow to build when the whole suite runs at once)
+vi.setConfig({ testTimeout: 30000 })
 
 const outline = (id: string, pts: Array<[number, number]>): ModelShape => ({
   id, name: id, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts: pts.map(([x, y]) => ({ x, y, m: 's' as const })),

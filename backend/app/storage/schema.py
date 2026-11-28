@@ -1415,6 +1415,31 @@ class ModelLimitsFor(BaseModel):
         return value is True
 
 
+class ModelJointFollow(BaseModel):
+    """The shoulder blade following the arm (slice 9d): past `after` degrees either way the part beyond the joint also turns about `at` by `share` of the turn past it."""
+
+    at: list[float]
+    after: float = 30.0
+    share: float = 0.5
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> list[float]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v in (float("inf"), float("-inf")) for v in value):
+            raise ValueError("a place")
+        return [round(_finite(v, 0.0, -1e5, 1e5), 2) for v in value]
+
+    @field_validator("after", mode="before")
+    @classmethod
+    def _after(cls, value: Any) -> float:
+        return round(_finite(value, 30.0, 0.0, 180.0), 2)
+
+    @field_validator("share", mode="before")
+    @classmethod
+    def _share(cls, value: Any) -> float:
+        return round(_finite(value, 0.5, 0.0, 1.0), 2)
+
+
 class ModelJoint(BaseModel):
     """A link made a pivot point (joints J2): the shapes on its two sides turn about the linked point. `turn` is how far the side of the point that follows is turned
     from the side it follows, in degrees; `lo` and `hi` are the smallest and largest turn the admin allows (lo <= 0 <= hi, the turn held between them)."""
@@ -1427,6 +1452,18 @@ class ModelJoint(BaseModel):
     kind: Optional[str] = None
     # Where the joint turns, in the model's space at rest, when that is not the linked point (a limb's joint inside two shapes that overlap). Written only when set.
     at: Optional[list[float]] = None
+    # The shoulder blade following the arm (slice 9d), or none. Written only when set.
+    follow: Optional[ModelJointFollow] = None
+
+    @field_validator("follow", mode="before")
+    @classmethod
+    def _follow(cls, value: Any) -> Optional[ModelJointFollow]:
+        if value is None or isinstance(value, ModelJointFollow):
+            return value
+        try:
+            return ModelJointFollow.model_validate(value) if isinstance(value, dict) else None
+        except ValueError:
+            return None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1451,7 +1488,7 @@ class ModelJoint(BaseModel):
     def _dump_named(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         """A joint with no name and no kind is written as before joint limits existed."""
         data = handler(self)
-        for key in ("name", "kind", "at"):
+        for key in ("name", "kind", "at", "follow"):
             if data.get(key) is None:
                 data.pop(key, None)
         return data
