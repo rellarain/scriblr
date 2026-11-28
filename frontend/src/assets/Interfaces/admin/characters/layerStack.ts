@@ -21,11 +21,12 @@ export const LAYER_IDS: LayerId[] = LAYERS.map(l => l.id)
 export const layerInfo = (id: LayerId): LayerInfo => LAYERS.find(l => l.id === id)!
 
 // The layers the shape editor offers (designerFeatures.ts), and the names some of them go by there.
-export const SHAPE_LAYERS: LayerId[] = ['weights', 'points', 'outlines', 'guides', 'pivots', 'mirror', 'figure', 'gridlines']
+export const SHAPE_LAYERS: LayerId[] = ['weights', 'points', 'outlines', 'guides', 'heads', 'pivots', 'mirror', 'figure', 'gridlines']
 const SHAPE_NAMES: Partial<Record<LayerId, Pick<LayerInfo, 'name' | 'hint'>>> = {
   weights: { name: 'Curve handles', hint: 'the curve handles of the selected point or segment' },
   pivots: { name: 'Pivots and anchors', hint: 'the pivot points the circles of each pivot turn about' },
   mirror: { name: 'Symmetry axes', hint: 'the axes of the selected shape\'s symmetry' },
+  heads: { name: 'Proportion guide', hint: "the model's proportion guide: a line every head from the crown down, and its named lines (the chin, the chest, the waist...)" },
 }
 export const shapeLayerInfo = (id: LayerId): LayerInfo => ({ ...layerInfo(id), ...SHAPE_NAMES[id] })
 

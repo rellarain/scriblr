@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits } from './types'
+import type { BodyPartList, BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits } from './types'
 
 // The character models come in two libraries that answer the same way: the admin's catalog (the models Scriblr ships and the ones the admin designs, /character-models) and the
 // writer's own (the models a writer designs for themselves, /my-models, whose ids start with "my-").
@@ -54,6 +54,8 @@ export const putWriterLimits = (limits: WriterModelLimits): Promise<WriterModelL
 // The bodies a new model can start from (slice 9a), and one of them with the model it starts (404 when there is no such body).
 export const getBodyTemplates = (): Promise<BodyTemplateList> => api.get<BodyTemplateList>('/character-models/body-templates')
 export const getBodyTemplate = (templateId: string): Promise<BodyTemplate> => api.get<BodyTemplate>(`/character-models/body-templates/${id(templateId)}`)
+// The parts the Body part menu adds (a head, a torso, an arm ...).
+export const getBodyParts = (): Promise<BodyPartList> => api.get<BodyPartList>('/character-models/body-parts')
 
 // Adds the basic adult that comes with the app, published (409 when it is already in the catalog).
 export function addBasicModel(): Promise<ModelCatalog> {

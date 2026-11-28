@@ -6,7 +6,7 @@ import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } f
 import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/frames'
 import { apply, boxOf, build, flatten, inPolygon, inverse, nearestEdge, type Box, type BuiltPoint } from './engine/geometry'
 import { gridStep, isMajor, snapTo } from './engine/gridSnap'
-import { alignTo, guideTargets, headGuide, type GuideTargets } from './engine/guides'
+import { alignTo, guideTargets, guideYs, headGuide, type GuideTargets } from './engine/guides'
 import { copyShareAt, copySharesOf, drawnOf, dropTargetAt, handleHome, isConnected, isWeld, rootOf, segmentHome, sharedSegment, sharersOf, slideOnEdge, toSourceSpot, weldTree, type DropTarget, sharesCurve } from './engine/connect'
 import { drawnCentre } from './engine/centre'
 import { crossesAxis, rayAngles, wedgeAt } from './engine/symmetry'
@@ -155,6 +155,8 @@ export interface CanvasProps {
   selPoint: number
   mirror: boolean
   snap: boolean
+  // the proportion guide's lines are snap targets while it is shown (slice 9a); off: only shown
+  snapGuide?: boolean
   // The layers to draw, bottom first (see layerStack.ts).
   layers: LayerId[]
   // Shapes (moved whole), pivots and frames land on the lines of the grid while they are dragged.
@@ -479,7 +481,9 @@ export function DesignerCanvas(p: CanvasProps) {
 
   // What a drag can line up with is found when it begins (nothing else moves while it lasts), only when the guides are shown.
   function beginGuides(except: string[]) {
-    targetsRef.current = shown.has('guides') ? guideTargets(content, solved, except, p.frames?.frames.map(f => f.box) ?? []) : null
+    // the proportion guide's lines (slice 9a) are targets while the guide is shown and snapping to it is on, even with the alignment guides hidden
+    const toGuide = shown.has('heads') && !!content.guide && p.snapGuide !== false
+    targetsRef.current = shown.has('guides') ? guideTargets(content, solved, except, p.frames?.frames.map(f => f.box) ?? [], toGuide) : toGuide ? { xs: [], ys: guideYs(content, solved) } : null
   }
   function showGuides(x: number | null, y: number | null) {
     setGuides(prev => (x === null && y === null ? (prev ? null : prev) : prev && prev.x === x && prev.y === y ? prev : { x, y }))

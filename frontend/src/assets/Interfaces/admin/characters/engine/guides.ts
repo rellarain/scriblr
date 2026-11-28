@@ -28,7 +28,8 @@ const unique = (list: number[]): number[] => {
 
 // What the dragged thing can line up with: the points and the box edges and middles of every other drawn shape, the mirror line (the model's `axis`), and the sides of any
 // frames given as boxes.
-export function guideTargets(c: ModelContent, solved: Solved, except: string[], frames: Array<{ x: number; y: number; w: number; h: number }> = []): GuideTargets {
+// With `guide`, the model's proportion guide too (slice 9a): its line at every head and its named lines.
+export function guideTargets(c: ModelContent, solved: Solved, except: string[], frames: Array<{ x: number; y: number; w: number; h: number }> = [], guide = false): GuideTargets {
   const skip = new Set(except)
   const xs: number[] = [apply(solved.global, c.axis ?? 100, 0)[0]], ys: number[] = []
   for (const id of solved.order) {
@@ -40,7 +41,19 @@ export function guideTargets(c: ModelContent, solved: Solved, except: string[], 
     for (const p of build(r.local, sh.closed, r.matrix)) { xs.push(p.x); ys.push(p.y) }
   }
   for (const f of frames) { xs.push(f.x, f.x + f.w); ys.push(f.y, f.y + f.h) }
+  if (guide) ys.push(...guideYs(c, solved))
   return { xs: unique(xs), ys: unique(ys) }
+}
+
+// The heights a shape snaps to on the model's proportion guide, in the canvas's space: a line every head from the crown down to the lowest named line (at least seven and a
+// half heads), and every named line. Empty when the model has no guide.
+export function guideYs(c: ModelContent, solved: Solved): number[] {
+  const g = c.guide
+  if (!g) return []
+  const y = (v: number) => apply(solved.global, c.axis ?? 100, v)[1]
+  const last = Math.max(g.top + 7.5 * g.head, ...g.lines.map(l => l.y))
+  const count = Math.min(HEAD_LINES_MAX, Math.ceil((last - g.top) / g.head - 1e-6))
+  return unique([...Array.from({ length: count + 1 }, (_, n) => y(g.top + n * g.head)), ...g.lines.map(l => y(l.y))])
 }
 
 const nearest = (values: number[], targets: number[], reach: number): { delta: number; at: number } | null => {
@@ -85,9 +98,10 @@ export interface HeadGuide {
   heads: number
 }
 
-// The head-units guide: lines one head apart from the crown down, read from the head bone as the rig has put it (so it follows the sliders: an Age preset moves it). Null with no
-// head bone, or one that cannot be found or has no length.
+// The head-units guide: lines one head apart from the crown down, read from the model's proportion guide when it has one (slice 9a: its named lines are the marks), else from
+// the head bone as the rig has put it (so it follows the sliders: an Age preset moves it). Null with neither, or a head bone that cannot be found or has no length.
 export function headGuide(c: ModelContent, solved: Solved): HeadGuide | null {
+  if (c.guide) return proportionGuide(c, solved)
   const bone = c.headBone ? boneById(c, c.headBone) : undefined
   const ends = bone ? boneEnds(solved, bone) : null
   if (!ends) return null
@@ -108,4 +122,25 @@ export function headGuide(c: ModelContent, solved: Solved): HeadGuide | null {
   const lines = Array.from({ length: count + 1 }, (_, n) => ({ n, y: top + n * unit }))
   const marks = HEAD_MARKS.map(m => ({ ...m, y: top + m.at * unit }))
   return { unit, top, x0: x0 - unit / 2, x1: x1 + unit / 2, lines, marks, bottom, heads: Math.round(heads * 100) / 100 }
+}
+
+// The proportion guide as the head-units layer draws it: the crown and a head from the guide (through the whole-model transform), its named lines as the marks, lines down to
+// the lowest of the figure and the guide's lines.
+function proportionGuide(c: ModelContent, solved: Solved): HeadGuide | null {
+  const g = c.guide!
+  const top = apply(solved.global, c.axis ?? 100, g.top)[1], unit = apply(solved.global, c.axis ?? 100, g.top + g.head)[1] - top
+  if (!(unit > 1e-3)) return null
+  let x0 = Infinity, x1 = -Infinity, low = -Infinity
+  for (const id of solved.order) {
+    const r = solved.shapes[id]
+    if (!r || !r.visible || r.off || (r.box.w <= 0 && r.box.h <= 0)) continue
+    x0 = Math.min(x0, r.box.x); x1 = Math.max(x1, r.box.x + r.box.w); low = Math.max(low, r.box.y + r.box.h)
+  }
+  const ax = apply(solved.global, c.axis ?? 100, 0)[0]
+  if (!Number.isFinite(x0)) { x0 = ax - 1.5 * unit; x1 = ax + 1.5 * unit }
+  const marks = g.lines.map(l => ({ at: Math.round(((apply(solved.global, c.axis ?? 100, l.y)[1] - top) / unit) * 100) / 100, name: l.name || 'Line', y: apply(solved.global, c.axis ?? 100, l.y)[1] }))
+  const bottom = Math.max(low, ...marks.map(m => m.y), top + unit)
+  const heads = (bottom - top) / unit
+  const count = Math.min(HEAD_LINES_MAX, Math.ceil(heads - 1e-6))
+  return { unit, top, x0: x0 - unit / 2, x1: x1 + unit / 2, lines: Array.from({ length: count + 1 }, (_, n) => ({ n, y: top + n * unit })), marks, bottom, heads: Math.round(heads * 100) / 100 }
 }

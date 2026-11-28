@@ -855,6 +855,9 @@ export interface ModelContent { name: string; description: string; shapes: Model
 export interface BodyTemplateInfo { id: string; name: string; note: string; heads: number; thumb: string }
 export interface BodyTemplate extends BodyTemplateInfo { content: ModelContent }
 export interface BodyTemplateList { templates: BodyTemplateInfo[] }
+// A part the Body part menu adds (slice 9a): a head, a torso, an arm ... as shapes with their own points, at the size of a head of 56 units with the crown at 10.
+export interface BodyPart { id: string; name: string; hint: string; shapes: ModelShape[] }
+export interface BodyPartList { parts: BodyPart[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

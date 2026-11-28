@@ -88,6 +88,20 @@
 .cmNewModelBody { display: flex; align-items: flex-start; gap: var(--space-3); }
 .cmNewModelPic { flex: 0 0 auto; width: 56px; height: 132px; object-fit: contain; }
 .cmNewModelFoot { display: flex; justify-content: flex-end; gap: var(--space-2); }
+// the Body part menu (slice 9a)
+.cmPartMenu { width: 232px; }
+.cmPartList { display: flex; flex-direction: column; }
+.cmPartItem {
+  display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--text-ui); text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+}
+.cmPartHint { margin-left: auto; font-size: var(--text-small); color: var(--ink-muted); }
+// the proportion guide (slice 9a), in the Overview
+.cmGuide { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+.cmGuideLines { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.cmGuideLine { display: flex; align-items: center; gap: var(--space-2); }
+.cmGuideName { flex: 1 1 auto; min-width: 0; box-sizing: border-box; padding: var(--space-1) var(--space-2); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); outline: none; &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); } }
 .cmPointForm { width: 232px; }
 .cmPointFormRow { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .cmShapeFormPivot { display: flex; flex-direction: column; gap: var(--space-1); }

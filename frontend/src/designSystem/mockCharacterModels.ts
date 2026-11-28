@@ -1,4 +1,4 @@
-import type { BodyTemplate, ModelContent, ModelEntry, PublishedModel } from '../api/types'
+import type { BodyPart, BodyTemplate, ModelContent, ModelEntry, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, objectById, publishFaults, renameObject, updateShape } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addGrip, addHand, addHandPoses, apartHand, mirrorGrip, renameGrip, setPresetGrip } from '../assets/Interfaces/admin/characters/engine/hands'
@@ -55,6 +55,11 @@ function mockBody(id: string, name: string, width: number): BodyTemplate {
   return { id, name, note: `A stand-in ${name.toLowerCase()}.`, heads: 7.5, thumb: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 440"><rect x="70" y="70" width="60" height="100" fill="#999"/></svg>', content: normalizeContent(c) }
 }
 export const MOCK_BODIES: BodyTemplate[] = [mockBody('man', 'Average man', 64), mockBody('woman', 'Average woman', 56)]
+// Two stand-in body parts: a hand of two shapes and a lock of hair, at the size of a head of 56 units with the crown at 10.
+export const MOCK_PARTS: BodyPart[] = [
+  { id: 'hand', name: 'Hand', hint: 'palm, 5 fingers', shapes: [{ ...newShape('palm', 'Palm (left)', 'rectangle', { x: 170, y: 230, w: 14, h: 20 }), outline: 1.2 }, { ...newShape('finger', 'Index finger (left)', 'rectangle', { x: 176, y: 250, w: 4, h: 14 }), outline: 0.6 }] },
+  { id: 'hair', name: 'Lock of hair', hint: '', shapes: [{ ...newShape('lock', 'Lock of hair', 'ellipse', { x: 104, y: 12, w: 16, h: 30 }), outline: 0.6, slot: 'k_hair' }] },
+]
 
 export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean } = {}) {
   // `basicUpdate`: a newer basic model waits (phase O4a), as when the admin had changed the basic model before an update of the app
@@ -76,6 +81,7 @@ export function createMockModels(initial: ModelEntry[], opts: { writer?: boolean
       return ok(catalog())
     }
     // the bodies a new model can start from (slice 9a): two small stand-ins, each a group with one shape and a proportion guide
+    if (parts[0] === 'body-parts' && parts.length === 1 && method === 'GET') return ok({ parts: structuredClone(MOCK_PARTS) })
     if (parts[0] === 'body-templates' && method === 'GET') {
       if (parts.length === 1) return ok({ templates: MOCK_BODIES.map(({ content: _c, ...info }) => info) })
       const t = MOCK_BODIES.find(b => b.id === parts[1])

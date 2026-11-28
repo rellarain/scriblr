@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import type { ModelContent, ModelEntry, ModelLayer, ModelPoint, ModelShape } from '../../../../api/types'
+import type { BodyPart, ModelContent, ModelEntry, ModelLayer, ModelPoint, ModelShape } from '../../../../api/types'
 import {
-  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, PathIcon, PlusIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
+  BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, MannequinIcon, PathIcon, PlusIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -15,7 +15,9 @@ import { CheckPanel } from './CheckPanel'
 import { useDesignerPolicy } from './designerPolicy'
 import { DesignerCanvas, type FrameCanvas, type GripMark, type LineGrab, type LineHandles, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
 import { ConsoleBar, PANEL_REST, ToolbarPanel, ViewBar, type PanelState } from './DesignerShell'
-import { DEFAULT_LAYERS, SHAPE_LAYERS, drawOrder, normalizeLayers, type LayerState } from './layerStack'
+import { DEFAULT_LAYERS, SHAPE_LAYERS, drawOrder, normalizeLayers, toggleLayer, type LayerState } from './layerStack'
+import type { GuideActions } from './GuideSection'
+import { BodyPartMenu, addBodyPart } from './BodyPartMenu'
 import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
@@ -195,6 +197,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // previews and checks drawer is open or not.
   const [layersRaw, setLayersRaw] = useStoredState<LayerState>('scriblr.designer.layers', DEFAULT_LAYERS)
   const layerState = useMemo(() => normalizeLayers(layersRaw), [layersRaw])
+  // whether shapes snap to the proportion guide while it is shown (slice 9a), kept on this computer
+  const [guideSnap, setGuideSnap] = useStoredState<boolean>('scriblr.designer.guideSnap', true)
   const [panelsRaw, setPanelsRaw] = useStoredState<{ left: PanelState; right: PanelState }>('scriblr.designer.panels', PANELS_START)
   const panels = {
     left: { ...PANELS_START.left, ...panelsRaw.left, w: Math.min(PANEL_LIMITS.left.max, Math.max(PANEL_LIMITS.left.min, Number(panelsRaw.left?.w) || PANELS_START.left.w)) },
@@ -259,6 +263,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [symChoose, setSymChoose] = useState<{ id: string; a: number; n: number } | null>(null)
   // the shape editor's new-shape form (shape types T1): where it was opened (in the stage, and in canvas space) and the object it adds to, and what it made last
   const [shapeForm, setShapeForm] = useState<{ left: number; top: number; x: number; y: number; objectId: string | null } | null>(null)
+  // the Body part menu (slice 9a), while it is open
+  const [partMenu, setPartMenu] = useState(false)
   const [formChoice, setFormChoice] = useState<ShapeChoice>(FIRST_CHOICE)
   const worldRef = useRef<((clientX: number, clientY: number) => [number, number]) | null>(null)
   const closeShapeForm = useCallback(() => setShapeForm(null), [])
@@ -1505,6 +1511,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const [x, y] = toWorld(clientX, clientY)
     setShapeForm({ left: clientX - r.left, top: clientY - r.top, x, y, objectId })
   }
+  // a body part from the menu: added as a group of its own on the proportion guide, and selected
+  function pickBodyPart(part: BodyPart) {
+    setPartMenu(false)
+    const r = addBodyPart(content, part, makeId)
+    if ('refused' in r) { setNote(r.refused); return }
+    if (commit(r.content)) setSel({ kind: 'group', id: r.groupId })
+  }
+
   function openShapeFormInView(objectId: string | null = null) {
     const r = stageRef.current?.getBoundingClientRect()
     if (!r) return
@@ -1804,6 +1818,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
   } : null
   // per-edge outlines (slice 9a): kept on the stored points the edges are drawn from (a twin's on its original, from the back on the back's own outline)
+  // the proportion guide (slice 9a): shown as the head-units layer, and set on the model
+  const guideActions: GuideActions | undefined = shapesOnly ? {
+    shown: !layerState.hidden.includes('heads'),
+    snap: guideSnap !== false,
+    onShow: on => { if (on === layerState.hidden.includes('heads')) setLayersRaw(toggleLayer(layerState, 'heads')) },
+    onSnap: on => setGuideSnap(on),
+    onGuide: next => commit({ ...content, guide: next }),
+  } : undefined
   const edgeActions: EdgeActions | undefined = shapesOnly ? {
     part,
     home: sh => edgeHome(content.shapes, sh, side === 'back'),
@@ -1995,7 +2017,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       <fieldset className="cmFieldset dzFieldset" disabled={busy}>
         <div className="dzStage" ref={stageRef}>
           <DesignerCanvas
-            content={canvasContent} solved={canvasSolved} sel={sel} part={part} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
+            content={canvasContent} solved={canvasSolved} sel={sel} part={part} selPoint={selPoint} mirror={mirror && !shapesOnly} snap={snap} snapGuide={guideSnap !== false} layers={shapesOnly ? drawOrder(layerState).filter(id => SHAPE_LAYERS.includes(id)) : drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={side} viewNonce={viewNonce} insets={insets}
             onViewMoved={() => setViewMoved(true)} axis={content.axis}
             editable={editable || (!!recording && !!selShape)} pivot={shapesOnly ? null : pivot} anchor={shapesOnly ? null : anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={shapesOnly ? shapePose : poseCanvas} grips={gripMarks} colouring={colouring}
             frames={frameCanvas} through={throughFrame} weights={weights} skin={skin} taper={taperCanvas} lock={lock} onNote={setNote}
@@ -2090,6 +2112,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onClose={closePointForm}
             />
           )}
+          {partMenu && <BodyPartMenu at={{ left: 16, top: 16 }} onPick={pickBodyPart} onClose={() => setPartMenu(false)} />}
           {shapeForm && (
             <ShapeForm
               at={{ left: shapeForm.left, top: shapeForm.top }} choice={formChoice} onChoice={setFormChoice} onCreate={createFromForm}
@@ -2160,7 +2183,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className={`cmIconBtn${gridSnap ? ' cmIconBtn--on' : ''}`} aria-label="Snap to grid" title="Snap to grid: a shape moved whole, a pivot and a frame land on the grid lines" aria-pressed={gridSnap} onClick={() => setGridSnap(s => !s)}><GridSnapIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               {shapesOnly
-                ? <button type="button" className="cmIconBtn" aria-label="New shape" title="New shape" aria-haspopup="dialog" aria-expanded={!!shapeForm} onClick={() => openShapeFormInView()}><PlusIcon size={14} /></button>
+                ? <>
+                  <button type="button" className="cmIconBtn" aria-label="New shape" title="New shape" aria-haspopup="dialog" aria-expanded={!!shapeForm} onClick={() => openShapeFormInView()}><PlusIcon size={14} /></button>
+                  <button type="button" className="cmIconBtn" aria-label="Body part" title="Body part: add a head, a torso, an arm, a hand, a leg, a foot, an eye, an ear, a nose, a mouth or a lock of hair, made to the proportion guide" aria-haspopup="dialog" aria-expanded={partMenu} onClick={() => setPartMenu(m => !m)}><MannequinIcon size={14} /></button>
+                </>
                 : <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />}
               {!shapesOnly && (weighing || content.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) && (
                 <span className="cmFallSide" role="group" aria-label="The side things fall to">
@@ -2209,7 +2235,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

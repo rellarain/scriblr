@@ -3649,6 +3649,19 @@ class BodyTemplateList(BaseModel):
     templates: list[BodyTemplateInfo] = Field(default_factory=list)
 
 
+class BodyPart(BaseModel):
+    """A part of a body the Body part menu adds (slice 9a): a head, a torso, an arm ... as shapes with their own points, placed on the model's proportion guide."""
+
+    id: str
+    name: str
+    hint: str = ""
+    shapes: list[ModelShape] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
+
+
+class BodyPartList(BaseModel):
+    parts: list[BodyPart] = Field(default_factory=list)
+
+
 class ModelCatalog(BaseModel):
     schemaVersion: int = CHARACTER_MODELS_SCHEMA_VERSION
     models: list[ModelEntry] = Field(default_factory=list, max_length=MODEL_MAX_MODELS)

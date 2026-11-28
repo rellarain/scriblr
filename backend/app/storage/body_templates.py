@@ -6,7 +6,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from .schema import BodyTemplate, BodyTemplateInfo, BodyTemplateList, ModelContent, ModelGuide
+from .schema import BodyPart, BodyPartList, BodyTemplate, BodyTemplateInfo, BodyTemplateList, ModelContent, ModelGuide
 
 
 class UnknownBodyTemplateError(KeyError):
@@ -20,13 +20,19 @@ def _path() -> Path:
 
 
 @lru_cache(maxsize=1)
-def _templates() -> tuple[BodyTemplate, ...]:
+def _raw() -> dict:
     try:
         raw = json.loads(_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return ()
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+@lru_cache(maxsize=1)
+def _templates() -> tuple[BodyTemplate, ...]:
+    raw = _raw()
     out: list[BodyTemplate] = []
-    for t in raw.get("templates", []) if isinstance(raw, dict) else []:
+    for t in raw.get("templates", []):
         try:
             content = ModelContent.model_validate(t["content"])
             guide = ModelGuide.model_validate(t["guide"]) if t.get("guide") is not None else None
@@ -48,3 +54,19 @@ def get_template(template_id: str) -> BodyTemplate:
         if t.id == template_id:
             return t
     raise UnknownBodyTemplateError(template_id)
+
+
+@lru_cache(maxsize=1)
+def _parts() -> tuple[BodyPart, ...]:
+    out: list[BodyPart] = []
+    for part in _raw().get("parts", []):
+        try:
+            out.append(BodyPart.model_validate(part))
+        except ValueError:
+            continue
+    return tuple(out)
+
+
+def list_parts() -> BodyPartList:
+    """The parts the Body part menu adds (a head, a torso, an arm ...), each as its shapes."""
+    return BodyPartList(parts=list(_parts()))

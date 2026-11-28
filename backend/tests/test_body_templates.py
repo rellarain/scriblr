@@ -66,3 +66,16 @@ def test_the_guide_survives_a_save(client):
     assert put.status_code == 200, put.text
     saved = put.json()["models"][0]["draft"]
     assert saved["guide"]["lines"][0] == {"name": "Chin", "y": 66.0}
+
+
+def test_the_body_parts_are_listed_each_with_shapes_of_its_own(client):
+    res = client.get("/api/character-models/body-parts")
+    assert res.status_code == 200
+    parts = res.json()["parts"]
+    assert [p["name"] for p in parts] == ["Head", "Torso", "Arm", "Hand", "Leg", "Foot", "Eye", "Ear", "Nose", "Mouth", "Lock of hair"]
+    for part in parts:
+        assert part["shapes"], part["name"]
+        # every shape has points of its own (a twin of the template is given its original's, mirrored)
+        assert all(len(s["pts"]) >= 3 and not s.get("mirrorOf") for s in part["shapes"]), part["name"]
+    hand = next(p for p in parts if p["id"] == "hand")
+    assert len(hand["shapes"]) == 16 and hand["hint"] == "palm, 5 fingers"

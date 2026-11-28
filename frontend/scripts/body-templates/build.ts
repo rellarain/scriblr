@@ -8,7 +8,8 @@ import { writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ModelContent, ModelGroup, ModelPoint, ModelShape, ModelView } from '../../src/api/types'
-import { build, inPolygon, flatten, type BuiltPoint } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
+import { build, inPolygon, flatten, reflectList, type BuiltPoint } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
+import { edgeFlags, reverseFlags, tagEdges } from '../../src/assets/Interfaces/admin/characters/engine/edges'
 import { LIMITS, copyBytes } from '../../src/assets/Interfaces/admin/characters/engine/limits'
 import { NO_COLOURING } from '../../src/assets/Interfaces/admin/characters/engine/colour'
 import { OUTLINE_INK, drawable, paintShapes } from '../../src/assets/Interfaces/admin/characters/engine/paint'
@@ -388,5 +389,46 @@ const templates = raw.bodies.map(body => {
   const guide = guideOf(raw, body)
   return { id: body.id, name: body.name, note: body.note, heads: body.heads, thumb: thumbOf(content), guide, content: { ...content, guide } }
 })
-writeFileSync(outFile, JSON.stringify({ version: 1, templates }))
+// ---- the body parts (the Body part menu): parts of the average body, each a list of shapes with their own points (a twin's are its original's, mirrored) ----
+
+interface BodyPart { id: string; name: string; hint: string; shapes: ModelShape[] }
+const PARTS: Array<[id: string, name: string, hint: string, objects: string[], leftOnly?: boolean]> = [
+  ['head', 'Head', '1 head', ['o_head']],
+  ['torso', 'Torso', 'chin to hips', ['o_neck', 'o_torso', 'o_pelvis']],
+  ['arm', 'Arm', '3 parts', ['o_upperarmL', 'o_forearmL', 'o_handL']],
+  ['hand', 'Hand', 'palm, 5 fingers', ['o_handL']],
+  ['leg', 'Leg', '3 parts', ['o_thighL', 'o_shinL', 'o_footL']],
+  ['foot', 'Foot', 'with its toes', ['o_footL']],
+  ['eye', 'Eye', 'lids, iris', ['o_eyes', 'o_brows'], true],
+  ['ear', 'Ear', '', ['o_ears'], true],
+  ['nose', 'Nose', '', ['o_nose']],
+  ['mouth', 'Mouth', 'lips', ['o_mouth']],
+]
+function partsOf(c: ModelContent): BodyPart[] {
+  const byId = new Map(c.shapes.map(s => [s.id, s]))
+  const own = (s: ModelShape): ModelShape => {
+    const orig = s.mirrorOf ? byId.get(s.mirrorOf) : undefined
+    if (!orig) return { ...s, mirrorOf: null }
+    // a twin's own points: its original's mirrored about the middle, its edges' outlines the other way round
+    const flags = reverseFlags(edgeFlags(orig.pts))
+    const pts = reflectList(orig.pts.map(p => { const { line: _l, ...rest } = p; return rest }), c.axis ?? 100)
+    return { ...orig, id: s.id, name: s.name, mirrorOf: null, pts: flags ? tagEdges(pts, flags) : pts }
+  }
+  const parts: BodyPart[] = PARTS.map(([id, name, hint, objects, leftOnly]) => {
+    const ids = objects.flatMap(oid => c.objects.find(o => o.id === oid)?.shapes ?? [])
+    const shapes = ids.map(sid => byId.get(sid)!).filter(s => !leftOnly || (!s.mirrorOf && / \(left\)$/.test(s.name))).map(own)
+    return { id, name, hint, shapes }
+  })
+  // a lock of hair: a tuft that tapers to a point and curls, from the hairline over the temple, in the hair's colour
+  const lock: Array<[number, number]> = [[101, 14], [112, 12.5], [120.5, 17], [123, 26], [121.5, 36], [118, 44], [119.5, 37], [118.5, 29], [114.5, 22.5], [107.5, 19.5]]
+  parts.push({ id: 'hair', name: 'Lock of hair', hint: '', shapes: [{
+    id: 'lock', name: 'Lock of hair', closed: true, z: 97, op: 1, view: 'both', half: 0, template: null, outline: 0.6, slot: 'k_hair', gray: null,
+    pts: lock.map(([x, y], i) => ({ x, y, m: i === 6 ? 's' as const : 'c' as const, hi: null, ho: null })),
+  }] })
+  return parts
+}
+const parts = partsOf(templates.find(t => t.id === 'man')!.content as ModelContent)
+console.log(`body parts: ${parts.map(p => `${p.name} (${p.shapes.length})`).join(', ')}`)
+
+writeFileSync(outFile, JSON.stringify({ version: 1, templates, parts }))
 console.log(`wrote ${outFile}`)

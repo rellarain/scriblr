@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from ..deps import get_app_data_storage_root
 from ..storage import body_templates
 from ..storage import character_models_store as store
-from ..storage.schema import BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits
+from ..storage.schema import BodyPartList, BodyTemplate, BodyTemplateList, ModelCatalog, ModelDraftList, PublishedModelList, WriterModelLimits
 
 
 def _library_router(prefix: str, tag: str, library: str, who: str) -> APIRouter:
@@ -99,6 +99,12 @@ def update_basic_model(root: Path = Depends(get_app_data_storage_root)) -> Model
 def list_body_templates() -> BodyTemplateList:
     """The bodies a new model can start from (WUI slice 9a), without their content."""
     return body_templates.list_templates()
+
+
+@router.get("/body-parts", response_model=BodyPartList)
+def list_body_parts() -> BodyPartList:
+    """The parts the Body part menu adds to a model (slice 9a): a head, a torso, an arm ..., each as its shapes."""
+    return body_templates.list_parts()
 
 
 @router.get("/body-templates/{template_id}", response_model=BodyTemplate)

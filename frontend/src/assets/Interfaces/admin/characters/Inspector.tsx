@@ -3,6 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
+import { GuideSection, type GuideActions } from './GuideSection'
 import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
@@ -85,6 +86,8 @@ export interface InspectorProps {
   connections?: ConnectionActions
   // per-edge outlines (slice 9a), in the Look section
   edges?: EdgeActions
+  // the proportion guide (slice 9a), in the shape editor's Overview
+  guide?: GuideActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -149,6 +152,7 @@ function ShapeTab(p: InspectorProps) {
           <dt>Objects</dt><dd>{content.objects.length}</dd>
           <dt>Shapes</dt><dd>{content.shapes.length}</dd>
         </dl>
+        {p.guide && <GuideSection content={content} actions={p.guide} />}
       </div>
     )
   }
