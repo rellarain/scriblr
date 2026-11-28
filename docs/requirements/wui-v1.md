@@ -50,6 +50,7 @@ Slice 9 is a rebuild of the character designer (the admin's Designer, and the wr
 
 - **Who designs**: admins and writers. A writer works only on **copies of published models** (My models, from Edit this model; never a blank model), and may change everything in a copy (shapes, rig, sliders, forms, colours, clothes) within the limits the admin sets in Configuration › Writers' designer.
 - **Starting**: a new model starts from a **body**: a body template on a **proportion guide** (so many heads tall, with lines at the chin, chest, waist and knees) that templates and shapes snap to.
+- **Outlines per edge** (the user, 2026-11-27: "I want to be able to select what edges of shapes have an outline"): each edge of a shape has the outline or not, so the parts of a body that overlap are outlined along the figure's silhouette only. A body template starts that way.
 - **Drawing**: **body-part templates** to place and reshape (a head, a torso, an arm, a hand, an eye, a lock of hair); **smoother curves** (smooth a point or a whole outline, simplify one with too many points); **trace a picture** (a reference image under the canvas, faded and locked); **merge, cut out and split** shapes.
 - **Joins**: parts that touch are drawn as **one outline** round the figure, so overlaps show no line, and **joint caps** cover the seam where a limb turns a long way.
 - **Proportions**: the guide while drawing, then **sliders** afterwards to vary the figure.

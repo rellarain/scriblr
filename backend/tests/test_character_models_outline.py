@@ -30,3 +30,31 @@ def test_the_outline_survives_a_round_trip_through_a_model():
     content = ModelContent.model_validate({"name": "Demo", "shapes": [_shape(outline=2.5).model_dump()]})
     again = ModelContent.model_validate(content.model_dump())
     assert again.shapes[0].outline == 2.5
+
+
+# ---- per-edge outlines (slice 9a): `line` False on a point leaves the edge from it to the next point without the outline ----
+
+
+def _edges(*lines):
+    pts = [{"x": 0, "y": 0, "m": "s"}, {"x": 10, "y": 0, "m": "s"}, {"x": 10, "y": 10, "m": "s"}]
+    for p, line in zip(pts, lines):
+        p["line"] = line
+    return ModelShape.model_validate({"id": "s1", "pts": pts, "outline": 1})
+
+
+def test_an_edge_without_the_outline_is_kept_and_anything_else_is_an_outlined_edge():
+    shape = _edges(False, True, "no")
+    assert [p.line for p in shape.pts] == [False, None, None]
+
+
+def test_only_edges_without_the_outline_are_written():
+    dumped = _edges(False, None, None).model_dump(mode="json")
+    assert dumped["pts"][0]["line"] is False
+    # an outlined edge's point is written as before per-edge outlines, so a model's content (and its key) is unchanged
+    assert "line" not in dumped["pts"][1] and "line" not in dumped["pts"][2]
+
+
+def test_the_edges_survive_a_round_trip_through_a_model():
+    content = ModelContent.model_validate({"name": "Demo", "shapes": [_edges(None, False, None).model_dump()]})
+    again = ModelContent.model_validate(content.model_dump(mode="json"))
+    assert [p.line for p in again.shapes[0].pts] == [None, False, None]

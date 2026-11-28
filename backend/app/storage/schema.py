@@ -5,7 +5,7 @@ import colorsys
 import math
 import re
 
-from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, SerializerFunctionWrapHandler, ValidationError, field_validator, model_serializer, model_validator
 
 SCHEMA_VERSION = 2
 # The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
@@ -1520,7 +1520,8 @@ class ModelBind(BaseModel):
 
 class ModelPoint(BaseModel):
     """One point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. `hi` and `ho` are the in and out handles as offsets
-    (None = automatic); `w` is how free the point is for hanging chains (later phases); `bind` links it to another shape."""
+    (None = automatic); `w` is how free the point is for hanging chains (later phases); `bind` links it to another shape; `line` False: the edge from this point to the
+    next has no outline (None: it has one, when the shape has an outline)."""
 
     x: float = 0.0
     y: float = 0.0
@@ -1529,6 +1530,7 @@ class ModelPoint(BaseModel):
     ho: Optional[list[float]] = None
     w: Optional[float] = None
     bind: Optional[ModelBind] = None
+    line: Optional[bool] = None
 
     @field_validator("bind", mode="before")
     @classmethod
@@ -1566,6 +1568,20 @@ class ModelPoint(BaseModel):
     @classmethod
     def _weight(cls, value: Any) -> Optional[float]:
         return None if value is None else _finite(value, 0.0, 0.0, 1.0)
+
+    @field_validator("line", mode="before")
+    @classmethod
+    def _line(cls, value: Any) -> Optional[bool]:
+        return False if value is False else None
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """A point whose edge has its outline is written as before the per-edge outline existed (no `line`), so the file stays small and a model's content key
+        does not change."""
+        data = handler(self)
+        if data.get("line") is None:
+            data.pop("line", None)
+        return data
 
 
 class ModelTint(BaseModel):

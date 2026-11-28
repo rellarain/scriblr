@@ -113,7 +113,9 @@ export function roundCorners(list: ModelPoint[], closed: boolean, r: number): Mo
     if (!(d >= 0.2)) { out.push(p); continue }
     const ax = p.x + ((a.x - p.x) / la) * d, ay = p.y + ((a.y - p.y) / la) * d, bx = p.x + ((b.x - p.x) / lb) * d, by = p.y + ((b.y - p.y) / lb) * d
     const w = p.w != null ? { w: p.w } : {}
-    out.push({ x: ax, y: ay, m: 'sc', hi: null, ho: [(p.x - ax) * CORNER_K, (p.y - ay) * CORNER_K], ...w }, { x: bx, y: by, m: 'cs', hi: [(p.x - bx) * CORNER_K, (p.y - by) * CORNER_K], ho: null, ...w })
+    // per-edge outlines: the corner's curve goes with the edge that comes into it, the rest of the edge after it keeps the point's own flag
+    const inLine = a.line === false ? { line: false as const } : {}, outLine = p.line === false ? { line: false as const } : {}
+    out.push({ x: ax, y: ay, m: 'sc', hi: null, ho: [(p.x - ax) * CORNER_K, (p.y - ay) * CORNER_K], ...w, ...inLine }, { x: bx, y: by, m: 'cs', hi: [(p.x - bx) * CORNER_K, (p.y - by) * CORNER_K], ho: null, ...w, ...outLine })
     rounded = true
   }
   return rounded ? out : list

@@ -3,7 +3,7 @@ import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } 
 import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
-import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
+import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
@@ -83,6 +83,8 @@ export interface InspectorProps {
   // The shape editor's Arrange section (S4) and Connections section (S5): what they need from the page.
   arrange?: ArrangeActions
   connections?: ConnectionActions
+  // per-edge outlines (slice 9a), in the Look section
+  edges?: EdgeActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -217,7 +219,7 @@ function ShapeTab(p: InspectorProps) {
           {shape.cloneOf && p.clones && <CloneSection content={content} kind="shape" thing={shape} actions={p.clones} />}
           {p.mirrors && !shape.pivot && !shape.cloneOf && <MirrorSection content={content} kind="shape" thing={shape} actions={p.mirrors} clones={shape.mirrorOf ? undefined : p.clones} />}
           {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
-          <LookSection shape={shape} onEditShape={p.onEditShape} />
+          <LookSection shape={shape} onEditShape={p.onEditShape} selPoint={selPoint} edges={p.edges} />
           {!shape.mirrorOf && !shape.cloneOf && <MarksSection shape={shape} onEditShape={p.onEditShape} />}
           {p.symmetry && !shape.cloneOf && <SymmetrySection shape={shape} actions={p.symmetry} />}
           {p.connections && !shape.cloneOf && <ConnectionsSection content={content} shape={shape} selPoint={selPoint} actions={p.connections} />}

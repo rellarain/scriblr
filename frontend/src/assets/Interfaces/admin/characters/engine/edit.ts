@@ -132,11 +132,13 @@ function edgeMiddle(list: ModelPoint[], i: number): [number, number] {
 export function addPoint(shape: ModelShape, i: number, o: EditOptions = {}): { shape: ModelShape; index: number } {
   const s = copyShape(shape), max = o.max ?? LIMITS.pointsMax, n = s.pts.length, ax = axisOf(o)
   if (n >= max || !s.pts[i]) return { shape: s, index: -1 }
-  const mid = edgeMiddle(s.pts, i), np: ModelPoint = { x: r2(mid[0]), y: r2(mid[1]), m: 'c', hi: null, ho: null }
+  // the new point's edge is the second half of the edge it splits, so it keeps that edge's outline (per-edge outlines)
+  const unlined = (k: number) => (s.pts[k]?.line === false ? { line: false as const } : {})
+  const mid = edgeMiddle(s.pts, i), np: ModelPoint = { x: r2(mid[0]), y: r2(mid[1]), m: 'c', hi: null, ho: null, ...unlined(i) }
   const ti = o.mirror ? twinIndex(s.pts, i, ax) : i, tj = o.mirror ? twinIndex(s.pts, (i + 1) % n, ax) : (i + 1) % n
   if (o.mirror && ti !== i && tj !== (i + 1) % n && ti !== tj && n + 2 <= max) {
-    const tw: ModelPoint = { x: r2(2 * ax - np.x), y: np.y, m: 'c', hi: null, ho: null }
     const after = Math.min(ti, tj) === 0 && Math.max(ti, tj) === n - 1 ? n - 1 : Math.min(ti, tj)
+    const tw: ModelPoint = { x: r2(2 * ax - np.x), y: np.y, m: 'c', hi: null, ho: null, ...unlined(after) }
     if (after > i) { s.pts.splice(after + 1, 0, tw); s.pts.splice(i + 1, 0, np); return { shape: s, index: i + 1 } }
     s.pts.splice(i + 1, 0, np); s.pts.splice(after + 1, 0, tw)
     return { shape: s, index: i + 1 }
@@ -163,7 +165,9 @@ export function joinSegment(shape: ModelShape, e: number, min = 3): ModelShape |
   const mid = bezierAt(build(shape.pts, shape.closed), e, 0.5)
   const inHas = hasIn(a.m), outHas = hasOut(b.m)
   const m: ModelPointMode = inHas && outHas ? 'c' : inHas ? 'cs' : outHas ? 'sc' : 's'
-  const joined: ModelPoint = { ...a, x: r2(mid.x), y: r2(mid.y), m, hi: a.hi ?? null, ho: b.ho ?? null }
+  // it goes out along the next point's edge, with that edge's outline
+  const { line: _line, ...rest } = a
+  const joined: ModelPoint = { ...rest, x: r2(mid.x), y: r2(mid.y), m, hi: a.hi ?? null, ho: b.ho ?? null, ...(b.line === false ? { line: false as const } : {}) }
   return { ...shape, pts: shape.pts.map((p, k) => (k === e ? joined : p)).filter((_, k) => k !== j) }
 }
 

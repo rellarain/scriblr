@@ -28,6 +28,8 @@ export interface PaintItem {
   // its outline (shape editor S3): the width in canvas units (the model's width scaled as the shape is) and how much of it shows (a shape faded by a slider fades its
   // outline too; the shape's own opacity fades only the fill). Absent or null: no outline.
   line?: { w: number; alpha: number } | null
+  // per-edge outlines (slice 9a): the path the outline runs along when some edges have none ('' when no edge has one); absent, it runs along `d`
+  lineD?: string
   // what the object it belongs to is worn under (phase 6b): the outlines of the garments over it that are shown, which it is trimmed to; `key` is the object, so its shapes share one
   // clip. Null when the object is worn under nothing or none of it is shown.
   wear: { key: string; ds: string[] } | null
@@ -118,6 +120,7 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
       id, d: r.d, fill: layer.fill, opacity: layer.opacity * (r.fade ?? 1), gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading, wear: anyWear && !layer.helper ? wearOf(id) : null,
       blank: (!!layer.clip && !clipD) || ((layer.shading || !!layer.cast) && compDs.length === 0), cast: layer.cast,
       line: layer.line ? { w: Math.round(layer.line * scaleOf(r.matrix) * 1000) / 1000, alpha: r.fade ?? 1 } : null,
+      ...(layer.line && r.lineD !== undefined ? { lineD: r.lineD } : {}),
     })
   }
   return items

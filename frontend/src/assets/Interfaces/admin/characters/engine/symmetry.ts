@@ -45,7 +45,11 @@ function movePt(p: ModelPoint, m: Mat): ModelPoint {
 }
 
 // A run of points the other way round: each point's handles and its curve modes swap ends.
-const reversed = (run: ModelPoint[]): ModelPoint[] => [...run].reverse().map(p => ({ ...p, m: SWAP[p.m], hi: p.ho ?? null, ho: p.hi ?? null }))
+// Per-edge outlines: point k of the reversed run starts the edge the original's point n-2-k started (its last point keeps its own: the edge to the next copy).
+const reversed = (run: ModelPoint[]): ModelPoint[] => [...run].reverse().map((p, k, all) => {
+  const { line: _line, ...rest } = p, from = k < all.length - 1 ? run[all.length - 2 - k] : p
+  return { ...rest, m: SWAP[p.m], hi: p.ho ?? null, ho: p.hi ?? null, ...(from.line === false ? { line: false as const } : {}) }
+})
 
 const roundPt = (p: ModelPoint): ModelPoint => ({
   ...p, x: r2(p.x), y: r2(p.y), hi: p.hi ? [r2(p.hi[0]), r2(p.hi[1])] : null, ho: p.ho ? [r2(p.ho[0]), r2(p.ho[1])] : null,

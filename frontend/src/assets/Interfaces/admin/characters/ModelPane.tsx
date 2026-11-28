@@ -85,7 +85,8 @@ import { cloneEdit, clonePlace, detachClone, makeClone, reconcileClones, setClon
 import { cloneTurn } from './engine/cloneAt'
 import type { CloneActions, MirrorActions } from './ShapePanels'
 import { addZone, ensureZones, moveGroupTo, moveObjectTo, moveShapeTo, moveZone, needsZones, newGroupIn, removeZone, renameZone, topZone, zoneById, zonesOf } from './engine/zones'
-import type { ArrangeActions, CentreActions, ConnectionActions, JointActions, SymmetryActions } from './ShapePanels'
+import type { ArrangeActions, CentreActions, ConnectionActions, EdgeActions, JointActions, SymmetryActions } from './ShapePanels'
+import { edgeHome, setHomeEdge } from './engine/edges'
 import { jointAt, migrateJoints, needsJoints, poseOf, setJointSetting, toggleJoint } from './engine/pivots'
 import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, centreAnchorOf, guardAnchors, marksOf, posableOn, toggleAnchor, toggleCentreAnchor, togglePosable } from './engine/anchors'
 import { isSlider, makeSlider, nearestPlace, placeAt, setStop, stopSlider } from './engine/sliders'
@@ -1802,6 +1803,17 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (commit(kept.content, true)) { setSymChoose(null); selectPoint(0) }
     },
   } : null
+  // per-edge outlines (slice 9a): kept on the stored points the edges are drawn from (a twin's on its original, from the back on the back's own outline)
+  const edgeActions: EdgeActions | undefined = shapesOnly ? {
+    part,
+    home: sh => edgeHome(content.shapes, sh, side === 'back'),
+    onEdge: (sh, e, on) => {
+      const home = edgeHome(content.shapes, sh, side === 'back')
+      if (!home) return
+      const list = setHomeEdge(home, e, on)
+      commit(updateShape(content, home.shapeId, s => (home.key === 'back' ? { ...s, back: list } : { ...s, pts: list })))
+    },
+  } : undefined
   const connections: ConnectionActions | undefined = shapesOnly ? {
     part,
     onName: (sid, i, field, value) => models.edit(entry.id, c => nameConnection(c, sid, i, field, value)),
@@ -2197,7 +2209,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

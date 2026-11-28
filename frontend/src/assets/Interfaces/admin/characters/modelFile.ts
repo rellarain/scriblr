@@ -72,6 +72,7 @@ function point(v: unknown): ModelPoint {
   if (typeof p.w === 'number') out.w = num(p.w, 0, 0, 1)
   const b = bind(p.bind)
   if (b) out.bind = b
+  if (p.line === false) out.line = false
   return out
 }
 

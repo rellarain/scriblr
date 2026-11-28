@@ -70,6 +70,10 @@ WUI (mockup first):
 - [x] Project > History as one timeline (activity, outline and plot snapshots, chapter revisions) with restore where allowed.
 - [ ] Rebuild the character designer and finish Characters (`wui-v1.md`, The character designer), mockup first:
   - [ ] 9a Start from a body: a body template on a proportion guide, body-part templates.
+    - [x] Outlines per edge: each edge of a shape has the outline or not (so a body's outline can run along its silhouette only).
+    - [ ] Body templates (six bodies, from the mockup) and the New model chooser.
+    - [ ] The proportion guide, drawn on the canvas and snapped to.
+    - [ ] Body-part templates: head, torso, arm, hand, eye, a lock of hair.
   - [ ] 9b Drawing: smooth and simplify outlines, trace a picture, merge, cut out and split.
   - [ ] 9c Joins: one outline round parts that touch, joint caps.
   - [ ] 9d Rig and posing: bones, smooth bends (skin weights), drag a hand or a foot to pose.
@@ -164,3 +168,4 @@ More items will be added.
 - 2026-11-27: WUI slice 7: Scratchpad conversions. A note becomes an outline node, a plotpoint, draft text or a revision flag in any project, and is kept marked with what it became or goes; draft text for a chapter open in the Draft goes into that draft as typed text.
 - 2026-11-27: WUI slice 8: History. The Project level's History tab is the project's history as one timeline by day (the writing in sittings, the outline's and the plot's snapshots, every chapter's revisions, the flags added and resolved), kept by kind, by book and by words searched for; a revision compares with the chapter now, and the outline, the plot or a chapter can be put back as it was (a chapter open in the Draft saves first and reads it again after).
 - 2026-11-27: Character designer interview. WUI slice 9 becomes a rebuild of the character designer, before Maps, in nine sub-slices with a mockup first: start from a body on a proportion guide, better drawing, one outline and joint caps, smooth bends and drag to pose, eight angles, variation, faces, the writers' designer (copies only) and a new starter model. The Designer's switched-off tools come back with it instead of in AUI v1.
+- 2026-11-27: WUI slice 9a, outlines per edge. A shape's outline can leave out any of its edges: select an edge and turn its outline off or on in Look, or set every edge or none; a twin is outlined as its original is, and points added or joined keep their edges' outline. The character designer mockup (the human form) is approved.

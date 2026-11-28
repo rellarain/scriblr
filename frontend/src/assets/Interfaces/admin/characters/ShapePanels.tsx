@@ -11,6 +11,7 @@ import { CAST_OPACITY, KIND_NAMES, actsAs, isCast, kindOf, unlinkedCount } from 
 import { SYM_AXES_MAX } from './engine/symmetry'
 import { MIN_SIDE, alignShape, flipShape, frameOf, setPlace, setSize, setTurn } from './engine/transform'
 import { Stepper } from './Stepper'
+import { edgeCount, homeEdgeLined, type EdgeHome } from './engine/edges'
 
 // The shape editor's own sections of the panel: how a shape is placed (S4), how it looks (S3), what it is connected to (S5) and its symmetry (S6). Each step is one undo step.
 
@@ -218,7 +219,15 @@ export function JointSection({ actions }: { actions: JointActions }) {
 }
 
 // The look of a shape (S3): its outline (on or off, and its width in the model's units) and its opacity, which fades the fill only. A shadow or a light has only its opacity (T1).
-export function LookSection({ shape, onEditShape }: { shape: ModelShape; onEditShape: EditShape }) {
+// Per-edge outlines (slice 9a): which part of the shape is selected, where its edges' outlines are kept (null: a clone, whose edges are its original's) and setting one edge
+// (null: every edge) on or off.
+export interface EdgeActions {
+  part: PartKind
+  home: (shape: ModelShape) => EdgeHome | null
+  onEdge: (shape: ModelShape, e: number | null, on: boolean) => void
+}
+
+export function LookSection({ shape, onEditShape, selPoint = -1, edges }: { shape: ModelShape; onEditShape: EditShape; selPoint?: number; edges?: EdgeActions }) {
   const on = typeof shape.outline === 'number', width = shape.outline ?? LIMITS.outlineNew, op = Math.round(shape.op * 100)
   const set = (patch: Partial<ModelShape>) => onEditShape(shape.id, { ...shape, ...patch })
   const stepWidth = (dir: -1 | 1, big: boolean) => set({ outline: Math.round(Math.min(LIMITS.outlineMax, Math.max(LIMITS.outlineMin, width + dir * (big ? 1 : 0.25))) * 100) / 100 })
@@ -232,7 +241,30 @@ export function LookSection({ shape, onEditShape }: { shape: ModelShape; onEditS
         <Stepper label="Outline width" value={on ? String(width) : 'None'} lowerOff={!on || width <= LIMITS.outlineMin} raiseOff={!on || width >= LIMITS.outlineMax} bigBy={1} onStep={stepWidth} />
       </div>
       )}
+      {on && !isCast(shape) && edges && <EdgeLines shape={shape} selPoint={selPoint} edges={edges} />}
       <Stepper label="Opacity of the shape" value={`${op}%`} lowerOff={op <= 0} raiseOff={op >= 100} bigBy={25} onStep={stepOpacity} />
+    </div>
+  )
+}
+
+// Which edges have the outline: the selected edge on or off, or every edge at once. A symmetric shape's copies are outlined together, so it is set as a whole.
+function EdgeLines({ shape, selPoint, edges }: { shape: ModelShape; selPoint: number; edges: EdgeActions }) {
+  const home = edges.home(shape)
+  if (!home) return <p className="cmInsText">A clone's edges are outlined as its original's are.</p>
+  const { lined, edges: total } = edgeCount(home.list, home.closed)
+  const seg = edges.part === 'segment' && !shape.sym && selPoint >= 0 && selPoint < total ? selPoint : -1
+  const segOn = seg >= 0 && homeEdgeLined(home, seg)
+  return (
+    <div className="cmEdgeLines cmInline" role="group" aria-label="Edges with the outline">
+      <p className="cmInsText">{lined === total ? 'Every edge has the outline.' : lined === 0 ? 'No edge has the outline.' : `${lined} of ${total} edges have the outline.`}</p>
+      {seg >= 0 && (
+        <button type="button" className={`cmBtn cmBtn--small${segOn ? ' cmBtn--on' : ''}`} aria-pressed={segOn} onClick={() => edges.onEdge(shape, seg, !segOn)}>Outline this edge</button>
+      )}
+      {seg < 0 && !shape.sym && <p className="cmInsText">Select an edge to outline it or not.</p>}
+      <div className="cmInline">
+        <button type="button" className="cmBtn cmBtn--small" disabled={lined === total} onClick={() => edges.onEdge(shape, null, true)}>Every edge</button>
+        <button type="button" className="cmBtn cmBtn--small" disabled={lined === 0} onClick={() => edges.onEdge(shape, null, false)}>No edges</button>
+      </div>
     </div>
   )
 }

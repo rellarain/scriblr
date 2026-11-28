@@ -709,7 +709,8 @@ export interface ModelSlide { lo: number; hi: number; at: number | null }
 export interface ModelJoint { turn: number; lo: number; hi: number }
 export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number; tan?: boolean; name?: string; segName?: string; slide?: ModelSlide | null; pivot?: ModelJoint | null }
 // A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic). bind links it to another shape.
-export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null; bind?: ModelBind | null }
+// `line: false`: the edge from this point to the next has no outline (the shape's outline is drawn along its other edges); absent: it has one.
+export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null; bind?: ModelBind | null; line?: false | null }
 // Paint effects. A tone of a colour: a shadow (darker, a little warmer and fuller), a mid tone (half a shadow) or a highlight (toward white), by an amount t (0.02..0.8).
 export type ModelTintKind = 'shadow' | 'mid' | 'highlight'
 export interface ModelTint { kind: ModelTintKind; t: number }

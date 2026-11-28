@@ -47,8 +47,9 @@ export function PaintedPath({ item, prefix, lineClass, ...rest }: { item: PaintI
       clipPath={a.clip} mask={a.mask} {...rest}
     />
   )
-  const line = item.line && !item.blank
-    ? <path d={item.d} className={lineClass} fill="none" stroke={OUTLINE_INK} strokeWidth={item.line.w} strokeOpacity={item.line.alpha} strokeLinejoin="round" pointerEvents="none" clipPath={a.clip} mask={a.mask} aria-hidden="true" data-line={item.id} />
+  const lineD = item.lineD ?? item.d
+  const line = item.line && !item.blank && lineD
+    ? <path d={lineD} className={lineClass} fill="none" stroke={OUTLINE_INK} strokeWidth={item.line.w} strokeOpacity={item.line.alpha} strokeLinejoin="round" pointerEvents="none" clipPath={a.clip} mask={a.mask} aria-hidden="true" data-line={item.id} />
     : null
   const both = line ? <>{path}{line}</> : path
   const inner = a.comp ? <g clipPath={a.comp}>{both}</g> : both
