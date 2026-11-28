@@ -19,6 +19,8 @@ export interface PoseActions {
   onApply: (id: string) => void
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
+  // why the figure cannot be dragged into a pose now (turned away from the front), or null
+  off?: string | null
 }
 
 export function PoseSection({ content, actions }: { content: ModelContent; actions: PoseActions }) {
@@ -33,8 +35,10 @@ export function PoseSection({ content, actions }: { content: ModelContent; actio
       <h3 className="cmInsSub">Pose</h3>
       {joints === 0 ? <p className="cmInsText">Nothing to pose yet: the figure needs pivot points between its parts.</p> : (
         <>
-          <div className="cmInline">{chip(actions.on, 'Drag to pose', () => actions.onToggle(!actions.on))}</div>
-          <p className="cmInsText">{actions.on
+          <div className="cmInline">
+            <button type="button" className={`cmBtn cmBtn--small${actions.on ? ' cmBtn--on' : ''}`} aria-pressed={actions.on} disabled={!!actions.off} onClick={() => actions.onToggle(!actions.on)}>Drag to pose</button>
+          </div>
+          <p className="cmInsText">{actions.off ? actions.off : actions.on
             ? 'Drag a hand or a foot and the limb reaches for the pointer; drag an elbow or a knee to swing the limb from its shoulder or hip. Each joint stays within its limits.'
             : 'Turn this on to pose the figure by dragging it, whatever is selected (with a group or an object selected, its parts can be dragged anyway).'}</p>
           <div className="cmInline" role="group" aria-label="Holds still">

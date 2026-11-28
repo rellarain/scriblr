@@ -23,7 +23,8 @@ import { mirrorGap, refit } from '../seed-model/outline'
 
 type V = [number, number]
 interface RawPart { kind: string; side: number; layer: string | null; union: boolean; outline: number | null; fill: string; rule: string; view: ModelView; pts: V[]; lines: V[][] }
-interface RawBody { id: string; name: string; note: string; heads: number; levels: Record<string, number>; joints: Record<string, V | number>; parts: RawPart[] }
+interface RawSide { kind: string; layer: string | null; pts: V[] }
+interface RawBody { id: string; name: string; note: string; heads: number; levels: Record<string, number>; joints: Record<string, V | number>; parts: RawPart[]; side: RawSide[] }
 interface Raw { unit: number; top: number; bodies: RawBody[] }
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -317,6 +318,67 @@ function skinned(c: ModelContent, bodyId: string): ModelContent {
   return w
 }
 
+// Turning (slice 9e): each part drawn at the sides, from the mockup's side view. The side view is the right profile, facing the picture's right (as the figure faces at 90°),
+// its near side's parts; a front part takes the side part of its kind (the n-th of them, for the fingers), its outline at 90° that part as it is and at 270° the same mirrored
+// (the original's side is the near side at 270°, the far side at 90°; a twin takes its original's from the other side). Each key keeps the front outline's points: they
+// are put along the side part's outline at the same share of the way round from the top, the same way round, and moved by as far as the part's middle turns there (a key is
+// drawn where the front puts the part, moved with its turned middle), so the part lands on the profile. The ¾ views blend the front and the side.
+function keyFrom(front: ModelPoint[], side: V[], mirror: boolean): ModelPoint[] {
+  const S0: V[] = mirror ? side.map(([x, y]) => [2 * AXIS - x, y]) : side
+  const F: V[] = front.map(p => [p.x, p.y])
+  const area = (q: V[]) => q.reduce((a, p, i) => { const n = q[(i + 1) % q.length]; return a + p[0] * n[1] - n[0] * p[1] }, 0)
+  const S = Math.sign(area(S0)) === Math.sign(area(F)) ? S0 : [...S0].reverse()
+  const top = (q: V[]) => q.reduce((b, p, i) => (p[1] < q[b][1] - 1e-9 ? i : b), 0)
+  // the share of the way round from the top at each point, the top first
+  const shares = (q: V[], start: number) => {
+    const n = q.length, acc = [0]
+    for (let k = 1; k <= n; k++) { const a = q[(start + k - 1) % n], b = q[(start + k) % n]; acc.push(acc[k - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])) }
+    return acc.map(v => v / (acc[n] || 1))
+  }
+  const fs = top(F), ss = top(S), fF = shares(F, fs), fS = shares(S, ss), m = S.length
+  const on = (f: number): V => {
+    let k = 0
+    while (k < m - 1 && fS[k + 1] < f) k++
+    const a = S[(ss + k) % m], b = S[(ss + k + 1) % m], t = (f - fS[k]) / ((fS[k + 1] - fS[k]) || 1)
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+  }
+  // the middle of the front outline as drawn: where the key is moved from
+  const box = flatten(build(front, true), true) as V[], xs = box.map(q => q[0]), mx = (Math.min(...xs) + Math.max(...xs)) / 2
+  return front.map((_, i) => { const [x, y] = on(fF[(i - fs + F.length) % F.length]); return { x: r2(x + mx - AXIS), y: r2(y), m: 'c' as const } })
+}
+const AXIS = 100
+// The angles a part is seen from, where its own outline would show wrongly: a buttock (drawn with its own outline for its fold) only from the back half, a side's face
+// parts and head planes from its own side round the front (the far eye is hidden in profile; a twin's range is its original's mirrored), the middle ones from the front half.
+function seenOf(kind: string, _layer: string | null, side: number, view: ModelView): [number, number] | null {
+  // a buttock keeps off the profile (its own outline would show on the hip there)
+  if (kind === 'buttock') return [110, 260]
+  // a part drawn for the front only, seen whole from its own side round the front (half faded at the side, joined planes and a breast would show through), the far
+  // one hidden at the side; a middle one from the front half
+  if (view === 'front') return side ? [260, 70] : [260, 100]
+  // one drawn for the back only, from the back round its own side
+  if (view === 'back') return side ? [110, 280] : [100, 260]
+  return null
+}
+let kindLayer = new Map<string, string | null>(), sideOf = new Map<string, number>()
+function angled(c: ModelContent, body: RawBody, kindOf: Map<string, { kind: string; nth: number }>): ModelContent {
+  const byKind = new Map<string, V[][]>()
+  for (const p of body.side) byKind.set(p.kind, [...(byKind.get(p.kind) ?? []), p.pts])
+  // the face's parts are drawn over the head's at every angle they are seen from (they are hidden from behind): turned, a part's place in the order blends from its
+  // front depth toward its back depth, and the face's back depths (under the head, from behind) would take the far eye under the head by the ¾ view
+  const isFace = (s: ModelShape) => kindLayer.get(s.mirrorOf ? (c.shapes.find(x => x.id === s.mirrorOf)?.id ?? s.id) : s.id) === FACE
+  const faceZ = c.shapes.filter(isFace).map(s => s.z), z0 = Math.min(...faceZ), z1 = Math.max(...faceZ)
+  const faceBack = (z: number) => r2(90 + ((z - z0) / ((z1 - z0) || 1)) * 9)
+  return {
+    ...c, shapes: c.shapes.map(s => (isFace(s) ? { ...s, zBack: faceBack(s.z) } : s)).map(s => {
+      const k = kindOf.get(s.id), list = k ? byKind.get(k.kind) : undefined
+      if (!k || !list || s.mirrorOf || s.pts.length < 3) return s
+      const side = list[Math.min(list.length, k.nth) - 1]
+      const angles = [{ at: 90, tilt: 0, pts: keyFrom(s.pts, side, false) }, { at: 270, tilt: 0, pts: keyFrom(s.pts, side, true) }]
+      return { ...s, turn: { depth: 0, thick: null, dz: [], seen: seenOf(k.kind, kindLayer.get(s.id) ?? null, sideOf.get(s.id) ?? 0, s.view), ...(s.turn ?? {}), angles } }
+    }),
+  }
+}
+
 // The join set a part is drawn in (slice 9c): the body's plain parts in one outline round the figure, the arms in one of their own (so an arm posed in front of the body
 // still shows its outline there; slice 9d), the head's planes in one round the head. A part with dark lines of its own inside the body (a buttock's fold) and the hands keep
 // their own outlines; from behind, the face's planes are under the neck, so the cranium keeps its line over it.
@@ -404,6 +466,8 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
   }
 
   let worstMirror = 0, points = 0
+  const kindOfShape = new Map<string, { kind: string; nth: number }>()
+  kindLayer = new Map(); sideOf = new Map()
   const leftIds: string[] = []
   const usedIds = new Set<string>()
   for (const f of fitted) {
@@ -430,6 +494,8 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
     let id = `${k.replace(/_/g, '')}${raw.side ? 'L' : ''}${n > 1 || ['toes', 'finger1', 'finger2', 'finger3', 'thumb1', 'thumb2', 'thumb3'].includes(k) ? n : ''}`
     while (usedIds.has(id)) id += 'x'
     usedIds.add(id)
+    kindOfShape.set(id, { kind: k, nth: n })
+    kindLayer.set(id, raw.layer); sideOf.set(id, raw.side)
     const shape: ModelShape = {
       id, name, closed: true, z: zOf.get(f.index)!, zBack: zBackOf.get(f.index)!, op: 1, view: raw.view, half: 0, template: null, pts, outline, ...paintOf(raw), ...joinOfPart(raw),
     }
@@ -457,6 +523,7 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
   c = { ...c, shapes: c.shapes.map(s => (s.mirrorOf ? { ...s, name: side(s.name) } : s)), objects: c.objects.map(o => (o.mirrorOf ? { ...o, name: side(o.name) } : o)), groups: c.groups.map(g => (g.mirrorOf ? { ...g, name: side(g.name) } : g)) }
   c = rigged(c, pivots, body.id)
   if (process.env.NO_SKIN !== '1') c = skinned(c, body.id)
+  if (process.env.NO_ANGLES !== '1') c = angled(c, body, kindOfShape)
   c = normalizeContent({ ...c, joins: true })
   const twins = c.shapes.filter(s => s.mirrorOf).length
   return { content: c, report: { id: body.id, shapes: c.shapes.length, twins, points, worstMirror: r2(worstMirror), kb: Math.round(copyBytes(c) / 1024), faults: publishFaults(c) } }
@@ -506,8 +573,8 @@ const PARTS: Array<[id: string, name: string, hint: string, objects: string[], l
 ]
 function partsOf(c: ModelContent): BodyPart[] {
   const byId = new Map(c.shapes.map(s => [s.id, s]))
-  // a part is drawn shapes only: the template's joints, marks and skin weights join it to parts it does not have
-  const loose = (s: ModelShape): ModelShape => ({ ...s, marks: [], skin: [], pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) })
+  // a part is drawn shapes only: the template's joints, marks and skin weights join it to parts it does not have, and its outlines at the sides fit only where the template has it
+  const loose = (s: ModelShape): ModelShape => ({ ...s, marks: [], skin: [], turn: null, pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) })
   const own = (s: ModelShape): ModelShape => loose(ownShape(s))
   const ownShape = (s: ModelShape): ModelShape => {
     const orig = s.mirrorOf ? byId.get(s.mirrorOf) : undefined

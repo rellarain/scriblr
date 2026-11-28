@@ -8,6 +8,9 @@ import { jointRows } from './jointLimits'
 import { poseOf } from './pivots'
 import { beginReach, movePose, type PoseDrag } from './posing'
 import { solve } from './rig'
+import { viewFor } from './angles'
+import { NO_COLOURING } from './colour'
+import { paintShapes } from './paint'
 
 // The body templates' rig (slice 9d), read from the seed the server serves: every part joined to the one it hangs from at its pivot, the pelvis anchored, the right side
 // the twin of the left; a hand dragged reaches with its own arm only, each joint within its limits.
@@ -53,6 +56,24 @@ describe.each(templates)('the $id template’s rig', ({ content: c }) => {
       // only the wrist, elbow and shoulder turned
       expect([...poseOf(posed).joints.values()].filter(j => j.turn !== 0).every(j => ['wrist', 'elbow', 'shoulder'].includes(j.kind ?? ''))).toBe(true)
     }
+  })
+
+  it('turns: drawn at the sides with the front outline’s points, narrower in profile and facing the way it turns (slice 9e)', () => {
+    const keyed = c.shapes.filter(s => (s.turn?.angles ?? []).length)
+    expect(keyed.length).toBeGreaterThan(50)
+    for (const s of keyed) {
+      expect(s.turn!.angles.map(a => a.at)).toEqual([90, 270])
+      for (const a of s.turn!.angles) expect(a.pts).toHaveLength(s.pts.length)
+    }
+    const width = (a: number) => { const sv = solve(c, {}, viewFor(a)); const xs = Object.values(sv.shapes).flatMap(x => (x.box ? [x.box.x, x.box.x + x.box.w] : [])); return Math.max(...xs) - Math.min(...xs) }
+    expect(width(90)).toBeLessThan(width(0) * 0.6)
+    // the nose's tip ahead of the cranium's middle: toward the picture's right at 90°, its left at 270°
+    const ahead = (a: number) => { const sv = solve(c, {}, viewFor(a)), tip = sv.shapes.tip.box!, head = sv.shapes.head.box!; return tip.x + tip.w / 2 - (head.x + head.w / 2) }
+    expect(ahead(90)).toBeGreaterThan(5)
+    expect(ahead(270)).toBeLessThan(-5)
+    // turned, no joint caps (a pivot does not turn with the outlines)
+    expect(paintShapes(c, solve(c, {}, viewFor(45)), NO_COLOURING).some(i => i.role === 'cap')).toBe(false)
+    expect(paintShapes(c, solve(c, {}, 'front'), NO_COLOURING).some(i => i.role === 'cap')).toBe(true)
   })
 
   it('reaches from the anchor when nothing else holds still: the waist bends too', () => {

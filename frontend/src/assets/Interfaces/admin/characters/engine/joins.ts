@@ -88,9 +88,10 @@ export function joinItems(c: ModelContent, solved: Solved, items: PaintItem[]): 
   const before = new Map<number, PaintItem[]>()
   const put = (k: number, item: PaintItem) => before.set(k, [...(before.get(k) ?? []), item])
 
-  // the joint caps: at the pivot, as wide as the limb there (the group's own shapes in a set)
+  // the joint caps: at the pivot, as wide as the limb there (the group's own shapes in a set); from the front and the back only (slice 9e: turned, the outlines move
+  // and the pivot does not)
   const caps = new Map<string, PaintItem[]>()
-  for (const g of c.groups) {
+  for (const g of solved.turned ? [] : c.groups) {
     const size = capOf(c, g), pivot = solved.pivots[g.id]
     if (!size || !pivot) continue
     const own = g.objects.flatMap(oid => c.objects.find(o => o.id === oid)?.shapes ?? []).filter(id => keyOf.has(id) && at.has(id)).sort((a, b) => at.get(a)! - at.get(b)!)

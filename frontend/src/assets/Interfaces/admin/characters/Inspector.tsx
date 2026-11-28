@@ -9,6 +9,7 @@ import { TraceSection, type TraceActions } from './TraceSection'
 import { JointCapSection, ModelJoinsSection, ShapeJoinSection, type JoinActions } from './JoinSections'
 import { JointLimitsSection, type LimitsActions } from './JointLimitsSection'
 import { PoseSection, type PoseActions } from './PoseSection'
+import { AnglesSection, type AnglesActions } from './AnglesSection'
 import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
@@ -102,6 +103,8 @@ export interface InspectorProps {
   limits?: LimitsActions
   // the Pose section (slice 9d): drag to pose, what holds still, reset, the saved poses
   pose?: PoseActions
+  // the Angles section (slice 9e): the figure from eight angles, each turning the canvas there
+  angles?: AnglesActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -169,6 +172,7 @@ function ShapeTab(p: InspectorProps) {
         {p.joins && <ModelJoinsSection content={content} actions={p.joins} />}
         {p.limits && <JointLimitsSection content={content} actions={p.limits} />}
         {p.pose && <PoseSection content={content} actions={p.pose} />}
+        {p.angles && <AnglesSection actions={p.angles} />}
         {p.guide && <GuideSection content={content} actions={p.guide} />}
         {p.trace && <TraceSection actions={p.trace} />}
       </div>
@@ -218,6 +222,7 @@ function ShapeTab(p: InspectorProps) {
       {sel.kind === 'object' && object && simple && object.cloneOf && p.clones && <CloneSection content={content} kind="object" thing={object} actions={p.clones} />}
       {sel.kind === 'object' && object && simple && !object.cloneOf && p.mirrors && <MirrorSection content={content} kind="object" thing={object} actions={p.mirrors} clones={object.mirrorOf ? undefined : p.clones} />}
       {sel.kind === 'object' && object && simple && !object.cloneOf && !object.mirrorOf && p.onAlign && <AlignSection kind="object" onAlign={axis => p.onAlign?.('object', object.id, axis)} />}
+      {sel.kind === 'object' && object && simple && p.turnSection}
       {sel.kind === 'group' && group && simple && p.onAlign && <AlignSection kind="group" onAlign={axis => p.onAlign?.('group', group.id, axis)} />}
       {sel.kind === 'group' && group && simple && p.joins && group.parent && (group.pivot || group.mirrorOf) && <JointCapSection content={content} group={group} actions={p.joins} />}
       {sel.kind === 'object' && object && !simple && (
@@ -244,6 +249,8 @@ function ShapeTab(p: InspectorProps) {
           {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} selPoint={selPoint} edges={p.edges} />
           {p.joins && !shape.mirrorOf && !shape.cloneOf && <ShapeJoinSection content={content} shape={shape} onEditShape={p.onEditShape} />}
+          {/* turning (slice 9e): back in the shape editor */}
+          {p.turnSection}
           {p.combine && !shape.mirrorOf && !shape.cloneOf && <OutlineSection content={content} shape={shape} part={p.edges?.part ?? 'shape'} selPoint={selPoint} mirror={mirror} axis={content.axis ?? 100} onEditShape={p.onEditShape} />}
           {p.combine && !shape.mirrorOf && !shape.cloneOf && <CombineSection content={content} shape={shape} actions={p.combine} />}
           {p.trace && <TraceSection actions={p.trace} />}

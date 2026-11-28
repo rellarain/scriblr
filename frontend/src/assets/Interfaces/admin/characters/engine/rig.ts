@@ -223,6 +223,8 @@ export interface Solved {
   turns?: Record<string, number>
   // seen from behind (the back view, or turned past the side): the joins of the back are used (slice 9c)
   behind?: boolean
+  // turned to an angle that is neither the front nor the back (slice 9e): joint caps are not drawn (a pivot does not turn with the outlines)
+  turned?: boolean
 }
 
 const finiteMat = (m: Mat): boolean => m.every(Number.isFinite)
@@ -450,7 +452,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return false
   }
 
-  const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G, turns: {}, ...(behind ? { behind: true } : {}) }
+  const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G, turns: {}, ...(behind ? { behind: true } : {}), ...(angle !== 0 && angle !== 180 ? { turned: true } : {}) }
   const turns = out.turns!
   // A group's matrix without its own foreshortening (phase O2), only for a group that has some: what hangs from it stands in this one, moved to where the shortened group puts
   // its joint, so a forearm hangs from the end of an upper arm that points at the viewer and keeps its own length (see carryFor).

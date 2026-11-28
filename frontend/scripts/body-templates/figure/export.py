@@ -1,7 +1,7 @@
 """The six bodies of the character designer mockup (WUI slice 9, the approved Character designer page), front view, as dense outlines in the
 model's units: 56 units to a head, the crown at y = 10, the middle at x = 100 (the picture's right, x > 100, is the character's left).
 
-Prints JSON on stdout: {bodies: [{id, name, note, heads, levels, joints, parts: [...]}]}, each part with its kind, side, layer, whether it is
+Prints JSON on stdout: {bodies: [{id, name, note, heads, levels, joints, parts: [...], side: [...]}]}, each part with its kind, side, layer, whether it is
 inside the body's one outline, its outline width in the mockup, its fill, which views see it, and its points. build.ts fits these as curves.
 Run with: python export.py (from this folder, or with this folder on the path)."""
 import json
@@ -65,7 +65,11 @@ def export(key, body):
     levels = dict(chin=y(1.0), chest=y(L["apex"]), waist=y(L["waist"]), crotch=y(L["crotch"]), knees=y(L["knee"]), soles=y(L["sole"]))
     out = [part_of(m) for m in front]
     out += [part_of(m, back=True) for m in back if m.p.back_only]
-    return dict(id=key, name=body["label"], note=body["note"], heads=round(L["sole"], 3), levels=levels, joints=joints, parts=out)
+    # the side view's parts (slice 9e): the right profile, facing the picture's right, the near side's parts (build.ts makes each front part's outline at the sides
+    # from the side part of its kind)
+    side_parts, _, _ = P.side_model(body, View(CX, TOP, U))
+    side = [dict(kind=m.p.kind, layer=m.p.layer, pts=m.d) for m in side_parts]
+    return dict(id=key, name=body["label"], note=body["note"], heads=round(L["sole"], 3), levels=levels, joints=joints, parts=out, side=side)
 
 
 if __name__ == "__main__":

@@ -65,6 +65,21 @@ describe('joint limits', () => {
 })
 
 describe('the Pose section', () => {
+  it('waits for the front: turned, the figure is not dragged into a pose (slice 9e)', async () => {
+    const { user } = await open()
+    const pivots = () => screen.getByRole('application').querySelectorAll('[data-pivot-point]').length
+    expect(pivots()).toBeGreaterThan(0)
+    await user.click(within(screen.getByRole('group', { name: 'Angles' })).getByRole('button', { name: 'Seen from the right profile' }))
+    expect(pose().getByRole('button', { name: 'Drag to pose' })).toBeDisabled()
+    // the pivot points do not turn with the outlines: not drawn turned
+    expect(pivots()).toBe(0)
+    expect(pose().getByText('Turn to the front to pose: the figure is posed as it is seen from the front.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pose with Hand (right)' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Front view' }))
+    expect(pose().getByRole('button', { name: 'Drag to pose' })).toBeEnabled()
+    expect(pivots()).toBeGreaterThan(0)
+  })
+
   it('poses the twin’s arm by its hand, saves the pose, resets it and puts it back', async () => {
     const { user } = await open()
     expect(pose().getByRole('button', { name: 'Reset the pose' })).toBeDisabled()

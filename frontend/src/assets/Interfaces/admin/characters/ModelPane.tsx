@@ -23,6 +23,7 @@ import { useModelTrace } from './TraceSection'
 import type { JoinActions } from './JoinSections'
 import type { LimitsActions } from './JointLimitsSection'
 import type { PoseActions } from './PoseSection'
+import type { AnglesActions } from './AnglesSection'
 import { applyPose, deletePose, renamePose, savePose as keepPose } from './engine/poses'
 import { cutOutShape, mergeShapes, splitShape } from './engine/outlineOps'
 import { advanceLock, lockStage } from './engine/crossings'
@@ -58,7 +59,8 @@ import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
 import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
 import { alignSkins, weightsOf } from './engine/skin'
-import { angleOf, fromBehind, type View } from './engine/angles'
+import { ANGLES, angleOf, fromBehind, viewFor, type View } from './engine/angles'
+import { drawable, paintShapes } from './engine/paint'
 import { shifted } from './engine/turn'
 import { alignTurns, clearPointDepths, clearThick, setAngleOutline, setFormAngleOutline, setWrap, stepPointDepth, stepShapeDepth, stepThick } from './engine/turnEdit'
 import { ObjectTurnSection, ShapeTurnSection, type TurnActions, type TurnWhere } from './TurnSection'
@@ -1627,7 +1629,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // the picture to trace (slice 9b): kept beside the draft, drawn under the canvas (its box from the model's space into the canvas's)
   const traceActions = useModelTrace(models.api, entry.id, content.guide, content.axis ?? 100)
   const tr = traceActions.trace
-  const traceCanvas: TraceCanvas | null = shapesOnly && tr && tr.shown ? (() => {
+  // the front-only tools (slice 9e): the picture to trace, combining and simplifying, connections and symmetry work on the front outline
+  const atFront = turnAngle === 0
+  const traceCanvas: TraceCanvas | null = shapesOnly && atFront && tr && tr.shown ? (() => {
     const g = solved.global, [x0, y0] = apply(g, tr.x, tr.y), [x1, y1] = apply(g, tr.x + tr.w, tr.y + tr.h)
     return {
       href: tr.image, box: { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, opacity: tr.opacity, locked: tr.locked,
@@ -1636,12 +1640,27 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   })() : null
   // joins (slice 9c): the model's switch, a set renamed in every shape that names it (from the front and from behind), a group's joint cap
   const poseActions: PoseActions | undefined = shapesOnly ? {
-    on: poseAll, onToggle: setPoseAll, holds: poseHolds, onHolds: setPoseHolds, posed: isPosed(content),
+    on: poseAll, onToggle: setPoseAll, holds: poseHolds, onHolds: setPoseHolds, posed: isPosed(content), off: atFront ? null : 'Turn to the front to pose: the figure is posed as it is seen from the front.',
     onReset: () => commit(resetPose(content)),
     onSave: name => { const r = keepPose(content, name); if (!r.ok) setNote(r.reason); else commit(r.content) },
     onApply: id => commit(applyPose(content, id)),
     onRename: (id, name) => commit(renamePose(content, id, name)),
     onDelete: id => commit(deletePose(content, id)),
+  } : undefined
+  // the Angles section (slice 9e): the figure as the canvas solves it, from each of the eight angles, in one box that holds them all
+  const angleThumbs = useMemo(() => {
+    if (!shapesOnly || sel.kind !== 'none' || recording) return null
+    const opts = { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show, fall: test.fall, order: test.order }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    const thumbs = ANGLES.map(n => {
+      const s = solve(shown, values, viewFor(n.at), opts)
+      for (const sh of Object.values(s.shapes)) { const b = sh.box; if (!b || !Number.isFinite(b.x)) continue; x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h) }
+      return { at: n.at, name: n.name, items: drawable(paintShapes(shown, s, colouring)) }
+    })
+    return Number.isFinite(x0) ? { thumbs, box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } } : null
+  }, [shapesOnly, sel.kind, recording, shown, values, test.forms, test.hidden, test.fall, test.order, show, through, colouring])
+  const anglesActions: AnglesActions | undefined = angleThumbs ? {
+    ...angleThumbs, current: turnAngle, onAngle: at => setView(viewFor(at)),
   } : undefined
   const limitsActions: LimitsActions | undefined = shapesOnly ? {
     onFor: (f: ModelLimitsFor) => commit(applyLimitsFor(content, f)),
@@ -1652,7 +1671,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onRename: (from, to) => commit({ ...content, shapes: content.shapes.map(s => (s.join === from || s.joinBack === from ? { ...s, ...(s.join === from ? { join: to } : {}), ...(s.joinBack === from ? { joinBack: to } : {}) } : s)) }),
     onCap: (groupId, cap) => commit({ ...content, groups: content.groups.map(g => (g.id === groupId ? { ...g, cap } : g)) }),
   } : undefined
-  const combineActions: CombineActions | undefined = shapesOnly ? {
+  const combineActions: CombineActions | undefined = shapesOnly && atFront ? {
     mode: combineMode,
     onMode: mode => { setCombineMode(mode); setSplitLine([]); setTapering(false); setLinkMode(null); setPaintPick(null) },
   } : undefined
@@ -1847,7 +1866,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // The shape editor's connections (S5): connecting a dropped point (part of the drag's undo step), pulling a point free with a right-drag (an undo step of its own, before
   // the drag), adding a point to a shared segment, and naming and cutting connections in the panel.
-  const connectTool: ConnectTool | null = shapesOnly ? {
+  const connectTool: ConnectTool | null = shapesOnly && atFront ? {
     onConnect: (sid, i, target) => {
       const tried = connect(content, canvasSolved, sid, i, target)
       if (!tried.ok) { setNote(tried.reason); return }
@@ -1875,7 +1894,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // The shape editor's symmetry (S6): choosing the axes in the panel, then the side on the canvas; turning it on lets go of the shape's own connections (a symmetric shape's
   // points follow nothing) and keeps the connections to it by place; turning it off keeps every point.
   const symChoosing = symChoose && selShape && symChoose.id === selShape.id ? { a: symChoose.a, n: symChoose.n } : null
-  const symmetry: SymmetryActions | undefined = shapesOnly && selShape ? {
+  const symmetry: SymmetryActions | undefined = shapesOnly && atFront && selShape ? {
     choosing: symChoosing,
     onStart: () => setSymChoose({ id: selShape.id, a: 90, n: 1 }),
     onChoose: (a, n) => setSymChoose({ id: selShape.id, a, n }),
@@ -2002,7 +2021,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // can be dragged, with an object that object (all its shapes together). A press that moves poses; one that stays put selects as usual, which leaves Pose mode. Each drag is
   // one undo step.
   // Drag to pose (slice 9d): the figure is posed by dragging it whatever is selected; what holds still while a part reaches
-  const posingOn = shapesOnly && !recording && !through && (poseAll || sel.kind === 'group' || sel.kind === 'object')
+  const posingOn = shapesOnly && !recording && !through && atFront && (poseAll || sel.kind === 'group' || sel.kind === 'object')
   const inPoseScope = (shapeId: string): boolean => (poseAll ? true : sel.kind === 'group' ? groupOfShape(content, shapeId) === sel.id : sel.kind === 'object' ? objectOfShape(content, shapeId)?.id === sel.id : false)
   function shapePoseBegin(grab: PoseGrab, world: [number, number]): boolean {
     const at = toModel(solved, world[0], world[1])
@@ -2039,7 +2058,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onDown: shapePoseBegin, onMove: shapePoseMove, onUp: () => { shapePoseRef.current = null }, onCancel: shapePoseCancel,
   } : null
   // the posable points and the sliders where they are drawn now (T5); a slider's stops are shown while its shape is edited
-  const poseMarks = shapesOnly ? content.shapes.flatMap(s => shapeMarks(content, s).filter(m => m.kind === 'pose').map(m => {
+  // turned to a ¾ or a side view, the pivots, anchors and posable points are not drawn (they do not turn with the outlines, and posing waits for the front)
+  const marksShown = shapesOnly && !canvasSolved.turned
+  const poseMarks = marksShown ? content.shapes.flatMap(s => shapeMarks(content, s).filter(m => m.kind === 'pose').map(m => {
     const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
     return { id: `${s.id}:${m.id}`, shapeId: s.id, markId: m.id, x, y, name: m.name }
   })) : undefined
@@ -2059,14 +2080,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     live(shapeId, setStop(s, i, which, nearestPlace(a, 0, a.length, world[0], world[1]), a.length))
   }
   // the anchors where they are drawn now
-  const anchorMarks = shapesOnly ? content.shapes.flatMap(s => anchorsOf(s).map(m => {
+  const anchorMarks = marksShown ? content.shapes.flatMap(s => anchorsOf(s).map(m => {
     // an anchor on the centre (C1) is where the centre is drawn
     const [x, y] = (m.c ? drawnCentre(s, canvasSolved.shapes[s.id]) : null) ?? apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
     return { id: `${s.id}:${m.id}`, x, y, name: m.name }
   })) : undefined
   // where the pivot points are now (they move with the side that holds them)
   // the pivot points where they are drawn now (joints J2), each with the name of its link
-  const pivotPoints = shapesOnly ? [...poseOf(content).joints.values()].map(j => {
+  const pivotPoints = marksShown ? [...poseOf(content).joints.values()].map(j => {
     const at = poseOf(content).points.get(j.id) ?? j.at, [x, y] = apply(canvasSolved.global, at[0], at[1])
     return { id: j.id, x, y, name: shapeById(content, j.shape)?.pts[j.i]?.bind?.name ?? '' }
   }) : undefined
@@ -2324,7 +2345,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} angles={anglesActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}
