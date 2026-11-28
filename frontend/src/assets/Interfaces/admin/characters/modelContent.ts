@@ -45,6 +45,17 @@ const clean = (v: string, max: number): string => v.trim().slice(0, max)
 export const repairDrape = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(100, Math.max(0, v))) : 0)
 
 // What a save sends: names trimmed and cut to length, the way the server cleans them (the page keeps what was typed until then).
+// Joins (slice 9c): a join set's name (trimmed, at most 40 characters; null when not joined), the back's ('' is none from behind; null the same as the front's), and a
+// joint cap's size (0.5..2 times the limb's half width, to the hundredth; null none).
+export const JOIN_NAME_MAX = 40
+export const CAP_RANGE = { min: 0.5, max: 2 } as const
+export const joinName = (v: unknown): string | null => (typeof v === 'string' ? v.trim().slice(0, JOIN_NAME_MAX) || null : null)
+export function joinFields(s: { join?: unknown; joinBack?: unknown }): { join?: string | null; joinBack?: string | null } {
+  const join = joinName(s.join), back = typeof s.joinBack === 'string' ? s.joinBack.trim().slice(0, JOIN_NAME_MAX) : null
+  return { ...(join ? { join } : {}), ...(back !== null ? { joinBack: back } : {}) }
+}
+export const repairCap = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(CAP_RANGE.max, Math.max(CAP_RANGE.min, v)) * 100) / 100 : null)
+
 // The proportion guide as the server keeps it (slice 9a): the crown and a head's height held to their ranges, at most twelve named lines; anything else is no guide.
 export const GUIDE_LINES_MAX = 12
 export const GUIDE_HEAD_RANGE = { min: 4, max: 200 } as const
@@ -62,9 +73,9 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
+    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...joinFields(s), ...paintFields(s) })),
     objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, mirrorLine: repairMirrorLine(o.mirrorLine), cloneOf: o.cloneOf ?? null, cloneAt: repairCloneAt(o.cloneAt), place: repairPlace(o.place), classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
-    groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states), depth: repairDepth(g.depth) })),
+    groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states), depth: repairDepth(g.depth), cap: repairCap(g.cap) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
     presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null, grip: p.grip ?? null, ...variantFields(p) })),
@@ -82,6 +93,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     pivots: (c.pivots ?? []).map(repairPivot),
     zones: repairZones(c.zones, c.groups),
     guide: repairGuide(c.guide),
+    joins: c.joins === true,
   }
 }
 

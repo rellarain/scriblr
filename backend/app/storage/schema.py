@@ -1274,6 +1274,8 @@ MODEL_SYM_AXES_MAX = 6     # shape editor S6: the most axes a symmetric shape ha
 MODEL_PIVOTS_MAX = 32      # shape types T3: the most pivot points a model has
 MODEL_ZONES_MAX = 24       # zones (Z2): the most zones a model has
 MODEL_GUIDE_LINES_MAX = 12  # the proportion guide (slice 9a): the most named lines it has
+MODEL_JOIN_NAME_MAX = 40   # joins (slice 9c): a join set's name
+MODEL_CAP_RANGE = (0.5, 2.0)  # a joint cap's size, times the limb's half width
 MODEL_GUIDE_HEAD_RANGE = (4.0, 200.0)
 MODEL_ZONE_NAME_MAX = 40
 MODEL_TURN_LIMIT = 180.0   # shape types T3: a pivot circle turns at most this far each way
@@ -2028,6 +2030,10 @@ class ModelShape(BaseModel):
     template: Optional[str] = Field(default=None, pattern=_MODEL_ID)
     # The shape this one is the mirror image of (about the model's axis): a derived twin has no points of its own until the pair is broken.
     mirrorOf: Optional[str] = None
+    # Joins (slice 9c): the set of shapes it is drawn with as one outline (the parts that touch), and the set it joins from behind (None: the same as from the front;
+    # "" not joined from behind). Written only when set.
+    join: Optional[str] = None
+    joinBack: Optional[str] = None
     # An outline of its own for the back view (None: the front outline seen from behind), its own depth in the back view, and the slider that loosens
     # the links of its points (None: they keep their distance).
     back: Optional[list[ModelPoint]] = Field(default=None, max_length=MODEL_POINTS_MAX)
@@ -2084,6 +2090,20 @@ class ModelShape(BaseModel):
     # Clones (Z4): the shape this one is a clone of (it has its outline, but no points of its own), and where it stands (None in a clone object: the object's place).
     cloneOf: Optional[str] = None
     cloneAt: Optional[ModelCloneAt] = None
+
+    @field_validator("join", "joinBack", mode="before")
+    @classmethod
+    def _join(cls, value: Any) -> Optional[str]:
+        return value.strip()[:MODEL_JOIN_NAME_MAX] if isinstance(value, str) else None
+
+    @model_serializer(mode="wrap")
+    def _dump_joins(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """A shape with no joins is written as before joins existed."""
+        data = handler(self)
+        for key in ("join", "joinBack"):
+            if data.get(key) is None:
+                data.pop(key, None)
+        return data
 
     @field_validator("name", mode="before")
     @classmethod
@@ -3029,10 +3049,26 @@ class ModelGroup(BaseModel):
     pivot: Optional[list[float]] = None
     attach: Optional[ModelAttach] = None
     mirrorOf: Optional[str] = None
+    # A joint cap (slice 9c): a circle at the pivot, this many times the limb's half width there, drawn with the group's shapes (in their join) so a limb turned a long
+    # way shows no seam. None: no cap. Written only when set.
+    cap: Optional[float] = None
     # The switches of the group (phase D3b): each option sets slider values, switches objects and groups off and chooses forms.
     states: list[ModelState] = Field(default_factory=list, max_length=MODEL_STATES_MAX)
     # Phase A1: how far the group's pivot stands toward the viewer (+) or away from its parent's, in the model's units (what turning the figure moves it by).
     depth: float = 0.0
+
+    @field_validator("cap", mode="before")
+    @classmethod
+    def _cap(cls, value: Any) -> Optional[float]:
+        return None if value is None else round(_finite(value, 1.05, *MODEL_CAP_RANGE), 2)
+
+    @model_serializer(mode="wrap")
+    def _dump_cap(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """A group with no joint cap is written as before caps existed."""
+        data = handler(self)
+        if data.get("cap") is None:
+            data.pop("cap", None)
+        return data
 
     @field_validator("depth", mode="before")
     @classmethod
@@ -3479,6 +3515,8 @@ class ModelContent(BaseModel):
     zones: list[ModelZone] = Field(default_factory=list, max_length=MODEL_ZONES_MAX)
     # The proportion guide (slice 9a), or none.
     guide: Optional[ModelGuide] = None
+    # Joins (slice 9c): shapes in the same join set are drawn as one outline round them. Written only when on.
+    joins: Optional[bool] = None
 
     @field_validator("guide", mode="before")
     @classmethod
@@ -3496,6 +3534,8 @@ class ModelContent(BaseModel):
         data = handler(self)
         if data.get("guide") is None:
             data.pop("guide", None)
+        if not data.get("joins"):
+            data.pop("joins", None)
         return data
 
     @field_validator("zones", mode="before")

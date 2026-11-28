@@ -152,6 +152,8 @@
 .cmShape { fill: var(--shape-fill, var(--ink-muted)); stroke: none; vector-effect: non-scaling-stroke; cursor: pointer; &--dim { opacity: 0.35; } }
 // a shape's outline (shape editor S3): its own path over the fill, in the model's units, never picked
 .cmShapeLine { pointer-events: none; &--dim { opacity: 0.35; } }
+// a join set's outline (no fill of its own) and a joint cap (painted like its limb), slice 9c: never picked
+.cmJoinPaint { fill: var(--shape-fill, var(--ink-muted)); stroke: none; pointer-events: none; }
 // the box of the selected shape (shape editor S4): its frame, eight square handles that resize it and a round one that turns it
 .cmBoxLine { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmBoxHandle, .cmBoxTurn {

@@ -75,7 +75,7 @@ WUI (mockup first):
     - [x] The proportion guide, drawn on the canvas and snapped to.
     - [x] Body parts: head, torso, arm, hand, leg, foot, eye, ear, nose, mouth, a lock of hair.
   - [x] 9b Drawing: smooth and simplify outlines, trace a picture, merge, cut out and split.
-  - [ ] 9c Joins: one outline round parts that touch, joint caps.
+  - [x] 9c Joins: one outline round parts that touch, joint caps.
   - [ ] 9d Rig and posing: bones, smooth bends (skin weights), drag a hand or a foot to pose.
   - [ ] 9e Eight angles.
   - [ ] 9f Variation: body sliders, forms, colour palettes, clothes in layers.
@@ -171,3 +171,4 @@ More items will be added.
 - 2026-11-27: WUI slice 9a, outlines per edge. A shape's outline can leave out any of its edges: select an edge and turn its outline off or on in Look, or set every edge or none; a twin is outlined as its original is, and points added or joined keep their edges' outline. The character designer mockup (the human form) is approved.
 - 2026-11-27: WUI slice 9a done. New model starts from one of six bodies (the approved mockup's average man and woman, athletic man, heavier man and woman, older woman: their right side the twin of their left, their outline along the silhouette) or a blank canvas; a model has a proportion guide (a line every head, named lines) that is drawn as a layer and snapped to, set in the Overview; the Body part menu adds a head, a torso, an arm, a hand, a leg, a foot, an eye, an ear, a nose, a mouth or a lock of hair made to the guide.
 - 2026-11-28: WUI slice 9b done. The shape editor's Outline section smooths the selected point or every point and simplifies an outline to fewer points, saying how far it strays; Combine merges another shape into the selected one, cuts one out of it (a hole through the paint when it lies wholly inside) or splits it along a line laid on the canvas, each edge keeping its outline; a picture to trace lies under the canvas, faded and locked, fitted to the guide, kept beside the draft and never published.
+- 2026-11-28: WUI slice 9c done. Shapes can be put in join sets (and in other sets from behind); with the model's joins on, each set is drawn as one outline round its parts, so where they overlap no line shows however they are posed. A group with a pivot can have a joint cap, a circle at the joint as wide as the limb, so a limb turned a long way shows no notch. The body templates start with the joins on (the body, the head) and caps at the elbows and knees; exporting a figure now draws outlines per edge.

@@ -20,6 +20,7 @@ import type { GuideActions } from './GuideSection'
 import { BodyPartMenu, addBodyPart } from './BodyPartMenu'
 import type { CombineActions, CombineMode } from './DrawSections'
 import { useModelTrace } from './TraceSection'
+import type { JoinActions } from './JoinSections'
 import { cutOutShape, mergeShapes, splitShape } from './engine/outlineOps'
 import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
@@ -1624,6 +1625,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       onBox: b => { const back = inverse(g), [ax, ay] = apply(back, b.x, b.y), [bx, by] = apply(back, b.x + b.w, b.y + b.h); traceActions.change({ x: Math.round(Math.min(ax, bx) * 100) / 100, y: Math.round(Math.min(ay, by) * 100) / 100 }) },
     }
   })() : null
+  // joins (slice 9c): the model's switch, a set renamed in every shape that names it (from the front and from behind), a group's joint cap
+  const joinActions: JoinActions | undefined = shapesOnly ? {
+    onJoins: on => commit({ ...content, joins: on }),
+    onRename: (from, to) => commit({ ...content, shapes: content.shapes.map(s => (s.join === from || s.joinBack === from ? { ...s, ...(s.join === from ? { join: to } : {}), ...(s.joinBack === from ? { joinBack: to } : {}) } : s)) }),
+    onCap: (groupId, cap) => commit({ ...content, groups: content.groups.map(g => (g.id === groupId ? { ...g, cap } : g)) }),
+  } : undefined
   const combineActions: CombineActions | undefined = shapesOnly ? {
     mode: combineMode,
     onMode: mode => { setCombineMode(mode); setSplitLine([]); setTapering(false); setLinkMode(null); setPaintPick(null) },
@@ -2283,7 +2290,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

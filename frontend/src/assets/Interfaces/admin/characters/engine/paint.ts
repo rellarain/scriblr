@@ -5,6 +5,7 @@ import type { CastKind } from './kinds'
 import type { Mat } from './geometry'
 import type { Solved } from './rig'
 import { coveringObjects } from './wear'
+import { joinItems } from './joins'
 
 // Painting a solved model (phase 4b): what each shape is drawn with, and the SVG definitions (gradients, clip paths, masks) that the effects need. Pure: the
 // canvas, the preview tiles and the pictures of forms all draw from the same items, so they cannot disagree. The solver gives each shape's outline as path text in
@@ -37,6 +38,8 @@ export interface PaintItem {
   blank: boolean
   // a shadow or a light (shape types T1): kept inside every other shape that is drawn (its `compDs`)
   cast?: CastKind | null
+  // joins (slice 9c): not a shape but a join set's one outline (`halo`: the members' outlines, the fill not painted) or a joint cap (`cap`); never picked
+  role?: 'halo' | 'cap'
 }
 
 // The one ink every outline is drawn in (shape editor S3): a dark neutral gray, part of the model's picture like its fills.
@@ -123,7 +126,8 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
       ...(layer.line && r.lineD !== undefined ? { lineD: r.lineD } : {}),
     })
   }
-  return items
+  // joins (slice 9c): each join set drawn as one outline, and the joint caps
+  return joinItems(c, solved, items)
 }
 
 // What a preview or a picture of a form draws: no helpers, and nothing that has nothing to be kept inside.

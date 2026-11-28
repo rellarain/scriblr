@@ -1371,6 +1371,8 @@ export function DesignerCanvas(p: CanvasProps) {
       )}
       <g clipPath={through ? `url(#${prefix}-through)` : undefined}>
         {paintItems.map(item => {
+          // a join set's one outline, or a joint cap (slice 9c): drawn, never picked
+          if (item.role) return <PaintedPath key={item.id} item={item} prefix={prefix} className="cmJoinPaint" lineClass="cmShapeLine" pointerEvents="none" data-join={item.role} />
           const id = item.id, s = shapesById.get(id)
           if (!s) return null
           const pickable = picking.has(id), selected = sel.kind === 'shape' && sel.id === id

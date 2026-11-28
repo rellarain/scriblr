@@ -230,6 +230,18 @@ const GROUPS: Array<[id: string, name: string, parent: string | null, objects: A
   ['footL', 'Foot (left)', 'shinL', [['o_footL', 'Foot (left)']]],
 ]
 const SIDED_GROUPS = ['upperarmL', 'thighL']
+// the joints a limb turns a long way at, with a joint cap: the elbows and the knees
+const CAPPED = new Set(['forearmL', 'shinL'])
+const CAP = 1.05
+
+// The join set a part is drawn in (slice 9c): the body's plain parts in one outline round the figure, the head's planes in one round the head. A part with dark lines of its
+// own inside the body (a buttock's fold) and the hands keep their own outlines; from behind, the face's planes are under the neck, so the cranium keeps its line over it.
+function joinOfPart(p: RawPart): Partial<ModelShape> {
+  if (p.lines.length > 0) return {}
+  if (p.union && p.layer !== 'hand' && p.kind !== 'palm') return { join: 'Body' }
+  if (p.layer === HEAD_LAYER) return p.kind === 'head' ? { join: 'Head' } : { join: 'Head', joinBack: '' }
+  return {}
+}
 
 // the middle of an outline's cut across at height y (null when it does not reach that height)
 function across(poly: V[], y: number): number | null {
@@ -301,7 +313,7 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
     footL: centre(ankle.poly),
   }
   for (const [id, name, parent, objects] of GROUPS) {
-    const g: ModelGroup = { id, name, parent, objects: [], pivot: [r2(pivots[id][0]), r2(pivots[id][1])], attach: null }
+    const g: ModelGroup = { id, name, parent, objects: [], pivot: [r2(pivots[id][0]), r2(pivots[id][1])], attach: null, ...(CAPPED.has(id) ? { cap: CAP } : {}) }
     c = addGroup(c, g)
     for (const [oid, oname] of objects) c = addObject(c, id, { id: oid, name: oname, layer: 'body', shapes: [] })
   }
@@ -334,7 +346,7 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
     while (usedIds.has(id)) id += 'x'
     usedIds.add(id)
     const shape: ModelShape = {
-      id, name, closed: true, z: zOf.get(f.index)!, zBack: zBackOf.get(f.index)!, op: 1, view: raw.view, half: 0, template: null, pts, outline, ...paintOf(raw),
+      id, name, closed: true, z: zOf.get(f.index)!, zBack: zBackOf.get(f.index)!, op: 1, view: raw.view, half: 0, template: null, pts, outline, ...paintOf(raw), ...joinOfPart(raw),
     }
     points += pts.length
     c = addShape(c, placeOf(raw).object, shape)
@@ -358,7 +370,7 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
   // a twin is named for its side
   const side = (name: string) => name.replace(/ \(left\) \(twin\)$/, ' (right)').replace(/ \(twin\)$/, '')
   c = { ...c, shapes: c.shapes.map(s => (s.mirrorOf ? { ...s, name: side(s.name) } : s)), objects: c.objects.map(o => (o.mirrorOf ? { ...o, name: side(o.name) } : o)), groups: c.groups.map(g => (g.mirrorOf ? { ...g, name: side(g.name) } : g)) }
-  c = normalizeContent(c)
+  c = normalizeContent({ ...c, joins: true })
   const twins = c.shapes.filter(s => s.mirrorOf).length
   return { content: c, report: { id: body.id, shapes: c.shapes.length, twins, points, worstMirror: r2(worstMirror), kb: Math.round(copyBytes(c) / 1024), faults: publishFaults(c) } }
 }
@@ -374,10 +386,11 @@ function thumbOf(c: ModelContent): string {
   const whole = (d: string) => d.replace(/-?\d+\.\d+/g, v => String(Math.round(Number(v))))
   // at the picture's size the eyes, nose, mouth and fingers are a few pixels: the shapes smaller than four units across are left out
   const solved = solve(c, defaultValues(c), 'front')
-  const items = drawable(paintShapes(c, solved, NO_COLOURING)).filter(i => { const b = solved.shapes[i.id]?.box; return !!b && Math.max(b.w, b.h) >= 4 })
+  const items = drawable(paintShapes(c, solved, NO_COLOURING)).filter(i => { if (i.role) return true; const b = solved.shapes[i.id]?.box; return !!b && Math.max(b.w, b.h) >= 4 })
   const body = items.map(i => {
     const line = i.line ? (i.lineD ?? i.d) : ''
-    return `<path d="${whole(i.d)}" fill="${i.fill}"/>` + (line ? `<path d="${whole(line)}" fill="none" stroke="${OUTLINE_INK}" stroke-width="${i.line!.w}" stroke-linejoin="round"/>` : '')
+    // a join set's outline (a halo) has no fill of its own
+    return (i.opacity > 0 ? `<path d="${whole(i.d)}" fill="${i.fill}"/>` : '') + (line ? `<path d="${whole(line)}" fill="none" stroke="${OUTLINE_INK}" stroke-width="${i.line!.w}" stroke-linejoin="round"/>` : '')
   }).join('')
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 4 184 432">${body}</svg>`
 }

@@ -221,6 +221,8 @@ export interface Solved {
   global: Mat
   // Each group's whole turn in degrees, its own and those of the groups above it added up (not wrapped): skin weights blend the turn between two groups by it.
   turns?: Record<string, number>
+  // seen from behind (the back view, or turned past the side): the joins of the back are used (slice 9c)
+  behind?: boolean
 }
 
 const finiteMat = (m: Mat): boolean => m.every(Number.isFinite)
@@ -448,7 +450,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return false
   }
 
-  const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G, turns: {} }
+  const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G, turns: {}, ...(behind ? { behind: true } : {}) }
   const turns = out.turns!
   // A group's matrix without its own foreshortening (phase O2), only for a group that has some: what hangs from it stands in this one, moved to where the shortened group puts
   // its joint, so a forearm hangs from the end of an upper arm that points at the viewer and keeps its own length (see carryFor).

@@ -39,8 +39,9 @@ function pathMarkup(item: PaintItem, prefix: string): string {
   const a = paintAttrs(item, prefix)
   const path = `<path d="${esc(item.d)}" fill="${esc(a.fill)}" fill-opacity="${item.blank ? 0 : item.opacity}"${a.clip ? ` clip-path="${a.clip}"` : ''}${a.mask ? ` mask="${a.mask}"` : ''}${a.blend ? ` style="mix-blend-mode:${a.blend}"` : ''}/>`
   // its outline (shape editor S3), over the fill in the one ink
-  const line = item.line && !item.blank
-    ? `<path d="${esc(item.d)}" fill="none" stroke="${OUTLINE_INK}" stroke-width="${num(item.line.w)}" stroke-opacity="${num(item.line.alpha)}" stroke-linejoin="round"${a.clip ? ` clip-path="${a.clip}"` : ''}${a.mask ? ` mask="${a.mask}"` : ''}/>`
+  const lineD = item.lineD ?? item.d
+  const line = item.line && !item.blank && lineD
+    ? `<path d="${esc(lineD)}" fill="none" stroke="${OUTLINE_INK}" stroke-width="${num(item.line.w)}" stroke-opacity="${num(item.line.alpha)}" stroke-linejoin="round"${a.clip ? ` clip-path="${a.clip}"` : ''}${a.mask ? ` mask="${a.mask}"` : ''}/>`
     : ''
   const inner = a.comp ? `<g clip-path="${a.comp}">${path}${line}</g>` : path + line
   return a.wear ? `<g clip-path="${a.wear}">${inner}</g>` : inner

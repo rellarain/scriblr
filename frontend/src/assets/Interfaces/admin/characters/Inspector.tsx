@@ -6,6 +6,7 @@ import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { GuideSection, type GuideActions } from './GuideSection'
 import { CombineSection, OutlineSection, type CombineActions } from './DrawSections'
 import { TraceSection, type TraceActions } from './TraceSection'
+import { JointCapSection, ModelJoinsSection, ShapeJoinSection, type JoinActions } from './JoinSections'
 import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
@@ -93,6 +94,8 @@ export interface InspectorProps {
   // drawing (slice 9b): the Combine section's mode, and the picture to trace
   combine?: CombineActions
   trace?: TraceActions
+  // joins (slice 9c): the model's switch, renaming a set, a group's joint cap
+  joins?: JoinActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -157,6 +160,7 @@ function ShapeTab(p: InspectorProps) {
           <dt>Objects</dt><dd>{content.objects.length}</dd>
           <dt>Shapes</dt><dd>{content.shapes.length}</dd>
         </dl>
+        {p.joins && <ModelJoinsSection content={content} actions={p.joins} />}
         {p.guide && <GuideSection content={content} actions={p.guide} />}
         {p.trace && <TraceSection actions={p.trace} />}
       </div>
@@ -207,6 +211,7 @@ function ShapeTab(p: InspectorProps) {
       {sel.kind === 'object' && object && simple && !object.cloneOf && p.mirrors && <MirrorSection content={content} kind="object" thing={object} actions={p.mirrors} clones={object.mirrorOf ? undefined : p.clones} />}
       {sel.kind === 'object' && object && simple && !object.cloneOf && !object.mirrorOf && p.onAlign && <AlignSection kind="object" onAlign={axis => p.onAlign?.('object', object.id, axis)} />}
       {sel.kind === 'group' && group && simple && p.onAlign && <AlignSection kind="group" onAlign={axis => p.onAlign?.('group', group.id, axis)} />}
+      {sel.kind === 'group' && group && simple && p.joins && group.parent && (group.pivot || group.mirrorOf) && <JointCapSection content={content} group={group} actions={p.joins} />}
       {sel.kind === 'object' && object && !simple && (
         <>
           <label className="cmField">
@@ -230,6 +235,7 @@ function ShapeTab(p: InspectorProps) {
           {p.mirrors && !shape.pivot && !shape.cloneOf && <MirrorSection content={content} kind="shape" thing={shape} actions={p.mirrors} clones={shape.mirrorOf ? undefined : p.clones} />}
           {p.arrange && !shape.pivot && <ArrangeSection shape={shape} actions={p.arrange} onEditShape={p.onEditShape} />}
           <LookSection shape={shape} onEditShape={p.onEditShape} selPoint={selPoint} edges={p.edges} />
+          {p.joins && !shape.mirrorOf && !shape.cloneOf && <ShapeJoinSection content={content} shape={shape} onEditShape={p.onEditShape} />}
           {p.combine && !shape.mirrorOf && !shape.cloneOf && <OutlineSection content={content} shape={shape} part={p.edges?.part ?? 'shape'} selPoint={selPoint} mirror={mirror} axis={content.axis ?? 100} onEditShape={p.onEditShape} />}
           {p.combine && !shape.mirrorOf && !shape.cloneOf && <CombineSection content={content} shape={shape} actions={p.combine} />}
           {p.trace && <TraceSection actions={p.trace} />}

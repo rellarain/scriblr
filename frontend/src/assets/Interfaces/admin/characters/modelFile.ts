@@ -12,7 +12,7 @@ import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
 import { roundWeight } from './engine/skin'
 import { repairAngles, repairDepth, repairTurn } from './engine/turn'
-import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, outlineOf, repairDrape, repairHsl, repairLooks, repairRoll, rotValue, roundOf, repairMirrorLine, repairCloneAt, repairGuide } from './modelContent'
+import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, outlineOf, repairDrape, repairHsl, repairLooks, repairRoll, rotValue, roundOf, repairMirrorLine, repairCloneAt, repairGuide, joinFields, repairCap } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -111,6 +111,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     skin: skins(v.skin, list(v.pts).length),
     over: [...new Set(list(v.over).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.overMax),
     turn: repairTurn(v.turn, list(v.pts).length, p => point(p as never)),
+    ...joinFields(v),
   }
 }
 
@@ -219,6 +220,7 @@ function group(v: Record<string, unknown>, id: string): ModelGroup {
     attach: a && shapeId ? { shape: shapeId, kind, i: Math.round(num(a.i, 0, 0, LIMITS.pointsMax - 1)), t: num(a.t, 0, 0, 1), slider: idOrNull(a.slider), rx: num(a.rx, 0.5, 0, 1), ry: num(a.ry, 0.5, 0, 1) } : null,
     states: withIds(list(v.states), groupState).slice(0, LIMITS.statesMax),
     depth: repairDepth(v.depth),
+    cap: repairCap(v.cap),
   }
 }
 
@@ -403,6 +405,7 @@ export function parseModelFile(source: string): ModelImport {
       zones: withIds(list(m.zones), (v, id) => ({ id, name: typeof v.name === 'string' ? v.name : '', groups: Array.isArray(v.groups) ? v.groups.filter((g): g is string => typeof g === 'string') : [] })),
       tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
       guide: repairGuide(m.guide),
+      joins: m.joins === true,
     }))
   })
   return { models, skipped }
