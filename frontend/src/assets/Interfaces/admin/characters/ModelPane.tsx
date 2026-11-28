@@ -63,8 +63,10 @@ import { ANGLES, angleOf, fromBehind, viewFor, type View } from './engine/angles
 import { drawable, paintShapes } from './engine/paint'
 import { shifted } from './engine/turn'
 import { alignMorphs, bodied } from './engine/morphs'
-import { hasBody } from './engine/bodySliders'
+import { hasBody, spanOf } from './engine/bodySliders'
 import type { BodyActions } from './BodySection'
+import { MEASURES, measure, shapeClass, sliderFor } from './engine/measure'
+import type { MeasureActions } from './MeasureSection'
 import { alignTurns, clearPointDepths, clearThick, setAngleOutline, setFormAngleOutline, setWrap, stepPointDepth, stepShapeDepth, stepThick } from './engine/turnEdit'
 import { ObjectTurnSection, ShapeTurnSection, type TurnActions, type TurnWhere } from './TurnSection'
 import { autoSkin, bendSlider, clearSkin, copySkin, defaultPartner, mirrorSkin, paintSkin, partnersOf, skinBlocked, smoothSkin, stepPointSkin } from './engine/skinEdit'
@@ -1663,9 +1665,23 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     return Number.isFinite(x0) ? { thumbs, box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } } : null
   }, [shapesOnly, sel.kind, recording, shown, values, test.forms, test.hidden, test.fall, test.order, show, through, colouring])
   // the Body section (slice 9f): the test character's body sliders and the bodies it blends
-  const bodyActions: BodyActions | undefined = shapesOnly && !recording && hasBody(content) ? {
+  const bodyOn = shapesOnly && !recording && hasBody(content)
+  const bodyActions: BodyActions | undefined = bodyOn ? {
     values, onValues: change => { setScrubbing(null); setValues(vs => ({ ...vs, ...change })) },
     onReset: ids => { setScrubbing(null); setValues(vs => { const next = { ...vs }; for (const id of ids) delete next[id]; return next }) },
+  } : undefined
+  // the Measurements section (slice 9f-2): the body in cm as the sliders draw it, and a typed measurement moving its slider (as near as its band allows)
+  const measured = useMemo(() => (bodyOn && sel.kind === 'none' ? measure(content, values) : null), [bodyOn, sel.kind, content, values])
+  const measureActions: MeasureActions | undefined = bodyActions && measured ? {
+    measures: measured, shape: shapeClass(measured),
+    onType: (key, cm) => {
+      const spec = MEASURES.find(x => x.key === key), r = spec?.slider ? content.ranges.find(x => x.id === spec.slider) : undefined
+      if (!spec?.slider || !r) return null
+      const span = spanOf(r, false), v = sliderFor(content, values, key, cm, span, spec.slider)
+      if (v === null) return `${spec.name} does not change with its slider here.`
+      setScrubbing(null); setValues(vs => ({ ...vs, [spec.slider!]: v }))
+      return v === span[0] || v === span[1] ? `${spec.name}: as near to ${cm} cm as the band of its slider allows.` : null
+    },
   } : undefined
   const anglesActions: AnglesActions | undefined = angleThumbs ? {
     ...angleThumbs, current: turnAngle, onAngle: at => setView(viewFor(at)),
@@ -2355,7 +2371,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} angles={anglesActions} body={bodyActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} angles={anglesActions} body={bodyActions} measures={measureActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

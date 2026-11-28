@@ -123,6 +123,11 @@
 // the Body section (slice 9f): a slider row (its name, the track with the band writers may use and a tick at the default, the value) and the blend of bodies
 .cmBodyGroup { display: flex; flex-direction: column; gap: var(--space-1); }
 .cmBodyHead { font-size: var(--text-small); font-weight: 700; color: var(--ink-muted); }
+// the Measurements section (slice 9f-2): a measurement a row (its name, the value or a field to type it in, the unit)
+.cmMeasureList { display: flex; flex-direction: column; gap: 2px; }
+.cmMeasureRow { display: grid; grid-template-columns: minmax(0, 1fr) 4.5em 2em; align-items: center; gap: var(--space-2); }
+.cmMeasureInput { box-sizing: border-box; width: 100%; padding: 2px var(--space-1); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); text-align: right; font-variant-numeric: tabular-nums; outline: none; &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); } }
+.cmMeasureUnit { font-size: var(--text-small); color: var(--ink-muted); }
 .cmBodyBlend { display: flex; flex-direction: column; gap: var(--space-2); }
 .cmBodyRow { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 4em; align-items: center; gap: var(--space-2); min-width: 0; }
 .cmBodyLabel { font-size: var(--text-small); color: var(--ink); }

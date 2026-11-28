@@ -11,6 +11,7 @@ import { JointLimitsSection, type LimitsActions } from './JointLimitsSection'
 import { PoseSection, type PoseActions } from './PoseSection'
 import { AnglesSection, type AnglesActions } from './AnglesSection'
 import { BodySection, type BodyActions } from './BodySection'
+import { MeasureSection, type MeasureActions } from './MeasureSection'
 import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
@@ -108,6 +109,8 @@ export interface InspectorProps {
   angles?: AnglesActions
   // the Body section (slice 9f): the bodies to blend and the body sliders of a model started from a body
   body?: BodyActions
+  // the Measurements section (slice 9f-2): the test character's body in cm and its shape class
+  measures?: MeasureActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -173,6 +176,7 @@ function ShapeTab(p: InspectorProps) {
           <dt>Shapes</dt><dd>{content.shapes.length}</dd>
         </dl>
         {p.body && <BodySection content={content} actions={p.body} />}
+        {p.measures && <MeasureSection actions={p.measures} />}
         {p.joins && <ModelJoinsSection content={content} actions={p.joins} />}
         {p.limits && <JointLimitsSection content={content} actions={p.limits} />}
         {p.pose && <PoseSection content={content} actions={p.pose} />}

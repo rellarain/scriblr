@@ -131,11 +131,11 @@ export function withBodyKeys(target: BodySource, all: BodySource[]): ModelConten
       const xs = own.map(p => p[0]), ys = own.map(p => p[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, top = Math.min(...ys), h = Math.max(...ys) - top
       out.bust = own.map(([x, y]) => [(x - cx) * 0.3, (y - (top + h * 0.2)) * 0.35])
     }
-    // the regions at the full key: shoulders broader by a tenth of a head each side, the waist and the hips wider, a thicker neck, a bigger head, longer arms
-    out.shoulders = own.map(([x, y]) => [arm ? 0.11 * U : group === 'chest' ? Math.sign(x - axis) * 0.11 * U * bump(y, shoulderY, (L.chest - shoulderY) * 1.6) : 0, 0])
-    out.waist = own.map(([x, y]) => [arm ? 0 : (group === 'chest' || group === 'pelvis') ? (x - axis) * 0.15 * bump(y, L.waist, 0.55 * U) : 0, 0])
-    out.hips = own.map(([x, y]) => [arm ? 0 : (group === 'pelvis' || group === 'thighL') ? (x - axis) * 0.12 * bump(y, L.crotch - 0.25 * U, 0.75 * U) : 0, 0])
-    if (group === 'neck') out.neck = own.map(([x]) => [(x - axis) * 0.25, 0])
+    // the regions at the full key: shoulders broader by a fifth of a head each side, the waist and the hips wider, a thicker neck, a bigger head, longer arms
+    out.shoulders = own.map(([x, y]) => [arm ? 0.2 * U : group === 'chest' ? Math.sign(x - axis) * 0.2 * U * bump(y, shoulderY, (L.chest - shoulderY) * 1.6) : 0, 0])
+    out.waist = own.map(([x, y]) => [arm ? 0 : (group === 'chest' || group === 'pelvis') ? (x - axis) * 0.3 * bump(y, L.waist, 0.55 * U) : 0, 0])
+    out.hips = own.map(([x, y]) => [arm ? 0 : (group === 'pelvis' || group === 'thighL') ? (x - axis) * 0.25 * bump(y, L.crotch - 0.25 * U, 0.75 * U) : 0, 0])
+    if (group === 'neck') out.neck = own.map(([x]) => [(x - axis) * 0.3, 0])
     if (group === 'head') out.head = own.map(([x, y]) => [(x - axis) * 0.12, (y - L.chin) * 0.12])
     if (arm) out.arms = own.map(([, y]) => [0, Math.max(0, y - shoulderY) * 0.12])
     // in tenths, and a key that does not move this shape left out
