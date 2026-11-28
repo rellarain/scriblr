@@ -1,4 +1,4 @@
-import type { ModelMark, ModelPlace, ModelPoint, ModelShape } from '../../../../../api/types'
+import type { ModelContent, ModelMark, ModelPlace, ModelPoint, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, mul, rotate, translate, type Mat } from './geometry'
 import { transformShape } from './transform'
 import { centreOf } from './centre'
@@ -96,6 +96,15 @@ export const removeMark = (s: ModelShape, id: string): ModelShape => ({ ...s, ma
 // Where a mark is in the shape's own space: a mark on the centre (C1) is wherever the centre is now, any other where it was put.
 export const markXY = (s: Pick<ModelShape, 'pts' | 'closed' | 'rot' | 'sym'>, m: ModelMark): [number, number] => (m.c ? centreOf(s) ?? [m.x, m.y] : [m.x, m.y])
 export const centreAnchorOf = (s: ModelShape): ModelMark | undefined => anchorsOf(s).find(m => m.c)
+// A shape's marks as posing reads them (slice 9d): a twin across the model's centre line has its original's, reflected, inside it (a twin has no points of its own).
+export function shapeMarks(c: ModelContent, s: ModelShape | undefined | null): ModelMark[] {
+  if (!s) return []
+  const o = s.mirrorOf && s.mirrorOf !== s.id && !s.mirrorLine ? c.shapes.find(x => x.id === s.mirrorOf) : undefined
+  if (!o || o.mirrorOf) return marksOf(s)
+  const axis = c.axis ?? 100
+  const side = (n: string) => (/\(left\)/i.test(n) ? n.replace(/\(left\)/i, '(right)') : /\(right\)/i.test(n) ? n.replace(/\(right\)/i, '(left)') : n)
+  return marksOf(o).map(m => { const [x, y] = markXY(o, m), { c: _centre, ...rest } = m; return { ...rest, name: side(m.name), x: r2(2 * axis - x), y: r2(y), i: null } })
+}
 // An anchor on the shape's centre (C1), or off again: the shape is pinned there and turns about it.
 export function toggleCentreAnchor(s: ModelShape): Made {
   const on = centreAnchorOf(s)

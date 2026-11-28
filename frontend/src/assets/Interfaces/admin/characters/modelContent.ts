@@ -2,6 +2,8 @@ import { normTurn } from './engine/transform'
 import { symmetryOf } from './engine/symmetry'
 import { kindOf } from './engine/kinds'
 import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
+import { repairLimitsFor } from './engine/jointLimits'
+import { repairPoses } from './engine/poses'
 import { repairMarks, repairPlace } from './engine/anchors'
 import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelGuide, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine, ModelCloneAt } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
@@ -54,6 +56,22 @@ export function joinFields(s: { join?: unknown; joinBack?: unknown }): { join?: 
   const join = joinName(s.join), back = typeof s.joinBack === 'string' ? s.joinBack.trim().slice(0, JOIN_NAME_MAX) : null
   return { ...(join ? { join } : {}), ...(back !== null ? { joinBack: back } : {}) }
 }
+// A twin's own turns at its original's pivot points (slice 9d): point numbers to degrees within a half turn either way; none left is none (and nothing written).
+export function repairTwinTurns(v: unknown): Record<string, number> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: Record<string, number> = {}
+  for (const [k, t] of Object.entries(v as Record<string, unknown>)) {
+    if (!/^\d{1,4}$/.test(k) || typeof t !== 'number' || !Number.isFinite(t)) continue
+    const turn = Math.round(Math.min(180, Math.max(-180, t)) * 100) / 100
+    if (turn) out[String(Number(k))] = turn
+  }
+  return Object.keys(out).length ? out : null
+}
+const withoutTwinTurns = <T extends { twinTurns?: unknown }>(s: T): Omit<T, 'twinTurns'> => { const { twinTurns: _t, ...rest } = s; return rest }
+export const twinTurnsField = (s: { twinTurns?: unknown }): { twinTurns?: Record<string, number> } => {
+  const t = repairTwinTurns(s.twinTurns)
+  return t ? { twinTurns: t } : {}
+}
 export const repairCap = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(CAP_RANGE.max, Math.max(CAP_RANGE.min, v)) * 100) / 100 : null)
 
 // The proportion guide as the server keeps it (slice 9a): the crown and a head's height held to their ranges, at most twelve named lines; anything else is no guide.
@@ -73,7 +91,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...joinFields(s), ...paintFields(s) })),
+    shapes: c.shapes.map(s => ({ ...withoutTwinTurns(s), name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...joinFields(s), ...twinTurnsField(s), ...paintFields(s) })),
     objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, mirrorLine: repairMirrorLine(o.mirrorLine), cloneOf: o.cloneOf ?? null, cloneAt: repairCloneAt(o.cloneAt), place: repairPlace(o.place), classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states), depth: repairDepth(g.depth), cap: repairCap(g.cap) })),
     axis: c.axis ?? 100,
@@ -93,7 +111,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     pivots: (c.pivots ?? []).map(repairPivot),
     zones: repairZones(c.zones, c.groups),
     guide: repairGuide(c.guide),
-    joins: c.joins === true,
+    joins: c.joins === true, limitsFor: repairLimitsFor(c.limitsFor), ...(c.poses !== undefined ? { poses: repairPoses(c.poses) } : {}),
   }
 }
 

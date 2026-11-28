@@ -105,6 +105,9 @@
 .cmGuide { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
 .cmGuideLines { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
 .cmGuideLine { display: flex; align-items: center; gap: var(--space-2); }
+// a joint's limits (slice 9d): its name over its From and To steppers
+.cmJointRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.cmJointName { flex: 1 0 100%; font-size: var(--text-small); color: var(--ink); }
 .cmGuideName { flex: 1 1 auto; min-width: 0; box-sizing: border-box; padding: var(--space-1) var(--space-2); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); outline: none; &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); } }
 .cmPointForm { width: 232px; }
 .cmPointFormRow { display: flex; flex-wrap: wrap; gap: var(--space-1); }

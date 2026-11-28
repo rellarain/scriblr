@@ -7,6 +7,8 @@ import { GuideSection, type GuideActions } from './GuideSection'
 import { CombineSection, OutlineSection, type CombineActions } from './DrawSections'
 import { TraceSection, type TraceActions } from './TraceSection'
 import { JointCapSection, ModelJoinsSection, ShapeJoinSection, type JoinActions } from './JoinSections'
+import { JointLimitsSection, type LimitsActions } from './JointLimitsSection'
+import { PoseSection, type PoseActions } from './PoseSection'
 import { AlignSection, ArrangeSection, CentreSection, CloneSection, ConnectionsSection, JointSection, LookSection, MarksSection, MirrorSection, SymmetrySection, type ArrangeActions, type CentreActions, type CloneActions, type ConnectionActions, type EdgeActions, type JointActions, type MirrorActions, type SymmetryActions, TypeSection } from './ShapePanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
@@ -96,6 +98,10 @@ export interface InspectorProps {
   trace?: TraceActions
   // joins (slice 9c): the model's switch, renaming a set, a group's joint cap
   joins?: JoinActions
+  // joint limits (slice 9d): the body the limits are for, and each pivot point's limits
+  limits?: LimitsActions
+  // the Pose section (slice 9d): drag to pose, what holds still, reset, the saved poses
+  pose?: PoseActions
   // ... and its Symmetry section (S6)
   symmetry?: SymmetryActions
   // the selected point's pivot section (joints J2)
@@ -161,6 +167,8 @@ function ShapeTab(p: InspectorProps) {
           <dt>Shapes</dt><dd>{content.shapes.length}</dd>
         </dl>
         {p.joins && <ModelJoinsSection content={content} actions={p.joins} />}
+        {p.limits && <JointLimitsSection content={content} actions={p.limits} />}
+        {p.pose && <PoseSection content={content} actions={p.pose} />}
         {p.guide && <GuideSection content={content} actions={p.guide} />}
         {p.trace && <TraceSection actions={p.trace} />}
       </div>

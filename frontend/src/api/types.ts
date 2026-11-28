@@ -706,7 +706,13 @@ export type ModelBindKind = 'point' | 'edge' | 'center'
 // Shape types T5: a slider, an edge link that moves along the other shape's outline between two stops (places e + t along it); `at` where it has been posed (null: as drawn)
 export interface ModelSlide { lo: number; hi: number; at: number | null }
 // Joints J2: a link made a pivot point: how far the side that follows is turned from the side it follows, and the smallest and largest turn allowed (lo <= 0 <= hi).
-export interface ModelJoint { turn: number; lo: number; hi: number }
+// Joint limits (slice 9d): a pivot point's name and the joint of the body it stands for (its limits come from the table for that joint, jointLimits.ts)
+export type ModelJointKind = 'neck' | 'shoulder' | 'elbow' | 'wrist' | 'hip' | 'knee' | 'ankle'
+// at: where the joint turns, in the model's space at rest, when that is not the linked point (a limb's joint inside two shapes that overlap); the linked point then keeps
+// its place on its own shape, and the link only says which two objects the joint joins
+export interface ModelJoint { turn: number; lo: number; hi: number; name?: string | null; kind?: ModelJointKind | null; at?: [number, number] | null }
+// The body the joint limits are set for (slice 9d): the table's ranges for men or women, at an age, hypermobile or not
+export interface ModelLimitsFor { sex: 'men' | 'women'; age: 'child' | 'adult' | 'elder'; hyper: boolean }
 export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number; tan?: boolean; name?: string; segName?: string; slide?: ModelSlide | null; pivot?: ModelJoint | null }
 // A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic). bind links it to another shape.
 // `line: false`: the edge from this point to the next has no outline (the shape's outline is drawn along its other edges); absent: it has one.
@@ -735,13 +741,16 @@ export interface ModelCloneAt { x: number; y: number; turn: number; flip: boolea
 export type ModelMarkKind = 'anchor' | 'pose'
 export interface ModelMark { id: string; kind: ModelMarkKind; x: number; y: number; i: number | null; name: string; c?: boolean }
 export interface ModelPlace { dx: number; dy: number; turn: number }
+// A saved pose (slice 9d): every pivot point's turn ("shape:point"; a twin's own at its original's points, keyed by the twin) and where each figure was placed (by object)
+export interface ModelPose { id: string; name: string; turns: Record<string, number>; places?: Record<string, ModelPlace> }
 // A shape that shows with a slider (phase 5b; a crease): fully hidden when the slider is at `hidden`, fully drawn at `shown`, in proportion between.
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
 // join, joinBack (slice 9c): the join set the shape is drawn in as one outline with the others in it (while the model's joins are on), and the set it is in from behind
+// twinTurns (slice 9d): a twin's own turns at its original's pivot points, by point number, read as the original's are (a twin has no points of its own to hold them)
 // (absent: the same as from the front; '': none from behind). A twin, a clone and a member take them from the shape they copy.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null; marks?: ModelMark[]; place?: ModelPlace | null; mirrorLine?: ModelMirrorLine | null; cloneOf?: string | null; cloneAt?: ModelCloneAt | null; join?: string | null; joinBack?: string | null }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null; marks?: ModelMark[]; place?: ModelPlace | null; mirrorLine?: ModelMirrorLine | null; cloneOf?: string | null; cloneAt?: ModelCloneAt | null; join?: string | null; joinBack?: string | null; twinTurns?: Record<string, number> | null }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }
@@ -853,7 +862,7 @@ export interface ModelFrame { id: string; name: string; x: number; y: number; w:
 // shapes snap to. A model started from a body template has its body's; a blank model has none.
 export interface ModelGuideLine { name: string; y: number }
 export interface ModelGuide { top: number; head: number; lines: ModelGuideLine[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[]; zones?: ModelZone[]; guide?: ModelGuide | null; joins?: boolean | null }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[]; pivots?: ModelPivot[]; zones?: ModelZone[]; guide?: ModelGuide | null; joins?: boolean | null; limitsFor?: ModelLimitsFor | null; poses?: ModelPose[] | null }
 // A body a new model can start from (slice 9a): listed with a note on the body, how many heads tall it stands and a small SVG picture of it; read with the model it starts.
 export interface BodyTemplateInfo { id: string; name: string; note: string; heads: number; thumb: string }
 export interface BodyTemplate extends BodyTemplateInfo { content: ModelContent }

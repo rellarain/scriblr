@@ -1,10 +1,12 @@
-import type { ModelCloneAt, ModelContent, ModelJoint, ModelMirrorLine, ModelObject, ModelShape, ModelShapeKind } from '../../../../api/types'
+import { useState } from 'react'
+import type { ModelCloneAt, ModelContent, ModelJoint, ModelJointKind, ModelMirrorLine, ModelObject, ModelShape, ModelShapeKind } from '../../../../api/types'
 import { sameLine, type LineOption } from './engine/mirrors'
 import type { PartKind } from './designerState'
 import { NAME_LIMIT, isWeld, linkHolder, sharedSegment, sharersOf, weldedTo, type CopyShare } from './engine/connect'
 import { shapeById } from './modelContent'
 import { AlignAcrossIcon, AlignDownIcon, AnchorIcon, BackwardIcon, CloseIcon, CopyIcon, FlipAcrossIcon, FlipDownIcon, ForwardIcon, LinkIcon, OrbitIcon, PlusIcon, PolygonIcon, SwapIcon, UnlockIcon } from '../../../icons'
-import { TURN_LIMIT } from './engine/pivots'
+import { JOINT_KINDS, JOINT_NAME_MAX, TURN_LIMIT } from './engine/pivots'
+import { JOINT_LABEL, JOINT_NOTE } from './engine/jointLimits'
 import { removeMark, renameMark } from './engine/anchors'
 import { LIMITS } from './engine/limits'
 import { CAST_OPACITY, KIND_NAMES, actsAs, isCast, kindOf, unlinkedCount } from './engine/kinds'
@@ -201,16 +203,38 @@ function MarkList({ shape, kind, group, one, onEditShape }: { shape: ModelShape;
 
 // A pivot circle (shape types T3): its pivot's name and place, the circle's size, its turn and the smallest and largest turn allowed, and one more circle on the pivot.
 // A pivot point's section (joints J2): the turn of the linked point it is made from, and the smallest and largest turn allowed (5 degrees a step; Shift 15).
+// Joint limits (slice 9d): its name and the joint of the body it stands for, which sets its limits from the table.
 export interface JointActions {
   joint: ModelJoint
   onSetting: (key: 'turn' | 'lo' | 'hi', value: number) => void
+  onName?: (name: string) => void
+  onKind?: (kind: ModelJointKind | null) => void
 }
 export function JointSection({ actions }: { actions: JointActions }) {
   const p = actions.joint
   const deg = (v: number) => `${fmt(v)}°`, step = (big: boolean) => (big ? 15 : 5)
+  const [name, setName] = useState<string | null>(null)
+  const commitName = () => { if (name !== null && name.trim() !== (p.name ?? '')) actions.onName?.(name); setName(null) }
   return (
     <div className="cmPivotPanel" role="group" aria-label="Pivot point">
       <h3 className="cmInsSub">Pivot point</h3>
+      {actions.onName && (
+        <label className="cmField">
+          <span>Name</span>
+          <input value={name ?? p.name ?? ''} maxLength={JOINT_NAME_MAX} placeholder={p.kind ? JOINT_LABEL[p.kind] : ''} aria-label="Name of the pivot point"
+            onChange={e => setName(e.target.value)} onBlur={commitName} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+        </label>
+      )}
+      {actions.onKind && (
+        <label className="cmField">
+          <span>Stands for</span>
+          <select value={p.kind ?? ''} onChange={e => actions.onKind?.((e.target.value || null) as ModelJointKind | null)}>
+            <option value="">No joint of the body</option>
+            {JOINT_KINDS.map(k => <option key={k} value={k}>{JOINT_LABEL[k]}</option>)}
+          </select>
+        </label>
+      )}
+      {p.kind && <p className="cmInsText">{JOINT_LABEL[p.kind]}: {JOINT_NOTE[p.kind]}. Choosing it set the limits; they can still be changed here.</p>}
       <Stepper label="Turn" value={deg(p.turn)} bigBy={15} lowerOff={p.turn <= p.lo} raiseOff={p.turn >= p.hi} onStep={(dir, big) => actions.onSetting('turn', p.turn + dir * step(big))} />
       <Stepper label="Turns at least" value={deg(p.lo)} bigBy={15} lowerOff={p.lo <= -TURN_LIMIT} raiseOff={p.lo >= 0} onStep={(dir, big) => actions.onSetting('lo', p.lo + dir * step(big))} />
       <Stepper label="Turns at most" value={deg(p.hi)} bigBy={15} lowerOff={p.hi <= 0} raiseOff={p.hi >= TURN_LIMIT} onStep={(dir, big) => actions.onSetting('hi', p.hi + dir * step(big))} />

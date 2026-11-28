@@ -1388,6 +1388,33 @@ def _optional_id(value: Any) -> Optional[str]:
     return value if isinstance(value, str) and re.fullmatch(_MODEL_ID, value) else None
 
 
+MODEL_JOINT_KINDS = ("neck", "shoulder", "elbow", "wrist", "hip", "knee", "ankle")
+MODEL_JOINT_NAME_MAX = 40
+
+
+class ModelLimitsFor(BaseModel):
+    """The body a model's joint limits are set for (slice 9d): the table's ranges for men or women, at an age, hypermobile or not. Anything else is the default."""
+
+    sex: str = "men"
+    age: str = "adult"
+    hyper: bool = False
+
+    @field_validator("sex", mode="before")
+    @classmethod
+    def _sex(cls, value: Any) -> str:
+        return "women" if value == "women" else "men"
+
+    @field_validator("age", mode="before")
+    @classmethod
+    def _age(cls, value: Any) -> str:
+        return value if value in ("child", "elder") else "adult"
+
+    @field_validator("hyper", mode="before")
+    @classmethod
+    def _hyper(cls, value: Any) -> bool:
+        return value is True
+
+
 class ModelJoint(BaseModel):
     """A link made a pivot point (joints J2): the shapes on its two sides turn about the linked point. `turn` is how far the side of the point that follows is turned
     from the side it follows, in degrees; `lo` and `hi` are the smallest and largest turn the admin allows (lo <= 0 <= hi, the turn held between them)."""
@@ -1395,6 +1422,39 @@ class ModelJoint(BaseModel):
     turn: float = 0.0
     lo: float = -MODEL_TURN_LIMIT
     hi: float = MODEL_TURN_LIMIT
+    # Joint limits (slice 9d): its name, and the joint of the body it stands for (its limits come from the table for that joint). Written only when set.
+    name: Optional[str] = None
+    kind: Optional[str] = None
+    # Where the joint turns, in the model's space at rest, when that is not the linked point (a limb's joint inside two shapes that overlap). Written only when set.
+    at: Optional[list[float]] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> Optional[str]:
+        return (value.strip()[:MODEL_JOINT_NAME_MAX] or None) if isinstance(value, str) else None
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> Optional[list[float]]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return None
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v in (float("inf"), float("-inf")) for v in value):
+            return None
+        return [round(_finite(v, 0.0, -1e5, 1e5), 2) for v in value]
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Optional[str]:
+        return value if value in MODEL_JOINT_KINDS else None
+
+    @model_serializer(mode="wrap")
+    def _dump_named(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """A joint with no name and no kind is written as before joint limits existed."""
+        data = handler(self)
+        for key in ("name", "kind", "at"):
+            if data.get(key) is None:
+                data.pop(key, None)
+        return data
 
     @field_validator("turn", "lo", "hi", mode="before")
     @classmethod
@@ -1893,6 +1953,55 @@ class ModelPlace(BaseModel):
         return round(a - 360.0 if a > 180.0 else a, 2)
 
 
+
+MODEL_POSES_MAX = 24
+MODEL_POSE_NAME_MAX = 40
+_POSE_TURN_KEY = re.compile(r"^[A-Za-z0-9_.-]{1,80}:\d{1,4}$")
+_POSE_ID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+
+
+class ModelPose(BaseModel):
+    """A saved pose (slice 9d): every pivot point's turn ("shape:point"; a twin's own at its original's points, keyed by the twin) and where each figure was placed (by
+    object), so it can be put back. Turns within a half turn; anything else is left out."""
+
+    id: str
+    name: str = "Pose"
+    turns: dict[str, float] = Field(default_factory=dict)
+    places: dict[str, ModelPlace] = Field(default_factory=dict)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> str:
+        return (value.strip()[:MODEL_POSE_NAME_MAX] or "Pose") if isinstance(value, str) else "Pose"
+
+    @field_validator("turns", mode="before")
+    @classmethod
+    def _turns(cls, value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        out: dict[str, float] = {}
+        for key, turn in value.items():
+            if isinstance(key, str) and _POSE_TURN_KEY.match(key) and not isinstance(turn, bool) and isinstance(turn, (int, float)):
+                kept = round(_finite(turn, 0.0, -180.0, 180.0), 2)
+                if kept:
+                    out[key] = kept
+        return out
+
+    @field_validator("places", mode="before")
+    @classmethod
+    def _places(cls, value: Any) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            return {}
+        out: dict[str, Any] = {}
+        for key, place in value.items():
+            if isinstance(key, str) and re.match(_MODEL_ID, key):
+                try:
+                    out[key] = ModelPlace.model_validate(place)
+                except ValueError:
+                    continue
+        return out
+
+
 class ModelPivot(BaseModel):
     """A pivot point (shape types T3): the shared middle of a pivot's circles, in the model's space as drawn."""
 
@@ -2034,6 +2143,9 @@ class ModelShape(BaseModel):
     # "" not joined from behind). Written only when set.
     join: Optional[str] = None
     joinBack: Optional[str] = None
+    # A twin's own turns at its original's pivot points (slice 9d), by point number, read as the original's are: a twin has no points of its own to hold them, and the
+    # two sides pose apart. Written only when set.
+    twinTurns: Optional[dict[str, float]] = None
     # An outline of its own for the back view (None: the front outline seen from behind), its own depth in the back view, and the slider that loosens
     # the links of its points (None: they keep their distance).
     back: Optional[list[ModelPoint]] = Field(default=None, max_length=MODEL_POINTS_MAX)
@@ -2096,11 +2208,25 @@ class ModelShape(BaseModel):
     def _join(cls, value: Any) -> Optional[str]:
         return value.strip()[:MODEL_JOIN_NAME_MAX] if isinstance(value, str) else None
 
+    @field_validator("twinTurns", mode="before")
+    @classmethod
+    def _twin_turns(cls, value: Any) -> Optional[dict[str, float]]:
+        if not isinstance(value, dict):
+            return None
+        out: dict[str, float] = {}
+        for key, turn in value.items():
+            if not (isinstance(key, str) and key.isdigit() and len(key) <= 4) or isinstance(turn, bool) or not isinstance(turn, (int, float)):
+                continue
+            kept = round(_finite(turn, 0.0, -180.0, 180.0), 2)
+            if kept:
+                out[str(int(key))] = kept
+        return out or None
+
     @model_serializer(mode="wrap")
     def _dump_joins(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
-        """A shape with no joins is written as before joins existed."""
+        """A shape with no joins (or turns of a twin's own) is written as before they existed."""
         data = handler(self)
-        for key in ("join", "joinBack"):
+        for key in ("join", "joinBack", "twinTurns"):
             if data.get(key) is None:
                 data.pop(key, None)
         return data
@@ -3517,6 +3643,34 @@ class ModelContent(BaseModel):
     guide: Optional[ModelGuide] = None
     # Joins (slice 9c): shapes in the same join set are drawn as one outline round them. Written only when on.
     joins: Optional[bool] = None
+    # The body the joint limits are set for (slice 9d), or none (men, adult). Written only when set.
+    limitsFor: Optional[ModelLimitsFor] = None
+    # Saved poses (slice 9d), at most 24, each id once. Written only when there are any.
+    poses: list[ModelPose] = Field(default_factory=list)
+
+    @field_validator("poses", mode="before")
+    @classmethod
+    def _poses(cls, value: Any) -> list[Any]:
+        if not isinstance(value, list):
+            return []
+        out: list[ModelPose] = []
+        seen: set[str] = set()
+        for raw in value:
+            if len(out) >= MODEL_POSES_MAX or not isinstance(raw, dict) or not isinstance(raw.get("id"), str) or not _POSE_ID.match(raw["id"]) or raw["id"] in seen:
+                continue
+            try:
+                out.append(ModelPose.model_validate(raw))
+            except ValueError:
+                continue
+            seen.add(raw["id"])
+        return out
+
+    @field_validator("limitsFor", mode="before")
+    @classmethod
+    def _limits_for(cls, value: Any) -> Optional[ModelLimitsFor]:
+        if value is None or isinstance(value, ModelLimitsFor):
+            return value
+        return ModelLimitsFor.model_validate(value) if isinstance(value, dict) else None
 
     @field_validator("guide", mode="before")
     @classmethod
@@ -3536,6 +3690,10 @@ class ModelContent(BaseModel):
             data.pop("guide", None)
         if not data.get("joins"):
             data.pop("joins", None)
+        if data.get("limitsFor") is None:
+            data.pop("limitsFor", None)
+        if not data.get("poses"):
+            data.pop("poses", None)
         return data
 
     @field_validator("zones", mode="before")

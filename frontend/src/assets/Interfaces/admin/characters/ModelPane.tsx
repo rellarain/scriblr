@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import type { BodyPart, ModelContent, ModelEntry, ModelLayer, ModelPoint, ModelShape } from '../../../../api/types'
+import type { BodyPart, ModelContent, ModelEntry, ModelJointKind, ModelLayer, ModelLimitsFor, ModelPoint, ModelShape } from '../../../../api/types'
 import {
   BrushIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HighlighterIcon, HistoryIcon, MannequinIcon, PathIcon, PlusIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
@@ -21,6 +21,9 @@ import { BodyPartMenu, addBodyPart } from './BodyPartMenu'
 import type { CombineActions, CombineMode } from './DrawSections'
 import { useModelTrace } from './TraceSection'
 import type { JoinActions } from './JoinSections'
+import type { LimitsActions } from './JointLimitsSection'
+import type { PoseActions } from './PoseSection'
+import { applyPose, deletePose, renamePose, savePose as keepPose } from './engine/poses'
 import { cutOutShape, mergeShapes, splitShape } from './engine/outlineOps'
 import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
@@ -93,12 +96,13 @@ import type { CloneActions, MirrorActions } from './ShapePanels'
 import { addZone, ensureZones, moveGroupTo, moveObjectTo, moveShapeTo, moveZone, needsZones, newGroupIn, removeZone, renameZone, topZone, zoneById, zonesOf } from './engine/zones'
 import type { ArrangeActions, CentreActions, ConnectionActions, EdgeActions, JointActions, SymmetryActions } from './ShapePanels'
 import { edgeHome, setHomeEdge } from './engine/edges'
-import { jointAt, migrateJoints, needsJoints, poseOf, setJointSetting, toggleJoint } from './engine/pivots'
-import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, centreAnchorOf, guardAnchors, marksOf, posableOn, toggleAnchor, toggleCentreAnchor, togglePosable } from './engine/anchors'
+import { jointAt, jointHolder, migrateJoints, needsJoints, poseOf, setJointSetting, toggleJoint } from './engine/pivots'
+import { applyLimitsFor, nameJoint, setJointKind } from './engine/jointLimits'
+import { addFreeAnchor, addFreePosable, anchorOn, anchorsOf, centreAnchorOf, guardAnchors, marksOf, posableOn, shapeMarks, toggleAnchor, toggleCentreAnchor, togglePosable } from './engine/anchors'
 import { isSlider, makeSlider, nearestPlace, placeAt, setStop, stopSlider } from './engine/sliders'
 import { drawnOf } from './engine/connect'
 import { drawnCentre } from './engine/centre'
-import { beginPose, beginReach, beginSlide, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag } from './engine/posing'
+import { beginPose, beginReach, beginSlide, isPosed, movePose, resetPose, type PoseDrag as ShapePoseDrag, type PoseHolds } from './engine/posing'
 import { disableSymmetry, enableSymmetry, followSymmetry, restoreLinePoint } from './engine/symmetry'
 import type { ConnectTool, RemoveTarget, RightSpot } from './DesignerCanvas'
 import { PointForm } from './PointForm'
@@ -251,6 +255,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [confirmUpdate, setConfirmUpdate] = useState(false)
   const [note, setNote] = useState('')
   const [tabRaw, setTab] = useState<InspectorTab>('shape')
+  // the Pose section (slice 9d): drag to pose whatever is selected, and what holds still while a part reaches
+  const [poseAll, setPoseAll] = useState(false)
+  const [poseHolds, setPoseHolds] = useState<PoseHolds>('limb')
   // a tab the writer has put away with the advanced tools is not the open one, whatever was open before
   const tab: InspectorTab = shapesOnly || (!policy.advanced && ADVANCED_TABS.includes(tabRaw)) ? 'shape' : tabRaw
   const test = useTestState()
@@ -1626,6 +1633,18 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     }
   })() : null
   // joins (slice 9c): the model's switch, a set renamed in every shape that names it (from the front and from behind), a group's joint cap
+  const poseActions: PoseActions | undefined = shapesOnly ? {
+    on: poseAll, onToggle: setPoseAll, holds: poseHolds, onHolds: setPoseHolds, posed: isPosed(content),
+    onReset: () => commit(resetPose(content)),
+    onSave: name => { const r = keepPose(content, name); if (!r.ok) setNote(r.reason); else commit(r.content) },
+    onApply: id => commit(applyPose(content, id)),
+    onRename: (id, name) => commit(renamePose(content, id, name)),
+    onDelete: id => commit(deletePose(content, id)),
+  } : undefined
+  const limitsActions: LimitsActions | undefined = shapesOnly ? {
+    onFor: (f: ModelLimitsFor) => commit(applyLimitsFor(content, f)),
+    onLimit: (shapeId, i, key, v) => commit(setJointSetting(content, shapeId, i, key, v)),
+  } : undefined
   const joinActions: JoinActions | undefined = shapesOnly ? {
     onJoins: on => commit({ ...content, joins: on }),
     onRename: (from, to) => commit({ ...content, shapes: content.shapes.map(s => (s.join === from || s.joinBack === from ? { ...s, ...(s.join === from ? { join: to } : {}), ...(s.joinBack === from ? { joinBack: to } : {}) } : s)) }),
@@ -1967,20 +1986,26 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onPivot: (sid, i) => { const r = toggleJoint(content, sid, i); if (!r.ok) setNote(r.reason); else commit(r.content, true) },
     onDisconnect: (sid, i) => { commit(disconnect(content, canvasSolved, sid, i), true) },
   } : undefined
+  const jointHold = selShape && selJoint ? jointHolder(content, selShape.id, selPoint) : null
   const jointActions: JointActions | undefined = selShape && selJoint ? {
     joint: selJoint,
     onSetting: (key, v) => { commit(setJointSetting(content, selShape.id, selPoint, key, v), true) },
+    ...(jointHold ? {
+      onName: (name: string) => commit(nameJoint(content, jointHold.shapeId, jointHold.i, name), true),
+      onKind: (kind: ModelJointKind | null) => commit(setJointKind(content, jointHold.shapeId, jointHold.i, kind), true),
+    } : {}),
   } : undefined
   // Pose mode in the shape editor (joints J3): on while a group or an object is selected (objects are the posable segments of a group). With a group selected any of its objects
   // can be dragged, with an object that object (all its shapes together). A press that moves poses; one that stays put selects as usual, which leaves Pose mode. Each drag is
   // one undo step.
-  const posingOn = shapesOnly && !recording && !through && (sel.kind === 'group' || sel.kind === 'object')
-  const inPoseScope = (shapeId: string): boolean => (sel.kind === 'group' ? groupOfShape(content, shapeId) === sel.id : sel.kind === 'object' ? objectOfShape(content, shapeId)?.id === sel.id : false)
+  // Drag to pose (slice 9d): the figure is posed by dragging it whatever is selected; what holds still while a part reaches
+  const posingOn = shapesOnly && !recording && !through && (poseAll || sel.kind === 'group' || sel.kind === 'object')
+  const inPoseScope = (shapeId: string): boolean => (poseAll ? true : sel.kind === 'group' ? groupOfShape(content, shapeId) === sel.id : sel.kind === 'object' ? objectOfShape(content, shapeId)?.id === sel.id : false)
   function shapePoseBegin(grab: PoseGrab, world: [number, number]): boolean {
     const at = toModel(solved, world[0], world[1])
     const target = grab.kind === 'slider' ? shapeById(content, grab.shapeId)?.pts[grab.i]?.bind?.s : undefined
-    const r = grab.kind === 'part' ? beginPose(content, grab.shapeId, at)
-      : grab.kind === 'mark' ? beginReach(content, grab.shapeId, grab.markId, at)
+    const r = grab.kind === 'part' ? beginPose(content, grab.shapeId, at, poseHolds)
+      : grab.kind === 'mark' ? beginReach(content, grab.shapeId, grab.markId, at, poseHolds)
       : grab.kind === 'slider' && target ? beginSlide(content, grab.shapeId, grab.i, drawnOf(content, canvasSolved, target))
       : null
     if (!r) return false
@@ -2003,7 +2028,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (d?.changed) models.edit(entry.id, () => d.start, false)
   }
   // what Pose mode can grab: the shapes of a figure with a pivot, a posable point, a slider
-  const poseHandles = content.shapes.some(s => marksOf(s).some(m => m.kind === 'pose') || s.pts.some(isSlider))
+  const poseHandles = content.shapes.some(s => shapeMarks(content, s).some(m => m.kind === 'pose') || s.pts.some(isSlider))
   const shapePose: PoseCanvas | null = posingOn && (poseOf(content).posable.size > 0 || poseHandles) ? {
     joints: [], scales: [], slides: [], light: true,
     canPose: id => poseOf(content).posable.has(id) && inPoseScope(id),
@@ -2011,7 +2036,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onDown: shapePoseBegin, onMove: shapePoseMove, onUp: () => { shapePoseRef.current = null }, onCancel: shapePoseCancel,
   } : null
   // the posable points and the sliders where they are drawn now (T5); a slider's stops are shown while its shape is edited
-  const poseMarks = shapesOnly ? content.shapes.flatMap(s => marksOf(s).filter(m => m.kind === 'pose').map(m => {
+  const poseMarks = shapesOnly ? content.shapes.flatMap(s => shapeMarks(content, s).filter(m => m.kind === 'pose').map(m => {
     const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
     return { id: `${s.id}:${m.id}`, shapeId: s.id, markId: m.id, x, y, name: m.name }
   })) : undefined
@@ -2290,7 +2315,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

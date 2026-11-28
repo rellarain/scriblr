@@ -1,6 +1,6 @@
-import type { ModelBind, ModelContent, ModelJoint, ModelPivot, ModelShape, ModelShapePivot } from '../../../../../api/types'
+import type { ModelBind, ModelContent, ModelJoint, ModelJointKind, ModelPivot, ModelShape, ModelShapePivot } from '../../../../../api/types'
 import { IDENTITY, apply, bezierAt, build, inverse, mul, nearestEdge, rotate, type Mat } from './geometry'
-import { anchorsOf, placeMat } from './anchors'
+import { placeMat, shapeMarks } from './anchors'
 import { treeRank } from './order'
 import { orbitOf } from './symmetry'
 import { centreOf } from './centre'
@@ -16,6 +16,10 @@ import type { Solved } from './rig'
 // that are not pivots join nothing: a point linked across objects follows the shape it is linked to.
 //
 // Pivot circles (shape types T3: a point with circles round it that shapes hung on) were replaced by pivot points; `migrateJoints` turns an old model's circles into pivot links.
+//
+// Twins (slice 9d): a twin shape has no points of its own, so it takes its original's pivot links, reflected across the model's centre line, between the twin objects (or the
+// object in the middle the original is linked to), with turns of its own (`ModelShape.twinTurns`, by point number, read as the original's would be: an elbow bends 0 to 145
+// on both sides), so the two sides pose apart.
 
 export const TURN_LIMIT = 180
 const r2 = (v: number): number => Math.round(v * 100) / 100
@@ -23,11 +27,19 @@ const angle = (v: unknown, fallback: number): number => (typeof v === 'number' &
 const wrap = (a: number): number => { const t = ((a % 360) + 360) % 360; return t > 180 ? t - 360 : t }
 
 // A pivot's settings as the server keeps them: lo <= 0 <= hi, the turn held between them.
+export const JOINT_KINDS: readonly ModelJointKind[] = ['neck', 'shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle']
+export const JOINT_NAME_MAX = 40
 export function repairJoint(v: unknown): ModelJoint | null {
   if (!v || typeof v !== 'object') return null
   const p = v as Record<string, unknown>
   const lo = Math.min(0, angle(p.lo, -TURN_LIMIT)), hi = Math.max(0, angle(p.hi, TURN_LIMIT))
-  return { turn: Math.min(hi, Math.max(lo, angle(p.turn, 0))), lo, hi }
+  const name = typeof p.name === 'string' ? p.name.trim().slice(0, JOINT_NAME_MAX) : '', kind = JOINT_KINDS.includes(p.kind as ModelJointKind) ? (p.kind as ModelJointKind) : null
+  const place = (q: unknown) => (typeof q === 'number' && Number.isFinite(q) ? r2(Math.min(1e5, Math.max(-1e5, q))) : null)
+  const at = Array.isArray(p.at) && p.at.length === 2 ? [place(p.at[0]), place(p.at[1])] : null
+  return {
+    turn: Math.min(hi, Math.max(lo, angle(p.turn, 0))), lo, hi, ...(name ? { name } : {}), ...(kind ? { kind } : {}),
+    ...(at && at[0] !== null && at[1] !== null ? { at: [at[0], at[1]] as [number, number] } : {}),
+  }
 }
 export const NEW_JOINT: ModelJoint = { turn: 0, lo: -TURN_LIMIT, hi: TURN_LIMIT }
 
@@ -37,8 +49,8 @@ export function repairShapePivot(v: unknown): ModelShapePivot | null {
   if (!v || typeof v !== 'object') return null
   const p = v as Record<string, unknown>
   if (typeof p.at !== 'string' || !p.at) return null
-  const j = repairJoint(p)!
-  return { at: p.at, ...j }
+  const { turn, lo, hi } = repairJoint(p)!
+  return { at: p.at, turn, lo, hi }
 }
 export function repairPivot(p: ModelPivot): ModelPivot {
   const place = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? r2(Math.min(1e5, Math.max(-1e5, v))) : fallback)
@@ -100,22 +112,51 @@ export function setJointSetting(c: ModelContent, shapeId: string, i: number, key
     if (!b.pivot) return b
     const v = r2(Math.min(TURN_LIMIT, Math.max(-TURN_LIMIT, value)))
     const lo = key === 'lo' ? Math.min(0, v) : b.pivot.lo, hi = key === 'hi' ? Math.max(0, v) : b.pivot.hi
-    return { ...b, pivot: { lo, hi, turn: Math.min(hi, Math.max(lo, key === 'turn' ? v : b.pivot.turn)) } }
+    return { ...b, pivot: { ...b.pivot, lo, hi, turn: Math.min(hi, Math.max(lo, key === 'turn' ? v : b.pivot.turn)) } }
   })
 }
 // A pivot turned by some degrees more, held to its limits (posing).
 export function addJointTurn(c: ModelContent, jointId: string, by: number): ModelContent {
   const [shapeId, k] = jointId.split(':'), i = Number(k)
-  const b = c.shapes.find(s => s.id === shapeId)?.pts[i]?.bind
+  const shape = c.shapes.find(s => s.id === shapeId), o = shape ? twinSource(c, shape) : undefined
+  if (shape && o) {
+    // a twin: its own turn, read as its original's (the turn the pose works with is the other way round)
+    const piv = o.pts[i]?.bind?.pivot
+    if (!piv) return c
+    const own = shape.twinTurns?.[String(i)] ?? 0, next = r2(Math.min(piv.hi, Math.max(piv.lo, own - by))) || 0
+    return setTwinTurn(c, shapeId, i, next)
+  }
+  const b = shape?.pts[i]?.bind
   if (!b?.pivot) return c
   return withBind(c, shapeId, i, x => ({ ...x, pivot: { ...x.pivot!, turn: r2(Math.min(x.pivot!.hi, Math.max(x.pivot!.lo, x.pivot!.turn + by))) } }))
+}
+
+// ---- twins ----
+
+// The shape a twin takes its pivot links from: its original, when it is a twin across the model's centre line of a shape that is not a twin itself.
+export function twinSource(c: ModelContent, t: ModelShape): ModelShape | undefined {
+  if (!t.mirrorOf || t.mirrorOf === t.id || t.mirrorLine) return undefined
+  const o = c.shapes.find(x => x.id === t.mirrorOf)
+  return o && !o.mirrorOf ? o : undefined
+}
+// A twin's own turn at point i of its original (0, the rest, leaves none written).
+export function setTwinTurn(c: ModelContent, twinId: string, i: number, turn: number): ModelContent {
+  return {
+    ...c, shapes: c.shapes.map(s => {
+      if (s.id !== twinId) return s
+      const { [String(i)]: _was, ...rest } = s.twinTurns ?? {}
+      const turns = turn ? { ...rest, [String(i)]: turn } : rest
+      const { twinTurns: _t, ...plain } = s
+      return Object.keys(turns).length ? { ...plain, twinTurns: turns } : plain
+    }),
+  }
 }
 
 // ---- the pose ----
 
 // A pivot link: the point that holds it (`shape`, `i`; its id is "shape:i"), the object of that point (`from`) and of the shape it is linked to (`to`), the pivot point where it is
 // drawn at rest, and the pivot's turn (how far `from` is turned from `to`).
-export interface Joint { id: string; shape: string; i: number; from: string; to: string; at: [number, number]; turn: number; lo: number; hi: number }
+export interface Joint { id: string; shape: string; i: number; from: string; to: string; at: [number, number]; turn: number; lo: number; hi: number; twin?: boolean; kind?: ModelJointKind | null }
 
 export interface Pose {
   // each shape that moves: the matrix it is drawn through (in the model's space); each object that moves
@@ -137,6 +178,8 @@ export interface Pose {
   figureAnchors: Map<string, number>
   // the shapes a drag in Pose mode can pose (every shape of an object)
   posable: Set<string>
+  // the objects with a pivot point (a twin in one is posed on its own, not as its original is drawn)
+  jointed: Set<string>
 }
 
 const cache = new WeakMap<ModelContent, Pose>()
@@ -170,7 +213,7 @@ function restPlace(byId: Map<string, ModelShape>, b: ModelBind): [number, number
 function work(c: ModelContent): Pose {
   const pose: Pose = {
     mats: new Map(), objectMats: new Map(), joints: new Map(), points: new Map(), blocked: new Set(), bodyOf: new Map(), bodies: new Map(), rootOf: new Map(),
-    parentOf: new Map(), anchors: new Map(), figureAnchors: new Map(), posable: new Set(),
+    parentOf: new Map(), anchors: new Map(), figureAnchors: new Map(), posable: new Set(), jointed: new Set(),
   }
   const byId = new Map(c.shapes.map(s => [s.id, s]))
   const rank = treeRank(c), objectRank = new Map<string, number>()
@@ -179,7 +222,7 @@ function work(c: ModelContent): Pose {
     pose.bodies.set(o.id, ids)
     for (const id of ids) { pose.bodyOf.set(id, o.id); pose.posable.add(id) }
     objectRank.set(o.id, Math.min(Infinity, ...ids.map(id => rank.get(id) ?? Infinity)))
-    const n = ids.reduce((k, id) => k + anchorsOf(byId.get(id)).length, 0)
+    const n = ids.reduce((k, id) => k + shapeMarks(c, byId.get(id)).filter(m => m.kind === 'anchor').length, 0)
     if (n) pose.anchors.set(o.id, n)
   }
   const rankOf = (o: string) => objectRank.get(o) ?? Infinity
@@ -189,14 +232,34 @@ function work(c: ModelContent): Pose {
     s.pts.forEach((p, i) => {
       const b = p.bind
       if (!b?.pivot) return
-      const from = pose.bodyOf.get(s.id), to = pose.bodyOf.get(b.s), at = restPlace(byId, b)
+      const from = pose.bodyOf.get(s.id), to = pose.bodyOf.get(b.s), at = b.pivot.at ?? restPlace(byId, b)
       if (!from || !to || from === to || !at) return
       const id = `${s.id}:${i}`
-      pose.joints.set(id, { id, shape: s.id, i, from, to, at, turn: b.pivot.turn, lo: b.pivot.lo, hi: b.pivot.hi })
+      pose.joints.set(id, { id, shape: s.id, i, from, to, at, turn: b.pivot.turn, lo: b.pivot.lo, hi: b.pivot.hi, kind: b.pivot.kind ?? null })
       near.set(from, [...(near.get(from) ?? []), id])
       near.set(to, [...(near.get(to) ?? []), id])
     })
   }
+  // the twins' joints: their originals', reflected, between the twin objects
+  const axis = c.axis ?? 100
+  for (const t of c.shapes) {
+    const o = twinSource(c, t)
+    if (!o) continue
+    o.pts.forEach((p, i) => {
+      const b = p.bind
+      if (!b?.pivot) return
+      const target = c.shapes.find(x => x.mirrorOf === b.s && !x.mirrorLine)
+      const from = pose.bodyOf.get(t.id), to = pose.bodyOf.get(target?.id ?? b.s), at = b.pivot.at ?? restPlace(byId, b)
+      if (!from || !to || from === to || !at) return
+      // a twin in the object its original is in (a left shape of a part in the middle) joins nothing new: its original's joint is that joint
+      if (from === pose.bodyOf.get(o.id) && to === pose.bodyOf.get(b.s)) return
+      const id = `${t.id}:${i}`, own = Math.min(b.pivot.hi, Math.max(b.pivot.lo, t.twinTurns?.[String(i)] ?? 0))
+      pose.joints.set(id, { id, shape: t.id, i, from, to, at: [r2(2 * axis - at[0]), at[1]], turn: -own || 0, lo: -b.pivot.hi || 0, hi: -b.pivot.lo || 0, twin: true, kind: b.pivot.kind ?? null })
+      near.set(from, [...(near.get(from) ?? []), id])
+      near.set(to, [...(near.get(to) ?? []), id])
+    })
+  }
+  for (const o of near.keys()) pose.jointed.add(o)
   const placeOfObject = (o: string) => placeMat(c.objects.find(x => x.id === o)?.place)
   const seen = new Set<string>()
   const objects = [...pose.bodies.keys()].sort((a, b) => rankOf(a) - rankOf(b))

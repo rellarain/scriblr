@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ModelContent, ModelGroup, ModelPoint, ModelShape, ModelView } from '../../src/api/types'
+import type { ModelBind, ModelContent, ModelGroup, ModelJointKind, ModelLimitsFor, ModelPoint, ModelShape, ModelView } from '../../src/api/types'
 import { build, inPolygon, flatten, reflectList, type BuiltPoint } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
 import { edgeFlags, reverseFlags, tagEdges } from '../../src/assets/Interfaces/admin/characters/engine/edges'
 import { LIMITS, copyBytes } from '../../src/assets/Interfaces/admin/characters/engine/limits'
@@ -15,6 +15,8 @@ import { NO_COLOURING } from '../../src/assets/Interfaces/admin/characters/engin
 import { OUTLINE_INK, drawable, paintShapes } from '../../src/assets/Interfaces/admin/characters/engine/paint'
 import { defaultValues, solve } from '../../src/assets/Interfaces/admin/characters/engine/rig'
 import { makeTwin } from '../../src/assets/Interfaces/admin/characters/engine/pairEdit'
+import { limitsOf } from '../../src/assets/Interfaces/admin/characters/engine/jointLimits'
+import { addFreeAnchor, addFreePosable, renameMark } from '../../src/assets/Interfaces/admin/characters/engine/anchors'
 import { addGroup, addObject, addShape, normalizeContent, publishFaults, starterContent } from '../../src/assets/Interfaces/admin/characters/modelContent'
 import { mirrorGap, refit } from '../seed-model/outline'
 
@@ -234,11 +236,73 @@ const SIDED_GROUPS = ['upperarmL', 'thighL']
 const CAPPED = new Set(['forearmL', 'shinL'])
 const CAP = 1.05
 
-// The join set a part is drawn in (slice 9c): the body's plain parts in one outline round the figure, the head's planes in one round the head. A part with dark lines of its
-// own inside the body (a buttock's fold) and the hands keep their own outlines; from behind, the face's planes are under the neck, so the cranium keeps its line over it.
+// The shape editor's joints (slice 9d): each part's object joined to the one it hangs from by a pivot point that turns at the group's pivot (the link's own point stays where
+// it is drawn), the joints of the body with their measured limits for the template's body, the face's parts held fast to the head; the pelvis anchored, and the head, the
+// hands, the elbows, the knees and the feet posable. The right side takes the left side's joints and marks as twins.
+type JointSpec = [child: string, parent: string, pivot: string, name: string, kind: ModelJointKind | null, range?: [number, number]]
+const JOINTS: JointSpec[] = [
+  ['o_torso', 'o_pelvis', 'chest', 'Waist', null, [-30, 30]],
+  ['o_neck', 'o_torso', 'neck', 'Neck', 'neck'],
+  ['o_head', 'o_neck', 'head', 'Head', null, [-20, 20]],
+  ...(['o_ears', 'o_eyes', 'o_brows', 'o_nose', 'o_mouth'] as const).map((o): JointSpec => [o, 'o_head', 'head', '', null, [0, 0]]),
+  ['o_upperarmL', 'o_torso', 'upperarmL', 'Shoulder (left)', 'shoulder'],
+  ['o_forearmL', 'o_upperarmL', 'forearmL', 'Elbow (left)', 'elbow'],
+  ['o_handL', 'o_forearmL', 'handL', 'Wrist (left)', 'wrist'],
+  ['o_thighL', 'o_pelvis', 'thighL', 'Hip (left)', 'hip'],
+  ['o_shinL', 'o_thighL', 'shinL', 'Knee (left)', 'knee'],
+  ['o_footL', 'o_shinL', 'footL', 'Ankle (left)', 'ankle'],
+]
+// the body each template's limits are for
+const LIMITS_FOR: Record<string, ModelLimitsFor> = {
+  woman: { sex: 'women', age: 'adult', hyper: false }, heavywoman: { sex: 'women', age: 'adult', hyper: false }, elder: { sex: 'women', age: 'elder', hyper: false },
+}
+function rigged(c: ModelContent, pivots: Record<string, V>, bodyId: string): ModelContent {
+  const f = LIMITS_FOR[bodyId] ?? { sex: 'men', age: 'adult', hyper: false }
+  let shapes = c.shapes
+  const own = (oid: string) => (c.objects.find(o => o.id === oid)?.shapes ?? []).map(id => shapes.find(s => s.id === id)).filter((s): s is ModelShape => !!s && !s.mirrorOf && s.pts.length >= 3)
+  // the point of an object's shapes nearest a place (not one that is linked already)
+  const nearest = (oid: string, [x, y]: V) => {
+    let best: { shape: ModelShape; i: number; d: number } | null = null
+    for (const s of own(oid)) s.pts.forEach((p, i) => { const d = Math.hypot(p.x - x, p.y - y); if (!p.bind && (!best || d < best.d)) best = { shape: s, i, d } })
+    if (!best) throw new Error(`${bodyId}: no point in ${oid} to join`)
+    return best as { shape: ModelShape; i: number; d: number }
+  }
+  for (const [child, parent, pv, name, kind, range] of JOINTS) {
+    const at = pivots[pv], a = nearest(child, at), b = nearest(parent, at)
+    const { lo, hi } = kind ? limitsOf(kind, f) : { lo: range![0], hi: range![1] }
+    const P = a.shape.pts[a.i], Q = b.shape.pts[b.i]
+    const bind: ModelBind = {
+      kind: 'point', s: b.shape.id, i: b.i, d: [r2(P.x - Q.x), r2(P.y - Q.y)], e: 0, t: 0, o: 0,
+      pivot: { turn: 0, lo, hi, ...(name ? { name } : {}), ...(kind ? { kind } : {}), at: [r2(at[0]), r2(at[1])] },
+    }
+    shapes = shapes.map(s => (s.id === a.shape.id ? { ...s, pts: s.pts.map((p, k) => (k === a.i ? { ...p, bind } : p)) } : s))
+  }
+  // a mark on a shape, named
+  const mark = (id: string, add: typeof addFreeAnchor, [x, y]: V, name: string) => {
+    shapes = shapes.map(s => {
+      if (s.id !== id) return s
+      const r = add(s, r2(x), r2(y))
+      if (!r.ok) throw new Error(`${bodyId}: ${name}: ${r.reason}`)
+      return renameMark(r.shape, r.shape.marks!.at(-1)!.id, name)
+    })
+  }
+  const middle = (id: string): V => { const s = shapes.find(x => x.id === id)!; return centre(flatten(build(s.pts, true), true) as V[]) }
+  mark('pelvis', addFreeAnchor, pivots.pelvis, 'Pelvis')
+  mark('head', addFreePosable, middle('head'), 'Head')
+  mark('palmL', addFreePosable, middle('palmL'), 'Hand (left)')
+  mark('forearmL', addFreePosable, pivots.forearmL, 'Elbow (left)')
+  mark('shinL', addFreePosable, pivots.shinL, 'Knee (left)')
+  mark('plantarL', addFreePosable, middle('plantarL'), 'Foot (left)')
+  return { ...c, shapes, limitsFor: f }
+}
+
+// The join set a part is drawn in (slice 9c): the body's plain parts in one outline round the figure, the arms in one of their own (so an arm posed in front of the body
+// still shows its outline there; slice 9d), the head's planes in one round the head. A part with dark lines of its own inside the body (a buttock's fold) and the hands keep
+// their own outlines; from behind, the face's planes are under the neck, so the cranium keeps its line over it.
+const ARM_PARTS = new Set(['upperarm', 'deltoid', 'biceps', 'triceps', 'forearm'])
 function joinOfPart(p: RawPart): Partial<ModelShape> {
   if (p.lines.length > 0) return {}
-  if (p.union && p.layer !== 'hand' && p.kind !== 'palm') return { join: 'Body' }
+  if (p.union && p.layer !== 'hand' && p.kind !== 'palm') return { join: ARM_PARTS.has(p.kind) ? 'Arms' : 'Body' }
   if (p.layer === HEAD_LAYER) return p.kind === 'head' ? { join: 'Head' } : { join: 'Head', joinBack: '' }
   return {}
 }
@@ -370,6 +434,7 @@ function bodyModel(body: RawBody): { content: ModelContent; report: Report } {
   // a twin is named for its side
   const side = (name: string) => name.replace(/ \(left\) \(twin\)$/, ' (right)').replace(/ \(twin\)$/, '')
   c = { ...c, shapes: c.shapes.map(s => (s.mirrorOf ? { ...s, name: side(s.name) } : s)), objects: c.objects.map(o => (o.mirrorOf ? { ...o, name: side(o.name) } : o)), groups: c.groups.map(g => (g.mirrorOf ? { ...g, name: side(g.name) } : g)) }
+  c = rigged(c, pivots, body.id)
   c = normalizeContent({ ...c, joins: true })
   const twins = c.shapes.filter(s => s.mirrorOf).length
   return { content: c, report: { id: body.id, shapes: c.shapes.length, twins, points, worstMirror: r2(worstMirror), kb: Math.round(copyBytes(c) / 1024), faults: publishFaults(c) } }
@@ -419,7 +484,10 @@ const PARTS: Array<[id: string, name: string, hint: string, objects: string[], l
 ]
 function partsOf(c: ModelContent): BodyPart[] {
   const byId = new Map(c.shapes.map(s => [s.id, s]))
-  const own = (s: ModelShape): ModelShape => {
+  // a part is drawn shapes only: the template's joints and marks join it to parts it does not have
+  const loose = (s: ModelShape): ModelShape => ({ ...s, marks: [], pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) })
+  const own = (s: ModelShape): ModelShape => loose(ownShape(s))
+  const ownShape = (s: ModelShape): ModelShape => {
     const orig = s.mirrorOf ? byId.get(s.mirrorOf) : undefined
     if (!orig) return { ...s, mirrorOf: null }
     // a twin's own points: its original's mirrored about the middle, its edges' outlines the other way round

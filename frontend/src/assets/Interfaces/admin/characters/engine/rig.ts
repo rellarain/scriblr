@@ -505,7 +505,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const held = carried?.get(i)
       if (held) return held
       // a point a link has already placed (on a shape that is not skinned) is in this shape's own space as it stands
-      if (p.bind && p.bind.s !== sh.id && shapeMap.has(p.bind.s)) return null
+      if (p.bind && p.bind.s !== sh.id && shapeMap.has(p.bind.s) && !p.bind.pivot?.at) return null
       return { base: own, inf: inf[i] ?? [] }
     })
     skinPoints(list, pts, own, skinRig)
@@ -678,7 +678,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const onCurve = new Map<number, { s: string; e: number; t: number; a: BuiltPoint[]; closed: boolean }>()   // the points joined with no offset onto the outline of a shape that is not skinned
     for (let k = 0; k < list.length; k++) {
       const p = list[k], b = p.bind
-      if (!b || b.s === sh.id) continue
+      // a pivot point placed at the joint (slice 9d) leaves its linked point where it is drawn
+      if (!b || b.s === sh.id || b.pivot?.at) continue
       const target = shapeOut(b.s)
       const a = target?.pre
       if (!target || !a || a.length < 1) continue
@@ -1135,7 +1136,10 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       // axis where that shape is drawn now), brought into the twin's own space
       const o = shapeOut(twin.id)
       const R = mirrorLineMat(c, sh.mirrorLine, id => shapeOut(id)?.frame, [twin.id, sh.id])
-      const T = o ? mul(inverse(Mg), mul(R, o.frame)) : null
+      // a twin in a figure with pivot points (slice 9d) is posed on its own: its original as drawn before its pose, reflected, then the twin's own pose
+      const ownPose = !sh.mirrorLine && pose.jointed.has(objectOfShape.get(sh.id) ?? '')
+      const Po = pose.mats.get(twin.id), Pt = pose.mats.get(sh.id)
+      const T = o ? (ownPose ? mul(inverse(Mg), mul(Pt ?? IDENTITY, mul(R, Po ? mul(inverse(Po), o.frame) : o.frame))) : mul(inverse(Mg), mul(R, o.frame))) : null
       rig = o && T ? mirrorPoints(o.rig, T) : []
       drawn = o && T ? mirrorPoints(o.local, T) : []
       closed = twin.closed

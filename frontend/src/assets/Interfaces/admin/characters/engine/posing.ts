@@ -1,5 +1,5 @@
-import type { ModelContent, ModelPlace } from '../../../../../api/types'
-import { anchorsOf, markXY, marksOf, placeMat, placeOf } from './anchors'
+import type { ModelContent, ModelPlace, ModelShape } from '../../../../../api/types'
+import { markXY, placeMat, placeOf, shapeMarks } from './anchors'
 import { IDENTITY, apply, inverse, mul, rotate, translate, type BuiltPoint, type Mat } from './geometry'
 import { nearestPlace, slideAt } from './sliders'
 import { addJointTurn, poseOf, type Pose } from './pivots'
@@ -31,7 +31,7 @@ const angleOfMat = (m: Mat): number => deg(Math.atan2(m[1], m[0]))
 
 export const canPose = (c: ModelContent, shapeId: string): boolean => poseOf(c).posable.has(shapeId)
 export const isPosed = (c: ModelContent): boolean =>
-  c.objects.some(o => !!o.place) || c.shapes.some(s => !!s.place || s.pts.some(p => (p.bind?.pivot?.turn ?? 0) !== 0 || p.bind?.slide?.at != null))
+  c.objects.some(o => !!o.place) || c.shapes.some(s => !!s.place || Object.keys(s.twinTurns ?? {}).length > 0 || s.pts.some(p => (p.bind?.pivot?.turn ?? 0) !== 0 || p.bind?.slide?.at != null))
 
 // Every pivot back to 0, every slider where it is drawn and every figure where it was drawn.
 export const resetPose = (c: ModelContent): ModelContent => ({
@@ -39,9 +39,10 @@ export const resetPose = (c: ModelContent): ModelContent => ({
   objects: c.objects.map(o => (o.place ? { ...o, place: null } : o)),
   shapes: c.shapes.map(s => {
     const moved = s.pts.some(p => (p.bind?.pivot?.turn ?? 0) !== 0 || p.bind?.slide?.at != null)
-    if (!s.place && !moved) return s
+    if (!s.place && !moved && !s.twinTurns) return s
+    const { twinTurns: _turns, ...plain } = s
     return {
-      ...s, place: null,
+      ...plain, place: null,
       ...(moved ? {
         pts: s.pts.map(p => {
           const b = p.bind
@@ -68,34 +69,41 @@ function chainOf(pose: Pose, body: string): string[] {
   return out
 }
 
+// What holds still while a part reaches (slice 9d): the limb's root (its shoulder or hip, or the neck for the head: the reach turns nothing beyond the first of them), or
+// nothing but the anchor (every pivot back to it turns).
+export type PoseHolds = 'limb' | 'anchor'
+const LIMB_ROOTS = new Set(['shoulder', 'hip', 'neck'])
+
 // A drag begun at `at` (in the model's space) from a spot of an object (`grab`, in the object's drawing as it is at rest): what it does, and the content to show at once (a
 // dangle lets the figure hang from the start).
-function begin(c: ModelContent, body: string, grab: [number, number], at: [number, number], what: string): PoseStart {
+function begin(c: ModelContent, body: string, grab: [number, number], at: [number, number], what: string, holds: PoseHolds = 'anchor'): PoseStart {
   const pose = poseOf(c), root = pose.rootOf.get(body) ?? body, anchors = pose.figureAnchors.get(root) ?? 0
   if (anchors === 0) return dangle(c, pose, body, root, at)
   if (body === root) {
     if (anchors > 1) return no('Two anchors hold this figure where it is.')
-    const holder = (pose.bodies.get(root) ?? []).map(id => c.shapes.find(x => x.id === id)!).find(x => anchorsOf(x).length)!
-    const m = anchorsOf(holder)[0], [mx, my] = markXY(holder, m), A = apply(objectMat(pose, root), mx, my)
+    const anchorsIn = (x: ModelShape) => shapeMarks(c, x).filter(k => k.kind === 'anchor')
+    const holder = (pose.bodies.get(root) ?? []).map(id => c.shapes.find(x => x.id === id)!).find(x => anchorsIn(x).length)!
+    const m = anchorsIn(holder)[0], [mx, my] = markXY(holder, m), A = apply(objectMat(pose, root), mx, my)
     return { ok: true, drag: { kind: 'turn', root, at: A, from: at, place0: placeMat(c.objects.find(o => o.id === root)?.place) }, content: c }
   }
-  const chain = chainOf(pose, body)
+  const whole = chainOf(pose, body), stop = holds === 'limb' ? whole.findIndex(id => LIMB_ROOTS.has(pose.joints.get(id)?.kind ?? '')) : -1
+  const chain = stop >= 0 ? whole.slice(0, stop + 1) : whole
   if (!chain.length) return no(`Nothing turns between ${what} and the anchor: make the link that joins it a pivot point.`)
   return { ok: true, drag: { kind: 'reach', body, grab, chain, angle0: angleOfMat(objectMat(pose, body)) }, content: c }
 }
 
 // A drag begun on a shape at `at` (in the model's space).
-export function beginPose(c: ModelContent, shapeId: string, at: [number, number]): PoseStart {
+export function beginPose(c: ModelContent, shapeId: string, at: [number, number], holds?: PoseHolds): PoseStart {
   const pose = poseOf(c), body = pose.bodyOf.get(shapeId)
   if (!body || !pose.posable.has(shapeId)) return no('This shape is in no object.')
-  return begin(c, body, apply(inverse(objectMat(pose, body)), at[0], at[1]), at, 'this object')
+  return begin(c, body, apply(inverse(objectMat(pose, body)), at[0], at[1]), at, 'this object', holds)
 }
 
 // A drag begun on a posable point.
-export function beginReach(c: ModelContent, shapeId: string, markId: string, at: [number, number]): PoseStart {
-  const pose = poseOf(c), body = pose.bodyOf.get(shapeId), m = marksOf(c.shapes.find(s => s.id === shapeId)).find(k => k.id === markId)
-  if (!body || !m) return no('A posable point poses the object it is on: put it on a shape of one.')
-  return begin(c, body, markXY(c.shapes.find(s => s.id === shapeId)!, m), at, 'this point')
+export function beginReach(c: ModelContent, shapeId: string, markId: string, at: [number, number], holds?: PoseHolds): PoseStart {
+  const shape = c.shapes.find(s => s.id === shapeId), pose = poseOf(c), body = pose.bodyOf.get(shapeId), m = shapeMarks(c, shape).find(k => k.id === markId)
+  if (!body || !m || !shape) return no('A posable point poses the object it is on: put it on a shape of one.')
+  return begin(c, body, markXY(shape, m), at, 'this point', holds)
 }
 
 // A drag begun on a slider: it moves along `outline` (canvas space) between its stops.
