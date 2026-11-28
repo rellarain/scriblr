@@ -57,6 +57,11 @@ export function driveText(c: ModelContent, d: ModelDrive): string {
     const u = spec?.unit ?? ''
     return `Sets ${(spec?.label ?? 'a property').toLowerCase()} of ${what} to ${d.atMin}${u} at the minimum and ${d.atMax}${u} at the maximum`
   }
+  if (d.kind === 'morph') {
+    // a body key (slice 9f), maybe scaled by another slider
+    const by = d.by ? c.ranges.find(r => r.id === d.by!.range) : undefined
+    return `Moves the shapes with the body key ${d.id} by ${d.atMin}% of it at the minimum and ${d.atMax}% at the maximum${d.by ? `, as far as ${named(by?.name, d.by.range)} is toward ${d.by.at}` : ''}`
+  }
   if (d.kind === 'length') return `Lengthens ${named((c.bones ?? []).find(b => b.id === d.id)?.name, d.id)} to ${d.atMin}% of its length at the minimum and ${d.atMax}% at the maximum`
   if (d.kind === 'depth') {
     const bone = named((c.bones ?? []).find(b => b.id === d.id)?.name, d.id)

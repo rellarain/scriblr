@@ -120,6 +120,28 @@
 .cmAngleName { font-size: var(--text-small); }
 .cmAngleShape { fill: var(--shape-fill, var(--ink-muted)); stroke: none; }
 .cmAngleLine { pointer-events: none; }
+// the Body section (slice 9f): a slider row (its name, the track with the band writers may use and a tick at the default, the value) and the blend of bodies
+.cmBodyGroup { display: flex; flex-direction: column; gap: var(--space-1); }
+.cmBodyHead { font-size: var(--text-small); font-weight: 700; color: var(--ink-muted); }
+.cmBodyBlend { display: flex; flex-direction: column; gap: var(--space-2); }
+.cmBodyRow { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 4em; align-items: center; gap: var(--space-2); min-width: 0; }
+.cmBodyLabel { font-size: var(--text-small); color: var(--ink); }
+.cmBodyValue { font-size: var(--text-small); color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.cmBodyTrack { position: relative; display: flex; align-items: center; min-width: 0; height: 20px;
+  input { position: relative; width: 100%; height: 20px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+    &::-webkit-slider-runnable-track { height: 2px; background: var(--ink-faint); }
+    &::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border: 2px solid var(--on-accent); border-radius: 50%; background: var(--accent); }
+    &::-moz-range-track { height: 2px; background: var(--ink-faint); }
+    &::-moz-range-thumb { width: 10px; height: 10px; border: 2px solid var(--on-accent); border-radius: 50%; background: var(--accent); }
+    &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  }
+}
+.cmBodyBand { position: absolute; top: 50%; height: 8px; margin-top: -4px; border-radius: 4px; background: var(--ov-sink-2); box-shadow: inset 0 0 0 1px var(--accent); pointer-events: none; }
+.cmBodyTick { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
+.cmBlendPad { width: 100%; max-width: 220px; height: auto; touch-action: none; cursor: crosshair; }
+.cmBlendShape { fill: var(--ov-sink-1); stroke: var(--accent); stroke-width: 1.2; }
+.cmBlendName { font-size: 10px; font-weight: 700; fill: var(--ink); pointer-events: none; }
+.cmBlendDot { fill: var(--accent); stroke: var(--on-accent); stroke-width: 2; cursor: grab; &:focus-visible { outline: none; stroke: var(--ink); stroke-width: 3; } }
 .cmGuideName { flex: 1 1 auto; min-width: 0; box-sizing: border-box; padding: var(--space-1) var(--space-2); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); outline: none; &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); } }
 .cmPointForm { width: 232px; }
 .cmPointFormRow { display: flex; flex-wrap: wrap; gap: var(--space-1); }

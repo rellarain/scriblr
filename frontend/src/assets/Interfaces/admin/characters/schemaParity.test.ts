@@ -67,6 +67,8 @@ describe('the model types match the backend schema', () => {
     ['ModelCloneAt', 'ModelCloneAt'],
     // joints (J2)
     ['ModelJoint', 'ModelJoint'],
+    // body keys (slice 9f)
+    ['ModelDriveBy', 'ModelDriveBy'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {

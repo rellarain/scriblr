@@ -1287,6 +1287,9 @@ MODEL_UNDER_MAX = 24           # the garments or families one object is worn und
 MODEL_SKIN_MAX = 3             # skin weights (phase O1): the groups one shape follows besides its own
 MODEL_OVER_MAX = 8             # phase O2: the other objects a shading shape lies on (a shadow down the chest and the pelvis)
 MODEL_DEPTH_MAX = 89.0         # phase O2: the most a bone may point toward or away from the viewer, in degrees (a depth drive)
+MODEL_MORPHS_MAX = 32          # slice 9f: body keys per shape (how each point moves at a body slider's full key, and at the angles it is drawn at)
+MODEL_MORPH_RANGE = (-200.0, 200.0)   # slice 9f: how far a body key moves a point, in the model's units
+MODEL_MORPH_AT_RANGE = (-1000.0, 1000.0)   # slice 9f: a morph drive's amount at the slider's ends, in percent of the key
 MODEL_DEPTH_RANGE = (-200.0, 200.0)   # phase A1: how far toward the viewer (+) or away a group's pivot or a shape stands, in the model's units
 MODEL_THICK_RANGE = (0.0, 2.0)        # phase A1: how deep a shape is for its width (1: as deep as it is wide, round; 0: a flat card)
 MODEL_ANGLE_OUTLINES_MAX = 16         # phase A1: outlines drawn at key angles, per shape
@@ -1319,7 +1322,7 @@ ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
 ModelAnchorKind = Literal["point", "edge", "range", "inside"]
 ModelRangeUnit = Literal["", "°", "%"]
-ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop", "depth", "yaw", "pitch"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop", "depth", "yaw", "pitch", "morph"]
 # Authored fields (phase D3c): a `prop` drive changes one property of a feature (a whole shape, one point or one edge of a shape, a whole object). For each property: the features
 # that have it, the amount at the slider's rest, and the least and the most it may be. Positions and offsets are in the model's units, sizes/opacity/reach/blend in percent
 # (100 at rest), rotation and direction in degrees, colour shifts in degrees of hue and points of saturation and lightness (0 at rest).
@@ -2183,6 +2186,9 @@ class ModelShape(BaseModel):
     # A twin's own turns at its original's pivot points (slice 9d), by point number, read as the original's are: a twin has no points of its own to hold them, and the
     # two sides pose apart. Written only when set.
     twinTurns: Optional[dict[str, float]] = None
+    # Body keys (slice 9f): for each key, how far each point moves at the key's full amount (one [dx, dy] per point), driven by the body sliders' morph drives.
+    # A twin moves as its original does. Written only when set.
+    morphs: Optional[dict[str, list[list[float]]]] = None
     # An outline of its own for the back view (None: the front outline seen from behind), its own depth in the back view, and the slider that loosens
     # the links of its points (None: they keep their distance).
     back: Optional[list[ModelPoint]] = Field(default=None, max_length=MODEL_POINTS_MAX)
@@ -2259,11 +2265,34 @@ class ModelShape(BaseModel):
                 out[str(int(key))] = kept
         return out or None
 
+    @field_validator("morphs", mode="before")
+    @classmethod
+    def _morphs(cls, value: Any) -> Optional[dict[str, list[list[float]]]]:
+        if not isinstance(value, dict):
+            return None
+        out: dict[str, list[list[float]]] = {}
+        for key, moves in value.items():
+            if len(out) >= MODEL_MORPHS_MAX or not (isinstance(key, str) and re.fullmatch(_MODEL_ID, key)) or not isinstance(moves, list):
+                continue
+            pairs = [[round(_finite(m[0], 0.0, *MODEL_MORPH_RANGE), 2), round(_finite(m[1], 0.0, *MODEL_MORPH_RANGE), 2)]
+                     if isinstance(m, (list, tuple)) and len(m) == 2 else [0.0, 0.0] for m in moves[:MODEL_POINTS_MAX]]
+            if any(dx or dy for dx, dy in pairs):
+                out[key] = pairs
+        return out or None
+
+    @model_validator(mode="after")
+    def _morphs_fit(self) -> "ModelShape":
+        # a key with another number of points than the outline (a twin has none) is dropped
+        if self.morphs:
+            kept = {k: v for k, v in self.morphs.items() if len(v) == len(self.pts)}
+            self.morphs = kept or None
+        return self
+
     @model_serializer(mode="wrap")
     def _dump_joins(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
-        """A shape with no joins (or turns of a twin's own) is written as before they existed."""
+        """A shape with no joins (or turns of a twin's own, or body keys) is written as before they existed."""
         data = handler(self)
-        for key in ("join", "joinBack", "twinTurns"):
+        for key in ("join", "joinBack", "twinTurns", "morphs"):
             if data.get(key) is None:
                 data.pop(key, None)
         return data
@@ -2528,10 +2557,24 @@ class ModelMove(BaseModel):
         return _finite(value, 0.0, -200.0, 200.0)
 
 
+class ModelDriveBy(BaseModel):
+    """Slice 9f: a morph drive scaled by another slider: that slider's value over `at` (1 at `at`, 0 at 0, and on the same way beyond), so a body key can depend
+    on two sliders (the fat a heavier body carries goes to the hips the more feminine the body is)."""
+
+    range: str = Field(pattern=_MODEL_ID)
+    at: float = 100.0
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> float:
+        return _finite(value, 100.0, -1000.0, 1000.0)
+
+
 class ModelDrive(BaseModel):
     """What a slider does: `turn` a group about its pivot, `scale` a group, a shape or the whole model, `points` move chosen points of a shape, or
     `bend` a shape smoothly along a length, or change the `length` of a bone (the group it starts at is stretched along it, and what hangs from it follows),
-    or let a shape `fall` (phase 5b: the runs of its points that have a weight hang from the point before them, each keeping its length).
+    or let a shape `fall` (phase 5b: the runs of its points that have a weight hang from the point before them, each keeping its length), or move every shape
+    that has the body key `id` by that key (`morph`, slice 9f: in percent of the key; `by` scales it by another slider).
     `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale, length and fall); the amount is 0
     (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false (phase 5c: then it does not follow
     this drive, and the twin group may have drives of its own, so the two sides are posed apart)."""
@@ -2554,6 +2597,21 @@ class ModelDrive(BaseModel):
     feature: Optional[ModelFeatureKind] = None
     prop: Optional[str] = None
     i: int = 0
+    # Slice 9f: the slider that scales this drive too (see ModelDriveBy). Written only when set.
+    by: Optional[ModelDriveBy] = None
+
+    @field_validator("by", mode="before")
+    @classmethod
+    def _by(cls, value: Any) -> Any:
+        return _optional_model(ModelDriveBy, value)
+
+    @model_serializer(mode="wrap")
+    def _dump_by(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """A drive scaled by no other slider is written as before `by` existed."""
+        data = handler(self)
+        if data.get("by") is None:
+            data.pop("by", None)
+        return data
 
     @field_validator("group", "id", "shape", mode="before")
     @classmethod
@@ -2612,6 +2670,13 @@ class ModelDrive(BaseModel):
             raise ValueError("this drive needs a shape")
         if self.kind in ("length", "depth") and not self.id:
             raise ValueError("a length or depth drive needs a bone")
+        if self.kind == "morph":
+            if not self.id:
+                raise ValueError("a morph drive needs a body key")
+            # how much of the key, in percent: none at rest, all of it at the maximum unless the drive says otherwise
+            self.atMin = 0.0 if "atMin" not in self.model_fields_set else _finite(self.atMin, 0.0, *MODEL_MORPH_AT_RANGE)
+            self.atMax = 100.0 if "atMax" not in self.model_fields_set else _finite(self.atMax, 100.0, *MODEL_MORPH_AT_RANGE)
+            return self
         if self.kind == "prop":
             spec = MODEL_PROPS.get(self.prop or "")
             if spec is None or self.feature not in spec[0]:

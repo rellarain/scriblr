@@ -20,6 +20,7 @@ import { addFreeAnchor, addFreePosable, renameMark } from '../../src/assets/Inte
 import { autoSkin } from '../../src/assets/Interfaces/admin/characters/engine/skinEdit'
 import { addGroup, addObject, addShape, normalizeContent, publishFaults, starterContent } from '../../src/assets/Interfaces/admin/characters/modelContent'
 import { mirrorGap, refit } from '../seed-model/outline'
+import { withBodyKeys, type BodySource } from './bodyKeys'
 
 type V = [number, number]
 interface RawPart { kind: string; side: number; layer: string | null; union: boolean; outline: number | null; fill: string; rule: string; view: ModelView; pts: V[]; lines: V[][] }
@@ -550,11 +551,19 @@ function thumbOf(c: ModelContent): string {
 }
 
 const raw = exportBodies()
-const templates = raw.bodies.map(body => {
+const built = raw.bodies.map(body => {
   const { content, report } = bodyModel(body)
   console.log(`${report.id}: ${report.shapes} shapes (${report.twins} twins), ${report.points} points, ${report.kb} KB, the sides within ${report.worstMirror} of mirror images${report.faults.length ? `; faults: ${report.faults.join(' ')}` : ''}`)
   const guide = guideOf(raw, body)
-  return { id: body.id, name: body.name, note: body.note, heads: body.heads, thumb: thumbOf(content), guide, content: { ...content, guide } }
+  return { id: body.id, name: body.name, note: body.note, heads: body.heads, thumb: thumbOf(content), guide, content: { ...content, guide }, body }
+})
+// the body sliders (slice 9f): every template carries the keys read from all six bodies, in its own drawing
+const sources: BodySource[] = built.map(t => ({ id: t.id, content: t.content as ModelContent, levels: t.body.levels as unknown as BodySource['levels'], heads: t.heads, joints: t.body.joints }))
+const templates = built.map(({ body: _b, ...t }) => {
+  const content: ModelContent = process.env.NO_KEYS === "1" ? (t.content as ModelContent) : normalizeContent(withBodyKeys(sources.find(s => s.id === t.id)!, sources))
+  const faults = publishFaults(content)
+  console.log(`${t.id} with its body sliders: ${Math.round(copyBytes(content) / 1024)} KB${faults.length ? `; faults: ${faults.join(' ')}` : ''}`)
+  return { ...t, content }
 })
 // ---- the body parts (the Body part menu): parts of the average body, each a list of shapes with their own points (a twin's are its original's, mirrored) ----
 
@@ -574,7 +583,7 @@ const PARTS: Array<[id: string, name: string, hint: string, objects: string[], l
 function partsOf(c: ModelContent): BodyPart[] {
   const byId = new Map(c.shapes.map(s => [s.id, s]))
   // a part is drawn shapes only: the template's joints, marks and skin weights join it to parts it does not have, and its outlines at the sides fit only where the template has it
-  const loose = (s: ModelShape): ModelShape => ({ ...s, marks: [], skin: [], turn: null, pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) })
+  const loose = (s: ModelShape): ModelShape => { const { morphs: _k, ...plain } = s; return { ...plain, marks: [], skin: [], turn: null, pts: s.pts.map(p => { const { bind: _b, ...rest } = p; return rest }) } }
   const own = (s: ModelShape): ModelShape => loose(ownShape(s))
   const ownShape = (s: ModelShape): ModelShape => {
     const orig = s.mirrorOf ? byId.get(s.mirrorOf) : undefined

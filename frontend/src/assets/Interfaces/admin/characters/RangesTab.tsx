@@ -180,7 +180,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   }
 
   function driveRow(r: ModelRange, d: ModelDrive, i: number, locked: boolean) {
-    const unit = d.kind === 'prop' ? (d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey].unit : '') : d.kind === 'scale' || d.kind === 'length' || d.kind === 'fall' ? '%' : '°'
+    const unit = d.kind === 'prop' ? (d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey].unit : '') : d.kind === 'scale' || d.kind === 'length' || d.kind === 'fall' || d.kind === 'morph' ? '%' : '°'
     return (
       <div className="cmDrive">
         <p className="cmInsText">{driveText(content, d)}</p>

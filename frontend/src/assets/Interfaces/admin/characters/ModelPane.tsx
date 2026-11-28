@@ -62,6 +62,9 @@ import { alignSkins, weightsOf } from './engine/skin'
 import { ANGLES, angleOf, fromBehind, viewFor, type View } from './engine/angles'
 import { drawable, paintShapes } from './engine/paint'
 import { shifted } from './engine/turn'
+import { alignMorphs, bodied } from './engine/morphs'
+import { hasBody } from './engine/bodySliders'
+import type { BodyActions } from './BodySection'
 import { alignTurns, clearPointDepths, clearThick, setAngleOutline, setFormAngleOutline, setWrap, stepPointDepth, stepShapeDepth, stepThick } from './engine/turnEdit'
 import { ObjectTurnSection, ShapeTurnSection, type TurnActions, type TurnWhere } from './TurnSection'
 import { autoSkin, bendSlider, clearSkin, copySkin, defaultPartner, mirrorSkin, paintSkin, partnersOf, skinBlocked, smoothSkin, stepPointSkin } from './engine/skinEdit'
@@ -489,7 +492,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     // depths and outlines at key angles stay with their points too (phase A3)
     // a mirrored object has a mirror of each shape of its original (Z3)
     // a clone object has a clone of each shape of its original (Z4)
-    const synced = reconcileClones(reconcileMirrors(reconcileClasses(alignTurns(content, alignSkins(content, next)), makeId), makeId), makeId)
+    const synced = reconcileClones(reconcileMirrors(reconcileClasses(alignMorphs(content, alignTurns(content, alignSkins(content, next))), makeId), makeId), makeId)
     const refused = policy.writer ? growthRefusal(content, synced, policy.writer) : null
     if (refused) { setNote(refused); return false }
     const cast = castRefusal(content, synced)
@@ -1659,6 +1662,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     })
     return Number.isFinite(x0) ? { thumbs, box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } } : null
   }, [shapesOnly, sel.kind, recording, shown, values, test.forms, test.hidden, test.fall, test.order, show, through, colouring])
+  // the Body section (slice 9f): the test character's body sliders and the bodies it blends
+  const bodyActions: BodyActions | undefined = shapesOnly && !recording && hasBody(content) ? {
+    values, onValues: change => { setScrubbing(null); setValues(vs => ({ ...vs, ...change })) },
+    onReset: ids => { setScrubbing(null); setValues(vs => { const next = { ...vs }; for (const id of ids) delete next[id]; return next }) },
+  } : undefined
   const anglesActions: AnglesActions | undefined = angleThumbs ? {
     ...angleThumbs, current: turnAngle, onAngle: at => setView(viewFor(at)),
   } : undefined
@@ -2060,7 +2068,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // the posable points and the sliders where they are drawn now (T5); a slider's stops are shown while its shape is edited
   // turned to a ¾ or a side view, the pivots, anchors and posable points are not drawn (they do not turn with the outlines, and posing waits for the front)
   const marksShown = shapesOnly && !canvasSolved.turned
-  const poseMarks = marksShown ? content.shapes.flatMap(s => shapeMarks(content, s).filter(m => m.kind === 'pose').map(m => {
+  // the body as the sliders have it (slice 9f): the marks sit where the body has them
+  const bodyNow = marksShown ? bodied(content, values) : content
+  const poseMarks = marksShown ? bodyNow.shapes.flatMap(s => shapeMarks(bodyNow, s).filter(m => m.kind === 'pose').map(m => {
     const [x, y] = apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
     return { id: `${s.id}:${m.id}`, shapeId: s.id, markId: m.id, x, y, name: m.name }
   })) : undefined
@@ -2080,15 +2090,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     live(shapeId, setStop(s, i, which, nearestPlace(a, 0, a.length, world[0], world[1]), a.length))
   }
   // the anchors where they are drawn now
-  const anchorMarks = marksShown ? content.shapes.flatMap(s => anchorsOf(s).map(m => {
+  const anchorMarks = marksShown ? bodyNow.shapes.flatMap(s => anchorsOf(s).map(m => {
     // an anchor on the centre (C1) is where the centre is drawn
     const [x, y] = (m.c ? drawnCentre(s, canvasSolved.shapes[s.id]) : null) ?? apply(canvasSolved.shapes[s.id]?.matrix ?? IDENTITY, m.x, m.y)
     return { id: `${s.id}:${m.id}`, x, y, name: m.name }
   })) : undefined
   // where the pivot points are now (they move with the side that holds them)
   // the pivot points where they are drawn now (joints J2), each with the name of its link
-  const pivotPoints = marksShown ? [...poseOf(content).joints.values()].map(j => {
-    const at = poseOf(content).points.get(j.id) ?? j.at, [x, y] = apply(canvasSolved.global, at[0], at[1])
+  const pivotPoints = marksShown ? [...poseOf(bodyNow).joints.values()].map(j => {
+    const at = poseOf(bodyNow).points.get(j.id) ?? j.at, [x, y] = apply(canvasSolved.global, at[0], at[1])
     return { id: j.id, x, y, name: shapeById(content, j.shape)?.pts[j.i]?.bind?.name ?? '' }
   }) : undefined
 
@@ -2345,7 +2355,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <Inspector
               content={panelContent} sel={sel} view={side} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror && !shapesOnly} onSelectPoint={selectPoint}
-              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} angles={anglesActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
+              arrange={arrange} connections={connections} edges={edgeActions} guide={guideActions} combine={combineActions} trace={shapesOnly ? traceActions : undefined} joins={joinActions} limits={limitsActions} pose={poseActions} angles={anglesActions} body={bodyActions} symmetry={symmetry} joint={jointActions} centre={centreActions} mirrors={mirrorActions} clones={cloneActions} onAlign={onAlignPart}
               turnSection={selShape ? <ShapeTurnSection content={content} shape={selShape} selPoint={selPoint} where={selWhere} spot={solved.shapes[selShape.id]?.angle} actions={turnActions} />
                 : sel.kind === 'object' && selObject ? <ObjectTurnSection content={content} object={selObject} actions={turnActions} /> : null}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : s.kind === 'zone' ? renameZone(c, s.id, name) : renameGroup(c, s.id, name)), false)}

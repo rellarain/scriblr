@@ -5,7 +5,7 @@ import { prunePivots, repairPivot, repairShapePivot } from './engine/pivots'
 import { repairLimitsFor } from './engine/jointLimits'
 import { repairPoses } from './engine/poses'
 import { repairMarks, repairPlace } from './engine/anchors'
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelGuide, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine, ModelCloneAt } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelDriveBy, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelGuide, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSkin, ModelSlot, ModelState, ModelTint, ModelZone, ModelMirrorLine, ModelCloneAt } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { DEPTH_MAX, chainOf } from './engine/rig'
@@ -72,6 +72,35 @@ export const twinTurnsField = (s: { twinTurns?: unknown }): { twinTurns?: Record
   const t = repairTwinTurns(s.twinTurns)
   return t ? { twinTurns: t } : {}
 }
+// Body keys as the server keeps them (slice 9f): at most the limit, each an id with one [dx, dy] per point (in hundredths, held to the range), all-zero keys and keys
+// of another length (a twin has no points) dropped; none at all is no field.
+export const MORPHS_MAX = 32
+export const MORPH_RANGE = { min: -200, max: 200 } as const
+const MORPH_ID = /^[A-Za-z0-9_.-]{1,80}$/
+export function repairMorphs(v: unknown, points: number): Record<string, Array<[number, number]>> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: Record<string, Array<[number, number]>> = {}
+  const held = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(Math.min(MORPH_RANGE.max, Math.max(MORPH_RANGE.min, x)) * 100) / 100 : 0)
+  for (const [k, moves] of Object.entries(v as Record<string, unknown>)) {
+    if (Object.keys(out).length >= MORPHS_MAX || !MORPH_ID.test(k) || !Array.isArray(moves) || moves.length !== points) continue
+    const pairs = moves.map((m): [number, number] => (Array.isArray(m) && m.length === 2 ? [held(m[0]), held(m[1])] : [0, 0]))
+    if (pairs.some(([dx, dy]) => dx !== 0 || dy !== 0)) out[k] = pairs
+  }
+  return Object.keys(out).length ? out : null
+}
+const withoutMorphs = <T extends { morphs?: unknown }>(s: T): Omit<T, 'morphs'> => { const { morphs: _m, ...rest } = s; return rest }
+export const morphsField = (s: { morphs?: unknown; pts?: unknown }): { morphs?: Record<string, Array<[number, number]>> } => {
+  const m = repairMorphs(s.morphs, Array.isArray(s.pts) ? s.pts.length : 0)
+  return m ? { morphs: m } : {}
+}
+// A drive scaled by another slider (slice 9f), as the server keeps it: a slider id and where it counts as 1; anything else is no field.
+export function byField(v: unknown): { by?: ModelDriveBy } {
+  if (!v || typeof v !== 'object') return {}
+  const b = v as Record<string, unknown>
+  if (typeof b.range !== 'string' || !MORPH_ID.test(b.range)) return {}
+  const at = typeof b.at === 'number' && Number.isFinite(b.at) ? Math.min(1000, Math.max(-1000, b.at)) : 100
+  return { by: { range: b.range, at } }
+}
 export const repairCap = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(CAP_RANGE.max, Math.max(CAP_RANGE.min, v)) * 100) / 100 : null)
 
 // The proportion guide as the server keeps it (slice 9a): the crown and a head's height held to their ranges, at most twelve named lines; anything else is no guide.
@@ -91,7 +120,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...withoutTwinTurns(s), name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...joinFields(s), ...twinTurnsField(s), ...paintFields(s) })),
+    shapes: c.shapes.map(s => ({ ...withoutMorphs(withoutTwinTurns(s)), name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, mirrorLine: repairMirrorLine(s.mirrorLine), cloneOf: s.cloneOf ?? null, cloneAt: repairCloneAt(s.cloneAt), back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...joinFields(s), ...twinTurnsField(s), ...morphsField(s), ...paintFields(s) })),
     objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, mirrorLine: repairMirrorLine(o.mirrorLine), cloneOf: o.cloneOf ?? null, cloneAt: repairCloneAt(o.cloneAt), place: repairPlace(o.place), classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), wrap: o.wrap ?? null, hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states), depth: repairDepth(g.depth), cap: repairCap(g.cap) })),
     axis: c.axis ?? 100,
@@ -258,8 +287,14 @@ function repairRange(r: ModelRange): ModelRange {
 // allows (the amount at rest when it has none) and only a point or an edge has a number; anything else of a drive is left alone.
 const FEATURES: ModelFeatureKind[] = ['shape', 'point', 'edge', 'object']
 // How far a bone points toward the viewer, as the server keeps it (phase O2): degrees, at most 89 either way.
+// How much of a body key a morph drive moves (slice 9f): percent, -1000..1000.
+const morphAt = (v: number, rest: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1000, Math.max(-1000, v)) : rest)
 const depthAt = (v: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(DEPTH_MAX, Math.max(-DEPTH_MAX, v)) : 0)
-function repairDrive(d: ModelDrive): ModelDrive[] {
+function repairDrive(raw: ModelDrive): ModelDrive[] {
+  // a drive scaled by another slider keeps `by` only when it is sound (slice 9f)
+  const { by, ...plain } = raw
+  const d: ModelDrive = { ...plain, ...byField(by) }
+  if (d.kind === 'morph') return d.id ? [{ ...d, atMin: morphAt(d.atMin, 0), atMax: morphAt(d.atMax, 100), feature: d.feature ?? null, prop: d.prop ?? null, i: d.i ?? 0 }] : []
   // the other kinds carry the three fields of an authored field empty, as the server writes them (so a draft and its published copy compare equal)
   if (d.kind === 'depth') return d.id ? [{ ...d, atMin: depthAt(d.atMin), atMax: depthAt(d.atMax), feature: d.feature ?? null, prop: d.prop ?? null, i: d.i ?? 0 }] : []
   if (d.kind !== 'prop') return [{ ...d, feature: d.feature ?? null, prop: d.prop ?? null, i: d.i ?? 0 }]

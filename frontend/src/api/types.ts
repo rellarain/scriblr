@@ -752,8 +752,9 @@ export interface ModelFade { slider: string; hidden: number; shown: number }
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
 // join, joinBack (slice 9c): the join set the shape is drawn in as one outline with the others in it (while the model's joins are on), and the set it is in from behind
 // twinTurns (slice 9d): a twin's own turns at its original's pivot points, by point number, read as the original's are (a twin has no points of its own to hold them)
+// morphs (slice 9f): body keys, for each key how far each point moves at the key's full amount ([dx, dy] per point), driven by the body sliders' morph drives; a twin moves as its original does
 // (absent: the same as from the front; '': none from behind). A twin, a clone and a member take them from the shape they copy.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null; marks?: ModelMark[]; place?: ModelPlace | null; mirrorLine?: ModelMirrorLine | null; cloneOf?: string | null; cloneAt?: ModelCloneAt | null; join?: string | null; joinBack?: string | null; twinTurns?: Record<string, number> | null }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number; outline?: number | null; rot?: number; sym?: ModelSymmetry | null; skin?: ModelSkin[]; over?: string[]; turn?: ModelTurn | null; kind?: ModelShapeKind; pivot?: ModelShapePivot | null; marks?: ModelMark[]; place?: ModelPlace | null; mirrorLine?: ModelMirrorLine | null; cloneOf?: string | null; cloneAt?: ModelCloneAt | null; join?: string | null; joinBack?: string | null; twinTurns?: Record<string, number> | null; morphs?: Record<string, Array<[number, number]>> | null }
 // Skin weights (phase O1): how much each point of a shape also follows group g besides its own, one weight per point (0..1, in hundredths). A point near a joint follows both
 // sides, part each, so the outline bends like skin; what the weights leave is the own group's. A shape has at most MODEL_SKIN_MAX (3); a twin is skinned as its original is.
 export interface ModelSkin { g: string; w: number[] }
@@ -805,7 +806,7 @@ export type ModelRangeUnit = '' | '°' | '%'
 export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }
 // depth (phase O2): a bone points toward the viewer (+) or away (-), atMin/atMax in degrees (at most 89 either way); `group` set to the twin of the bone's group poses that
 // twin instead (the two sides posed apart).
-export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop' | 'depth' | 'yaw' | 'pitch'
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop' | 'depth' | 'yaw' | 'pitch' | 'morph'
 // Authored fields (phase D3c). A 'prop' drive changes one property of a feature: a whole shape, one point or one edge of a shape, or a whole object.
 export type ModelFeatureKind = 'shape' | 'point' | 'edge' | 'object'
 export type ModelOwnerKind = 'object' | 'group' | 'preset'
@@ -816,6 +817,8 @@ export type ModelScaleAxis = 'xy' | 'x' | 'y'
 // One point of a points drive: how far it moves with the slider at its maximum (dx, dy) and at its minimum (dxMin, dyMin).
 export interface ModelMove { i: number; dx: number; dy: number; dxMin: number; dyMin: number }
 // What a slider does: turn a group about its pivot, scale a group, a shape or the whole model, move points, bend a shape along a length, change a bone's length, or let a shape fall (the runs of its points that have a weight hang from the point before them). atMin and atMax are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale, length and fall); it is 0 (100 %) at the rest value.
+// Slice 9f: a morph drive scaled by another slider: that slider's value over `at` (1 at `at`, 0 at 0), so a body key can depend on two sliders.
+export interface ModelDriveBy { range: string; at: number }
 export interface ModelDrive {
   kind: ModelDriveKind
   group: string | null
@@ -835,6 +838,8 @@ export interface ModelDrive {
   feature?: ModelFeatureKind | null
   prop?: string | null
   i?: number
+  // a 'morph' drive (slice 9f) moves every shape that has the body key `id` by that key, atMin/atMax in percent of it; `by` scales it by another slider
+  by?: ModelDriveBy | null
 }
 // A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
 export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; role?: string | null; drives: ModelDrive[] }

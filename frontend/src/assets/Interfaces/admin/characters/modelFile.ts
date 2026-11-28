@@ -14,7 +14,7 @@ import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
 import { roundWeight } from './engine/skin'
 import { repairAngles, repairDepth, repairTurn } from './engine/turn'
-import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, outlineOf, repairDrape, repairHsl, repairLooks, repairRoll, rotValue, roundOf, repairMirrorLine, repairCloneAt, repairGuide, joinFields, repairCap, twinTurnsField } from './modelContent'
+import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, outlineOf, repairDrape, repairHsl, repairLooks, repairRoll, rotValue, roundOf, repairMirrorLine, repairCloneAt, repairGuide, joinFields, repairCap, twinTurnsField, morphsField, byField } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -115,6 +115,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     turn: repairTurn(v.turn, list(v.pts).length, p => point(p as never)),
     ...joinFields(v),
     ...twinTurnsField(v),
+    ...morphsField(v),
   }
 }
 
@@ -138,7 +139,7 @@ function move(v: unknown): ModelMove {
 
 // A drive the server would accept, or null (the server drops the same ones).
 function drive(v: unknown): ModelDrive | null {
-  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop', 'depth', 'yaw', 'pitch'].includes(v.kind as string)) return null
+  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop', 'depth', 'yaw', 'pitch', 'morph'].includes(v.kind as string)) return null
   const kind = v.kind as ModelDrive['kind']
   const group = idOf(v.group), id = idOf(v.id), shapeId = idOf(v.shape)
   if (kind === 'prop') {
@@ -156,14 +157,15 @@ function drive(v: unknown): ModelDrive | null {
   if ((kind === 'turn' || kind === 'yaw' || kind === 'pitch') && !group) return null
   if (kind === 'scale' && (!target || (target !== 'model' && !id))) return null
   if ((kind === 'points' || kind === 'bend' || kind === 'fall') && !shapeId) return null
-  if ((kind === 'length' || kind === 'depth') && !id) return null
+  if ((kind === 'length' || kind === 'depth' || kind === 'morph') && !id) return null
   const scale = kind === 'scale' || kind === 'length'
-  const at = (x: unknown, rest = 0) => (scale ? num(x, 100, 5, 1000) : kind === 'fall' ? num(x, rest, 0, 100) : kind === 'depth' ? num(x, 0, -89, 89) : num(x, 0, -360, 360))
+  const at = (x: unknown, rest = 0) => (scale ? num(x, 100, 5, 1000) : kind === 'fall' || kind === 'morph' ? num(x, rest, kind === 'morph' ? -1000 : 0, kind === 'morph' ? 1000 : 100) : kind === 'depth' ? num(x, 0, -89, 89) : num(x, 0, -360, 360))
   const y0 = num(v.y0, 0, -50, 450), y1 = num(v.y1, 0, -50, 450)
   return {
     kind, group, target, id, axis: v.axis === 'x' || v.axis === 'y' ? v.axis : 'xy', shape: shapeId,
     moves: list(v.moves).slice(0, LIMITS.pointsMax).map(move), sym: v.sym === true,
     pivot: kind === 'bend' ? (pair(v.pivot) ?? [100, 200]) : pair(v.pivot), y0: Math.min(y0, y1), y1: Math.max(y0, y1), atMin: at(v.atMin, 0), atMax: at(v.atMax, 100), mirror: v.mirror !== false,
+    ...byField(v.by),
   }
 }
 

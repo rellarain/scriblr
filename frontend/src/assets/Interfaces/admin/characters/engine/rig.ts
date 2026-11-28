@@ -12,6 +12,7 @@ import { mirrorLineMat, mirrorPoints, usesMirrorLine } from './mirrorLine'
 import { carryPoints, cloneMat, middleOf, middleOfAll } from './cloneAt'
 import { curvePlace, sameSegment } from './connect'
 import { poseOf } from './pivots'
+import { bodied } from './morphs'
 import { slidPlace } from './sliders'
 import { centreOf, centreThrough } from './centre'
 import { isCast } from './kinds'
@@ -63,13 +64,16 @@ export function amount(r: ModelRange, d: ModelDrive, v: number, base = 0): numbe
 // The sliders that change a shape's own points (a recorded move, a bend, a scale of the shape), as opposed to turning or scaling its group.
 // What an authored field's slider (a `prop` drive, phase D3c) does to the points of a shape: a position, a size, a rotation, a point, an edge. Opacity and paint do not.
 const movesPoints = (d: ModelDrive): boolean => d.kind === 'prop' && !!d.prop && !isPaintProp(d.prop) && !isDrawingProp(d.prop)
-export const drivesShapePoints = (d: ModelDrive, shapeId: string, objectId?: string): boolean =>
-  (d.kind === 'points' && d.shape === shapeId) || (d.kind === 'bend' && d.shape === shapeId) || (d.kind === 'fall' && d.shape === shapeId) || (d.kind === 'scale' && d.target === 'shape' && d.id === shapeId)
+// `keys` are the shape's body keys (slice 9f; a twin's are its original's): a morph drive moves the shapes that have its key.
+export const drivesShapePoints = (d: ModelDrive, shapeId: string, objectId?: string, keys?: Record<string, unknown> | null): boolean =>
+  (d.kind === 'morph' && !!d.id && !!keys?.[d.id])
+  || (d.kind === 'points' && d.shape === shapeId) || (d.kind === 'bend' && d.shape === shapeId) || (d.kind === 'fall' && d.shape === shapeId) || (d.kind === 'scale' && d.target === 'shape' && d.id === shapeId)
   || (movesPoints(d) && (d.feature === 'object' ? !!objectId && d.id === objectId : d.shape === shapeId))
 
 export function pointDrivers(c: ModelContent, shapeId: string): ModelRange[] {
   const objectId = c.objects.find(o => o.shapes.includes(shapeId))?.id
-  return c.ranges.filter(r => r.drives.some(d => drivesShapePoints(d, shapeId, objectId)))
+  const sh = c.shapes.find(s => s.id === shapeId), keys = (sh?.mirrorOf ? c.shapes.find(s => s.id === sh.mirrorOf) : sh)?.morphs
+  return c.ranges.filter(r => r.drives.some(d => drivesShapePoints(d, shapeId, objectId, keys)))
 }
 
 // What a prop drive comes to at a slider value: the amount at rest is the property's own (0 for a move, 100 percent for a size).
@@ -358,7 +362,9 @@ function plainRest(c: ModelContent): Solved {
   return s
 }
 
-export function solve(c: ModelContent, values: Values = {}, view: View = 'front', opts: SolveOptions = {}): Solved {
+export function solve(given: ModelContent, values: Values = {}, view: View = 'front', opts: SolveOptions = {}): Solved {
+  // the body sliders' keys baked in (slice 9f): the points, the pivots and the joints where the body has them
+  const c = bodied(given, values)
   const axis = c.axis ?? 100
   const ranges = c.ranges ?? []
   const val = (r: ModelRange) => valueOf(r, values)
